@@ -78,6 +78,10 @@ fdroid/archive/
 fdroid/tmp/
 fdroid/icon.png
 
+# Agent / local tooling
+.claude/
+CLAUDE.md
+
 # Yarn
 .yarn/*
 !.yarn/patches
