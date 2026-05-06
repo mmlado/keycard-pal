@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { StatusBar } from 'react-native';
+import { StatusBar, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
 import { NavigationContainer } from '@react-navigation/native';
@@ -18,12 +18,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={styles.root}>
       <PaperProvider theme={theme}>
         <StatusBar
           barStyle="light-content"
-          backgroundColor="transparent"
-          translucent
+          backgroundColor="#121212"
         />
         <NavigationContainer>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -41,3 +40,9 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    backgroundColor: '#121212',
+  },
+});
