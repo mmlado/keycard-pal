@@ -3,21 +3,25 @@ import { Text } from 'react-native-paper';
 
 import theme from '../../theme';
 
-export default function EnsToggleRow({
-  enabled,
-  onToggle,
-}: {
-  enabled: boolean;
-  onToggle: (value: boolean) => void;
-}) {
+type SettingsToggleRowProps = {
+  label: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+};
+
+export default function SettingsToggleRow({
+  label,
+  value,
+  onValueChange,
+}: SettingsToggleRowProps) {
   return (
     <View style={styles.toggleRow}>
       <Text variant="bodyMedium" style={styles.label}>
-        ENS resolution
+        {label}
       </Text>
       <Switch
-        value={enabled}
-        onValueChange={onToggle}
+        value={value}
+        onValueChange={onValueChange}
         trackColor={{
           false: theme.colors.surfaceVariant,
           true: theme.colors.primary,

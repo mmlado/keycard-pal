@@ -12,6 +12,12 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
+jest.mock('../src/storage/preferencesStorage', () => ({
+  loadBooleanPreference: jest.fn().mockResolvedValue(false),
+  preferenceKeys: { pinPadScramble: 'preference_pinpad_scramble' },
+  saveBooleanPreference: jest.fn().mockResolvedValue(undefined),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -22,6 +28,10 @@ const onType = jest.fn();
 beforeEach(() => {
   onComplete.mockClear();
   onType.mockClear();
+  jest.clearAllMocks();
+  jest
+    .requireMock('../src/storage/preferencesStorage')
+    .loadBooleanPreference.mockResolvedValue(false);
 });
 
 /** Walk the toJSON tree and collect Pressable nodes.
@@ -53,27 +63,36 @@ function getDigitOrder(json: any): string[] {
     .map(match => match.replace(/"/g, ''));
 }
 
+function getDigitFromChildren(children: any): string {
+  const text = JSON.stringify(children);
+  const match = text.match(/"[0-9]"/);
+  return match ? match[0].replace(/"/g, '') : '';
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe('PinPad', () => {
   describe('field label', () => {
-    it('renders the "6 digits" field label by default', () => {
+    it('renders the "6 digits" field label by default', async () => {
       render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       expect(screen.getByText('6 digits')).toBeTruthy();
     });
 
-    it('renders the correct label for a custom length', () => {
+    it('renders the correct label for a custom length', async () => {
       render(<PinPad onComplete={onComplete} length={12} />);
+      await act(async () => {});
       expect(screen.getByText('12 digits')).toBeTruthy();
       expect(screen.queryByText('6 digits')).toBeNull();
     });
 
-    it('normalizes invalid lengths before rendering the field label', () => {
+    it('normalizes invalid lengths before rendering the field label', async () => {
       const { rerender } = render(
         <PinPad onComplete={onComplete} length={0} />,
       );
+      await act(async () => {});
       expect(screen.getByText('1 digits')).toBeTruthy();
 
       rerender(<PinPad onComplete={onComplete} length={2.8} />);
@@ -87,6 +106,7 @@ describe('PinPad', () => {
   describe('PIN entry', () => {
     it('does not call onComplete before 6 digits are entered', async () => {
       render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       for (let i = 0; i < 5; i++) {
         await act(async () => {
           fireEvent.press(screen.getByText('1'));
@@ -97,6 +117,7 @@ describe('PinPad', () => {
 
     it('calls onComplete with the 6-digit PIN on the final press', async () => {
       render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       for (let i = 0; i < 6; i++) {
         await act(async () => {
           fireEvent.press(screen.getByText('1'));
@@ -108,6 +129,7 @@ describe('PinPad', () => {
 
     it('resets the pin after completion so a second entry works', async () => {
       render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       for (let i = 0; i < 6; i++) {
         await act(async () => {
           fireEvent.press(screen.getByText('1'));
@@ -125,6 +147,7 @@ describe('PinPad', () => {
 
     it('backspace removes the last entered digit', async () => {
       render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       await act(async () => {
         fireEvent.press(screen.getByText('2'));
       });
@@ -141,6 +164,7 @@ describe('PinPad', () => {
 
     it('ignores digit presses when the current entry exceeds a shorter length', async () => {
       const { rerender } = render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       await act(async () => {
         fireEvent.press(screen.getByText('1'));
       });
@@ -155,7 +179,7 @@ describe('PinPad', () => {
 
     it('uses the normalized length for completion', async () => {
       render(<PinPad onComplete={onComplete} length={0} />);
-
+      await act(async () => {});
       await act(async () => {
         fireEvent.press(screen.getByText('1'));
       });
@@ -167,6 +191,7 @@ describe('PinPad', () => {
   describe('onType callback', () => {
     it('calls onType when a digit is pressed', async () => {
       render(<PinPad onComplete={onComplete} onType={onType} />);
+      await act(async () => {});
       await act(async () => {
         fireEvent.press(screen.getByText('1'));
       });
@@ -175,6 +200,7 @@ describe('PinPad', () => {
 
     it('calls onType when backspace is pressed', async () => {
       render(<PinPad onComplete={onComplete} onType={onType} />);
+      await act(async () => {});
       await act(async () => {
         fireEvent.press(screen.getByText('1'));
       });
@@ -187,6 +213,7 @@ describe('PinPad', () => {
 
     it('does not throw when onType is not provided', async () => {
       render(<PinPad onComplete={onComplete} />); // no onType prop
+      await act(async () => {});
       await expect(
         act(async () => {
           fireEvent.press(screen.getByText('1'));
@@ -195,16 +222,61 @@ describe('PinPad', () => {
     });
   });
 
-  describe('scrambled layout', () => {
-    it('renders all 10 digits', () => {
+  describe('fixed layout', () => {
+    it('renders digits 1-9 in order on the first three rows', async () => {
       render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
+      const { toJSON } = screen;
+      const json = toJSON();
+      const pressables = getPressableNodesFromJSON(json);
+      const firstNine = pressables.slice(0, 9);
+      const digits = firstNine.map(p => getDigitFromChildren(p.children));
+      expect(digits).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+    });
+
+    it('renders 0 in bottom-centre and backspace in bottom-right', async () => {
+      render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
+      const { toJSON } = screen;
+      const json = toJSON();
+      const pressables = getPressableNodesFromJSON(json);
+      expect(pressables[9].props.accessibilityState?.disabled).toBe(true);
+      const zeroText = JSON.stringify(pressables[10].children);
+      expect(zeroText).toContain('"0"');
+      const backspaceText = JSON.stringify(pressables[11].children);
+      expect(backspaceText).not.toMatch(/"[0-9]"/);
+    });
+  });
+
+  describe('scrambled layout', () => {
+    it('renders all 10 digits', async () => {
+      render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       for (const d of ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']) {
         expect(screen.getByText(d)).toBeTruthy();
       }
     });
 
-    it('reshuffles when a new error arrives', async () => {
+    it('shows scrambled layout when preference is true', async () => {
+      jest
+        .requireMock('../src/storage/preferencesStorage')
+        .loadBooleanPreference.mockResolvedValue(true);
+      render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
+      const { toJSON } = screen;
+      const json = toJSON();
+      const pressables = getPressableNodesFromJSON(json);
+      const firstNine = pressables.slice(0, 9);
+      const digits = firstNine.map(p => getDigitFromChildren(p.children));
+      expect(digits).not.toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+    });
+
+    it('reshuffles when a new error arrives only when scramble is enabled', async () => {
+      jest
+        .requireMock('../src/storage/preferencesStorage')
+        .loadBooleanPreference.mockResolvedValue(true);
       const { rerender, toJSON } = render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       const before = JSON.stringify(toJSON());
       await act(async () => {
         rerender(<PinPad onComplete={onComplete} error="Wrong PIN" />);
@@ -217,8 +289,22 @@ describe('PinPad', () => {
       }
     });
 
-    it('keeps bottom-left empty and bottom-right as backspace', () => {
+    it('does not reshuffle on error when scramble is disabled', async () => {
+      jest
+        .requireMock('../src/storage/preferencesStorage')
+        .loadBooleanPreference.mockResolvedValue(false);
+      const { rerender, toJSON } = render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
+      const before = getDigitOrder(toJSON());
+      await act(async () => {
+        rerender(<PinPad onComplete={onComplete} error="Wrong PIN" />);
+      });
+      expect(getDigitOrder(toJSON())).toEqual(before);
+    });
+
+    it('keeps bottom-left empty and bottom-right as backspace', async () => {
       const { toJSON } = render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       const pressables = getPressableNodesFromJSON(toJSON());
       expect(pressables).toHaveLength(12);
       // Bottom-left (index 9) must be disabled — accessibilityState.disabled
@@ -232,9 +318,13 @@ describe('PinPad', () => {
     });
 
     it('does not reshuffle when error is unchanged', async () => {
+      jest
+        .requireMock('../src/storage/preferencesStorage')
+        .loadBooleanPreference.mockResolvedValue(true);
       const { rerender, toJSON } = render(
         <PinPad onComplete={onComplete} error="Wrong PIN" />,
       );
+      await act(async () => {});
       const before = JSON.stringify(toJSON());
       await act(async () => {
         rerender(<PinPad onComplete={onComplete} error="Wrong PIN" />);
@@ -244,6 +334,7 @@ describe('PinPad', () => {
 
     it('keeps the same key order while digits are entered', async () => {
       const { toJSON } = render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       const before = getDigitOrder(toJSON());
 
       await act(async () => {
@@ -255,7 +346,7 @@ describe('PinPad', () => {
 
     it('applies pressed styling while a digit key is pressed', async () => {
       render(<PinPad onComplete={onComplete} />);
-
+      await act(async () => {});
       await act(async () => {
         fireEvent(screen.getByText('1'), 'pressIn');
       });
@@ -265,25 +356,29 @@ describe('PinPad', () => {
   });
 
   describe('error display', () => {
-    it('shows the error text when the error prop is provided', () => {
+    it('shows the error text when the error prop is provided', async () => {
       render(<PinPad onComplete={onComplete} error="PINs don't match" />);
+      await act(async () => {});
       expect(screen.getByText("PINs don't match")).toBeTruthy();
     });
 
-    it('does not show error text when no error prop', () => {
+    it('does not show error text when no error prop', async () => {
       render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
       expect(screen.queryByText("PINs don't match")).toBeNull();
     });
 
-    it('renders the same number of nodes whether error is present or absent', () => {
+    it('renders the same number of nodes whether error is present or absent', async () => {
       // The error element is always in the tree (opacity:0 hides it, not
       // conditional rendering). Verifies no layout shift occurs.
       const { toJSON: withErrorJSON } = render(
         <PinPad onComplete={onComplete} error="Something wrong" />,
       );
+      await act(async () => {});
       const { toJSON: withoutErrorJSON } = render(
         <PinPad onComplete={onComplete} />,
       );
+      await act(async () => {});
 
       function countNodes(json: any): number {
         if (!json) return 0;

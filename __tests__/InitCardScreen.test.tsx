@@ -28,6 +28,12 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
+jest.mock('../src/storage/preferencesStorage', () => ({
+  loadBooleanPreference: jest.fn().mockResolvedValue(false),
+  preferenceKeys: { pinPadScramble: 'preference_pinpad_scramble' },
+  saveBooleanPreference: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockStart = jest.fn();
 const mockCancel = jest.fn();
 const mockReset = jest.fn();

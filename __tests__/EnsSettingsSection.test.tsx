@@ -6,8 +6,8 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
-import EnsSettingsSection from '../src/components/settings/EnsSettingsSection.online';
-import EnsSettingsSectionOffline from '../src/components/settings/EnsSettingsSection.offline';
+import EnsSettingsSection from '../src/components/settings/ens/EnsSettingsSection.online';
+import EnsSettingsSectionOffline from '../src/components/settings/ens/EnsSettingsSection.offline';
 
 const mockLoadEnsSettings = jest.fn();
 const mockSaveEnsEnabled = jest.fn();

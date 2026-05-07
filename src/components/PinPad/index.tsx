@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import {
+  loadBooleanPreference,
+  preferenceKeys,
+} from '../../storage/preferencesStorage';
 import theme from '../../theme';
 
 import Keypad from './Keypad';
@@ -38,6 +42,15 @@ function shuffleKeys(): string[][] {
   ];
 }
 
+function fixedKeys(): string[][] {
+  return [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    ['', '0', '⌫'],
+  ];
+}
+
 export default function PinPad({
   onComplete,
   error,
@@ -46,23 +59,36 @@ export default function PinPad({
 }: PinPadProps) {
   const normalizedLength = normalizePinLength(length);
   const [pin, setPin] = useState('');
-  const [padKeys, setPadKeys] = useState(shuffleKeys);
+  const [scramble, setScramble] = useState(false);
+  const [padKeys, setPadKeys] = useState(fixedKeys);
   const prevError = useRef(error);
   const pinRef = useRef('');
   const lengthRef = useRef(length);
   const onCompleteRef = useRef(onComplete);
   const onTypeRef = useRef(onType);
 
+  useEffect(() => {
+    loadBooleanPreference(preferenceKeys.pinPadScramble).then(setScramble);
+  }, []);
+
+  useEffect(() => {
+    if (scramble) {
+      setPadKeys(shuffleKeys());
+    } else {
+      setPadKeys(fixedKeys());
+    }
+  }, [scramble]);
+
   lengthRef.current = normalizedLength;
   onCompleteRef.current = onComplete;
   onTypeRef.current = onType;
 
   useEffect(() => {
-    if (error && error !== prevError.current) {
+    if (scramble && error && error !== prevError.current) {
       setPadKeys(shuffleKeys());
     }
     prevError.current = error;
-  }, [error]);
+  }, [error, scramble]);
 
   const handleKey = useCallback((key: string) => {
     if (key !== '') {

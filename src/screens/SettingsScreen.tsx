@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DashboardAction, SettingsScreenProps } from '../navigation/types';
 import theme from '../theme';
 
-import EnsSettingsSection from '../components/settings/EnsSettingsSection.online';
+import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
+import PinPadSettingsSection from '../components/settings/PinPadSettingsSection';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Settings',
@@ -26,6 +27,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     >
       <View style={styles.section}>
         <EnsSettingsSection />
+        <PinPadSettingsSection />
       </View>
     </ScrollView>
   );

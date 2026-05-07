@@ -1,7 +1,7 @@
 import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../theme';
+import theme from '../../../theme';
 
 export default function EnsRpcUrlInput({
   input,
