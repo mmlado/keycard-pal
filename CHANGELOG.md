@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Add opt-in PIN pad scramble toggle in Settings (default: fixed layout)
 - Add opt-in ENS reverse resolution: toggle + custom RPC URL in Settings, ENS name display on address rows, "no ens" indicator for unregistered addresses
 
+### Fixed
+
+- Fix system UI dark theme: navigation bar, status bar, and safe area background now match app background on all screens
+
 ## [1.5.0] - 2026-05-06
 
 ### Added
