@@ -4,6 +4,20 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import TransactionDetailScreen from '../src/screens/TransactionDetailScreen';
 import type { EthSignRequest } from '../src/types';
 
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: { getItem: jest.fn(), setItem: jest.fn() },
+}));
+
+jest.mock('../src/hooks/ens/useEnsName.online', () => ({
+  useEnsName: () => ({
+    name: null,
+    loading: false,
+    error: false,
+    retry: jest.fn(),
+  }),
+}));
+
 // PSBT with one input and one output so inspectBtcPsbt can parse it fully
 const VALID_PSBT_HEX = (() => {
   const { Psbt, payments, networks } = require('bitcoinjs-lib');

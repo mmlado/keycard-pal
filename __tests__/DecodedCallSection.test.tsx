@@ -25,6 +25,13 @@ jest.mock('../src/components/InfoRow', () => {
   );
 });
 
+jest.mock('../src/components/ens/AddressInfoRow.online', () => {
+  const { Text } = require('react-native');
+  return ({ label, value }: { label: string; value: string }) => (
+    <Text>{`${label}: ${value}`}</Text>
+  );
+});
+
 jest.mock('../src/utils/buildConfig', () => ({
   INTERNET_ENABLED: false,
 }));
