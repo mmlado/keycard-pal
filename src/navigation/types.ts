@@ -71,6 +71,7 @@ export type RootStackParamList = {
     url: string;
     title?: string;
   };
+  Settings: undefined;
 };
 
 export type DashboardScreenProps = NativeStackScreenProps<
@@ -196,6 +197,11 @@ export type LicenseDetailScreenProps = NativeStackScreenProps<
 export type UrlQRScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'UrlQR'
+>;
+
+export type SettingsScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'Settings'
 >;
 
 export type DashboardAction = {

@@ -3,6 +3,7 @@ import { Icon, Text } from 'react-native-paper';
 
 import theme from '../theme';
 
+import AddressInfoRow from './ens/AddressInfoRow.online';
 import InfoRow from './InfoRow';
 
 import { INTERNET_ENABLED } from '../utils/buildConfig';
@@ -57,11 +58,11 @@ export default function DecodedCallSection({
         )}
         {tokenContract && (
           <View style={styles.row}>
-            <InfoRow label="Token contract" value={tokenContract} />
+            <AddressInfoRow label="Token contract" value={tokenContract} />
           </View>
         )}
         <View style={styles.row}>
-          <InfoRow label="Recipient" value={call.to} />
+          <AddressInfoRow label="Recipient" value={call.to} />
         </View>
         <View style={styles.row}>
           <InfoRow
@@ -91,14 +92,14 @@ export default function DecodedCallSection({
         )}
         {tokenContract && (
           <View style={styles.row}>
-            <InfoRow label="Token contract" value={tokenContract} />
+            <AddressInfoRow label="Token contract" value={tokenContract} />
           </View>
         )}
         <View style={styles.row}>
-          <InfoRow label="From" value={call.from} />
+          <AddressInfoRow label="From" value={call.from} />
         </View>
         <View style={styles.row}>
-          <InfoRow label="Recipient" value={call.to} />
+          <AddressInfoRow label="Recipient" value={call.to} />
         </View>
         <View style={styles.row}>
           <InfoRow
@@ -129,11 +130,11 @@ export default function DecodedCallSection({
         )}
         {tokenContract && (
           <View style={styles.row}>
-            <InfoRow label="Token contract" value={tokenContract} />
+            <AddressInfoRow label="Token contract" value={tokenContract} />
           </View>
         )}
         <View style={styles.row}>
-          <InfoRow label="Spender" value={call.spender} />
+          <AddressInfoRow label="Spender" value={call.spender} />
         </View>
         <View style={styles.row}>
           <InfoRow
@@ -170,7 +171,10 @@ export default function DecodedCallSection({
         </View>
         {call.args.map((arg, index) => (
           <View key={`${arg.name}-${index}`} style={styles.row}>
-            <InfoRow label={`${arg.name} (${arg.type})`} value={arg.value} />
+            <AddressInfoRow
+              label={`${arg.name} (${arg.type})`}
+              value={arg.value}
+            />
           </View>
         ))}
         {call.highRisk && (
@@ -216,7 +220,7 @@ export default function DecodedCallSection({
               }`}
             />
             {command.args.map(arg => (
-              <InfoRow
+              <AddressInfoRow
                 key={`${command.index}-${arg.name}`}
                 label={`${arg.name} (${arg.type})`}
                 value={arg.value}

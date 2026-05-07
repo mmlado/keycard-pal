@@ -19,6 +19,7 @@ import QRScannerScreen from '../screens/QRScannerScreen';
 import SetCardNameScreen from '../screens/SetCardNameScreen';
 import TransactionDetailScreen from '../screens/TransactionDetailScreen';
 import UrlQRScreen from '../screens/UrlQRScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 // Address screens
 import AddressDetailScreen from '../screens/address/AddressDetailScreen';
@@ -184,5 +185,10 @@ export const routes: Route[] = [
     name: 'UrlQR',
     component: UrlQRScreen,
     options: defaultHeaderOptions,
+  },
+  {
+    name: 'Settings',
+    component: SettingsScreen,
+    options: { ...defaultHeaderOptions, title: 'Settings' },
   },
 ];

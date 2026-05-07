@@ -4,6 +4,7 @@ import { Icon, Text } from 'react-native-paper';
 import theme from '../theme';
 import type { EthSignRequest } from '../types';
 
+import AddressInfoRow from './ens/AddressInfoRow.online';
 import DecodedCallSection from './DecodedCallSection';
 import InfoRow from './InfoRow';
 
@@ -56,11 +57,14 @@ function PermitReviewSection({
       <SectionHeader title="EIP-712 Permit" />
       {special.tokenContract && (
         <View style={styles.row}>
-          <InfoRow label="Token contract" value={special.tokenContract} />
+          <AddressInfoRow
+            label="Token contract"
+            value={special.tokenContract}
+          />
         </View>
       )}
       <View style={styles.row}>
-        <InfoRow label="Spender" value={special.spender} />
+        <AddressInfoRow label="Spender" value={special.spender} />
       </View>
       <View style={styles.row}>
         <InfoRow
@@ -102,11 +106,11 @@ function SafeTxReviewSection({
       <SectionHeader title="Safe Transaction" />
       {special.safeAddress && (
         <View style={styles.row}>
-          <InfoRow label="Safe" value={special.safeAddress} />
+          <AddressInfoRow label="Safe" value={special.safeAddress} />
         </View>
       )}
       <View style={styles.row}>
-        <InfoRow label="To" value={special.to} />
+        <AddressInfoRow label="To" value={special.to} />
       </View>
       <View style={styles.row}>
         <InfoRow label="Value" value={special.value} />
@@ -123,8 +127,11 @@ function SafeTxReviewSection({
         <InfoRow label="Gas price" value={special.gasPrice} />
       </View>
       <View style={styles.row}>
-        <InfoRow label="Gas token" value={special.gasToken} />
-        <InfoRow label="Refund receiver" value={special.refundReceiver} />
+        <AddressInfoRow label="Gas token" value={special.gasToken} />
+        <AddressInfoRow
+          label="Refund receiver"
+          value={special.refundReceiver}
+        />
       </View>
       {special.decodedCall ? (
         <DecodedCallSection
@@ -189,7 +196,7 @@ export default function EthSignRequestDetail({
       </View>
 
       <View style={styles.row}>
-        <InfoRow label="Signer" value={signer} />
+        <AddressInfoRow label="Signer" value={signer} />
       </View>
 
       {request.address && (
@@ -207,7 +214,7 @@ export default function EthSignRequestDetail({
       {tx?.to &&
         (!tx.decodedCall || tx.decodedCall.kind === 'contract-call') && (
           <View style={styles.row}>
-            <InfoRow label="To" value={tx.to} />
+            <AddressInfoRow label="To" value={tx.to} />
           </View>
         )}
 
@@ -261,7 +268,7 @@ export default function EthSignRequestDetail({
           </View>
           {Object.entries(eip712!.domain).map(([key, value]) => (
             <View key={`domain-${key}`} style={styles.row}>
-              <InfoRow label={key} value={value} />
+              <AddressInfoRow label={key} value={value} />
             </View>
           ))}
         </>
@@ -279,7 +286,7 @@ export default function EthSignRequestDetail({
           <SectionHeader title="Message Fields" />
           {Object.entries(eip712!.message).map(([key, value]) => (
             <View key={`message-${key}`} style={styles.row}>
-              <InfoRow label={key} value={value} />
+              <AddressInfoRow label={key} value={value} />
             </View>
           ))}
         </>
