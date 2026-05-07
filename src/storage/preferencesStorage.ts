@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const preferenceKeys = {
   dashboardKeycardNoticeDismissed:
     'preference_dashboard_keycard_notice_dismissed',
+  pinPadScramble: 'preference_pinpad_scramble',
 } as const;
 
 export async function loadBooleanPreference(key: string): Promise<boolean> {

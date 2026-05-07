@@ -2,19 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../theme';
+import theme from '../../../theme';
 
 import EnsRpcUrlInput from './EnsRpcUrlInput';
-import EnsToggleRow from './EnsToggleRow';
+import SettingsToggleRow from '../SettingsToggleRow';
 
-import { clearEnsNameCache } from '../../hooks/ens/useEnsName.online';
-import { validateRpcUrl } from '../../utils/ens/client.online';
+import { clearEnsNameCache } from '../../../hooks/ens/useEnsName.online';
+import { validateRpcUrl } from '../../../utils/ens/client.online';
 import {
   DEFAULT_ENS_RPC_URL,
   loadEnsSettings,
   saveEnsEnabled,
   saveEnsRpcUrl,
-} from '../../storage/ensSettings.online';
+} from '../../../storage/ensSettings.online';
 
 export default function EnsSettingsSection() {
   const [input, setInput] = useState('');
@@ -99,7 +99,11 @@ export default function EnsSettingsSection() {
 
   return (
     <View style={styles.section}>
-      <EnsToggleRow enabled={enabled} onToggle={handleToggle} />
+      <SettingsToggleRow
+        label="ENS resolution"
+        value={enabled}
+        onValueChange={handleToggle}
+      />
       {enabled && (
         <EnsRpcUrlInput
           input={input}

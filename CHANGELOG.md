@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Add opt-in PIN pad scramble toggle in Settings (default: fixed layout)
 - Add opt-in ENS reverse resolution: toggle + custom RPC URL in Settings, ENS name display on address rows, "no ens" indicator for unregistered addresses
 
 ## [1.5.0] - 2026-05-06
