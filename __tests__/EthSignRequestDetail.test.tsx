@@ -14,6 +14,22 @@ jest.mock('react-native-paper', () => {
   };
 });
 
+const mockEnsNames: Record<string, string> = {};
+jest.mock('../src/components/ens/AddressInfoRow.online', () => ({
+  __esModule: true,
+  default: ({ label, value }: { label: string; value: string }) => {
+    const { Text, View } = require('react-native');
+    const ensName = mockEnsNames[value];
+    return (
+      <View>
+        <Text>{label}</Text>
+        {ensName && <Text>{ensName}</Text>}
+        <Text>{value}</Text>
+      </View>
+    );
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -249,6 +265,48 @@ describe('EthSignRequestDetail — EIP-55 address display', () => {
     expect(
       screen.getByText('0xabCDEF1234567890ABcDEF1234567890aBCDeF12'),
     ).toBeTruthy();
+    expect(
+      screen.getByText('0xD3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef'),
+    ).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ENS address rows
+// ---------------------------------------------------------------------------
+
+describe('EthSignRequestDetail — ENS address display', () => {
+  beforeEach(() => {
+    Object.keys(mockEnsNames).forEach(k => delete mockEnsNames[k]);
+  });
+
+  it('shows ENS name and raw address for resolved recipient', () => {
+    mockEnsNames['0xD3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef'] =
+      'recipient.eth';
+    renderDetail({
+      signData: legacyTxHex(),
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0",
+      chainId: 1,
+      address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+    });
+
+    expect(screen.getByText('recipient.eth')).toBeTruthy();
+    expect(
+      screen.getByText('0xD3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef'),
+    ).toBeTruthy();
+  });
+
+  it('shows raw address only when ENS not resolved', () => {
+    renderDetail({
+      signData: legacyTxHex(),
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0",
+      chainId: 1,
+      address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
+    });
+
+    expect(screen.queryByText('recipient.eth')).toBeNull();
     expect(
       screen.getByText('0xD3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef'),
     ).toBeTruthy();

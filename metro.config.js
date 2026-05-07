@@ -1,5 +1,6 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const path = require('path');
+const { createResolveRequest } = require('./metro.resolveRequest');
 
 /**
  * Metro configuration
@@ -23,6 +24,7 @@ const config = {
       ...nodeLibs,
       crypto: path.join(__dirname, 'src/shims/crypto.ts'),
     },
+    resolveRequest: createResolveRequest(process.env.ONLINE_BUILD === 'true'),
   },
 };
 

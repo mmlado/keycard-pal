@@ -426,7 +426,6 @@ export const licenses: LicenseEntry[] = [
   { package: 'react', licenseType: 'MIT' },
   { package: 'react-native', licenseType: 'MIT' },
   { package: 'react-native-animated-ur-qr', licenseType: 'MIT' },
-  { package: 'react-native-camera-kit', licenseType: 'MIT' },
   { package: 'react-native-encrypted-storage', licenseType: 'MIT' },
   { package: 'react-native-get-random-values', licenseType: 'MIT' },
   { package: 'react-native-keycard', licenseType: 'MIT' },

@@ -8,7 +8,7 @@ import type { AddressDetailScreenProps } from '../../navigation/types';
 import theme from '../../theme';
 
 import { Icons } from '../../assets/icons';
-import AddressText from '../../components/AddressText';
+import EnsAddressLabel from '../../components/ens/EnsAddressLabel.online';
 import PrimaryButton from '../../components/PrimaryButton';
 
 export default function AddressDetailScreen({
@@ -37,7 +37,7 @@ export default function AddressDetailScreen({
             backgroundColor="#ffffff"
           />
         </View>
-        <AddressText address={address} selectable style={styles.address} />
+        <EnsAddressLabel address={address} />
       </View>
       <PrimaryButton
         label="Copy Address"
@@ -66,11 +66,5 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#ffffff',
     borderRadius: 8,
-  },
-  address: {
-    color: theme.colors.onSurface,
-    fontFamily: 'monospace',
-    textAlign: 'center',
-    paddingHorizontal: 8,
   },
 });
