@@ -17,6 +17,7 @@ let capturedOnTimeout: (() => void) | null = null;
 
 const mockStartNFC = jest.fn();
 const mockStopNFC = jest.fn();
+const mockStopNFCWithError = jest.fn();
 
 jest.mock('react-native-keycard', () => ({
   __esModule: true,
@@ -40,6 +41,7 @@ jest.mock('react-native-keycard', () => ({
       },
       startNFC: (msg: string) => mockStartNFC(msg),
       stopNFC: () => mockStopNFC(),
+      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
     },
     NFCCardChannel: class {},
   },
@@ -75,8 +77,10 @@ describe('useKeycardOperation', () => {
   beforeEach(() => {
     mockStartNFC.mockResolvedValue(undefined);
     mockStopNFC.mockResolvedValue(undefined);
+    mockStopNFCWithError.mockResolvedValue(undefined);
     mockStartNFC.mockClear();
     mockStopNFC.mockClear();
+    mockStopNFCWithError.mockClear();
     capturedOnConnected = null;
     capturedOnDisconnected = null;
     capturedOnCancelled = null;
@@ -120,6 +124,28 @@ describe('useKeycardOperation', () => {
       });
       expect(result.current.phase).toBe('pin_entry');
       expect(mockStartNFC).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('retry', () => {
+    it('does not start NFC when no operation is queued', async () => {
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(mockStartNFC).not.toHaveBeenCalled();
+    });
+
+    it('restarts NFC when an operation is queued', async () => {
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      mockStartNFC.mockClear();
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(mockStartNFC).toHaveBeenCalledWith('Tap your Keycard');
     });
   });
 
@@ -189,8 +215,11 @@ describe('useKeycardOperation', () => {
       expect(result.current.phase).toBe('pin_entry');
     });
 
-    it('timeout updates status message', async () => {
+    it('timeout updates status message when in nfc phase', async () => {
       const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
       await act(async () => {
         capturedOnTimeout?.();
       });

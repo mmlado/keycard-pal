@@ -147,6 +147,8 @@ function makeCheckHook(
     checkSlots: mockCheckSlots,
     cancel: mockCancel,
     reset: jest.fn(),
+    resetNFCOnly: jest.fn(),
+    readSlotInfoFromCmdSet: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -373,12 +375,12 @@ describe('PairingSlotsScreen', () => {
       cardUid: 'abcd',
     };
 
-    it('resets unpair hook, resets check, and re-checks slots when unpair finishes', () => {
-      const mockResetCheck = jest.fn();
+    it('resets unpair hook and resets NFC state when unpair finishes', () => {
+      const mockResetNFCOnly = jest.fn();
       const mockResetUnpair = jest.fn();
       mockUsePairingSlots.mockReturnValue({
         ...makeCheckHook('ready', slotInfo),
-        reset: mockResetCheck,
+        resetNFCOnly: mockResetNFCOnly,
       });
       mockUseKeycardOperation.mockReturnValue({
         ...makeUnpairHook('idle'),
@@ -390,7 +392,7 @@ describe('PairingSlotsScreen', () => {
 
       mockUsePairingSlots.mockReturnValue({
         ...makeCheckHook('ready', slotInfo),
-        reset: mockResetCheck,
+        resetNFCOnly: mockResetNFCOnly,
       });
       mockUseKeycardOperation.mockReturnValue({
         ...makeUnpairHook('done'),
@@ -401,8 +403,7 @@ describe('PairingSlotsScreen', () => {
       );
 
       expect(mockResetUnpair).toHaveBeenCalled();
-      expect(mockResetCheck).toHaveBeenCalled();
-      expect(mockCheckSlots).toHaveBeenCalled();
+      expect(mockResetNFCOnly).toHaveBeenCalled();
     });
   });
 

@@ -23,20 +23,20 @@ export interface UsePairingSlots {
   checkSlots: () => void;
   cancel: () => void;
   reset: () => void;
+  resetNFCOnly: () => void;
+  readSlotInfoFromCmdSet: (cmdSet: Commandset) => Promise<void>;
 }
 
 export function usePairingSlots(): UsePairingSlots {
   const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
 
-  const handleConnected = useCallback(async (cmdSet: Commandset) => {
+  const readSlotInfo = useCallback(async (cmdSet: Commandset) => {
     const appInfo = cmdSet.applicationInfo;
     if (!appInfo) {
       throw new Error('No application info in SELECT response');
     }
-
     const uid = toHex(appInfo.instanceUID);
     const existingPairing = await loadPairing(uid);
-
     setSlotInfo({
       totalSlots: TOTAL_SLOTS,
       freeSlots: appInfo.freePairingSlots,
@@ -44,6 +44,13 @@ export function usePairingSlots(): UsePairingSlots {
       cardUid: uid,
     });
   }, []);
+
+  const handleConnected = useCallback(
+    async (cmdSet: Commandset) => {
+      await readSlotInfo(cmdSet);
+    },
+    [readSlotInfo],
+  );
 
   const {
     start,
@@ -67,6 +74,26 @@ export function usePairingSlots(): UsePairingSlots {
     nfcReset();
   }, [nfcReset]);
 
+  // Resets NFC state only — keeps slotInfo so screen stays populated.
+  const resetNFCOnly = useCallback(() => {
+    nfcReset();
+  }, [nfcReset]);
+
+  // Re-reads slot info from an already-connected cmdSet (e.g. after unpair).
+  // Calls SELECT to get fresh applicationInfo before reading.
+  const readSlotInfoFromCmdSet = useCallback(
+    async (cmdSet: Commandset) => {
+      const selectResp = await cmdSet.select();
+      if (selectResp.sw !== 0x9000) {
+        throw new Error(
+          `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
+        );
+      }
+      await readSlotInfo(cmdSet);
+    },
+    [readSlotInfo],
+  );
+
   let phase: PairingSlotsPhase = 'idle';
   if (nfcPhase === 'nfc') {
     phase = 'checking';
@@ -83,5 +110,7 @@ export function usePairingSlots(): UsePairingSlots {
     checkSlots,
     cancel,
     reset,
+    resetNFCOnly,
+    readSlotInfoFromCmdSet,
   };
 }

@@ -12,6 +12,7 @@ let capturedOnTimeout: (() => void) | null = null;
 
 const mockStartNFC = jest.fn();
 const mockStopNFC = jest.fn();
+const mockStopNFCWithError = jest.fn();
 
 jest.mock('react-native-keycard', () => ({
   __esModule: true,
@@ -35,6 +36,7 @@ jest.mock('react-native-keycard', () => ({
       },
       startNFC: (msg: string) => mockStartNFC(msg),
       stopNFC: () => mockStopNFC(),
+      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
     },
     NFCCardChannel: class {},
   },
@@ -65,10 +67,12 @@ describe('useFactoryReset', () => {
   beforeEach(() => {
     mockStartNFC.mockResolvedValue(undefined);
     mockStopNFC.mockResolvedValue(undefined);
+    mockStopNFCWithError.mockResolvedValue(undefined);
     mockSelect.mockResolvedValue({ sw: 0x9000 });
     mockFactoryReset.mockResolvedValue(undefined);
     mockStartNFC.mockClear();
     mockStopNFC.mockClear();
+    mockStopNFCWithError.mockClear();
     mockSelect.mockClear();
     mockFactoryReset.mockClear();
     mockCmdSet.applicationInfo = { initializedCard: true };
@@ -155,8 +159,11 @@ describe('useFactoryReset', () => {
       expect(result.current.phase).toBe('idle');
     });
 
-    it('timeout updates status message', async () => {
+    it('timeout updates status message when in nfc phase', async () => {
       const { result } = renderHook(() => useFactoryReset());
+      await act(async () => {
+        result.current.start();
+      });
       await act(async () => {
         capturedOnTimeout?.();
       });

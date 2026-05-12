@@ -13,7 +13,7 @@ function writeFixture(content) {
 }
 
 function run(...args) {
-  return spawnSync('node', [SCRIPT, ...args], { encoding: 'utf8' });
+  return spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
 }
 
 describe('check-offline-bundle', () => {
@@ -59,7 +59,9 @@ describe('check-offline-bundle', () => {
   });
 
   it('fails on a fixture containing ENS privacy disclosure', () => {
-    const filePath = writeFixture('"ENS lookups send reviewed Ethereum addresses"');
+    const filePath = writeFixture(
+      '"ENS lookups send reviewed Ethereum addresses"',
+    );
     try {
       const result = run('--bundle', filePath);
       expect(result.status).not.toBe(0);

@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../theme';
 import { Icons } from '../../assets/icons';
+import theme from '../../theme';
 import { displayKeycardName } from '../../utils/keycardName';
 import type { NFCVariant } from './index';
 
@@ -94,6 +94,12 @@ export default function NFCSheet({
         {status}
       </Text>
 
+      {variant === 'error' && (
+        <Text variant="bodyMedium" style={styles.retryHint}>
+          Tap your card to try again
+        </Text>
+      )}
+
       {variant !== 'success' && (
         <Pressable
           style={styles.cancelButton}
@@ -140,5 +146,10 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: theme.colors.secondary,
+  },
+  retryHint: {
+    color: theme.colors.onSurfaceMuted,
+    textAlign: 'center',
+    marginBottom: 8,
   },
 });

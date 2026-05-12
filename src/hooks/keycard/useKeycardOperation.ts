@@ -39,6 +39,7 @@ export interface UseKeycardOperation<T> {
   clearPinError: () => void;
   cancel: () => void;
   reset: () => void;
+  retry: () => void;
   proceedWithNonGenuine: () => void;
 }
 
@@ -225,6 +226,12 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     startNFC(); // Re-enter nfc phase; user taps card again
   }, [startNFC]);
 
+  // Re-starts NFC without PIN re-entry — uses the cached PIN from the previous attempt.
+  const retry = useCallback(() => {
+    if (!operationRef.current) return;
+    startNFC();
+  }, [startNFC]);
+
   const cancel = useCallback(() => {
     resetNFC();
     setWaitingForPin(false);
@@ -261,6 +268,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     clearPinError,
     cancel,
     reset,
+    retry,
     proceedWithNonGenuine,
   };
 }
