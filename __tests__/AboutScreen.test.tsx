@@ -66,13 +66,13 @@ describe('AboutScreen', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders the app, icon, project link, Keycard, donations, contributors, and license sections', () => {
+  it('renders the app, icon, project link, Keycard, support, contributors, and license sections', () => {
     renderScreen();
     expect(screen.getAllByText('GapSign').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('GapSign app icon')).toBeTruthy();
     expect(screen.getByText('GitHub project')).toBeTruthy();
     expect(screen.getByText(/Keycard required/)).toBeTruthy();
-    expect(screen.getByText('Support development')).toBeTruthy();
+    expect(screen.getByText('Buy me a coffee')).toBeTruthy();
     expect(screen.getByText(bitcoinAddress)).toBeTruthy();
     expect(screen.getByText(ethereumAddress)).toBeTruthy();
     const labels = screen
@@ -91,29 +91,29 @@ describe('AboutScreen', () => {
     );
   });
 
-  it('copies donation addresses', () => {
+  it('copies support addresses', () => {
     renderScreen();
-    fireEvent.press(screen.getByLabelText('Copy Bitcoin donation address'));
+    fireEvent.press(screen.getByLabelText('Copy Bitcoin address'));
     expect(mockSetString).toHaveBeenCalledWith(bitcoinAddress);
 
-    fireEvent.press(screen.getByLabelText('Copy Ethereum donation address'));
+    fireEvent.press(screen.getByLabelText('Copy Ethereum address'));
     expect(mockSetString).toHaveBeenCalledWith(ethereumAddress);
   });
 
-  it('opens donation addresses as QR codes', () => {
+  it('opens support addresses as QR codes', () => {
     renderScreen();
-    fireEvent.press(screen.getByLabelText('Show Bitcoin donation QR code'));
+    fireEvent.press(screen.getByLabelText('Show Bitcoin QR code'));
     expect(navigation.navigate).toHaveBeenCalledWith('AddressDetail', {
       address: bitcoinAddress,
       index: 0,
-      title: 'Bitcoin donation',
+      title: 'Bitcoin address',
     });
 
-    fireEvent.press(screen.getByLabelText('Show Ethereum donation QR code'));
+    fireEvent.press(screen.getByLabelText('Show Ethereum QR code'));
     expect(navigation.navigate).toHaveBeenCalledWith('AddressDetail', {
       address: ethereumAddress,
       index: 0,
-      title: 'Ethereum donation',
+      title: 'Ethereum address',
     });
   });
 

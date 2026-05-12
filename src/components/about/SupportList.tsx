@@ -7,7 +7,7 @@ import theme from '../../theme';
 import { Icons } from '../../assets/icons';
 import AddressText from '../AddressText';
 
-const DONATION_ADDRESSES = [
+const SUPPORT_ADDRESSES = [
   {
     label: 'Ethereum',
     address: '0xF665E3D58DABa87d741A347674DCc4C4b794cAc9',
@@ -18,14 +18,14 @@ const DONATION_ADDRESSES = [
   },
 ];
 
-interface DonationListProps {
+interface SupportListProps {
   onShowQR: (label: string, address: string) => void;
 }
 
-export default function DonationList({ onShowQR }: DonationListProps) {
+export default function SupportList({ onShowQR }: SupportListProps) {
   return (
     <View style={styles.list}>
-      {DONATION_ADDRESSES.map(({ label, address }) => (
+      {SUPPORT_ADDRESSES.map(({ label, address }) => (
         <View key={label} style={styles.row}>
           <View style={styles.text}>
             <Text style={styles.label}>{label}</Text>
@@ -36,7 +36,7 @@ export default function DonationList({ onShowQR }: DonationListProps) {
               style={styles.iconButton}
               onPress={() => Clipboard.setString(address)}
               accessibilityRole="button"
-              accessibilityLabel={`Copy ${label} donation address`}
+              accessibilityLabel={`Copy ${label} address`}
             >
               <Icons.copy
                 width={20}
@@ -48,7 +48,7 @@ export default function DonationList({ onShowQR }: DonationListProps) {
               style={styles.iconButton}
               onPress={() => onShowQR(label, address)}
               accessibilityRole="button"
-              accessibilityLabel={`Show ${label} donation QR code`}
+              accessibilityLabel={`Show ${label} QR code`}
             >
               <Icons.qr width={20} height={20} color={theme.colors.onSurface} />
             </Pressable>
