@@ -1,14 +1,15 @@
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import theme from '../../theme';
+import theme from '../../../theme';
 
-import SupportList from './SupportList';
+import DonationList from './List';
 
-type SupportSectionProps = {
+type Props = {
   onShowQR: (label: string, address: string) => void;
 };
 
-export default function SupportSection({ onShowQR }: SupportSectionProps) {
+export default function DonationSection({ onShowQR }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Buy me a coffee</Text>
@@ -16,7 +17,7 @@ export default function SupportSection({ onShowQR }: SupportSectionProps) {
         If GapSign keeps your funds safe, you can send a coffee my way. It helps
         keep the project maintained and open-source.
       </Text>
-      <SupportList onShowQR={onShowQR} />
+      <DonationList onShowQR={onShowQR} />
     </View>
   );
 }
