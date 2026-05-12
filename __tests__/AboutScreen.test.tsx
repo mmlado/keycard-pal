@@ -34,6 +34,7 @@ jest.mock('../src/assets/icons', () => {
   const Icon = (props: any) => <View {...props} />;
   return {
     Icons: {
+      checkmark: Icon,
       chevronRight: Icon,
       close: Icon,
       copy: Icon,
