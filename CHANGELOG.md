@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Bump GitHub Actions: `checkout@v6`, `setup-node@v6`, `setup-java@v5`; use Node 22 in CI and release workflows
+
+### Fixed
+
+- Fix `createBundle*JsAndAssets` Metro env script not being generated when React Native Gradle plugin registers bundle tasks lazily; switch from `tasks.findByName` to `tasks.matching { }.configureEach`
+
 ## [1.6.0] - 2026-05-12
 
 ### Added

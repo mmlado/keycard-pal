@@ -171,15 +171,12 @@ afterEvaluate {
     android.applicationVariants.all { variant ->
         def isFull = variant.productFlavors.any { it.name == "full" }
         def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
-        def bundleTask = tasks.findByName(taskName)
-        if (bundleTask != null) {
-            bundleTask.configure {
-                def originalArgs = nodeExecutableAndArgs.get().toList()
-                def envScript = file("${buildDir}/metro-env-${variant.name}.js")
-                envScript.parentFile.mkdirs()
-                envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
-                nodeExecutableAndArgs.set(originalArgs + ["--require", envScript.absolutePath])
-            }
+        tasks.matching { it.name == taskName }.configureEach {
+            def originalArgs = nodeExecutableAndArgs.get().toList()
+            def envScript = file("${buildDir}/metro-env-${variant.name}.js")
+            envScript.parentFile.mkdirs()
+            envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
+            nodeExecutableAndArgs.set(originalArgs + ["--require", envScript.absolutePath])
         }
     }
 }
