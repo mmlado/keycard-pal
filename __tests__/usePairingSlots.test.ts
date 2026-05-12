@@ -10,6 +10,7 @@ let capturedOnConnected: ((...args: any[]) => Promise<void>) | null = null;
 
 const mockStartNFC = jest.fn();
 const mockStopNFC = jest.fn();
+const mockStopNFCWithError = jest.fn();
 
 jest.mock('react-native-keycard', () => ({
   __esModule: true,
@@ -24,6 +25,7 @@ jest.mock('react-native-keycard', () => ({
       onNFCTimeout: () => ({ remove: jest.fn() }),
       startNFC: (msg: string) => mockStartNFC(msg),
       stopNFC: () => mockStopNFC(),
+      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
     },
     NFCCardChannel: class {},
   },
@@ -60,8 +62,10 @@ describe('usePairingSlots', () => {
   beforeEach(() => {
     mockStartNFC.mockResolvedValue(undefined);
     mockStopNFC.mockResolvedValue(undefined);
+    mockStopNFCWithError.mockResolvedValue(undefined);
     mockStartNFC.mockClear();
     mockStopNFC.mockClear();
+    mockStopNFCWithError.mockClear();
     mockSelect.mockClear();
     mockSelect.mockResolvedValue({ sw: 0x9000 });
     mockLoadPairing.mockClear();
@@ -170,6 +174,60 @@ describe('usePairingSlots', () => {
       });
       expect(result.current.phase).toBe('idle');
       expect(mockStopNFC).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetNFCOnly', () => {
+    it('stops NFC but keeps slotInfo', async () => {
+      mockLoadPairing.mockResolvedValue({ pairingIndex: 1 });
+      const { result } = renderHook(() => usePairingSlots());
+
+      await act(async () => {
+        result.current.checkSlots();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.slotInfo).not.toBeNull();
+
+      await act(async () => {
+        result.current.resetNFCOnly();
+      });
+      expect(result.current.slotInfo).not.toBeNull();
+      expect(mockStopNFC).toHaveBeenCalled();
+    });
+  });
+
+  describe('readSlotInfoFromCmdSet', () => {
+    it('throws when SELECT fails', async () => {
+      const { result } = renderHook(() => usePairingSlots());
+      const failingCmdSet = {
+        select: jest.fn().mockResolvedValue({ sw: 0x6a82 }),
+      };
+      await expect(
+        result.current.readSlotInfoFromCmdSet(failingCmdSet as any),
+      ).rejects.toThrow('SELECT failed: 0x6A82');
+    });
+
+    it('updates slotInfo when SELECT succeeds', async () => {
+      mockLoadPairing.mockResolvedValue({ pairingIndex: 2 });
+      const { result } = renderHook(() => usePairingSlots());
+      const cmdSet = {
+        select: jest.fn().mockResolvedValue({ sw: 0x9000 }),
+        applicationInfo: {
+          instanceUID: new Uint8Array([0xab, 0xcd]),
+          freePairingSlots: 5,
+        },
+      };
+      await act(async () => {
+        await result.current.readSlotInfoFromCmdSet(cmdSet as any);
+      });
+      expect(result.current.slotInfo).toEqual({
+        totalSlots: 10,
+        freeSlots: 5,
+        ourSlotIndex: 2,
+        cardUid: 'abcd',
+      });
     });
   });
 

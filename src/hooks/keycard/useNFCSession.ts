@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import RNKeycard from 'react-native-keycard';
 import Keycard from 'keycard-sdk';
 import { Commandset } from 'keycard-sdk/dist/commandset';
@@ -61,15 +62,24 @@ export default function useNFCSession(
 
       await onCardConnected(cmdSet, setStatus);
       setPhase('done');
+      RNKeycard.Core.stopNFC().catch(() => {});
     } catch (e: any) {
       if (disconnectedRef.current) {
         disconnectedRef.current = false;
+        if (Platform.OS === 'ios') {
+          // iOS NFC session dies on disconnect — show error so user can retry.
+          // Android keeps scanning; staying at 'nfc' lets the user re-tap.
+          setStatus('Connection lost — tap again');
+          setPhase('error');
+        }
         return;
       }
       realErrorRef.current = true;
-      console.log(`[Keycard] Error: ${e.message}`, e);
-      setStatus(e.message);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(`[Keycard] Error: ${msg}`, e);
+      setStatus(msg);
       setPhase('error');
+      RNKeycard.Core.stopNFCWithError(msg).catch(() => {});
     } finally {
       inFlightRef.current = false;
     }
@@ -82,6 +92,9 @@ export default function useNFCSession(
     // can see it before React processes the setPhase update.
     if (phaseRef.current === 'nfc' && !realErrorRef.current) {
       disconnectedRef.current = true;
+      // Update status before queuing setPhase so a subsequent catch-block
+      // setStatus (iOS path) is processed after this one, not before.
+      setStatus('Connection lost - adjust Keycard position');
     }
     setPhase(prev => {
       if (prev !== 'nfc') return prev;
@@ -89,7 +102,6 @@ export default function useNFCSession(
         realErrorRef.current = false;
         return 'error';
       }
-      setStatus('Connection lost - adjust Keycard position');
       return 'nfc';
     });
   }, [onCardDisconnected]);
@@ -105,7 +117,10 @@ export default function useNFCSession(
     });
     const timeoutSub = RNKeycard.Core.onNFCTimeout(() => {
       console.log('[Keycard] NFC timed out');
-      setStatus('Timed out — tap again');
+      if (phaseRef.current === 'nfc') {
+        setStatus('Timed out — tap again');
+      }
+      setPhase(prev => (prev === 'nfc' ? 'error' : prev));
     });
 
     return () => {
@@ -118,12 +133,23 @@ export default function useNFCSession(
   }, [handleCardConnected, handleCardDisconnected]);
 
   const startNFC = useCallback(() => {
+    disconnectedRef.current = false;
+    realErrorRef.current = false;
+    inFlightRef.current = false;
     setStatus('Tap your Keycard');
     setPhase('nfc');
-    RNKeycard.Core.startNFC('Tap your Keycard').catch((err: any) => {
-      setStatus(`Failed to start NFC: ${err.message}`);
-      setPhase('error');
-    });
+    RNKeycard.Core.startNFC('Tap your Keycard')
+      .then((result: any) => {
+        if (result && result.isSuccess === false) {
+          setStatus('Failed to start NFC reader. Try again.');
+          setPhase('error');
+        }
+      })
+      .catch((err: any) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatus(`Failed to start NFC: ${msg}`);
+        setPhase('error');
+      });
   }, []);
 
   const reset = useCallback(() => {

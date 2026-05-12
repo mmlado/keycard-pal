@@ -1,10 +1,18 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, BackHandler, Modal, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  BackHandler,
+  Modal,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import theme from '../../theme';
 import PinPad from '../PinPad';
 import GenuineWarning from './GenuineWarning';
+import NFCError from './NFCError';
 import NFCSheet from './NFCSheet';
 
 export type NFCVariant = 'scanning' | 'success' | 'error' | 'genuine_warning';
@@ -16,6 +24,7 @@ export type NFCOperation = {
   pinError?: string | null;
   submitPin?: (pin: string) => void;
   proceedWithNonGenuine?: () => void;
+  retry?: () => void;
 };
 
 type Props = {
@@ -33,16 +42,20 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
     pinError,
     submitPin,
     proceedWithNonGenuine,
+    retry,
   } = nfc;
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(400)).current;
+  const [modalVisible, setModalVisible] = useState(false);
 
   const showPinPad = phase === 'pin_entry';
   const showGenuineWarning = phase === 'genuine_warning';
+  const showIOSError = Platform.OS === 'ios' && phase === 'error';
   const showSheet =
-    phase === 'nfc' ||
-    phase === 'error' ||
-    (showOnDone === true && phase === 'done');
+    Platform.OS === 'android' &&
+    (phase === 'nfc' ||
+      phase === 'error' ||
+      (showOnDone === true && phase === 'done'));
 
   useEffect(() => {
     if (!showPinPad) return;
@@ -54,13 +67,24 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
   }, [showPinPad, onCancel]);
 
   useEffect(() => {
+    if (showIOSError) {
+      setModalVisible(false);
+      return;
+    }
+    if (showSheet || showGenuineWarning) {
+      setModalVisible(true);
+    }
     Animated.spring(slideAnim, {
       toValue: showSheet ? 0 : 400,
       useNativeDriver: true,
       tension: 60,
       friction: 12,
-    }).start();
-  }, [showSheet, slideAnim]);
+    }).start(({ finished }) => {
+      if (finished && !showSheet && !showGenuineWarning) {
+        setModalVisible(false);
+      }
+    });
+  }, [showSheet, showGenuineWarning, showIOSError, slideAnim]);
 
   const variant: NFCVariant =
     phase === 'genuine_warning'
@@ -81,8 +105,17 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
         </View>
       )}
 
+      {showIOSError && (
+        <NFCError
+          status={status}
+          retry={retry}
+          onCancel={onCancel}
+          paddingBottom={insets.bottom + 24}
+        />
+      )}
+
       <Modal
-        visible={showGenuineWarning || showSheet}
+        visible={modalVisible}
         transparent
         statusBarTranslucent
         animationType="fade"

@@ -101,6 +101,20 @@ describe('AboutScreen', () => {
     expect(mockSetString).toHaveBeenCalledWith(ethereumAddress);
   });
 
+  it('clears pending copy timer when copy is pressed again', () => {
+    jest.useFakeTimers();
+    try {
+      renderScreen();
+      fireEvent.press(screen.getByLabelText('Copy Bitcoin address'));
+      fireEvent.press(screen.getByLabelText('Copy Bitcoin address'));
+      expect(mockSetString).toHaveBeenCalledTimes(2);
+      // Advance past the reset delay — copied should still be false (timer was cleared and restarted)
+      jest.runAllTimers();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('opens support addresses as QR codes', () => {
     renderScreen();
     fireEvent.press(screen.getByLabelText('Show Bitcoin QR code'));

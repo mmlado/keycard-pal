@@ -35,7 +35,8 @@ export default function PairingSlotsScreen({
     status: checkStatus,
     checkSlots,
     cancel: cancelCheck,
-    reset: resetCheck,
+    resetNFCOnly: resetCheckNFCOnly,
+    readSlotInfoFromCmdSet,
   } = usePairingSlots();
 
   const unpairHook = useKeycardOperation<void>();
@@ -64,10 +65,11 @@ export default function PairingSlotsScreen({
   useEffect(() => {
     if (unpairPhase === 'done') {
       resetUnpair();
-      resetCheck();
-      checkSlots();
+      // Keep slotInfo — it was already updated in the unpair callback via
+      // readSlotInfoFromCmdSet, so no second NFC tap is needed.
+      resetCheckNFCOnly();
     }
-  }, [unpairPhase, resetUnpair, resetCheck, checkSlots]);
+  }, [unpairPhase, resetUnpair, resetCheckNFCOnly]);
 
   const handleUnpairPress = useCallback((slotIndex: number) => {
     setPendingSlotIndex(slotIndex);
@@ -79,8 +81,6 @@ export default function PairingSlotsScreen({
     executeUnpair(
       async cmdSet => {
         await cmdSet.unpair(slotIndex);
-        // If we unpaired our own slot, remove the local pairing so the
-        // next use triggers a fresh autoPair instead of a stale key.
         if (slotInfo?.ourSlotIndex === slotIndex) {
           try {
             await deletePairing(slotInfo.cardUid);
@@ -88,11 +88,14 @@ export default function PairingSlotsScreen({
             // Card-side unpair already succeeded; local cleanup is best-effort.
           }
         }
+        // Re-read slot info in the same NFC connection so the screen updates
+        // immediately without requiring a second tap on either platform.
+        await readSlotInfoFromCmdSet(cmdSet);
         setUnpairNotice(`Slot ${slotIndex + 1} was unpaired`);
       },
       { requiresPin: true, requiresMasterKey: false },
     );
-  }, [pendingSlotIndex, executeUnpair, slotInfo]);
+  }, [pendingSlotIndex, executeUnpair, slotInfo, readSlotInfoFromCmdSet]);
 
   const handleCancelUnpairConfirm = useCallback(() => {
     setPendingSlotIndex(null);
