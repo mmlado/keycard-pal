@@ -39,9 +39,9 @@ RepoType: git
 Repo: https://github.com/mmlado/GapSign
 
 Builds:
-  - versionName: 1.5.0
-    versionCode: 10500
-    commit: v1.5.0
+  - versionName: 1.6.0
+    versionCode: 10600
+    commit: v1.6.0
     subdir: android/app
     sudo:
       - apt-get install -y openjdk-17-jdk
@@ -60,5 +60,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.5.0
-CurrentVersionCode: 10500
+CurrentVersion: 1.6.0
+CurrentVersionCode: 10600
