@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-05-12
+
 ### Changed
 
 - Bump GitHub Actions: `checkout@v6`, `setup-node@v6`, `setup-java@v5`; use Node 22 in CI and release workflows
@@ -224,7 +226,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/GapSign/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/mmlado/GapSign/compare/v1.6.1...HEAD
+[1.6.1]: https://github.com/mmlado/GapSign/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/mmlado/GapSign/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/mmlado/GapSign/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/mmlado/GapSign/compare/v1.3.0...v1.4.0
