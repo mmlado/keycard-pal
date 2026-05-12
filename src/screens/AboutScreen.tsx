@@ -15,7 +15,7 @@ import theme from '../theme';
 
 import AppIdentityHeader from '../components/about/AppIdentityHeader';
 import ContributorsList from '../components/about/ContributorsList';
-import DonationSection from '../components/about/DonationSection';
+import SupportSection from '../components/about/SupportSection';
 import KeycardPurchaseCard from '../components/KeycardPurchaseCard';
 import LicenseList from '../components/about/LicenseList';
 
@@ -97,12 +97,12 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
         }
       />
 
-      <DonationSection
+      <SupportSection
         onShowQR={(label, address) =>
           navigation.navigate('AddressDetail', {
             address,
             index: 0,
-            title: `${label} donation`,
+            title: `${label} address`,
           })
         }
       />

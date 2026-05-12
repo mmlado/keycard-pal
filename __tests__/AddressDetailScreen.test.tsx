@@ -137,14 +137,14 @@ describe('AddressDetailScreen', () => {
               params: {
                 address: ETH_ADDRESS,
                 index: 0,
-                title: 'Ethereum donation',
+                title: 'Ethereum address',
               },
             } as any
           }
         />,
       );
       expect(navigation.setOptions).toHaveBeenCalledWith({
-        title: 'Ethereum donation',
+        title: 'Ethereum address',
       });
     });
   });

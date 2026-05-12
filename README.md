@@ -144,9 +144,9 @@ npm test      # Jest test suite
 npm run lint  # ESLint
 ```
 
-## Support development
+## Buy me a coffee
 
-If GapSign is useful to you, voluntary donations help support ongoing open-source development.
+If GapSign keeps your funds safe, you can send a coffee my way.
 
 - Ethereum: `0xF665E3D58DABa87d741A347674DCc4C4b794cAc9`
 - Bitcoin: `bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf`
