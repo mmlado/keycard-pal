@@ -161,6 +161,13 @@ android {
 }
 
 afterEvaluate {
+    // Decouple ktlint from check/build — run explicitly via 'npm run lint:android'
+    tasks.matching { it.name == "check" }.configureEach { checkTask ->
+        checkTask.setDependsOn(checkTask.dependsOn.findAll { dep ->
+            !(dep instanceof TaskProvider && dep.name.startsWith("ktlint"))
+        })
+    }
+
     android.applicationVariants.all { variant ->
         def isFull = variant.productFlavors.any { it.name == "full" }
         def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
