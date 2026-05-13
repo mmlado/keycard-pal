@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix Metro env script deleted by preceding `clean` task before the bundle task executes; move file write to `doFirst` so it runs at execution time
+
 ## [1.6.1] - 2026-05-12
 
 ### Changed
