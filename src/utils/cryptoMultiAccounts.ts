@@ -10,6 +10,7 @@ import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { pubKeyFingerprint } from './cryptoAccount';
+import { TLV_KEY_TEMPLATE, TLV_PUB_KEY } from './keycardTlv';
 import {
   derivationPathToKeypath,
   numberToFingerprintBuffer,
@@ -56,9 +57,6 @@ const BITGET_KEYS: MultiAccountKey[] = [
     source: EIP4527_STANDARD,
   },
 ];
-
-const TLV_KEY_TEMPLATE = 0xa1;
-const TLV_PUB_KEY = 0x80;
 
 export type BitgetExportResult = {
   masterFingerprint: number;
