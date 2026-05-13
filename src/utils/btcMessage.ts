@@ -9,16 +9,13 @@ import { UR, UREncoder } from '@ngraveio/bc-ur';
 import { sha256 } from '@noble/hashes/sha2.js';
 import Keycard from 'keycard-sdk';
 
+import { parseDerSignature } from './keycardTlv';
+
 const BTC_MESSAGE_SIGNATURE_TYPE = 'btc-signature';
 const BTC_SIGN_REQUEST_UUID_TAG = RegistryTypes.UUID.getTag();
 const BTC_SIGN_REQUEST_KEYPATH_TAG = RegistryTypes.CRYPTO_KEYPATH.getTag();
 const BTC_MESSAGE_DATA_TYPE = 1;
 const BTC_MESSAGE_SIGNATURE_HEADER = 27 + 4;
-const TLV_SIGNATURE_TEMPLATE = 0xa0;
-const TLV_PUB_KEY = 0x80;
-const TLV_ECDSA_TEMPLATE = 0x30;
-const TLV_INTEGER = 0x02;
-const SCALAR_BYTES = 32;
 
 enum BtcSignRequestKeys {
   requestId = 1,
@@ -43,17 +40,6 @@ export type BtcSignRequest = {
   address?: string;
   origin?: string;
 };
-
-function derIntTo32(bytes: Uint8Array): Uint8Array {
-  const stripped = bytes[0] === 0x00 ? bytes.slice(1) : bytes;
-  if (stripped.length === SCALAR_BYTES) {
-    return stripped;
-  }
-
-  const padded = new Uint8Array(SCALAR_BYTES);
-  padded.set(stripped, SCALAR_BYTES - stripped.length);
-  return padded;
-}
 
 function formatRequestId(requestId: DataItem | Buffer | string): string {
   if (requestId instanceof DataItem) {
@@ -174,14 +160,7 @@ export function parseKeycardBtcMessageSignature(
     hash,
     tlvData: data,
   });
-  const tlv = new Keycard.BERTLV(data);
-  tlv.enterConstructed(TLV_SIGNATURE_TEMPLATE);
-  const publicKey = Buffer.from(
-    Keycard.CryptoUtils.compressPublicKey(tlv.readPrimitive(TLV_PUB_KEY)),
-  );
-  tlv.enterConstructed(TLV_ECDSA_TEMPLATE);
-  const r = derIntTo32(tlv.readPrimitive(TLV_INTEGER));
-  const s = derIntTo32(tlv.readPrimitive(TLV_INTEGER));
+  const { publicKey, r, s } = parseDerSignature(data);
 
   return {
     signature: Buffer.concat([

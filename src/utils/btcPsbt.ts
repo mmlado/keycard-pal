@@ -4,13 +4,7 @@ import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { pubKeyFingerprint } from './cryptoAccount';
-
-const TLV_SIGNATURE_TEMPLATE = 0xa0;
-const TLV_PUB_KEY = 0x80;
-const TLV_ECDSA_TEMPLATE = 0x30;
-const TLV_INTEGER = 0x02;
-const TLV_KEY_TEMPLATE = 0xa1;
-const SCALAR_BYTES = 32;
+import { TLV_KEY_TEMPLATE, TLV_PUB_KEY, parseDerSignature } from './keycardTlv';
 
 type NetworkName = 'mainnet' | 'testnet' | 'unknown';
 
@@ -42,17 +36,6 @@ type SignableInput = {
   pubkey: Buffer;
   sighashType?: number;
 };
-
-function derIntTo32(bytes: Uint8Array): Uint8Array {
-  const stripped = bytes[0] === 0x00 ? bytes.slice(1) : bytes;
-  if (stripped.length === SCALAR_BYTES) {
-    return stripped;
-  }
-
-  const padded = new Uint8Array(SCALAR_BYTES);
-  padded.set(stripped, SCALAR_BYTES - stripped.length);
-  return padded;
-}
 
 function toPsbt(psbtHex: string): Psbt {
   return Psbt.fromBuffer(Buffer.from(psbtHex, 'hex'));
@@ -169,15 +152,7 @@ function isChangeOutput(output: Psbt['data']['outputs'][number]): boolean {
 }
 
 function parseKeycardSignature(data: Uint8Array): KeycardSignature {
-  const tlv = new Keycard.BERTLV(data);
-  tlv.enterConstructed(TLV_SIGNATURE_TEMPLATE);
-  const publicKey = Buffer.from(
-    Keycard.CryptoUtils.compressPublicKey(tlv.readPrimitive(TLV_PUB_KEY)),
-  );
-  tlv.enterConstructed(TLV_ECDSA_TEMPLATE);
-  const r = derIntTo32(tlv.readPrimitive(TLV_INTEGER));
-  const s = derIntTo32(tlv.readPrimitive(TLV_INTEGER));
-
+  const { publicKey, r, s } = parseDerSignature(data);
   return {
     publicKey,
     signature: Buffer.concat([Buffer.from(r), Buffer.from(s)]),

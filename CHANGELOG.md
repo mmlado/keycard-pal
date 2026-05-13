@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Extract `usePinPadScramble` hook from `PinPad`; preference loading is no longer inlined in the component
+- Extract `keycardTlv.ts` with shared DER/TLV constants and `parseDerSignature`; removes duplication across `btcMessage`, `btcPsbt`, and `cryptoMultiAccounts`
 
 ## [1.6.2] - 2026-05-13
 
