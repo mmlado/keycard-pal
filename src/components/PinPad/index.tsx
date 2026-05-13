@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import {
-  loadBooleanPreference,
-  preferenceKeys,
-} from '../../storage/preferencesStorage';
 import theme from '../../theme';
 
+import { usePinPadScramble } from '../../hooks/usePinPadScramble';
 import Keypad from './Keypad';
 import PinInput from './PinInput';
 
@@ -57,19 +54,15 @@ export default function PinPad({
   onType,
   length = PIN_LENGTH,
 }: PinPadProps) {
+  const scramble = usePinPadScramble();
   const normalizedLength = normalizePinLength(length);
   const [pin, setPin] = useState('');
-  const [scramble, setScramble] = useState(false);
   const [padKeys, setPadKeys] = useState(fixedKeys);
   const prevError = useRef(error);
   const pinRef = useRef('');
   const lengthRef = useRef(length);
   const onCompleteRef = useRef(onComplete);
   const onTypeRef = useRef(onType);
-
-  useEffect(() => {
-    loadBooleanPreference(preferenceKeys.pinPadScramble).then(setScramble);
-  }, []);
 
   useEffect(() => {
     if (scramble) {

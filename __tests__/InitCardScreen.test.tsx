@@ -69,7 +69,9 @@ function hookMock(phase: string) {
 
 async function renderScreen(phase = 'idle') {
   mockUseInitCard.mockReturnValue(hookMock(phase));
-  const result = render(<InitCardScreen navigation={navigation} route={route} />);
+  const result = render(
+    <InitCardScreen navigation={navigation} route={route} />,
+  );
   await act(async () => {});
   return result;
 }

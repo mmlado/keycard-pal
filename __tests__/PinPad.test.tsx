@@ -290,9 +290,6 @@ describe('PinPad', () => {
     });
 
     it('does not reshuffle on error when scramble is disabled', async () => {
-      jest
-        .requireMock('../src/storage/preferencesStorage')
-        .loadBooleanPreference.mockResolvedValue(false);
       const { rerender, toJSON } = render(<PinPad onComplete={onComplete} />);
       await act(async () => {});
       const before = getDigitOrder(toJSON());
