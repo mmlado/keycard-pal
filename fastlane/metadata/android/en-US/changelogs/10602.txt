@@ -1,0 +1,1 @@
+Fix Metro env script deleted by preceding `clean` task before the bundle task executes; move file write to `doFirst` so it runs at execution time
