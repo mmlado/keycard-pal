@@ -172,11 +172,14 @@ afterEvaluate {
         def isFull = variant.productFlavors.any { it.name == "full" }
         def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
         tasks.matching { it.name == taskName }.configureEach {
-            def originalArgs = nodeExecutableAndArgs.get().toList()
             def envScript = file("${buildDir}/metro-env-${variant.name}.js")
-            envScript.parentFile.mkdirs()
-            envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
-            nodeExecutableAndArgs.set(originalArgs + ["--require", envScript.absolutePath])
+            // Set --require at configuration time; write the file in doFirst so
+            // it survives a preceding `clean` task that would delete build/.
+            nodeExecutableAndArgs.set(nodeExecutableAndArgs.get().toList() + ["--require", envScript.absolutePath])
+            doFirst {
+                envScript.parentFile.mkdirs()
+                envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
+            }
         }
     }
 }
