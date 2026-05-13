@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Extract `usePinPadScramble` hook from `PinPad`; preference loading is no longer inlined in the component
+
 ## [1.6.2] - 2026-05-13
 
 ### Fixed
