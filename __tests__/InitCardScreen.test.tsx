@@ -67,9 +67,11 @@ function hookMock(phase: string) {
   };
 }
 
-function renderScreen(phase = 'idle') {
+async function renderScreen(phase = 'idle') {
   mockUseInitCard.mockReturnValue(hookMock(phase));
-  return render(<InitCardScreen navigation={navigation} route={route} />);
+  const result = render(<InitCardScreen navigation={navigation} route={route} />);
+  await act(async () => {});
+  return result;
 }
 
 function lastBeforeRemoveHandler() {
@@ -111,14 +113,14 @@ describe('InitCardScreen', () => {
 
   describe('initial render', () => {
     it('sets header title to "Create a PIN" on first render', async () => {
-      renderScreen();
+      await renderScreen();
       expect(navigation.setOptions).toHaveBeenCalledWith({
         title: 'Create a PIN',
       });
     });
 
     it('shows the PIN pad on first render', async () => {
-      renderScreen();
+      await renderScreen();
       expect(screen.getByText('6 digits')).toBeTruthy();
     });
   });
@@ -129,7 +131,7 @@ describe('InitCardScreen', () => {
 
   describe('step transitions', () => {
     it('moves to pin_confirm after 6 digits are entered', async () => {
-      renderScreen();
+      await renderScreen();
       navigation.setOptions.mockClear();
       await enterPin(0);
       expect(navigation.setOptions).toHaveBeenCalledWith({
@@ -138,21 +140,21 @@ describe('InitCardScreen', () => {
     });
 
     it('moves to duress_question after the PIN is confirmed correctly', async () => {
-      renderScreen();
+      await renderScreen();
       await enterPin(0);
       await enterPin(0);
       expect(screen.getByText('Add a duress PIN?')).toBeTruthy();
     });
 
     it('shows an error when the confirmed PIN does not match', async () => {
-      renderScreen();
+      await renderScreen();
       await enterPin(0);
       await enterPin(1);
       expect(screen.getByText("PINs don't match")).toBeTruthy();
     });
 
     it('stays on pin_confirm after a mismatch (does not advance)', async () => {
-      renderScreen();
+      await renderScreen();
       navigation.setOptions.mockClear();
       await enterPin(0);
       await enterPin(1);
@@ -170,7 +172,7 @@ describe('InitCardScreen', () => {
 
   describe('duress question', () => {
     async function reachConfirmPrompt() {
-      const view = renderScreen();
+      const view = await renderScreen();
       await enterPin(0);
       await enterPin(0);
       return view;
@@ -203,7 +205,7 @@ describe('InitCardScreen', () => {
 
   describe('duress PIN entry', () => {
     async function reachDuressEntry() {
-      const view = renderScreen();
+      const view = await renderScreen();
       await enterPin(0);
       await enterPin(0);
       await act(async () => {
@@ -248,22 +250,22 @@ describe('InitCardScreen', () => {
     }
 
     it('nfc.phase is idle when phase is idle', async () => {
-      renderScreen('idle');
+      await renderScreen('idle');
       expect(lastProps().nfc.phase).toBe('idle');
     });
 
     it('nfc.phase is nfc when phase is nfc', async () => {
-      renderScreen('nfc');
+      await renderScreen('nfc');
       expect(lastProps().nfc.phase).toBe('nfc');
     });
 
     it('nfc.phase is error when phase is error', async () => {
-      renderScreen('error');
+      await renderScreen('error');
       expect(lastProps().nfc.phase).toBe('error');
     });
 
     it('nfc.phase is done and showOnDone is true when phase is done', async () => {
-      renderScreen('done');
+      await renderScreen('done');
       expect(lastProps().nfc.phase).toBe('done');
       expect(lastProps().showOnDone).toBe(true);
     });
@@ -292,14 +294,14 @@ describe('InitCardScreen', () => {
     });
 
     it('cancels NFC when leaving during NFC phase', async () => {
-      renderScreen('nfc');
+      await renderScreen('nfc');
       const handler = lastBeforeRemoveHandler();
       handler?.({ preventDefault: jest.fn() });
       expect(mockCancel).toHaveBeenCalled();
     });
 
     it('returns from duress question to PIN confirmation before leaving', async () => {
-      renderScreen();
+      await renderScreen();
       await enterPin(0);
       await enterPin(0);
       const event = { preventDefault: jest.fn() };
@@ -315,7 +317,7 @@ describe('InitCardScreen', () => {
     });
 
     it('returns from duress setup to the duress question before leaving', async () => {
-      renderScreen();
+      await renderScreen();
       await enterPin(0);
       await enterPin(0);
       await act(async () => {
