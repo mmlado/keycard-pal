@@ -59,7 +59,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@babel/preset-env": "^7.25.3",
+    "@babel/preset-env": "^7.29.5",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "20.1.2",
     "@react-native-community/cli-platform-android": "20.1.2",
@@ -80,6 +80,9 @@
     "react-native-asset": "^2.2.14",
     "react-native-svg-transformer": "^1.5.3",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "fast-xml-parser": "^5.8.0"
   },
   "engines": {
     "node": ">=20"
