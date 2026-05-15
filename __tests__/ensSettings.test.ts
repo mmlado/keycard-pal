@@ -1,6 +1,5 @@
 import {
   DEFAULT_ENS_RPC_URL,
-  loadEnsRpcUrl,
   loadEnsSettings,
   saveEnsEnabled,
   saveEnsRpcUrl,
@@ -8,7 +7,6 @@ import {
 
 import {
   DEFAULT_ENS_RPC_URL as DEFAULT_OFFLINE,
-  loadEnsRpcUrl as loadOffline,
   loadEnsSettings as loadSettingsOffline,
   saveEnsEnabled as saveEnabledOffline,
   saveEnsRpcUrl as saveOffline,
@@ -67,32 +65,6 @@ describe('ensSettings.online', () => {
     });
   });
 
-  describe('loadEnsRpcUrl', () => {
-    it('returns null when disabled', async () => {
-      mockGetItem
-        .mockResolvedValueOnce('false')
-        .mockResolvedValueOnce('https://custom.rpc');
-      expect(await loadEnsRpcUrl()).toBeNull();
-    });
-
-    it('returns null when enabled but no URL stored', async () => {
-      mockGetItem.mockResolvedValueOnce('true').mockResolvedValueOnce(null);
-      expect(await loadEnsRpcUrl()).toBeNull();
-    });
-
-    it('returns URL when enabled and URL stored', async () => {
-      mockGetItem
-        .mockResolvedValueOnce('true')
-        .mockResolvedValueOnce('https://custom.rpc');
-      expect(await loadEnsRpcUrl()).toBe('https://custom.rpc');
-    });
-
-    it('returns null when storage throws', async () => {
-      mockGetItem.mockRejectedValue(new Error('storage failure'));
-      expect(await loadEnsRpcUrl()).toBeNull();
-    });
-  });
-
   describe('saveEnsEnabled', () => {
     it('stores "true" when enabled', async () => {
       mockSetItem.mockResolvedValue(undefined);
@@ -137,11 +109,6 @@ describe('ensSettings.offline', () => {
 
   it('loadEnsSettings returns disabled with empty URL', async () => {
     expect(await loadSettingsOffline()).toEqual({ enabled: false, rpcUrl: '' });
-    expect(mockGetItem).not.toHaveBeenCalled();
-  });
-
-  it('loadEnsRpcUrl returns null', async () => {
-    expect(await loadOffline()).toBeNull();
     expect(mockGetItem).not.toHaveBeenCalled();
   });
 

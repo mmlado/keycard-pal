@@ -25,19 +25,6 @@ export async function loadEnsSettings(): Promise<EnsSettings> {
   }
 }
 
-export async function loadEnsRpcUrl(): Promise<string | null> {
-  try {
-    const [enabled, url] = await Promise.all([
-      AsyncStorage.getItem(ENS_ENABLED_KEY),
-      AsyncStorage.getItem(ENS_RPC_URL_KEY),
-    ]);
-    if (enabled !== 'true') return null;
-    return url?.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
 export async function saveEnsEnabled(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(ENS_ENABLED_KEY, enabled ? 'true' : 'false');
 }

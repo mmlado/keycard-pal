@@ -7,11 +7,11 @@ import {
 } from '../src/hooks/ens/useEnsName.online';
 import { useEnsName as useEnsNameOffline } from '../src/hooks/ens/useEnsName.offline';
 
-const mockLoadEnsRpcUrl = jest.fn();
+const mockLoadEnsSettings = jest.fn();
 const mockResolveEnsName = jest.fn();
 
 jest.mock('../src/storage/ensSettings.online', () => ({
-  loadEnsRpcUrl: (...args: any[]) => mockLoadEnsRpcUrl(...args),
+  loadEnsSettings: (...args: any[]) => mockLoadEnsSettings(...args),
 }));
 
 jest.mock('../src/utils/ens/client.online', () => ({
@@ -24,17 +24,22 @@ jest.mock('viem', () => ({
 
 const mockedGetAddress = getAddress as jest.MockedFunction<typeof getAddress>;
 
+const DISABLED = { enabled: false, rpcUrl: '' };
+const enabled = (rpcUrl: string) => ({ enabled: true, rpcUrl });
+
 describe('useEnsName.online', () => {
   const address = '0x1234567890abcdef1234567890abcdef12345678';
 
   beforeEach(() => {
     clearEnsNameCache();
     jest.clearAllMocks();
-    mockedGetAddress.mockImplementation((addr: string) => addr);
+    mockedGetAddress.mockImplementation(
+      (addr: string) => addr as `0x${string}`,
+    );
   });
 
-  it('returns no name when URL is null; no resolver call', async () => {
-    mockLoadEnsRpcUrl.mockResolvedValue(null);
+  it('returns no name when ENS is disabled; no resolver call', async () => {
+    mockLoadEnsSettings.mockResolvedValue(DISABLED);
 
     const { result } = renderHook(() => useEnsName(address));
 
@@ -47,7 +52,7 @@ describe('useEnsName.online', () => {
   });
 
   it('confirmed name is cached and returned synchronously on second call', async () => {
-    mockLoadEnsRpcUrl.mockResolvedValue('https://rpc.example.com');
+    mockLoadEnsSettings.mockResolvedValue(enabled('https://rpc.example.com'));
     mockResolveEnsName.mockResolvedValue({ name: 'vitalik.eth' });
 
     const { result, unmount } = renderHook(() => useEnsName(address));
@@ -65,7 +70,7 @@ describe('useEnsName.online', () => {
   });
 
   it('not-found returns empty string name, error: false; retry is a no-op', async () => {
-    mockLoadEnsRpcUrl.mockResolvedValue('https://rpc.example.com');
+    mockLoadEnsSettings.mockResolvedValue(enabled('https://rpc.example.com'));
     mockResolveEnsName.mockResolvedValue({ name: null, reason: 'not-found' });
 
     const { result } = renderHook(() => useEnsName(address));
@@ -82,7 +87,7 @@ describe('useEnsName.online', () => {
   });
 
   it('mismatch returns empty string name, error: false; retry is a no-op', async () => {
-    mockLoadEnsRpcUrl.mockResolvedValue('https://rpc.example.com');
+    mockLoadEnsSettings.mockResolvedValue(enabled('https://rpc.example.com'));
     mockResolveEnsName.mockResolvedValue({ name: null, reason: 'mismatch' });
 
     const { result } = renderHook(() => useEnsName(address));
@@ -99,7 +104,7 @@ describe('useEnsName.online', () => {
   });
 
   it('rpc-error returns error: true; calling retry triggers another resolver call', async () => {
-    mockLoadEnsRpcUrl.mockResolvedValue('https://rpc.example.com');
+    mockLoadEnsSettings.mockResolvedValue(enabled('https://rpc.example.com'));
     mockResolveEnsName
       .mockResolvedValueOnce({ name: null, reason: 'rpc-error' })
       .mockResolvedValueOnce({ name: 'vitalik.eth' });
@@ -122,7 +127,7 @@ describe('useEnsName.online', () => {
   });
 
   it('retry is no-op when last failure is not rpc-error (success state)', async () => {
-    mockLoadEnsRpcUrl.mockResolvedValue('https://rpc.example.com');
+    mockLoadEnsSettings.mockResolvedValue(enabled('https://rpc.example.com'));
     mockResolveEnsName.mockResolvedValue({ name: 'vitalik.eth' });
 
     const { result } = renderHook(() => useEnsName(address));

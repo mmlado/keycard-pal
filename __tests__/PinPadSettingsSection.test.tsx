@@ -16,9 +16,8 @@ const mockLoadPreference = jest.fn().mockResolvedValue(false);
 const mockSavePreference = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../src/storage/preferencesStorage', () => ({
-  loadBooleanPreference: (...args: unknown[]) => mockLoadPreference(...args),
-  preferenceKeys: { pinPadScramble: 'preference_pinpad_scramble' },
-  saveBooleanPreference: (...args: unknown[]) => mockSavePreference(...args),
+  loadPinPadScramble: () => mockLoadPreference(),
+  savePinPadScramble: (v: boolean) => mockSavePreference(v),
 }));
 
 // ---------------------------------------------------------------------------
@@ -51,30 +50,24 @@ describe('PinPadSettingsSection', () => {
     expect(switchComponent.props.value).toBe(false);
   });
 
-  it('calls saveBooleanPreference with true when toggled on', async () => {
+  it('calls savePinPadScramble with true when toggled on', async () => {
     render(<PinPadSettingsSection />);
     await act(async () => {});
     const switchComponent = getSwitch();
     await act(async () => {
       fireEvent(switchComponent, 'valueChange', true);
     });
-    expect(mockSavePreference).toHaveBeenCalledWith(
-      'preference_pinpad_scramble',
-      true,
-    );
+    expect(mockSavePreference).toHaveBeenCalledWith(true);
   });
 
-  it('calls saveBooleanPreference with false when toggled off', async () => {
+  it('calls savePinPadScramble with false when toggled off', async () => {
     render(<PinPadSettingsSection />);
     await act(async () => {});
     const switchComponent = getSwitch();
     await act(async () => {
       fireEvent(switchComponent, 'valueChange', false);
     });
-    expect(mockSavePreference).toHaveBeenCalledWith(
-      'preference_pinpad_scramble',
-      false,
-    );
+    expect(mockSavePreference).toHaveBeenCalledWith(false);
   });
 
   it('reverts toggle state when save fails', async () => {
@@ -94,8 +87,6 @@ describe('PinPadSettingsSection', () => {
     await act(async () => {});
     const switchComponent = getSwitch();
     expect(switchComponent.props.value).toBe(true);
-    expect(mockLoadPreference).toHaveBeenCalledWith(
-      'preference_pinpad_scramble',
-    );
+    expect(mockLoadPreference).toHaveBeenCalled();
   });
 });

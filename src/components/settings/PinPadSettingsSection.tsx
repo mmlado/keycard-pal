@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import {
-  loadBooleanPreference,
-  preferenceKeys,
-  saveBooleanPreference,
+  loadPinPadScramble,
+  savePinPadScramble,
 } from '../../storage/preferencesStorage';
 
 import SettingsToggleRow from './SettingsToggleRow';
@@ -12,14 +11,12 @@ export default function PinPadSettingsSection() {
   const [scramble, setScramble] = useState(false);
 
   useEffect(() => {
-    loadBooleanPreference(preferenceKeys.pinPadScramble).then(setScramble);
+    loadPinPadScramble().then(setScramble);
   }, []);
 
   const handleToggle = (value: boolean) => {
     setScramble(value);
-    saveBooleanPreference(preferenceKeys.pinPadScramble, value).catch(() =>
-      setScramble(!value),
-    );
+    savePinPadScramble(value).catch(() => setScramble(!value));
   };
 
   return (

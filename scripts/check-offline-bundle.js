@@ -9,7 +9,7 @@ const path = require('path');
 const FORBIDDEN_MARKERS = [
   'ethereum-rpc.publicnode.com',
   'EnsSettingsSection',
-  'loadEnsRpcUrl',
+  'saveEnsEnabled',
   'ENS RPC URL',
   'ENS lookups send',
 ];

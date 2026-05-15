@@ -5,9 +5,8 @@ import type { NavigationProp } from '@react-navigation/native';
 
 import type { RootStackParamList } from '../navigation/types';
 import {
-  loadBooleanPreference,
-  preferenceKeys,
-  saveBooleanPreference,
+  loadDashboardKeycardNoticeDismissed,
+  saveDashboardKeycardNoticeDismissed,
 } from '../storage/preferencesStorage';
 
 import KeycardPurchaseCard from './KeycardPurchaseCard';
@@ -22,26 +21,25 @@ export default function DashboardKeycardNotice() {
   useEffect(() => {
     let isMounted = true;
 
-    loadBooleanPreference(preferenceKeys.dashboardKeycardNoticeDismissed).then(
-      dismissed => {
-        if (isMounted) {
-          setVisible(!dismissed);
-          setIsReady(true);
-        }
-      },
-    );
+    loadDashboardKeycardNoticeDismissed()
+      .then(dismissed => {
+        if (isMounted) setVisible(!dismissed);
+      })
+      .catch(() => {
+        if (isMounted) setVisible(false);
+      })
+      .finally(() => {
+        if (isMounted) setIsReady(true);
+      });
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const handleClose = useCallback(async () => {
+  const handleClose = useCallback(() => {
     setVisible(false);
-    await saveBooleanPreference(
-      preferenceKeys.dashboardKeycardNoticeDismissed,
-      true,
-    );
+    saveDashboardKeycardNoticeDismissed(true).catch(() => {});
   }, []);
 
   if (!isReady || !visible) {

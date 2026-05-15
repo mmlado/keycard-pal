@@ -59,12 +59,10 @@ const mockLoadBooleanPreference = jest.fn();
 const mockSaveBooleanPreference = jest.fn();
 
 jest.mock('../src/storage/preferencesStorage', () => ({
-  preferenceKeys: {
-    dashboardKeycardNoticeDismissed:
-      'preference_dashboard_keycard_notice_dismissed',
-  },
-  loadBooleanPreference: (...args: any[]) => mockLoadBooleanPreference(...args),
-  saveBooleanPreference: (...args: any[]) => mockSaveBooleanPreference(...args),
+  loadDashboardKeycardNoticeDismissed: (...args: any[]) =>
+    mockLoadBooleanPreference(...args),
+  saveDashboardKeycardNoticeDismissed: (...args: any[]) =>
+    mockSaveBooleanPreference(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -238,10 +236,25 @@ describe('DashboardScreen', () => {
         fireEvent.press(screen.getByTestId('dashboard-keycard-notice-close'));
       });
 
-      expect(mockSaveBooleanPreference).toHaveBeenCalledWith(
-        'preference_dashboard_keycard_notice_dismissed',
-        true,
-      );
+      expect(mockSaveBooleanPreference).toHaveBeenCalledWith(true);
+      expect(screen.queryByText('Keycard required')).toBeNull();
+    });
+
+    it('hides the notice when load rejects', async () => {
+      mockLoadBooleanPreference.mockRejectedValue(new Error('storage error'));
+      await renderScreen();
+      expect(screen.queryByText('Keycard required')).toBeNull();
+    });
+
+    it('dismisses the notice even when save rejects', async () => {
+      mockLoadBooleanPreference.mockResolvedValue(false);
+      mockSaveBooleanPreference.mockRejectedValue(new Error('storage error'));
+      await renderScreen();
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('dashboard-keycard-notice-close'));
+      });
+
       expect(screen.queryByText('Keycard required')).toBeNull();
     });
   });

@@ -1,7 +1,8 @@
 import {
-  loadBooleanPreference,
-  preferenceKeys,
-  saveBooleanPreference,
+  loadDashboardKeycardNoticeDismissed,
+  loadPinPadScramble,
+  saveDashboardKeycardNoticeDismissed,
+  savePinPadScramble,
 } from '../src/storage/preferencesStorage';
 
 const mockGetItem = jest.fn();
@@ -21,66 +22,89 @@ describe('preferencesStorage', () => {
     mockSetItem.mockReset();
   });
 
-  describe('loadBooleanPreference', () => {
-    it('uses the provided storage key', async () => {
+  describe('loadDashboardKeycardNoticeDismissed', () => {
+    it('reads the correct storage key', async () => {
       mockGetItem.mockResolvedValue(null);
-      await loadBooleanPreference(
-        preferenceKeys.dashboardKeycardNoticeDismissed,
-      );
+      await loadDashboardKeycardNoticeDismissed();
       expect(mockGetItem).toHaveBeenCalledWith(
         'preference_dashboard_keycard_notice_dismissed',
       );
     });
 
-    it('returns true when the stored value is enabled', async () => {
+    it('returns true when stored value is "1"', async () => {
       mockGetItem.mockResolvedValue('1');
-      expect(
-        await loadBooleanPreference(
-          preferenceKeys.dashboardKeycardNoticeDismissed,
-        ),
-      ).toBe(true);
+      expect(await loadDashboardKeycardNoticeDismissed()).toBe(true);
     });
 
-    it('returns false when the stored value is missing', async () => {
+    it('returns false when nothing stored', async () => {
       mockGetItem.mockResolvedValue(null);
-      expect(
-        await loadBooleanPreference(
-          preferenceKeys.dashboardKeycardNoticeDismissed,
-        ),
-      ).toBe(false);
+      expect(await loadDashboardKeycardNoticeDismissed()).toBe(false);
     });
 
     it('returns false when storage throws', async () => {
       mockGetItem.mockRejectedValue(new Error('storage failure'));
-      expect(
-        await loadBooleanPreference(
-          preferenceKeys.dashboardKeycardNoticeDismissed,
-        ),
-      ).toBe(false);
+      expect(await loadDashboardKeycardNoticeDismissed()).toBe(false);
     });
   });
 
-  describe('saveBooleanPreference', () => {
-    it('stores enabled preferences as 1', async () => {
+  describe('saveDashboardKeycardNoticeDismissed', () => {
+    it('stores true as "1"', async () => {
       mockSetItem.mockResolvedValue(undefined);
-      await saveBooleanPreference(
-        preferenceKeys.dashboardKeycardNoticeDismissed,
-        true,
-      );
+      await saveDashboardKeycardNoticeDismissed(true);
       expect(mockSetItem).toHaveBeenCalledWith(
         'preference_dashboard_keycard_notice_dismissed',
         '1',
       );
     });
 
-    it('stores disabled preferences as 0', async () => {
+    it('stores false as "0"', async () => {
       mockSetItem.mockResolvedValue(undefined);
-      await saveBooleanPreference(
-        preferenceKeys.dashboardKeycardNoticeDismissed,
-        false,
-      );
+      await saveDashboardKeycardNoticeDismissed(false);
       expect(mockSetItem).toHaveBeenCalledWith(
         'preference_dashboard_keycard_notice_dismissed',
+        '0',
+      );
+    });
+  });
+
+  describe('loadPinPadScramble', () => {
+    it('reads the correct storage key', async () => {
+      mockGetItem.mockResolvedValue(null);
+      await loadPinPadScramble();
+      expect(mockGetItem).toHaveBeenCalledWith('preference_pinpad_scramble');
+    });
+
+    it('returns true when stored value is "1"', async () => {
+      mockGetItem.mockResolvedValue('1');
+      expect(await loadPinPadScramble()).toBe(true);
+    });
+
+    it('returns false when nothing stored', async () => {
+      mockGetItem.mockResolvedValue(null);
+      expect(await loadPinPadScramble()).toBe(false);
+    });
+
+    it('returns false when storage throws', async () => {
+      mockGetItem.mockRejectedValue(new Error('storage failure'));
+      expect(await loadPinPadScramble()).toBe(false);
+    });
+  });
+
+  describe('savePinPadScramble', () => {
+    it('stores true as "1"', async () => {
+      mockSetItem.mockResolvedValue(undefined);
+      await savePinPadScramble(true);
+      expect(mockSetItem).toHaveBeenCalledWith(
+        'preference_pinpad_scramble',
+        '1',
+      );
+    });
+
+    it('stores false as "0"', async () => {
+      mockSetItem.mockResolvedValue(undefined);
+      await savePinPadScramble(false);
+      expect(mockSetItem).toHaveBeenCalledWith(
+        'preference_pinpad_scramble',
         '0',
       );
     });

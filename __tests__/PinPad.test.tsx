@@ -13,9 +13,8 @@ jest.mock('react-native-paper', () => {
 });
 
 jest.mock('../src/storage/preferencesStorage', () => ({
-  loadBooleanPreference: jest.fn().mockResolvedValue(false),
-  preferenceKeys: { pinPadScramble: 'preference_pinpad_scramble' },
-  saveBooleanPreference: jest.fn().mockResolvedValue(undefined),
+  loadPinPadScramble: jest.fn().mockResolvedValue(false),
+  savePinPadScramble: jest.fn().mockResolvedValue(undefined),
 }));
 
 // ---------------------------------------------------------------------------
@@ -31,7 +30,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest
     .requireMock('../src/storage/preferencesStorage')
-    .loadBooleanPreference.mockResolvedValue(false);
+    .loadPinPadScramble.mockResolvedValue(false);
 });
 
 /** Walk the toJSON tree and collect Pressable nodes.
@@ -260,7 +259,7 @@ describe('PinPad', () => {
     it('shows scrambled layout when preference is true', async () => {
       jest
         .requireMock('../src/storage/preferencesStorage')
-        .loadBooleanPreference.mockResolvedValue(true);
+        .loadPinPadScramble.mockResolvedValue(true);
       render(<PinPad onComplete={onComplete} />);
       await act(async () => {});
       const { toJSON } = screen;
@@ -274,7 +273,7 @@ describe('PinPad', () => {
     it('reshuffles when a new error arrives only when scramble is enabled', async () => {
       jest
         .requireMock('../src/storage/preferencesStorage')
-        .loadBooleanPreference.mockResolvedValue(true);
+        .loadPinPadScramble.mockResolvedValue(true);
       const { rerender, toJSON } = render(<PinPad onComplete={onComplete} />);
       await act(async () => {});
       const before = JSON.stringify(toJSON());
@@ -317,7 +316,7 @@ describe('PinPad', () => {
     it('does not reshuffle when error is unchanged', async () => {
       jest
         .requireMock('../src/storage/preferencesStorage')
-        .loadBooleanPreference.mockResolvedValue(true);
+        .loadPinPadScramble.mockResolvedValue(true);
       const { rerender, toJSON } = render(
         <PinPad onComplete={onComplete} error="Wrong PIN" />,
       );
