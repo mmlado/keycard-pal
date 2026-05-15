@@ -42,9 +42,15 @@ it('does not update state after unmount', async () => {
   let resolve!: (v: boolean) => void;
   jest
     .requireMock('../src/storage/preferencesStorage')
-    .loadBooleanPreference.mockReturnValue(new Promise(r => { resolve = r; }));
+    .loadBooleanPreference.mockReturnValue(
+      new Promise(r => {
+        resolve = r;
+      }),
+    );
   const { result, unmount } = renderHook(() => usePinPadScramble());
   unmount();
-  await act(async () => { resolve(true); });
+  await act(async () => {
+    resolve(true);
+  });
   expect(result.current).toBe(false);
 });

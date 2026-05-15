@@ -1,14 +1,10 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon, Text } from 'react-native-paper';
-
 import { Icons } from '../assets/icons';
 import type { TransactionDetailScreenProps } from '../navigation/types';
 import theme from '../theme';
-import BtcPsbtDetail from '../components/BtcPsbtDetail';
-import BtcSignRequestDetail from '../components/BtcSignRequestDetail';
-import EthSignRequestDetail from '../components/EthSignRequestDetail';
+import SignRequestDetail from '../components/SignRequestDetail';
 import PrimaryButton from '../components/PrimaryButton';
 import { inspectBtcPsbt } from '../utils/btcPsbt';
 
@@ -69,49 +65,7 @@ export default function TransactionDetailScreen({
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        {result.kind === 'eth-sign-request' && (
-          <EthSignRequestDetail request={result.request} />
-        )}
-
-        {result.kind === 'crypto-psbt' && (
-          <BtcPsbtDetail psbtHex={result.request.psbtHex} />
-        )}
-
-        {result.kind === 'btc-sign-request' && (
-          <BtcSignRequestDetail request={result.request} />
-        )}
-
-        {result.kind === 'unsupported' && (
-          <View style={styles.errorContainer}>
-            <Icon
-              source="alert-circle-outline"
-              size={48}
-              color={theme.colors.onSurfaceVariant}
-            />
-            <Text variant="titleMedium" style={styles.errorTitle}>
-              Unsupported QR Type
-            </Text>
-            <Text variant="bodyMedium" style={styles.errorMessage}>
-              {result.type}
-            </Text>
-          </View>
-        )}
-
-        {result.kind === 'error' && (
-          <View style={styles.errorContainer}>
-            <Icon
-              source="alert-circle"
-              size={48}
-              color={theme.colors.negative}
-            />
-            <Text variant="titleMedium" style={styles.errorTitleRed}>
-              Scan Error
-            </Text>
-            <Text variant="bodyMedium" style={styles.errorMessage} selectable>
-              {result.message}
-            </Text>
-          </View>
-        )}
+        <SignRequestDetail result={result} />
       </ScrollView>
 
       {(result.kind === 'eth-sign-request' ||
@@ -150,21 +104,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     backgroundColor: theme.colors.background,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 32,
-  },
-  errorTitle: {
-    color: theme.colors.onSurfaceVariant,
-  },
-  errorTitleRed: {
-    color: theme.colors.negative,
-  },
-  errorMessage: {
-    color: theme.colors.onSurface,
-    textAlign: 'center',
-    fontFamily: 'monospace',
   },
 });

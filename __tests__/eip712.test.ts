@@ -1,4 +1,8 @@
-import { parseEip712Prehashed, parseEip712Summary } from '../src/utils/eip712';
+import {
+  parseEip712Prehashed,
+  parseEip712RawTypedData,
+  parseEip712Summary,
+} from '../src/utils/eip712';
 
 function typedDataHex(payload: unknown): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('hex');
@@ -451,5 +455,44 @@ describe('parseEip712Prehashed', () => {
 
   it('returns null for empty input', () => {
     expect(parseEip712Prehashed('')).toBeNull();
+  });
+});
+
+describe('parseEip712RawTypedData', () => {
+  it('parses valid EIP-712 JSON into raw fields', () => {
+    const payload = {
+      types: { Mail: [{ name: 'from', type: 'address' }] },
+      primaryType: 'Mail',
+      domain: { name: 'Test', chainId: 1 },
+      message: { from: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826' },
+    };
+    const hex = Buffer.from(JSON.stringify(payload), 'utf8').toString('hex');
+    const result = parseEip712RawTypedData(hex);
+    expect(result).not.toBeNull();
+    expect(result!.primaryType).toEqual('Mail');
+    expect(result!.domain).toEqual({ name: 'Test', chainId: 1 });
+    expect(result!.message).toEqual({
+      from: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+    });
+  });
+
+  it('returns null for non-UTF8 hex (binary data)', () => {
+    expect(parseEip712RawTypedData('deadbeef')).toBeNull();
+  });
+
+  it('returns null for valid UTF8 that is not JSON', () => {
+    const hex = Buffer.from('not json', 'utf8').toString('hex');
+    expect(parseEip712RawTypedData(hex)).toBeNull();
+  });
+
+  it('uses fallback primaryType when missing from payload', () => {
+    const payload = {
+      types: {},
+      domain: {},
+      message: {},
+    };
+    const hex = Buffer.from(JSON.stringify(payload), 'utf8').toString('hex');
+    const result = parseEip712RawTypedData(hex);
+    expect(result!.primaryType).toEqual('EIP712Domain');
   });
 });

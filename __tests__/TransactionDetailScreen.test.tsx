@@ -101,11 +101,30 @@ jest.mock('react-native-safe-area-context', () => ({
 
 // Use react-native's own Text so rendered content is visible in the JSON tree.
 jest.mock('react-native-paper', () => {
-  const { Text } = require('react-native');
+  const { Text, TouchableOpacity, View } = require('react-native');
   return {
     MD3DarkTheme: { colors: {} },
     Text,
     Icon: () => null,
+    SegmentedButtons: ({
+      buttons,
+      onValueChange,
+    }: {
+      value: string;
+      onValueChange: (v: string) => void;
+      buttons: { value: string; label: string }[];
+    }) => (
+      <View>
+        {buttons.map((b: { value: string; label: string }) => (
+          <TouchableOpacity
+            key={b.value}
+            onPress={() => onValueChange(b.value)}
+          >
+            <Text>{b.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ),
   };
 });
 

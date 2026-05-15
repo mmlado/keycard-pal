@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react-native';
 import React from 'react';
 
-import DecodedCallSection from '../src/components/DecodedCallSection';
+import DecodedCallSection from '../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection';
 
 import type { DecodedCall } from '../src/utils/txParser';
 
@@ -255,6 +255,16 @@ describe('DecodedCallSection', () => {
       ).toBeTruthy();
       expect(screen.getByText('Input: 0xdeadbeef')).toBeTruthy();
     });
+
+    it('shows top-level router error', () => {
+      const call: DecodedCall = {
+        kind: 'universal-router-execute',
+        error: 'Failed to decode commands',
+        commands: [],
+      };
+      render(<DecodedCallSection call={call} />);
+      expect(screen.getByText('Failed to decode commands')).toBeTruthy();
+    });
   });
 
   describe('with token metadata (chainId + known contract)', () => {
@@ -307,6 +317,22 @@ describe('DecodedCallSection', () => {
         />,
       );
       expect(screen.queryByTestId('token-logo')).toBeNull();
+    });
+
+    it('shows symbol and formatted amount for a known ERC-20 approve', () => {
+      const call: DecodedCall = {
+        kind: 'erc20-approve',
+        spender: ADDR_A,
+        amount: 1_000_000n, // 1.00 USDC
+      };
+      render(
+        <DecodedCallSection
+          call={call}
+          tokenContract={USDC_ADDRESS}
+          chainId={MAINNET}
+        />,
+      );
+      expect(screen.getByText('Allowance: 1 USDC')).toBeTruthy();
     });
 
     it('shows "Unlimited USDC" for max uint256 approve', () => {
