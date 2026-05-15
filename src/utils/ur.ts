@@ -1,4 +1,5 @@
 import { EthSignRequest } from '@keystonehq/bc-ur-registry-eth';
+import { UR, UREncoder } from '@ngraveio/bc-ur';
 
 import type {
   EthSignRequest as EthSignRequestType,
@@ -40,6 +41,13 @@ function parseEthSignRequest(cbor: Buffer): EthSignRequestType {
       : undefined,
     origin: parsed.getOrigin(),
   };
+}
+
+export function encodeToUR(type: string, cbor: Buffer): string {
+  return new UREncoder(
+    new UR(cbor, type),
+    Math.max(cbor.length, 100),
+  ).nextPart();
 }
 
 export function handleUR(type: string, cbor: Buffer): ScanResult {

@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
-import { UR, UREncoder } from '@ngraveio/bc-ur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { KeycardScreenProps } from '../navigation/types';
@@ -16,7 +14,7 @@ import {
   hashBitcoinMessage,
   parseKeycardBtcMessageSignature,
 } from '../utils/btcMessage';
-import { BtcSigningSession } from '../utils/btcPsbt';
+import { BtcSigningSession, buildCryptoPsbtUR } from '../utils/btcPsbt';
 import { buildEthSignatureUR } from '../utils/ethSignature';
 import {
   buildExportUr,
@@ -50,16 +48,6 @@ function buildEthResultUR(
     params.requestId,
     txType,
   );
-}
-
-function buildBtcResultUR(psbtHex: string): string {
-  const psbt = new CryptoPSBT(Buffer.from(psbtHex, 'hex'));
-  const cbor = psbt.toCBOR();
-  const type = psbt.getRegistryType().getType();
-  return new UREncoder(
-    new UR(cbor, type),
-    Math.max(cbor.length, 100),
-  ).nextPart();
 }
 
 export default function KeycardScreen({
@@ -205,7 +193,7 @@ export default function KeycardScreen({
     ) {
       return;
     }
-    navigateToSignResult(buildBtcResultUR(result.psbtHex));
+    navigateToSignResult(buildCryptoPsbtUR(result.psbtHex));
   }, [result, navigateToSignResult]);
 
   const handleBtcMessageSignDone = useCallback(() => {

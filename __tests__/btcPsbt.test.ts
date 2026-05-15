@@ -1,7 +1,10 @@
 import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
 
+import { URDecoder } from '@ngraveio/bc-ur';
+
 import {
   BtcSigningSession,
+  buildCryptoPsbtUR,
   inspectBtcPsbt,
   parseCryptoPsbtRequest,
 } from '../src/utils/btcPsbt';
@@ -330,5 +333,25 @@ describe('BtcSigningSession', () => {
       'Taproot inputs are not supported yet.',
     );
     expect(cmdSet.signWithPath).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildCryptoPsbtUR
+// ---------------------------------------------------------------------------
+
+describe('buildCryptoPsbtUR', () => {
+  it('returns a UR string with crypto-psbt type prefix', () => {
+    const result = buildCryptoPsbtUR(MINIMAL_PSBT_HEX);
+    expect(result).toMatch(/^ur:crypto-psbt\//i);
+  });
+
+  it('produces output decodable back to the same PSBT bytes', () => {
+    const result = buildCryptoPsbtUR(MINIMAL_PSBT_HEX);
+    const decoder = new URDecoder();
+    decoder.receivePart(result);
+    expect(decoder.isComplete()).toBe(true);
+    const decoded = CryptoPSBT.fromCBOR(decoder.resultUR().cbor);
+    expect(decoded.getPSBT().toString('hex')).toBe(MINIMAL_PSBT_HEX);
   });
 });

@@ -8,7 +8,7 @@ import {
   CryptoOutput,
   ScriptExpressions,
 } from '@keystonehq/bc-ur-registry';
-import { UR, UREncoder } from '@ngraveio/bc-ur';
+import { encodeToUR } from './ur';
 import { ripemd160 } from '@noble/hashes/legacy.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import Keycard from 'keycard-sdk';
@@ -115,8 +115,5 @@ export function buildCryptoAccountUR(account: BitcoinCryptoAccount): string {
 
   const cbor = cryptoAccount.toCBOR();
   const type = cryptoAccount.getRegistryType().getType();
-  return new UREncoder(
-    new UR(cbor, type),
-    Math.max(cbor.length, 100),
-  ).nextPart();
+  return encodeToUR(type, cbor);
 }
