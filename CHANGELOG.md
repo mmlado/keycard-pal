@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Show ERC-8213 verification digests (Calldata Digest for transactions, EIP-712 Digest for typed data) so you can independently verify what you're signing
 
+### Fixed
+
+- Contributors missing from the About screen; release build now merges the GitHub contributors API
+
 ### Changed
 
 - Extract `usePinPadScramble` hook from `PinPad`; preference loading is no longer inlined in the component
