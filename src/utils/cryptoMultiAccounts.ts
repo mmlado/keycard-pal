@@ -5,7 +5,7 @@ import {
   CryptoHDKey,
   CryptoMultiAccounts,
 } from '@keystonehq/bc-ur-registry';
-import { UR, UREncoder } from '@ngraveio/bc-ur';
+import { encodeToUR } from './ur';
 import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
@@ -140,8 +140,5 @@ export function buildCryptoMultiAccountsUR(result: BitgetExportResult): string {
 
   const cbor = cryptoMultiAccounts.toCBOR();
   const type = cryptoMultiAccounts.getRegistryType().getType();
-  return new UREncoder(
-    new UR(cbor, type),
-    Math.max(cbor.length, 100),
-  ).nextPart();
+  return encodeToUR(type, cbor);
 }

@@ -5,7 +5,7 @@ import {
   decodeToDataItem,
   encodeDataItem,
 } from '@keystonehq/bc-ur-registry';
-import { UR, UREncoder } from '@ngraveio/bc-ur';
+import { encodeToUR } from './ur';
 import { sha256 } from '@noble/hashes/sha2.js';
 import Keycard from 'keycard-sdk';
 
@@ -188,8 +188,5 @@ export function buildBtcSignatureUR(args: {
     }),
   );
 
-  return new UREncoder(
-    new UR(cbor, BTC_MESSAGE_SIGNATURE_TYPE),
-    Math.max(cbor.length, 100),
-  ).nextPart();
+  return encodeToUR(BTC_MESSAGE_SIGNATURE_TYPE, cbor);
 }

@@ -37,8 +37,6 @@ describe('computeCalldataDigest', () => {
   it('returns null for odd-length calldata', () => {
     expect(computeCalldataDigest('0xabc')).toBeNull();
   });
-
-
 });
 
 describe('computeEip712DigestFromJson', () => {

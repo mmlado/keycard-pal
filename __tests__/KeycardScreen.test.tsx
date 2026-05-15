@@ -40,6 +40,7 @@ jest.mock('../src/utils/btcPsbt', () => ({
   BtcSigningSession: jest.fn().mockImplementation(() => ({
     signWithKeycard: jest.fn().mockResolvedValue({ psbtHex: 'deadbeef' }),
   })),
+  buildCryptoPsbtUR: jest.fn(() => 'ur:crypto-psbt/mock'),
   inspectBtcPsbt: jest.fn(),
 }));
 

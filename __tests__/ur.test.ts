@@ -9,7 +9,7 @@ import {
 import { EthSignRequest } from '@keystonehq/bc-ur-registry-eth';
 import { URDecoder } from '@ngraveio/bc-ur';
 
-import { handleUR } from '../src/utils/ur';
+import { encodeToUR, handleUR } from '../src/utils/ur';
 import { DATA_TYPE_LABELS } from '../src/types';
 
 const VALID_EIP1559_TX_HEX =
@@ -299,6 +299,31 @@ describe('handleUR – btc-sign-request', () => {
     if (result.kind === 'error') {
       expect(result.message).toMatch(/Unsupported btc-sign-request data type/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// encodeToUR
+// ---------------------------------------------------------------------------
+
+describe('encodeToUR', () => {
+  it('returns a UR string with the given type prefix', () => {
+    const cbor = new CryptoPSBT(
+      Buffer.from('70736274ff01000a0200000000000000000000', 'hex'),
+    ).toCBOR();
+    const result = encodeToUR('crypto-psbt', cbor);
+    expect(result).toMatch(/^ur:crypto-psbt\//i);
+  });
+
+  it('produces output decodable by URDecoder', () => {
+    const cbor = new CryptoPSBT(
+      Buffer.from('70736274ff01000a0200000000000000000000', 'hex'),
+    ).toCBOR();
+    const encoded = encodeToUR('crypto-psbt', cbor);
+    const decoder = new URDecoder();
+    decoder.receivePart(encoded);
+    expect(decoder.isComplete()).toBe(true);
+    expect(decoder.resultUR().type).toBe('crypto-psbt');
   });
 });
 

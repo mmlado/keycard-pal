@@ -5,6 +5,7 @@ import type { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { pubKeyFingerprint } from './cryptoAccount';
 import { TLV_KEY_TEMPLATE, TLV_PUB_KEY, parseDerSignature } from './keycardTlv';
+import { encodeToUR } from './ur';
 
 type NetworkName = 'mainnet' | 'testnet' | 'unknown';
 
@@ -324,4 +325,11 @@ export class BtcSigningSession {
       totalInputs: signableInputs.length,
     };
   }
+}
+
+export function buildCryptoPsbtUR(psbtHex: string): string {
+  const psbt = new CryptoPSBT(Buffer.from(psbtHex, 'hex'));
+  const cbor = psbt.toCBOR();
+  const type = psbt.getRegistryType().getType();
+  return encodeToUR(type, cbor);
 }

@@ -3,7 +3,7 @@ import {
   CryptoKeypath,
   PathComponent,
 } from '@keystonehq/bc-ur-registry';
-import { UR, UREncoder } from '@ngraveio/bc-ur';
+import { encodeToUR } from './ur';
 import Keycard from 'keycard-sdk';
 
 import {
@@ -51,8 +51,5 @@ export function buildCryptoHdKeyUR(
 
   const cbor = hdKey.toCBOR();
   const type = hdKey.getRegistryType().getType();
-  return new UREncoder(
-    new UR(cbor, type),
-    Math.max(cbor.length, 100),
-  ).nextPart();
+  return encodeToUR(type, cbor);
 }
