@@ -7,6 +7,7 @@ import theme from '../theme';
 import SignRequestDetail from '../components/SignRequestDetail';
 import PrimaryButton from '../components/PrimaryButton';
 import { inspectBtcPsbt } from '../utils/btcPsbt';
+import { buildSignKeycardParams } from '../utils/signNavigation';
 
 export default function TransactionDetailScreen({
   route,
@@ -27,37 +28,13 @@ export default function TransactionDetailScreen({
       }
     })();
 
+  const keycardParams = buildSignKeycardParams(result);
+
   const handleSign = useCallback(() => {
-    if (result.kind === 'eth-sign-request') {
-      const request = result.request;
-      navigation.navigate('Keycard', {
-        operation: 'sign',
-        signMode: 'eth',
-        signData: request.signData,
-        derivationPath: request.derivationPath,
-        chainId: request.chainId,
-        requestId: request.requestId,
-        dataType: request.dataType,
-      });
-    } else if (result.kind === 'crypto-psbt') {
-      navigation.navigate('Keycard', {
-        operation: 'sign',
-        signMode: 'btc',
-        psbtHex: result.request.psbtHex,
-      });
-    } else if (result.kind === 'btc-sign-request') {
-      const request = result.request;
-      navigation.navigate('Keycard', {
-        operation: 'sign',
-        signMode: 'btc-message',
-        requestId: request.requestId,
-        signDataHex: request.signDataHex,
-        derivationPath: request.derivationPath,
-        address: request.address,
-        origin: request.origin,
-      });
+    if (keycardParams) {
+      navigation.navigate('Keycard', keycardParams);
     }
-  }, [result, navigation]);
+  }, [keycardParams, navigation]);
 
   return (
     <View style={styles.container}>
@@ -68,9 +45,7 @@ export default function TransactionDetailScreen({
         <SignRequestDetail result={result} />
       </ScrollView>
 
-      {(result.kind === 'eth-sign-request' ||
-        result.kind === 'crypto-psbt' ||
-        result.kind === 'btc-sign-request') && (
+      {keycardParams !== null && (
         <View style={[styles.actions, { paddingBottom: insets.bottom + 16 }]}>
           <PrimaryButton
             label={
