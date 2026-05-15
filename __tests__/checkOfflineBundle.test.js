@@ -48,8 +48,8 @@ describe('check-offline-bundle', () => {
     }
   });
 
-  it('fails on a fixture containing loadEnsRpcUrl', () => {
-    const filePath = writeFixture('loadEnsRpcUrl().then(console.log);');
+  it('fails on a fixture containing saveEnsEnabled', () => {
+    const filePath = writeFixture('saveEnsEnabled(true);');
     try {
       const result = run('--bundle', filePath);
       expect(result.status).not.toBe(0);

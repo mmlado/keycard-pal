@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAddress } from 'viem';
 
-import { loadEnsRpcUrl } from '../../storage/ensSettings.online';
+import { loadEnsSettings } from '../../storage/ensSettings.online';
 import { resolveEnsName } from '../../utils/ens/client.online';
 
 const cache = new Map<string, string>();
@@ -60,7 +60,8 @@ export function useEnsName(address: string): UseEnsNameResult {
       setError(false);
       lastFailureRef.current = null;
 
-      const rpcUrl = await loadEnsRpcUrl();
+      const { enabled, rpcUrl: configuredUrl } = await loadEnsSettings();
+      const rpcUrl = enabled && configuredUrl ? configuredUrl : null;
       if (!rpcUrl) {
         if (!cancelled) {
           setLoading(false);

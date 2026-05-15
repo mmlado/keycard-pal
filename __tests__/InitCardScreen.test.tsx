@@ -29,9 +29,8 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 jest.mock('../src/storage/preferencesStorage', () => ({
-  loadBooleanPreference: jest.fn().mockResolvedValue(false),
-  preferenceKeys: { pinPadScramble: 'preference_pinpad_scramble' },
-  saveBooleanPreference: jest.fn().mockResolvedValue(undefined),
+  loadPinPadScramble: jest.fn().mockResolvedValue(false),
+  savePinPadScramble: jest.fn().mockResolvedValue(undefined),
 }));
 
 const mockStart = jest.fn();
