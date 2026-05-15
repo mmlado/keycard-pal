@@ -1,12 +1,14 @@
 import { StyleSheet, View } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
 
-import type { BtcSignRequest } from '../types';
-import theme from '../theme';
-import { inspectBtcSignRequest } from '../utils/btcMessage';
-import InfoRow from './InfoRow';
+import theme from '@/theme';
+import type { BtcSignRequest } from '@/types';
 
-export default function BtcSignRequestDetail({
+import InfoRow from '@/components/InfoRow';
+
+import { inspectBtcSignRequest } from '@/utils/btcMessage';
+
+export default function SignRequestDetail({
   request,
 }: {
   request: BtcSignRequest;

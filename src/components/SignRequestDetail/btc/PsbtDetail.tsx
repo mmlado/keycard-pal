@@ -1,15 +1,17 @@
 import { StyleSheet, View } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
 
-import theme from '../theme';
-import InfoRow from './InfoRow';
-import { inspectBtcPsbt } from '../utils/btcPsbt';
+import theme from '@/theme';
+
+import InfoRow from '@/components/InfoRow';
+
+import { inspectBtcPsbt } from '@/utils/btcPsbt';
 
 function formatSats(value: number): string {
   return `${value.toLocaleString()} sats`;
 }
 
-export default function BtcPsbtDetail({ psbtHex }: { psbtHex: string }) {
+export default function PsbtDetail({ psbtHex }: { psbtHex: string }) {
   let summary;
   try {
     summary = inspectBtcPsbt(psbtHex);

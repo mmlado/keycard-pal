@@ -11,9 +11,15 @@ export function usePinPadScramble(): boolean {
   useEffect(() => {
     let mounted = true;
     loadBooleanPreference(preferenceKeys.pinPadScramble)
-      .then(value => { if (mounted) setScramble(value); })
-      .catch(() => { if (mounted) setScramble(false); });
-    return () => { mounted = false; };
+      .then(value => {
+        if (mounted) setScramble(value);
+      })
+      .catch(() => {
+        if (mounted) setScramble(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return scramble;

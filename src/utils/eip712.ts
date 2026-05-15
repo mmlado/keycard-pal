@@ -250,6 +250,35 @@ function parseSpecialReview(
   );
 }
 
+export type Eip712RawTypedData = {
+  domain: Record<string, unknown>;
+  message: Record<string, unknown>;
+  primaryType: string;
+  types: Record<string, unknown>;
+};
+
+export function parseEip712RawTypedData(
+  signDataHex: string,
+): Eip712RawTypedData | null {
+  const json = decodeUtf8(signDataHex);
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!isJsonObject(parsed)) return null;
+    return {
+      domain: isJsonObject(parsed.domain) ? parsed.domain : {},
+      message: isJsonObject(parsed.message) ? parsed.message : {},
+      primaryType:
+        typeof parsed.primaryType === 'string'
+          ? parsed.primaryType
+          : 'EIP712Domain',
+      types: isJsonObject(parsed.types) ? parsed.types : {},
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function parseEip712Summary(signDataHex: string): Eip712Summary | null {
   const json = decodeUtf8(signDataHex);
   if (!json) {

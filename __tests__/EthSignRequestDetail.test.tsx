@@ -2,15 +2,34 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import { RLP } from '@ethereumjs/rlp';
 
-import EthSignRequestDetail from '../src/components/EthSignRequestDetail';
+import EthSignRequestDetail from '../src/components/SignRequestDetail/eth/SignRequestDetail';
 import type { EthSignRequest } from '../src/types';
 
 jest.mock('react-native-paper', () => {
-  const { Text } = require('react-native');
+  const { Text, TouchableOpacity, View } = require('react-native');
   return {
     MD3DarkTheme: { colors: {} },
     Text,
     Icon: () => null,
+    SegmentedButtons: ({
+      buttons,
+      onValueChange,
+    }: {
+      value: string;
+      onValueChange: (v: string) => void;
+      buttons: { value: string; label: string }[];
+    }) => (
+      <View>
+        {buttons.map(b => (
+          <TouchableOpacity
+            key={b.value}
+            onPress={() => onValueChange(b.value)}
+          >
+            <Text>{b.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ),
   };
 });
 
@@ -546,5 +565,62 @@ describe('EthSignRequestDetail — EIP-712 special renderers', () => {
     expect(screen.getByText('ERC-20 Transfer')).toBeTruthy();
     expect(screen.getByText('1 USDC')).toBeTruthy();
     expect(screen.queryByText(/a9059cbb/)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// request.address, requestId, origin fields
+// ---------------------------------------------------------------------------
+
+describe('EthSignRequestDetail — optional fields', () => {
+  it('shows derivation path row when request.address is set', () => {
+    renderDetail({
+      signData: legacyTxHex(),
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0/0",
+      address: '0xd3cda913deb6f4967b2ef3aa68f5a843da74c4ef',
+    });
+    expect(screen.getByText("m/44'/60'/0'/0/0")).toBeTruthy();
+    expect(screen.getByText('Path')).toBeTruthy();
+  });
+
+  it('shows request ID row when requestId is present', () => {
+    renderDetail({
+      signData: legacyTxHex(),
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0",
+      requestId: 'req-abc-123',
+    });
+    expect(screen.getByText('req-abc-123')).toBeTruthy();
+  });
+
+  it('shows origin row when origin is present', () => {
+    renderDetail({
+      signData: legacyTxHex(),
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0",
+      origin: 'app.uniswap.org',
+    });
+    expect(screen.getByText('app.uniswap.org')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pre-hashed EIP-712 (DataTabPanel eip712Prehashed branch)
+// ---------------------------------------------------------------------------
+
+describe('EthSignRequestDetail — pre-hashed EIP-712', () => {
+  it('shows domain separator and message hash for a 0x1901 payload', () => {
+    const domainHash =
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const messageHash =
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    renderDetail({
+      signData: '1901' + domainHash + messageHash,
+      dataType: 2,
+      derivationPath: "m/44'/60'/0'/0",
+    });
+    expect(screen.getByText(/Domain separator/)).toBeTruthy();
+    expect(screen.getByText(/Message hash/)).toBeTruthy();
   });
 });
