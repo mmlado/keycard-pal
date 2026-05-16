@@ -10,31 +10,30 @@ let capturedOptions: {
   requiresMasterKey?: boolean;
 } | null = null;
 
-const mockExecute = jest.fn(
-  (
+const mockStart = jest.fn();
+
+jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
+  useKeycardOp: (
     fn: OperationFn,
     opts: { requiresPin?: boolean; requiresMasterKey?: boolean },
   ) => {
     capturedOperation = fn;
     capturedOptions = opts;
+    return {
+      phase: 'idle',
+      status: '',
+      result: null,
+      start: mockStart,
+      cancel: jest.fn(),
+      reset: jest.fn(),
+      submitPin: jest.fn(),
+    };
   },
-);
-
-jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
-  useKeycardOperation: () => ({
-    phase: 'idle',
-    status: '',
-    result: null,
-    execute: mockExecute,
-    cancel: jest.fn(),
-    reset: jest.fn(),
-    submitPin: jest.fn(),
-  }),
 }));
 
 describe('useGenerateSlip39Shares', () => {
   beforeEach(() => {
-    mockExecute.mockClear();
+    mockStart.mockClear();
     capturedOperation = null;
     capturedOptions = null;
   });
@@ -45,7 +44,7 @@ describe('useGenerateSlip39Shares', () => {
       result.current.start();
     });
 
-    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(mockStart).toHaveBeenCalledTimes(1);
     expect(capturedOptions).toEqual({
       requiresPin: false,
       requiresMasterKey: false,
@@ -73,6 +72,6 @@ describe('useGenerateSlip39Shares', () => {
     const { result } = renderHook(() => useGenerateSlip39Shares(3, 1));
 
     expect(() => result.current.start()).toThrow(/at least 2/);
-    expect(mockExecute).not.toHaveBeenCalled();
+    expect(mockStart).not.toHaveBeenCalled();
   });
 });

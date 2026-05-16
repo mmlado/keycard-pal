@@ -39,11 +39,12 @@ jest.mock('../src/assets/icons', () => {
 
 // Capture the useFocusEffect callback so tests can fire focus events.
 let focusCallback: (() => void) | null = null;
+const mockUseNavigationNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb: () => void) => {
     focusCallback = cb;
   },
-  useNavigation: () => ({ navigate: jest.fn() }),
+  useNavigation: () => ({ navigate: mockUseNavigationNavigate }),
 }));
 
 const mockDashboardActions: { label: string; navigate: (nav: any) => void }[] =
@@ -92,6 +93,7 @@ describe('DashboardScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
     navigation.setParams.mockClear();
+    mockUseNavigationNavigate.mockClear();
     mockDashboardActions.length = 0;
     mockLoadBooleanPreference.mockReset();
     mockSaveBooleanPreference.mockReset();
@@ -256,6 +258,18 @@ describe('DashboardScreen', () => {
       });
 
       expect(screen.queryByText('Keycard required')).toBeNull();
+    });
+
+    it('navigates to UrlQR when the QR icon button is pressed', async () => {
+      mockLoadBooleanPreference.mockResolvedValue(false);
+      await renderScreen();
+
+      fireEvent.press(screen.getByTestId('dashboard-keycard-qr-button'));
+
+      expect(mockUseNavigationNavigate).toHaveBeenCalledWith('UrlQR', {
+        url: 'https://get.keycard.tech/vuxxnf',
+        title: 'Buy a Keycard',
+      });
     });
   });
 });

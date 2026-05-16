@@ -10,26 +10,25 @@ let capturedOptions: {
   requiresMasterKey?: boolean;
 } | null = null;
 
-const mockExecute = jest.fn(
-  (
+const mockStart = jest.fn();
+
+jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
+  useKeycardOp: (
     fn: OperationFn,
     opts: { requiresPin?: boolean; requiresMasterKey?: boolean },
   ) => {
     capturedOperation = fn;
     capturedOptions = opts;
+    return {
+      phase: 'idle',
+      status: '',
+      result: null,
+      start: mockStart,
+      cancel: jest.fn(),
+      reset: jest.fn(),
+      submitPin: jest.fn(),
+    };
   },
-);
-
-jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
-  useKeycardOperation: () => ({
-    phase: 'idle',
-    status: '',
-    result: null,
-    execute: mockExecute,
-    cancel: jest.fn(),
-    reset: jest.fn(),
-    submitPin: jest.fn(),
-  }),
 }));
 
 jest.mock('keycard-sdk/dist/constants', () => ({
@@ -54,7 +53,7 @@ jest.mock('@scure/bip39/wordlists/english.js', () => ({
 
 describe('useGenerateKey', () => {
   beforeEach(() => {
-    mockExecute.mockClear();
+    mockStart.mockClear();
     capturedOperation = null;
     capturedOptions = null;
   });

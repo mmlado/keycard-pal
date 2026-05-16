@@ -16,26 +16,25 @@ let capturedOptions: {
   requiresMasterKey?: boolean;
 } | null = null;
 
-const mockExecute = jest.fn(
-  (
+const mockStart = jest.fn();
+
+jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
+  useKeycardOp: (
     fn: OperationFn,
     opts: { requiresPin?: boolean; requiresMasterKey?: boolean },
   ) => {
     capturedOperation = fn;
     capturedOptions = opts;
+    return {
+      phase: 'idle',
+      status: '',
+      result: null,
+      start: mockStart,
+      cancel: jest.fn(),
+      reset: jest.fn(),
+      submitPin: jest.fn(),
+    };
   },
-);
-
-jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
-  useKeycardOperation: () => ({
-    phase: 'idle',
-    status: '',
-    result: null,
-    execute: mockExecute,
-    cancel: jest.fn(),
-    reset: jest.fn(),
-    submitPin: jest.fn(),
-  }),
 }));
 
 jest.mock('keycard-sdk/dist/mnemonic', () => ({
@@ -66,7 +65,7 @@ const preparedKeyPair = { type: 'keypair' } as unknown as BIP32KeyPair;
 
 describe('deriveMnemonicKeyPair', () => {
   beforeEach(() => {
-    mockExecute.mockClear();
+    mockStart.mockClear();
     mockToBinarySeed.mockClear();
     mockFromBinarySeed.mockClear();
     mockFromBinarySeed.mockReturnValue({ type: 'keypair' });
@@ -100,7 +99,7 @@ describe('deriveMnemonicKeyPair', () => {
 
 describe('useLoadKey', () => {
   beforeEach(() => {
-    mockExecute.mockClear();
+    mockStart.mockClear();
     capturedOperation = null;
     capturedOptions = null;
   });
@@ -111,7 +110,7 @@ describe('useLoadKey', () => {
       result.current.start(preparedKeyPair);
     });
 
-    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(mockStart).toHaveBeenCalledTimes(1);
     expect(capturedOptions).toEqual({
       requiresPin: true,
       requiresMasterKey: false,

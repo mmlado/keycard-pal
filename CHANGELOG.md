@@ -22,6 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Extract `encodeToUR` helper to `ur.ts`; consolidate repeated `new UREncoder(new UR(...))` pattern across `btcMessage`, `cryptoAccount`, `cryptoHdKey`, `cryptoMultiAccounts`, and `btcPsbt`; move `buildBtcResultUR` out of `KeycardScreen` into `btcPsbt` as `buildCryptoPsbtUR`
 - Extract `buildSignKeycardParams` to `src/utils/signNavigation.ts`; remove result-kind dispatch from `TransactionDetailScreen.handleSign`
 - Replace generic `preferenceKeys` + `loadBooleanPreference` with typed per-preference helpers; drop `loadEnsRpcUrl` in favour of `loadEnsSettings`
+- `useKeycardOperation` composes with `useNFCOperation` instead of bypassing it to `useNFCSession`
+- Add `useKeycardOp` factory; remove `keycard.execute` boilerplate from six operation hooks
 
 ## [1.6.2] - 2026-05-13
 
