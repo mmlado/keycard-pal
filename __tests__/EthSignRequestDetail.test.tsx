@@ -49,6 +49,11 @@ jest.mock('../src/components/ens/AddressInfoRow.online', () => ({
   },
 }));
 
+jest.mock('../src/hooks/useTokenImagesEnabled.online', () => ({
+  __esModule: true,
+  default: () => false,
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

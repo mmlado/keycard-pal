@@ -3,20 +3,31 @@ import { Text } from 'react-native-paper';
 
 import theme from '@/theme';
 
+import useTokenImagesEnabled from '@/hooks/useTokenImagesEnabled.online';
 import { INTERNET_ENABLED } from '@/utils/buildConfig';
 import type { TokenMetadata } from '@/utils/tokenMetadata';
 
-function TokenLogo({ uri }: { uri: string }) {
+function TokenLogo({
+  uri,
+  imagesEnabled,
+}: {
+  uri: string;
+  imagesEnabled: boolean;
+}) {
   if (!INTERNET_ENABLED && !uri.startsWith('asset:/')) return null;
+  if (!imagesEnabled && !uri.startsWith('asset:/')) return null;
   return (
     <Image source={{ uri }} style={styles.tokenLogo} testID="token-logo" />
   );
 }
 
 export default function TokenSymbolRow({ token }: { token: TokenMetadata }) {
+  const imagesEnabled = useTokenImagesEnabled();
   return (
     <View style={styles.tokenRow}>
-      {token.logoURI && <TokenLogo uri={token.logoURI} />}
+      {token.logoURI && (
+        <TokenLogo uri={token.logoURI} imagesEnabled={imagesEnabled} />
+      )}
       <Text variant="labelMedium" style={styles.tokenSymbol}>
         {token.symbol}
       </Text>
