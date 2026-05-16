@@ -7,6 +7,7 @@ import theme from '../theme';
 
 import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
 import PinPadSettingsSection from '../components/settings/PinPadSettingsSection';
+import TokenImagesSettingsSection from '../components/settings/TokenImagesSettingsSection.online';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Settings',
@@ -26,8 +27,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       contentContainerStyle={styles.content}
     >
       <View style={styles.section}>
-        <EnsSettingsSection />
         <PinPadSettingsSection />
+        <TokenImagesSettingsSection />
+        <EnsSettingsSection />
       </View>
     </ScrollView>
   );

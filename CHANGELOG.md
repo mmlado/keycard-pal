@@ -9,10 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Show ERC-8213 verification digests (Calldata Digest for transactions, EIP-712 Digest for typed data) so you can independently verify what you're signing
-
-### Fixed
-
-- Contributors missing from the About screen; release build now merges the GitHub contributors API
+- Add opt-in toggle in Settings to enable remote token image downloads (online build only); preference persisted via `preferencesStorage`, default off
 
 ### Changed
 
@@ -24,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Replace generic `preferenceKeys` + `loadBooleanPreference` with typed per-preference helpers; drop `loadEnsRpcUrl` in favour of `loadEnsSettings`
 - `useKeycardOperation` composes with `useNFCOperation` instead of bypassing it to `useNFCSession`
 - Add `useKeycardOp` factory; remove `keycard.execute` boilerplate from six operation hooks
+- Reorder Settings screen: PIN pad scramble first, token images second, ENS last
+
+### Fixed
+
+- Contributors missing from the About screen; release build now merges the GitHub contributors API
 
 ## [1.6.2] - 2026-05-13
 

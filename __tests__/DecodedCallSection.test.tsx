@@ -36,6 +36,11 @@ jest.mock('../src/utils/buildConfig', () => ({
   INTERNET_ENABLED: false,
 }));
 
+jest.mock('../src/hooks/useTokenImagesEnabled.online', () => ({
+  __esModule: true,
+  default: () => false,
+}));
+
 jest.mock('../src/data/token-logos-index.json', () => ({
   '1:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 'png',
 }));
