@@ -7,25 +7,24 @@ type OperationFn = (cmdSet: any) => Promise<any>;
 let capturedOperation: OperationFn | null = null;
 let capturedOptions: { requiresPin?: boolean } | null = null;
 
-const mockExecute = jest.fn(
-  (fn: OperationFn, opts: { requiresPin?: boolean }) => {
-    capturedOperation = fn;
-    capturedOptions = opts;
-  },
-);
+const mockStart = jest.fn();
 const mockPubKeyFingerprint = jest.fn();
 const mockFromTLV = jest.fn();
 
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
-  useKeycardOperation: () => ({
-    phase: 'idle',
-    status: '',
-    result: null,
-    execute: mockExecute,
-    cancel: jest.fn(),
-    reset: jest.fn(),
-    submitPin: jest.fn(),
-  }),
+  useKeycardOp: (fn: OperationFn, opts: { requiresPin?: boolean }) => {
+    capturedOperation = fn;
+    capturedOptions = opts;
+    return {
+      phase: 'idle',
+      status: '',
+      result: null,
+      start: mockStart,
+      cancel: jest.fn(),
+      reset: jest.fn(),
+      submitPin: jest.fn(),
+    };
+  },
 }));
 
 jest.mock('../src/utils/cryptoAccount', () => ({
@@ -40,7 +39,7 @@ const expectedFingerprint = 0xdeadbeef;
 
 describe('useVerifyFingerprint', () => {
   beforeEach(() => {
-    mockExecute.mockClear();
+    mockStart.mockClear();
     mockPubKeyFingerprint.mockClear();
     mockFromTLV.mockClear();
     capturedOperation = null;

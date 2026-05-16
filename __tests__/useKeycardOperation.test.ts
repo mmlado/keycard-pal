@@ -1,7 +1,10 @@
 /* eslint-disable no-bitwise */
 
 import { act, renderHook } from '@testing-library/react-native';
-import { useKeycardOperation } from '../src/hooks/keycard/useKeycardOperation';
+import {
+  useKeycardOp,
+  useKeycardOperation,
+} from '../src/hooks/keycard/useKeycardOperation';
 import type { UseKeycardOperation } from '../src/hooks/keycard/useKeycardOperation';
 import { checkGenuine } from '../src/utils/genuineCheck';
 import { loadPairing } from '../src/storage/pairingStorage';
@@ -68,6 +71,33 @@ const mockCheckGenuine = checkGenuine as jest.MockedFunction<
   typeof checkGenuine
 >;
 const mockLoadPairing = loadPairing as jest.MockedFunction<typeof loadPairing>;
+
+// ---------------------------------------------------------------------------
+// Shared mock Commandset factory
+// ---------------------------------------------------------------------------
+
+const makeMockCmdSet = () => ({
+  applicationInfo: {
+    instanceUID: new Uint8Array([0xaa, 0xbb]),
+    initializedCard: true,
+    freePairingSlots: 5,
+    hasMasterKey: () => true,
+  },
+  select: jest.fn().mockResolvedValue({ sw: 0x9000 }),
+  identifyCard: jest.fn(),
+  autoPair: jest.fn().mockResolvedValue(undefined),
+  getPairing: jest.fn().mockReturnValue({ pairingIndex: 0 }),
+  setPairing: jest.fn(),
+  autoOpenSecureChannel: jest.fn().mockResolvedValue(undefined),
+  getData: jest.fn().mockResolvedValue({
+    sw: 0x9000,
+    data: new Uint8Array([0x20 | 9, ...Buffer.from('Main card')]),
+  }),
+  verifyPIN: jest.fn().mockResolvedValue({
+    sw: 0x9000,
+    checkAuthOK: jest.fn(),
+  }),
+});
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -256,31 +286,6 @@ describe('useKeycardOperation', () => {
   // -------------------------------------------------------------------------
 
   describe('genuine check', () => {
-    // A minimal Commandset whose select() returns 0x9000 so useNFCSession
-    // proceeds to call our handleCardConnected.
-    const makeMockCmdSet = () => ({
-      applicationInfo: {
-        instanceUID: new Uint8Array([0xaa, 0xbb]),
-        initializedCard: true,
-        freePairingSlots: 5,
-        hasMasterKey: () => true,
-      },
-      select: jest.fn().mockResolvedValue({ sw: 0x9000 }),
-      identifyCard: jest.fn(),
-      autoPair: jest.fn().mockResolvedValue(undefined),
-      getPairing: jest.fn().mockReturnValue({ pairingIndex: 0 }),
-      setPairing: jest.fn(),
-      autoOpenSecureChannel: jest.fn().mockResolvedValue(undefined),
-      getData: jest.fn().mockResolvedValue({
-        sw: 0x9000,
-        data: new Uint8Array([0x20 | 9, ...Buffer.from('Main card')]),
-      }),
-      verifyPIN: jest.fn().mockResolvedValue({
-        sw: 0x9000,
-        checkAuthOK: jest.fn(),
-      }),
-    });
-
     beforeEach(() => {
       // Default: no existing pairing, genuine check passes
       mockLoadPairing.mockResolvedValue(null);
@@ -472,5 +477,132 @@ describe('useKeycardOperation', () => {
       await triggerCardConnect(result.current);
       expect(mockOp).toHaveBeenCalledTimes(1);
     });
+
+    it('enters error phase when applicationInfo is missing from SELECT response', async () => {
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        applicationInfo: null,
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'No application info in SELECT response',
+      );
+    });
+  });
+
+  describe('clearPinError', () => {
+    it('is exposed and callable without side effects when no error exists', async () => {
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.clearPinError();
+      });
+      expect(result.current.pinError).toBeNull();
+    });
+  });
+
+  describe('PIN verification', () => {
+    beforeEach(() => {
+      mockLoadPairing.mockResolvedValue({ pairingIndex: 0 } as any);
+      mockCheckGenuine.mockResolvedValue(true);
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => makeMockCmdSet());
+    });
+
+    it('sets pinError and returns to pin_entry on wrong PIN', async () => {
+      const { WrongPINException } = require('keycard-sdk/dist/apdu-exception');
+      const err = new WrongPINException(2);
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        verifyPIN: jest.fn().mockResolvedValue({
+          sw: 0x63c2,
+          checkAuthOK: () => {
+            throw err;
+          },
+        }),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      await act(async () => {
+        result.current.submitPin('wrong');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+
+      expect(result.current.pinError).toBe(
+        'PIN is not valid. 2 attempts left.',
+      );
+      expect(result.current.phase).toBe('pin_entry');
+    });
+
+    it('enters error phase with locked message when no attempts remain', async () => {
+      const { WrongPINException } = require('keycard-sdk/dist/apdu-exception');
+      const err = new WrongPINException(0);
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        verifyPIN: jest.fn().mockResolvedValue({
+          sw: 0x6300,
+          checkAuthOK: () => {
+            throw err;
+          },
+        }),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      await act(async () => {
+        result.current.submitPin('wrong');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'Card is locked. Use Unblock Card option.',
+      );
+      expect(result.current.pinError).toBeNull();
+    });
+  });
+});
+
+describe('useKeycardOp', () => {
+  beforeEach(() => {
+    mockStartNFC.mockResolvedValue(undefined);
+    mockStartNFC.mockClear();
+  });
+
+  it('start() transitions to nfc when requiresPin is false', async () => {
+    const { result } = renderHook(() =>
+      useKeycardOp(jest.fn(), { requiresPin: false }),
+    );
+    await act(async () => {
+      result.current.start();
+    });
+    expect(result.current.phase).toBe('nfc');
+    expect(mockStartNFC).toHaveBeenCalledWith('Tap your Keycard');
+  });
+
+  it('start() transitions to pin_entry when requiresPin is true (default)', async () => {
+    const { result } = renderHook(() => useKeycardOp(jest.fn()));
+    await act(async () => {
+      result.current.start();
+    });
+    expect(result.current.phase).toBe('pin_entry');
+    expect(mockStartNFC).not.toHaveBeenCalled();
   });
 });

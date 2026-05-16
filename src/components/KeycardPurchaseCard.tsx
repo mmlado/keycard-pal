@@ -15,6 +15,7 @@ import PrimaryButton from './PrimaryButton';
 type KeycardPurchaseCardProps = {
   buttonTestID?: string;
   closeButtonTestID?: string;
+  qrButtonTestID?: string;
   onClose?: () => void;
   onShowQR?: () => void;
 };
@@ -26,6 +27,7 @@ const keycardPurchaseDescription =
 export default function KeycardPurchaseCard({
   buttonTestID,
   closeButtonTestID,
+  qrButtonTestID,
   onClose,
   onShowQR,
 }: KeycardPurchaseCardProps) {
@@ -69,7 +71,11 @@ export default function KeycardPurchaseCard({
           testID={buttonTestID}
         />
         {onShowQR ? (
-          <Pressable style={styles.qrIconButton} onPress={onShowQR}>
+          <Pressable
+            style={styles.qrIconButton}
+            onPress={onShowQR}
+            testID={qrButtonTestID}
+          >
             <Icons.qr
               width={22}
               height={22}

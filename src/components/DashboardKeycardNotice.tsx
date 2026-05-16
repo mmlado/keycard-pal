@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NavigationProp } from '@react-navigation/native';
+import { type NavigationProp, useNavigation } from '@react-navigation/native';
 
 import type { RootStackParamList } from '../navigation/types';
-import {
-  loadDashboardKeycardNoticeDismissed,
-  saveDashboardKeycardNoticeDismissed,
-} from '../storage/preferencesStorage';
 
 import KeycardPurchaseCard from './KeycardPurchaseCard';
 
 import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
+import {
+  loadDashboardKeycardNoticeDismissed,
+  saveDashboardKeycardNoticeDismissed,
+} from '../storage/preferencesStorage';
 
 export default function DashboardKeycardNotice() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -58,6 +57,7 @@ export default function DashboardKeycardNotice() {
         }
         buttonTestID="dashboard-keycard-purchase-link"
         closeButtonTestID="dashboard-keycard-notice-close"
+        qrButtonTestID="dashboard-keycard-qr-button"
       />
     </View>
   );

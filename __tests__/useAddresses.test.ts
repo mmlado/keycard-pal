@@ -10,23 +10,22 @@ type OperationFn = (cmdSet: any) => Promise<any>;
 let capturedOperation: OperationFn | null = null;
 let capturedOptions: { requiresPin?: boolean } | null = null;
 
-const mockExecute = jest.fn(
-  (fn: OperationFn, opts: { requiresPin?: boolean }) => {
-    capturedOperation = fn;
-    capturedOptions = opts;
-  },
-);
+const mockStart = jest.fn();
 
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
-  useKeycardOperation: () => ({
-    phase: 'idle',
-    status: '',
-    result: null,
-    execute: mockExecute,
-    cancel: jest.fn(),
-    reset: jest.fn(),
-    submitPin: jest.fn(),
-  }),
+  useKeycardOp: (fn: OperationFn, opts: { requiresPin?: boolean }) => {
+    capturedOperation = fn;
+    capturedOptions = opts;
+    return {
+      phase: 'idle',
+      status: '',
+      result: null,
+      start: mockStart,
+      cancel: jest.fn(),
+      reset: jest.fn(),
+      submitPin: jest.fn(),
+    };
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -53,7 +52,7 @@ jest.mock('../src/utils/hdAddress', () => ({
 
 describe('useAddresses', () => {
   beforeEach(() => {
-    mockExecute.mockClear();
+    mockStart.mockClear();
     mockExtendedKey.mockClear();
     capturedOperation = null;
     capturedOptions = null;
@@ -65,7 +64,7 @@ describe('useAddresses', () => {
       await act(async () => {
         result.current.start();
       });
-      expect(mockExecute).toHaveBeenCalledTimes(1);
+      expect(mockStart).toHaveBeenCalledTimes(1);
       expect(capturedOptions).toEqual({ requiresPin: true });
     });
   });

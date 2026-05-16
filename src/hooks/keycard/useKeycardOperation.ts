@@ -8,7 +8,7 @@ import { loadPairing, savePairing } from '../../storage/pairingStorage';
 import { checkGenuine } from '../../utils/genuineCheck';
 import { toHex } from '../../utils/hex';
 import { displayKeycardName, parseKeycardName } from '../../utils/keycardName';
-import useNFCSession from './useNFCSession';
+import { useNFCOperation } from './useNFCOperation';
 
 export type Phase =
   | 'idle'
@@ -44,7 +44,6 @@ export interface UseKeycardOperation<T> {
 }
 
 export function useKeycardOperation<T>(): UseKeycardOperation<T> {
-  const [result, setResult] = useState<T | null>(null);
   const [waitingForPin, setWaitingForPin] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
@@ -58,10 +57,12 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const approvedNonGenuineUidsRef = useRef<Set<string>>(new Set());
   const pendingUidRef = useRef<string | null>(null);
 
-  const handleCardDisconnected = useCallback(async () => {}, []);
-
   const doPairAndExecute = useCallback(
-    async (cmdSet: Commandset, uid: string, setStatus: (s: string) => void) => {
+    async (
+      cmdSet: Commandset,
+      uid: string,
+      setStatus: (s: string) => void,
+    ): Promise<T | null> => {
       const existingPairing = await loadPairing(uid);
       if (existingPairing) {
         console.log(
@@ -106,13 +107,12 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       }
 
       if (operationRunningRef.current || !operationRef.current) {
-        return;
+        return null;
       }
       operationRunningRef.current = true;
       setStatus('Processing...');
       try {
-        const opResult = await operationRef.current(cmdSet, { setStatus });
-        setResult(opResult);
+        return await operationRef.current(cmdSet, { setStatus });
       } finally {
         operationRunningRef.current = false;
       }
@@ -121,7 +121,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   );
 
   const handleCardConnected = useCallback(
-    async (cmdSet: Commandset, setStatus: (status: string) => void) => {
+    async (
+      cmdSet: Commandset,
+      setStatus: (status: string) => void,
+    ): Promise<T | null> => {
       const appInfo = cmdSet.applicationInfo;
       if (!appInfo) {
         throw new Error('No application info in SELECT response');
@@ -159,14 +162,14 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
           console.log('[Keycard] Genuine check failed — showing warning');
           pendingUidRef.current = uid;
           setShowGenuineWarning(true);
-          // Return without throwing: useNFCSession will set nfcPhase='done',
+          // Return null: useNFCSession will set nfcPhase='done',
           // but our phase computation overrides it to 'genuine_warning'.
-          return;
+          return null;
         }
         console.log('[Keycard] Genuine check passed');
       }
 
-      await doPairAndExecute(cmdSet, uid, setStatus);
+      return await doPairAndExecute(cmdSet, uid, setStatus);
     },
     [doPairAndExecute],
   );
@@ -174,9 +177,11 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const {
     phase: nfcPhase,
     status,
-    startNFC,
-    reset: resetNFC,
-  } = useNFCSession(handleCardConnected, handleCardDisconnected);
+    result,
+    start: startNFC,
+    cancel: nfcCancel,
+    reset: nfcReset,
+  } = useNFCOperation<T | null>(handleCardConnected);
 
   // 'genuine_warning' takes priority over all other phase overrides.
   const phase: Phase = showGenuineWarning
@@ -223,7 +228,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       pendingUidRef.current = null;
     }
     setShowGenuineWarning(false);
-    startNFC(); // Re-enter nfc phase; user taps card again
+    startNFC();
   }, [startNFC]);
 
   // Re-starts NFC without PIN re-entry — uses the cached PIN from the previous attempt.
@@ -232,8 +237,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     startNFC();
   }, [startNFC]);
 
-  const cancel = useCallback(() => {
-    resetNFC();
+  const clearKeycardState = useCallback(() => {
     setWaitingForPin(false);
     setPinError(null);
     setCardName(null);
@@ -242,20 +246,17 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     pinRef.current = '';
     operationRef.current = null;
     operationRunningRef.current = false;
-  }, [resetNFC]);
+  }, []);
+
+  const cancel = useCallback(() => {
+    nfcCancel();
+    clearKeycardState();
+  }, [nfcCancel, clearKeycardState]);
 
   const reset = useCallback(() => {
-    resetNFC();
-    setWaitingForPin(false);
-    setPinError(null);
-    setCardName(null);
-    setShowGenuineWarning(false);
-    pendingUidRef.current = null;
-    pinRef.current = '';
-    operationRef.current = null;
-    operationRunningRef.current = false;
-    setResult(null);
-  }, [resetNFC]);
+    nfcReset();
+    clearKeycardState();
+  }, [nfcReset, clearKeycardState]);
 
   return {
     phase,
@@ -271,4 +272,21 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     retry,
     proceedWithNonGenuine,
   };
+}
+
+export function useKeycardOp<T>(
+  op: KeycardOperationFn<T>,
+  options: ExecuteOptions = {},
+): Omit<UseKeycardOperation<T>, 'execute'> & { start: () => void } {
+  const { execute, ...rest } = useKeycardOperation<T>();
+  const opRef = useRef(op);
+  opRef.current = op;
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
+  const start = useCallback(() => {
+    execute(opRef.current, optionsRef.current);
+  }, [execute]);
+
+  return { ...rest, start };
 }
