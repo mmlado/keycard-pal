@@ -57,6 +57,23 @@ describe('metro.resolveRequest', () => {
         'android',
       );
     });
+
+    it('forces async-storage resolution from the project root shim', () => {
+      resolveRequest(
+        mockContext as any,
+        '@react-native-async-storage/async-storage',
+        'android',
+      );
+      expect(resolve).toHaveBeenCalledTimes(1);
+      assertNoResolveRequestRecursion();
+      expect(resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          originModulePath: expect.stringMatching(/_shim_\.js$/),
+        }),
+        '@react-native-async-storage/async-storage',
+        'android',
+      );
+    });
   });
 
   describe('offline build', () => {

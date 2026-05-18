@@ -20,6 +20,8 @@ const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
 
 jest.mock('../src/utils/ethSignature', () => ({
   buildEthSignatureUR: jest.fn(),
+  buildEthSignatureURFromResult: jest.fn(),
+  buildRawEthHexSignature: jest.fn(),
 }));
 
 jest.mock('../src/utils/cryptoAccount', () => ({
@@ -58,6 +60,15 @@ jest.mock('../src/utils/btcMessage', () => ({
   })),
 }));
 
+jest.mock('../src/utils/keycardExport', () => {
+  const actual = jest.requireActual('../src/utils/keycardExport');
+  return {
+    ...actual,
+    exportKeyForWallet: jest.fn(),
+    prepareSignHash: jest.fn(() => new Uint8Array(32)),
+  };
+});
+
 const mockSubmitPin = jest.fn();
 const mockCancel = jest.fn();
 const mockExecute = jest.fn();
@@ -65,6 +76,16 @@ const mockUseKeycardOperation = jest.fn();
 
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
   useKeycardOperation: () => mockUseKeycardOperation(),
+}));
+
+const mockRespondSuccess = jest.fn().mockResolvedValue(undefined);
+const mockRespondError = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../src/hooks/useWalletConnectSession.online', () => ({
+  useWalletConnectSession: () => ({
+    respondSuccess: mockRespondSuccess,
+    respondError: mockRespondError,
+  }),
 }));
 
 const navigation = {
@@ -245,10 +266,11 @@ describe('KeycardScreen', () => {
     });
 
     it('navigates after the 800ms timer fires', async () => {
-      const { buildEthSignatureUR } = require('../src/utils/ethSignature') as {
-        buildEthSignatureUR: jest.Mock;
-      };
-      buildEthSignatureUR.mockReturnValue('UR:ETH-SIGN/...');
+      const { buildEthSignatureURFromResult } =
+        require('../src/utils/ethSignature') as {
+          buildEthSignatureURFromResult: jest.Mock;
+        };
+      buildEthSignatureURFromResult.mockReturnValue('UR:ETH-SIGN/...');
 
       mockUseKeycardOperation.mockReturnValue({
         ...hookMock('done'),
@@ -439,6 +461,244 @@ describe('KeycardScreen', () => {
       const resetCall = navigation.reset.mock.calls[0][0];
       expect(resetCall.routes[1].name).toBe('QRResult');
       expect(resetCall.routes[1].params.urString).toBe('ur:btc-signature/mock');
+    });
+
+    it('does not navigate when result is not a Uint8Array (handleBtcMessageSignDone guard)', async () => {
+      mockUseKeycardOperation.mockReturnValue({
+        ...hookMock('done'),
+        result: { psbtHex: 'unexpected' },
+      });
+      await renderWithMockedHook(btcMessageSignRoute);
+      await act(async () => {
+        jest.advanceTimersByTime(800);
+      });
+      expect(navigation.reset).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleCancel', () => {
+    function lastOnCancel() {
+      const calls = MockNFCBottomSheet.mock.calls;
+      return calls[calls.length - 1][0].onCancel as () => Promise<void>;
+    }
+
+    it('calls cancel and resets to Dashboard', async () => {
+      await renderScreen('nfc');
+      await act(async () => {
+        await lastOnCancel()();
+      });
+      expect(mockCancel).toHaveBeenCalledTimes(1);
+      expect(navigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
+    });
+
+    it('calls respondError and resets to Dashboard when wcContext is present', async () => {
+      const wcSignRoute = {
+        params: {
+          operation: 'sign',
+          signMode: 'eth',
+          signData: 'deadbeef',
+          derivationPath: "m/44'/60'/0'/0",
+          dataType: 1,
+          chainId: 1,
+          wcContext: { id: 99, topic: 'test-topic' },
+        },
+        key: 'Keycard',
+        name: 'Keycard',
+      } as any;
+
+      await renderScreen('nfc', wcSignRoute);
+      await act(async () => {
+        await lastOnCancel()();
+      });
+      expect(mockRespondError).toHaveBeenCalledWith(
+        { id: 99, topic: 'test-topic' },
+        4001,
+        'User rejected',
+      );
+      expect(navigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
+    });
+  });
+
+  describe('eth sign execute callback', () => {
+    it('calls signWithPath with the prepared hash and derivation path', async () => {
+      const { prepareSignHash } = require('../src/utils/keycardExport') as {
+        prepareSignHash: jest.Mock;
+      };
+      const hash = new Uint8Array(32).fill(0xcc);
+      (prepareSignHash as jest.Mock).mockReturnValue(hash);
+
+      const checkOK = jest.fn();
+      const signWithPath = jest.fn().mockResolvedValue({
+        checkOK,
+        data: new Uint8Array([0xde, 0xad]),
+      });
+
+      await renderScreen('pin_entry', signRoute);
+
+      const signOp = mockExecute.mock.calls[0][0];
+      const result = await signOp({ signWithPath });
+
+      expect(signWithPath).toHaveBeenCalledWith(
+        hash,
+        signRoute.params.derivationPath,
+        false,
+      );
+      expect(checkOK).toHaveBeenCalledTimes(1);
+      expect(result).toEqual(new Uint8Array([0xde, 0xad]));
+    });
+  });
+
+  describe('btc PSBT execute callback', () => {
+    it('calls signWithKeycard and returns the signed psbtHex', async () => {
+      const { BtcSigningSession } = require('../src/utils/btcPsbt') as {
+        BtcSigningSession: jest.Mock;
+      };
+      const signWithKeycard = jest
+        .fn()
+        .mockResolvedValue({ psbtHex: 'signedpsbt' });
+      BtcSigningSession.mockImplementation(() => ({ signWithKeycard }));
+
+      await renderScreen('pin_entry', btcSignRoute);
+
+      const signOp = mockExecute.mock.calls[0][0];
+      const setStatus = jest.fn();
+      const result = await signOp({ signWithPath: jest.fn() }, { setStatus });
+
+      expect(signWithKeycard).toHaveBeenCalledWith(
+        { signWithPath: expect.any(Function) },
+        setStatus,
+      );
+      expect(result).toEqual({ psbtHex: 'signedpsbt' });
+    });
+  });
+
+  describe('export execute callback', () => {
+    it('calls exportKeyForWallet with derivationPath and setStatus', async () => {
+      const { exportKeyForWallet } = require('../src/utils/keycardExport') as {
+        exportKeyForWallet: jest.Mock;
+      };
+      exportKeyForWallet.mockResolvedValue({
+        exportRespData: new Uint8Array([1]),
+      });
+
+      await renderScreen('pin_entry', ethExportRoute);
+
+      const exportOp = mockExecute.mock.calls[0][0];
+      const cmdSet = {};
+      const setStatus = jest.fn();
+      await exportOp(cmdSet, { setStatus });
+
+      expect(exportKeyForWallet).toHaveBeenCalledWith(
+        cmdSet,
+        ethExportRoute.params.derivationPath,
+        setStatus,
+      );
+    });
+
+    it('does not navigate when export result is a Uint8Array (ArrayBuffer guard)', async () => {
+      mockUseKeycardOperation.mockReturnValue({
+        ...hookMock('done'),
+        result: new Uint8Array([1, 2, 3]),
+      });
+      await renderWithMockedHook(ethExportRoute);
+      await act(async () => {
+        jest.advanceTimersByTime(800);
+      });
+      expect(navigation.reset).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('WalletConnect eth sign done', () => {
+    it('calls respondSuccess and resets to Dashboard instead of navigating to QRResult', async () => {
+      const { buildRawEthHexSignature } =
+        require('../src/utils/ethSignature') as {
+          buildRawEthHexSignature: jest.Mock;
+        };
+      buildRawEthHexSignature.mockReturnValue('0xdeadbeef');
+
+      const wcSignRoute = {
+        params: {
+          operation: 'sign',
+          signMode: 'eth',
+          signData: 'deadbeef',
+          derivationPath: "m/44'/60'/0'/0",
+          dataType: 1,
+          chainId: 1,
+          wcContext: { id: 42, topic: 'wc-topic' },
+        },
+        key: 'Keycard',
+        name: 'Keycard',
+      } as any;
+
+      mockUseKeycardOperation.mockReturnValue({
+        ...hookMock('done'),
+        result: new Uint8Array(65).fill(0xab),
+      });
+      await renderWithMockedHook(wcSignRoute);
+      await act(async () => {
+        jest.advanceTimersByTime(800);
+      });
+      await act(async () => {});
+
+      expect(mockRespondSuccess).toHaveBeenCalledWith(
+        { id: 42, topic: 'wc-topic' },
+        '0xdeadbeef',
+      );
+      expect(navigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
+    });
+  });
+
+  describe('handleEthSignDone guard', () => {
+    it('does not navigate when result is not a Uint8Array', async () => {
+      mockUseKeycardOperation.mockReturnValue({
+        ...hookMock('done'),
+        result: { unexpected: true },
+      });
+      await renderWithMockedHook(signRoute);
+      await act(async () => {
+        jest.advanceTimersByTime(800);
+      });
+      expect(navigation.reset).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('UR build error handling', () => {
+    it('logs console.error when UR building throws inside the 800ms timer', async () => {
+      const { buildEthSignatureURFromResult } =
+        require('../src/utils/ethSignature') as {
+          buildEthSignatureURFromResult: jest.Mock;
+        };
+      buildEthSignatureURFromResult.mockImplementation(() => {
+        throw new Error('encode failed');
+      });
+
+      const consoleSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      mockUseKeycardOperation.mockReturnValue({
+        ...hookMock('done'),
+        result: new Uint8Array(65).fill(0x01),
+      });
+      await renderWithMockedHook(signRoute);
+      await act(async () => {
+        jest.advanceTimersByTime(800);
+      });
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[KeycardScreen] Failed to build UR:',
+        'encode failed',
+      );
+      consoleSpy.mockRestore();
     });
   });
 });

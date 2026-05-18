@@ -29,13 +29,19 @@ export default function Eip712JsonPanel({
 
   const eip712Digest = useMemo(() => {
     const raw = parseEip712RawTypedData(request.signData);
-    if (!raw) return null;
-    return computeEip712DigestFromJson(
-      raw.domain,
-      raw.message,
-      raw.primaryType,
-      raw.types,
-    );
+    if (raw) {
+      return computeEip712DigestFromJson(
+        raw.domain,
+        raw.message,
+        raw.primaryType,
+        raw.types,
+      );
+    }
+    // dataType=0 (WC pre-hashed): signData is already the 32-byte digest
+    if (/^0x[0-9a-fA-F]{64}$/.test(request.signData)) {
+      return request.signData;
+    }
+    return null;
   }, [request.signData]);
 
   return (

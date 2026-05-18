@@ -65,5 +65,9 @@
 		<string>A000000804000101</string>
 		<string>A0000008040001</string>
 	</array>
+	<key>INTERNET_ENABLED</key>
+	<string>$(INTERNET_ENABLED)</string>
+	<key>WC_PROJECT_ID</key>
+	<string>$(WC_PROJECT_ID)</string>
 </dict>
 </plist>

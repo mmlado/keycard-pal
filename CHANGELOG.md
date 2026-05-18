@@ -8,8 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- (online) WalletConnect v2: connect a dApp via QR, sign `personal_sign` and `eth_signTypedData_v4` with Keycard, configure project ID in Settings
 - Show ERC-8213 verification digests (Calldata Digest for transactions, EIP-712 Digest for typed data) so you can independently verify what you're signing
-- Add opt-in toggle in Settings to enable remote token image downloads (online build only); preference persisted via `preferencesStorage`, default off
+- (online) Add opt-in toggle in Settings to enable remote token image downloads; preference persisted via `preferencesStorage`, default off
 
 ### Changed
 

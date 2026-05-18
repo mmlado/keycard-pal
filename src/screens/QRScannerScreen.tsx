@@ -23,13 +23,14 @@ import theme from '../theme';
 import CameraView from '../components/CameraView';
 import { type ReadCodeEvent } from '../components/Camera';
 import { handleUR } from '../utils/ur';
+import { detectWcUri } from '../utils/walletConnect/qrDetector.online';
 
 export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: 'Scan transaction QR' });
+    navigation.setOptions({ title: 'Scan' });
   }, [navigation]);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [progress, setProgress] = useState(0);
@@ -66,6 +67,11 @@ export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
 
       const value = event.nativeEvent.codeStringValue;
       if (!value) {
+        return;
+      }
+
+      if (detectWcUri(value, navigation)) {
+        scannedRef.current = true;
         return;
       }
 

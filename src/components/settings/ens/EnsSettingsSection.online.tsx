@@ -4,7 +4,7 @@ import { Text } from 'react-native-paper';
 
 import theme from '../../../theme';
 
-import EnsRpcUrlInput from './EnsRpcUrlInput';
+import TextInputSetting from '../TextInputSetting';
 import SettingsToggleRow from '../SettingsToggleRow';
 
 import { clearEnsNameCache } from '../../../hooks/ens/useEnsName.online';
@@ -105,11 +105,14 @@ export default function EnsSettingsSection() {
         onValueChange={handleToggle}
       />
       {enabled && (
-        <EnsRpcUrlInput
-          input={input}
+        <TextInputSetting
+          label="RPC URL"
+          value={input}
           dirty={dirty}
-          validating={validating}
+          saving={validating}
           error={error}
+          placeholder={DEFAULT_ENS_RPC_URL}
+          keyboardType="url"
           onChangeText={value => {
             setInput(value);
             setError(null);

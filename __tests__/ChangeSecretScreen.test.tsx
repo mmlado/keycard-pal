@@ -32,6 +32,10 @@ jest.mock('../src/storage/preferencesStorage', () => ({
   savePinPadScramble: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../src/hooks/usePinPadScramble', () => ({
+  usePinPadScramble: () => false,
+}));
+
 const mockStart = jest.fn();
 const mockCancel = jest.fn();
 const mockReset = jest.fn();

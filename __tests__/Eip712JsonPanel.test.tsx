@@ -108,4 +108,47 @@ describe('Eip712JsonPanel', () => {
       screen.getByText('from: 0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'),
     ).toBeTruthy();
   });
+
+  it('shows pre-hashed digest on Digests tab when signData is already a 32-byte hex hash (dataType=0 WC path)', () => {
+    const digest =
+      '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+    const prehashedRequest: EthSignRequest = {
+      signData: digest,
+      dataType: 0,
+      derivationPath: "m/44'/60'/0'/0",
+    };
+    render(
+      <Eip712JsonPanel
+        request={prehashedRequest}
+        eip712={eip712}
+        chainId={1}
+      />,
+    );
+    fireEvent.press(screen.getByText('Digests'));
+    expect(screen.getByText(`EIP-712 Digest: ${digest}`)).toBeTruthy();
+  });
+
+  it('renders special EIP-712 review section when available', () => {
+    render(
+      <Eip712JsonPanel
+        request={request}
+        eip712={{ ...eip712, special: { kind: 'permit' } as any }}
+        chainId={1}
+      />,
+    );
+    expect(screen.getByText('SpecialEip712Section')).toBeTruthy();
+  });
+
+  it('omits digest row when signData cannot be parsed or treated as a digest', () => {
+    const invalidRequest: EthSignRequest = {
+      signData: 'not-eip712-json-or-digest',
+      dataType: 2,
+      derivationPath: "m/44'/60'/0'/0",
+    };
+    render(
+      <Eip712JsonPanel request={invalidRequest} eip712={eip712} chainId={1} />,
+    );
+    fireEvent.press(screen.getByText('Digests'));
+    expect(screen.queryByText(/EIP-712 Digest:/)).toBeNull();
+  });
 });

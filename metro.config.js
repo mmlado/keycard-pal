@@ -23,6 +23,11 @@ const config = {
     extraNodeModules: {
       ...nodeLibs,
       crypto: path.join(__dirname, 'src/shims/crypto.ts'),
+      // Force WalletConnect's bundled async-storage v1 to resolve to our v3 (TurboModule-compatible)
+      '@react-native-async-storage/async-storage': path.join(
+        __dirname,
+        'node_modules/@react-native-async-storage/async-storage',
+      ),
     },
     resolveRequest: createResolveRequest(process.env.ONLINE_BUILD === 'true'),
   },

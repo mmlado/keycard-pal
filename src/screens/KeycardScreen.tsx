@@ -8,6 +8,7 @@ import theme from '../theme';
 import NFCBottomSheet from '../components/NFCBottomSheet';
 
 import { useKeycardOperation } from '../hooks/keycard/useKeycardOperation';
+import { useWalletConnectSession } from '../hooks/useWalletConnectSession.online';
 
 import {
   buildBtcSignatureUR,
@@ -15,40 +16,16 @@ import {
   parseKeycardBtcMessageSignature,
 } from '../utils/btcMessage';
 import { BtcSigningSession, buildCryptoPsbtUR } from '../utils/btcPsbt';
-import { buildEthSignatureUR } from '../utils/ethSignature';
+import {
+  buildEthSignatureURFromResult,
+  buildRawEthHexSignature,
+} from '../utils/ethSignature';
 import {
   buildExportUr,
   exportKeyForWallet,
   prepareSignHash,
   type ExportKeyResult,
 } from '../utils/keycardExport';
-
-function buildEthResultUR(
-  result: Uint8Array,
-  hash: Uint8Array,
-  params: {
-    dataType?: number;
-    chainId?: number;
-    requestId?: string;
-    signData?: string;
-  },
-): string {
-  const firstByte = params.signData
-    ? parseInt(params.signData.slice(0, 2), 16)
-    : undefined;
-  const txType =
-    firstByte === 0x01 || firstByte === 0x02 ? firstByte : undefined;
-  return buildEthSignatureUR(
-    Array.from(result)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join(''),
-    hash,
-    params.dataType,
-    params.chainId,
-    params.requestId,
-    txType,
-  );
-}
 
 export default function KeycardScreen({
   route,
@@ -58,11 +35,23 @@ export default function KeycardScreen({
   const insets = useSafeAreaInsets();
   const hashRef = useRef<Uint8Array | null>(null);
   const btcSessionRef = useRef<BtcSigningSession | null>(null);
+  const respondedRef = useRef(false);
+
+  const { respondSuccess, respondError } = useWalletConnectSession();
+
+  const wcContext =
+    params.operation === 'sign' && params.signMode === 'eth'
+      ? params.wcContext
+      : undefined;
 
   const keycard = useKeycardOperation<
     ExportKeyResult | { psbtHex: string } | Uint8Array
   >();
   const { phase, result, execute, cancel } = keycard;
+
+  const resetToDashboard = useCallback(() => {
+    navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
+  }, [navigation]);
 
   const handleSign = useCallback(() => {
     if (params.operation !== 'sign') {
@@ -171,18 +160,45 @@ export default function KeycardScreen({
     if (!hashRef.current || !(result instanceof Uint8Array)) {
       return;
     }
-    const urString = buildEthResultUR(
-      result,
-      hashRef.current,
-      params as {
-        dataType?: number;
-        chainId?: number;
-        requestId?: string;
-        signData?: string;
-      },
+
+    const p = params as {
+      dataType?: number;
+      chainId?: number;
+      requestId?: string;
+      signData?: string;
+    };
+
+    if (wcContext && !respondedRef.current) {
+      respondedRef.current = true;
+      const rawSig = buildRawEthHexSignature(
+        result,
+        hashRef.current,
+        p.dataType,
+        p.chainId,
+        p.signData,
+      );
+      respondSuccess(wcContext, rawSig).finally(() => resetToDashboard());
+      return;
+    }
+
+    navigateToSignResult(
+      buildEthSignatureURFromResult(
+        result,
+        hashRef.current,
+        p.dataType,
+        p.chainId,
+        p.requestId,
+        p.signData,
+      ),
     );
-    navigateToSignResult(urString);
-  }, [result, params, navigateToSignResult]);
+  }, [
+    result,
+    params,
+    wcContext,
+    respondSuccess,
+    resetToDashboard,
+    navigateToSignResult,
+  ]);
 
   const handleBtcSignDone = useCallback(() => {
     if (
@@ -276,10 +292,18 @@ export default function KeycardScreen({
     navigation.setOptions({ title: 'Enter Keycard PIN' });
   }, [navigation]);
 
-  const handleCancel = useCallback(() => {
+  const handleCancel = useCallback(async () => {
     cancel();
-    navigation.goBack();
-  }, [cancel, navigation]);
+    if (wcContext && !respondedRef.current) {
+      respondedRef.current = true;
+      try {
+        await respondError(wcContext, 4001, 'User rejected');
+      } catch {
+        // ignore — relay may have already expired
+      }
+    }
+    resetToDashboard();
+  }, [cancel, wcContext, respondError, resetToDashboard]);
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
