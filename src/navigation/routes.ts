@@ -3,6 +3,7 @@ import React from 'react';
 
 import theme from '../theme';
 import type { RootStackParamList } from './types';
+import { onlineRoutes } from './onlineRoutes.online';
 
 // Top-level screens
 import AboutScreen from '../screens/AboutScreen';
@@ -191,4 +192,6 @@ export const routes: Route[] = [
     component: SettingsScreen,
     options: { ...defaultHeaderOptions, title: 'Settings' },
   },
+
+  ...onlineRoutes,
 ];

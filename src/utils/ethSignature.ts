@@ -39,17 +39,89 @@ function encodeV(v: number): Uint8Array {
   ]);
 }
 
-/**
- * Parse the raw Keycard signature TLV, compute v, and wrap in a
- * `ur:eth-signature` UR string ready to display as a QR code.
- *
- * @param signRespDataHex - hex string of `signResp.data` (TLV from Keycard)
- * @param hash            - the 32-byte hash that was signed (for recId recovery)
- * @param dataType        - eth-sign-request dataType (1=legacy, 2=typed, 3=personal, 4=typed transaction)
- * @param chainId         - chain ID (used for legacy tx v calculation)
- * @param requestId       - optional UUID hex from the original eth-sign-request
- * @param txType          - optional EIP-2718 transaction type byte (0x01 EIP-2930, 0x02 EIP-1559)
- */
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Detects EIP-2718 tx type from first byte of signData (0x01=EIP-2930, 0x02=EIP-1559).
+function detectTxType(signData?: string): number | undefined {
+  if (!signData) return undefined;
+  const hex = signData.startsWith('0x') ? signData.slice(2) : signData;
+  const firstByte = parseInt(hex.slice(0, 2), 16);
+  return firstByte === 0x01 || firstByte === 0x02 ? firstByte : undefined;
+}
+
+export function computeEthV(
+  recId: number,
+  dataType: number | undefined,
+  chainId: number | undefined,
+  txType?: number,
+): number {
+  if (txType === 0x01 || txType === 0x02) {
+    return recId;
+  }
+  switch (dataType) {
+    case 1:
+      return V_BASE_EIP155 + 2 * (chainId ?? 0) + recId;
+    case 4:
+      return recId;
+    default:
+      return V_BASE_LEGACY + recId;
+  }
+}
+
+export function buildRawHexSignature(
+  r: Uint8Array,
+  s: Uint8Array,
+  v: number,
+): string {
+  const paddedR = pad32(r);
+  const paddedS = pad32(s);
+  const vBytes = encodeV(v);
+  let hex = '0x';
+  for (const part of [paddedR, paddedS, vBytes]) {
+    for (const byte of part) {
+      hex += byte.toString(16).padStart(2, '0');
+    }
+  }
+  return hex;
+}
+
+export function buildRawEthHexSignature(
+  result: Uint8Array,
+  hash: Uint8Array,
+  dataType: number | undefined,
+  chainId: number | undefined,
+  signData?: string,
+): string {
+  const sig = new Keycard.RecoverableSignature({
+    hash,
+    tlvData: hexToBytes(ensureHexPrefix(bytesToHex(result))),
+  });
+  const v = computeEthV(sig.recId!, dataType, chainId, detectTxType(signData));
+  return buildRawHexSignature(sig.r!, sig.s!, v);
+}
+
+export function buildEthSignatureURFromResult(
+  result: Uint8Array,
+  hash: Uint8Array,
+  dataType: number | undefined,
+  chainId: number | undefined,
+  requestId: string | undefined,
+  signData?: string,
+): string {
+  return buildEthSignatureUR(
+    bytesToHex(result),
+    hash,
+    dataType,
+    chainId,
+    requestId,
+    detectTxType(signData),
+  );
+}
+
 export function buildEthSignatureUR(
   signRespDataHex: string,
   hash: Uint8Array,
@@ -66,23 +138,7 @@ export function buildEthSignatureUR(
   const recId = sig.recId!;
   const r = pad32(sig.r!);
   const s = pad32(sig.s!);
-
-  let v: number;
-  if (txType === 0x01 || txType === 0x02) {
-    // Typed transactions use yParity directly: v = recId.
-    v = recId;
-  } else {
-    switch (dataType) {
-      case 1: // legacy transaction (EIP-155)
-        v = V_BASE_EIP155 + 2 * (chainId ?? 0) + recId;
-        break;
-      case 4: // typed transaction without an explicit txType
-        v = recId;
-        break;
-      default: // EIP-712 (2), personal_sign (3), unknown
-        v = V_BASE_LEGACY + recId;
-    }
-  }
+  const v = computeEthV(recId, dataType, chainId, txType);
 
   const sigBytes = new Uint8Array(r.length + s.length + encodeV(v).length);
   sigBytes.set(r, 0);

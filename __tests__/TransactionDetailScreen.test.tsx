@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import TransactionDetailScreen from '../src/screens/TransactionDetailScreen';
 import type { EthSignRequest } from '../src/types';
@@ -7,6 +7,22 @@ import type { EthSignRequest } from '../src/types';
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(), setItem: jest.fn() },
+}));
+
+const mockRespondError = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../src/hooks/useWalletConnectSession.online', () => ({
+  useWalletConnectSession: () => ({
+    phase: 'idle',
+    activeSession: null,
+    pendingRequest: null,
+    pair: jest.fn(),
+    approveSession: jest.fn(),
+    rejectSession: jest.fn(),
+    disconnect: jest.fn(),
+    respondSuccess: jest.fn(),
+    respondError: mockRespondError,
+  }),
 }));
 
 jest.mock('../src/hooks/ens/useEnsName.online', () => ({
@@ -101,11 +117,17 @@ jest.mock('react-native-safe-area-context', () => ({
 
 // Use react-native's own Text so rendered content is visible in the JSON tree.
 jest.mock('react-native-paper', () => {
-  const { Text, TouchableOpacity, View } = require('react-native');
+  const { Text, Pressable, TouchableOpacity, View } = require('react-native');
   return {
     MD3DarkTheme: { colors: {} },
     Text,
     Icon: () => null,
+    Button: ({ children, onPress }: any) =>
+      require('react').createElement(
+        Pressable,
+        { onPress },
+        require('react').createElement(Text, null, children),
+      ),
     SegmentedButtons: ({
       buttons,
       onValueChange,
@@ -139,6 +161,29 @@ function renderScreen(result: any) {
       route={
         {
           params: { result },
+          key: 'TransactionDetail',
+          name: 'TransactionDetail',
+        } as any
+      }
+      navigation={navigation}
+    />,
+  );
+  return { ...view, navigation };
+}
+
+const wcContext = { id: 1, topic: 'test-topic' };
+
+function renderScreenWithWc(result: any) {
+  const navigation = {
+    navigate: jest.fn(),
+    reset: jest.fn(),
+    addListener: jest.fn(() => jest.fn()),
+  } as any;
+  const view = render(
+    <TransactionDetailScreen
+      route={
+        {
+          params: { result, wcContext },
           key: 'TransactionDetail',
           name: 'TransactionDetail',
         } as any
@@ -324,9 +369,8 @@ describe('TransactionDetailScreen – eth-sign-request result', () => {
         origin: 'MetaMask',
       },
     });
-    expect(screen.getByText('EIP-712 Typed Data')).toBeTruthy();
+    expect(screen.getAllByText('Mail').length).toBeGreaterThan(0);
     expect(screen.getByText('Primary type')).toBeTruthy();
-    expect(screen.getByText('Mail')).toBeTruthy();
     expect(screen.getByText('EIP-712 Domain')).toBeTruthy();
     expect(screen.getByText('Ether Mail')).toBeTruthy();
     expect(screen.getByText('Message Fields')).toBeTruthy();
@@ -443,5 +487,73 @@ describe('TransactionDetailScreen – btc-sign-request result', () => {
       address: request.address,
       origin: request.origin,
     });
+  });
+});
+
+describe('TransactionDetailScreen – WalletConnect context', () => {
+  beforeEach(() => mockRespondError.mockClear());
+
+  it('shows Reject button when wcContext is present', async () => {
+    renderScreenWithWc({ kind: 'eth-sign-request', request: fullRequest });
+    expect(screen.getByText('Reject')).toBeTruthy();
+  });
+
+  it('calls respondError and navigates to Dashboard on Reject press', async () => {
+    const { navigation } = renderScreenWithWc({
+      kind: 'eth-sign-request',
+      request: fullRequest,
+    });
+    fireEvent.press(screen.getByText('Reject'));
+    await act(async () => {});
+    expect(mockRespondError).toHaveBeenCalledWith(
+      wcContext,
+      4001,
+      'User rejected',
+    );
+    expect(navigation.reset).toHaveBeenCalledWith(
+      expect.objectContaining({ routes: [{ name: 'Dashboard' }] }),
+    );
+  });
+
+  it('registers beforeRemove listener when wcContext is present', () => {
+    const { navigation } = renderScreenWithWc({
+      kind: 'eth-sign-request',
+      request: fullRequest,
+    });
+    expect(navigation.addListener).toHaveBeenCalledWith(
+      'beforeRemove',
+      expect.any(Function),
+    );
+  });
+
+  it('rejects WalletConnect request on back navigation', async () => {
+    const { navigation } = renderScreenWithWc({
+      kind: 'eth-sign-request',
+      request: fullRequest,
+    });
+    const beforeRemove = navigation.addListener.mock.calls[0][1];
+
+    beforeRemove();
+    await act(async () => {});
+
+    expect(mockRespondError).toHaveBeenCalledWith(
+      wcContext,
+      4001,
+      'User rejected',
+    );
+  });
+
+  it('does not reject on beforeRemove when navigating to Keycard', async () => {
+    const { navigation } = renderScreenWithWc({
+      kind: 'eth-sign-request',
+      request: fullRequest,
+    });
+    const beforeRemove = navigation.addListener.mock.calls[0][1];
+
+    fireEvent.press(screen.getByText('Sign transaction'));
+    beforeRemove();
+    await act(async () => {});
+
+    expect(mockRespondError).not.toHaveBeenCalled();
   });
 });

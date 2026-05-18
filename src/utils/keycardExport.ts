@@ -34,7 +34,7 @@ export function prepareSignHash(
   signData: string,
   dataType: number | undefined,
 ): Uint8Array {
-  const raw = new Uint8Array(Buffer.from(signData, 'hex'));
+  const raw = new Uint8Array(Buffer.from(signData.replace(/^0x/i, ''), 'hex'));
   if (dataType === 1 || dataType === 4) {
     return keccak_256(raw);
   }

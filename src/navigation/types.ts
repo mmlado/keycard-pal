@@ -1,6 +1,7 @@
 import { NavigationProp } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import type { WCContext } from '../constants/walletConnect';
 import type { ScanResult } from '../types';
 
 export type KeycardParams =
@@ -12,6 +13,7 @@ export type KeycardParams =
       chainId?: number;
       requestId?: string;
       dataType?: number;
+      wcContext?: WCContext;
     }
   | {
       operation: 'sign';
@@ -38,13 +40,14 @@ export type SecretType = 'pin' | 'puk' | 'pairing';
 
 export type RootStackParamList = {
   Dashboard: { toast?: string } | undefined;
+  WalletConnectPairing: { uri: string };
   KeycardMenu: undefined;
   SetCardName: undefined;
   InitCard: undefined;
   SecretsMenu: undefined;
   ChangeSecret: { secretType: SecretType };
   QRScanner: undefined;
-  TransactionDetail: { result: ScanResult };
+  TransactionDetail: { result: ScanResult; wcContext?: WCContext };
   Keycard: KeycardParams;
   ExportKey: undefined;
   KeyPairMenu: undefined;
@@ -202,6 +205,11 @@ export type UrlQRScreenProps = NativeStackScreenProps<
 export type SettingsScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'Settings'
+>;
+
+export type WalletConnectPairingScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'WalletConnectPairing'
 >;
 
 export type DashboardAction = {

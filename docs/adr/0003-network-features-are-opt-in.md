@@ -14,12 +14,15 @@ ENS resolution was already opt-in at launch. Token image fetching was opt-out (r
 
 Every network-touching feature in the online build must be **opt-in**: disabled by default, enabled explicitly by the user in Settings. Preferences are persisted via `preferencesStorage`. Storage keys for opt-in features use an `_enabled` suffix so that the unset state (no stored value) maps to `false` via the existing `loadBoolean` helper, which defaults to `false`.
 
+**Exception — gesture-gated features:** A feature does not require a Settings toggle when the user's deliberate gesture to activate it is itself an unambiguous opt-in. The activation must be explicit, targeted (not ambient), and require active user confirmation before any network connection is made. WalletConnect v2 qualifies: the user must scan a `wc:` QR code and then approve the session proposal — no network activity occurs until those steps complete. No Settings toggle is required for such features.
+
 Features covered by this decision:
 
 - ENS reverse resolution — opt-in toggle in Settings (already compliant)
 - Remote token image downloads — opt-in toggle in Settings (added in 1.7.0)
+- WalletConnect v2 — exempt; `wc:` QR scan + session approval is the opt-in gesture
 
-Any future network-touching feature added to the online build must follow the same pattern.
+Any future network-touching feature added to the online build must follow the same pattern or qualify under the gesture-gated exception.
 
 ## Rationale
 
@@ -29,10 +32,12 @@ Any future network-touching feature added to the online build must follow the sa
 
 ## Consequences
 
-- New network-touching features require a Settings toggle before shipping.
+- New network-touching features require a Settings toggle before shipping, unless they qualify under the gesture-gated exception.
 - Token images are disabled by default; users must opt in via Settings.
 - The `preferencesStorage` module grows one load/save pair per opt-in feature.
+- WalletConnect v2 ships without a Settings toggle; the `wc:` QR scan + session approval gates all network activity.
 
 ## Revisit if
 
-- A feature is so fundamental to the online build that opt-out is a better UX (e.g., a future WalletConnect integration that is the reason a user installs the online build at all).
+- A gesture-gated feature is found to make ambient network calls before user confirmation (would remove the exception for that feature).
+- The gesture-gated exception is abused for features whose activation is not clearly deliberate and targeted.

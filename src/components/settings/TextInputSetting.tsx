@@ -1,52 +1,66 @@
-import { ActivityIndicator, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardTypeOptions,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../../theme';
+import theme from '../../theme';
 
-export default function EnsRpcUrlInput({
-  input,
+export default function TextInputSetting({
+  label,
+  value,
   dirty,
-  validating,
+  saving,
   error,
+  placeholder,
+  keyboardType,
   onChangeText,
   onRevert,
   onSave,
 }: {
-  input: string;
+  label: string;
+  value: string;
   dirty: boolean;
-  validating: boolean;
-  error: string | null;
-  onChangeText: (value: string) => void;
+  saving?: boolean;
+  error?: string | null;
+  placeholder?: string;
+  keyboardType?: KeyboardTypeOptions;
+  onChangeText: (v: string) => void;
   onRevert: () => void;
   onSave: () => void;
 }) {
   return (
     <>
-      <Text variant="bodySmall" style={styles.fieldLabel}>
-        RPC URL
+      <Text variant="bodySmall" style={styles.label}>
+        {label}
       </Text>
       <TextInput
         style={styles.input}
-        value={input}
+        value={value}
         onChangeText={onChangeText}
         autoCapitalize="none"
         autoCorrect={false}
-        keyboardType="url"
-        editable={!validating}
+        placeholder={placeholder}
+        placeholderTextColor={theme.colors.onSurfaceVariant}
+        keyboardType={keyboardType}
+        editable={!saving}
       />
-      {error && <Text style={styles.error}>{error}</Text>}
-      {(dirty || validating) && (
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {(dirty || saving) && (
         <View style={styles.buttonRow}>
-          {dirty && !validating && (
+          {dirty && !saving && (
             <Text style={styles.revertButton} onPress={onRevert}>
               Revert
             </Text>
           )}
           <Text
-            style={[styles.saveButton, validating && styles.saveButtonDisabled]}
-            onPress={validating ? undefined : onSave}
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            onPress={saving ? undefined : onSave}
           >
-            {validating ? (
+            {saving ? (
               <ActivityIndicator size="small" color={theme.colors.primary} />
             ) : (
               'Save'
@@ -59,7 +73,7 @@ export default function EnsRpcUrlInput({
 }
 
 const styles = StyleSheet.create({
-  fieldLabel: {
+  label: {
     color: theme.colors.onSurfaceVariant,
   },
   input: {

@@ -22,14 +22,15 @@ export default function SignRequestDetail({
     request.chainId !== undefined
       ? getNativeCurrencySymbol(request.chainId)
       : 'ETH';
-  const typeLabel = getTxLabel(request.signData, request.dataType);
-  const tx = parseTx(request.signData, request.dataType, nativeSymbol);
-  const eip712 =
-    request.dataType === 2 ? parseEip712Summary(request.signData) : null;
+  // WC EIP-712 requests carry original JSON in reviewData (dataType=0 + digest in signData)
+  const eip712Source =
+    request.reviewData ?? (request.dataType === 2 ? request.signData : null);
+  const eip712 = eip712Source ? parseEip712Summary(eip712Source) : null;
   const eip712Prehashed =
-    request.dataType === 2 && !eip712
-      ? parseEip712Prehashed(request.signData)
-      : null;
+    eip712Source && !eip712 ? parseEip712Prehashed(eip712Source) : null;
+  const typeLabel =
+    eip712?.primaryType ?? getTxLabel(request.signData, request.dataType);
+  const tx = parseTx(request.signData, request.dataType, nativeSymbol);
   const signer = request.address
     ? checksumEthAddress(request.address)
     : request.derivationPath;

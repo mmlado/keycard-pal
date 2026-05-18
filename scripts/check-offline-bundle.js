@@ -3,15 +3,23 @@
 const fs = require('fs');
 const path = require('path');
 
-// These markers are string literals that only appear if our own ENS source
-// files are bundled. Avoid viem function names — viem is a shared dependency
-// and its barrel exports include ENS internals regardless of tree-shaking.
+// These markers are string literals that only appear if our own ENS or
+// WalletConnect source files are bundled. Avoid viem function names — viem
+// is a shared dependency and its barrel exports include ENS internals
+// regardless of tree-shaking.
 const FORBIDDEN_MARKERS = [
+  // ENS
   'ethereum-rpc.publicnode.com',
   'EnsSettingsSection',
   'saveEnsEnabled',
   'ENS RPC URL',
   'ENS lookups send',
+  // WalletConnect
+  'WalletConnectProvider',
+  'WalletConnectSettingsSection',
+  'wc_project_id_override',
+  '@reown/walletkit',
+  'reown.com/privacy-policy',
 ];
 
 function parseArgs(argv) {

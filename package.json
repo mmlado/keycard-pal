@@ -5,7 +5,7 @@
   "scripts": {
     "android": "ONLINE_BUILD=true react-native run-android --mode fullDebug",
     "android:offline": "react-native run-android --mode offlineDebug",
-    "ios": "react-native run-ios",
+    "ios": "set -a; [ -f .env ] && . ./.env; set +a; react-native run-ios",
     "lint": "eslint .",
     "lint:android": "cd android && ./gradlew ktlintCheck",
     "lint:ios": "cd ios && swiftlint lint",
@@ -54,6 +54,10 @@
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.23.0",
     "react-native-svg": "^15.15.3",
+    "@react-native-community/netinfo": "12.0.1",
+    "@reown/walletkit": "^1.5.5",
+    "@walletconnect/react-native-compat": "2.23.9",
+    "fast-text-encoding": "1.0.6",
     "slip39": "^0.1.9",
     "viem": "^2.47.6"
   },

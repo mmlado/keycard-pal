@@ -78,6 +78,10 @@ def enableProguardInReleaseBuilds = true
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def dotenv = new Properties()
+def dotenvFile = rootProject.file("../.env")
+if (dotenvFile.exists()) dotenv.load(dotenvFile.newInputStream())
+def wcProjectId = System.getenv("WC_PROJECT_ID") ?: dotenv.getProperty("WC_PROJECT_ID", "")
 def releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
 def releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
 def releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
@@ -105,12 +109,14 @@ android {
             // Usage in Java/Kotlin: if (BuildConfig.INTERNET_ENABLED) { ... }
             // Usage in JS: expose via a NativeModule when the first internet feature lands
             buildConfigField "boolean", "INTERNET_ENABLED", "true"
+            buildConfigField "String", "WC_PROJECT_ID", "\"${wcProjectId}\""
         }
         offline {
             dimension "distribution"
             applicationId "tech.gapsign.offline"
             // BuildConfig.INTERNET_ENABLED == false — INTERNET permission never declared
             buildConfigField "boolean", "INTERNET_ENABLED", "false"
+            buildConfigField "String", "WC_PROJECT_ID", "\"\""
         }
     }
     buildFeatures {

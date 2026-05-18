@@ -10,6 +10,7 @@ import { DashboardScreenProps } from '../navigation/types';
 import theme from '../theme';
 
 import DashboardKeycardNotice from '../components/DashboardKeycardNotice';
+import WalletConnectDashboardCard from '../components/walletConnect/DashboardCard.online';
 import Menu from '../components/Menu';
 import PrimaryButton from '../components/PrimaryButton';
 
@@ -51,13 +52,10 @@ export default function DashboardScreen({
       <Menu entries={entries} />
 
       <DashboardKeycardNotice />
+      <WalletConnectDashboardCard />
 
       <View style={styles.actions}>
-        <PrimaryButton
-          label="Scan transaction"
-          onPress={handleSign}
-          icon={Icons.scan}
-        />
+        <PrimaryButton label="Scan" onPress={handleSign} icon={Icons.scan} />
       </View>
 
       <Snackbar

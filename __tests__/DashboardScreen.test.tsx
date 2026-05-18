@@ -59,6 +59,11 @@ jest.mock('../src/navigation/dashboardActions', () => ({
 const mockLoadBooleanPreference = jest.fn();
 const mockSaveBooleanPreference = jest.fn();
 
+jest.mock(
+  '../src/components/walletConnect/DashboardCard.online',
+  () => () => null,
+);
+
 jest.mock('../src/storage/preferencesStorage', () => ({
   loadDashboardKeycardNoticeDismissed: (...args: any[]) =>
     mockLoadBooleanPreference(...args),
@@ -108,9 +113,9 @@ describe('DashboardScreen', () => {
   });
 
   describe('static layout', () => {
-    it('renders the Scan transaction button', async () => {
+    it('renders the Scan button', async () => {
       await renderScreen();
-      expect(screen.getByText('Scan transaction')).toBeTruthy();
+      expect(screen.getByText('Scan')).toBeTruthy();
     });
 
     it('renders one fewer pressable when action list is empty', async () => {
@@ -163,9 +168,9 @@ describe('DashboardScreen', () => {
   });
 
   describe('navigation', () => {
-    it('navigates to QRScanner when Scan transaction is pressed', async () => {
+    it('navigates to QRScanner when Scan is pressed', async () => {
       await renderScreen();
-      fireEvent.press(screen.getByText('Scan transaction'));
+      fireEvent.press(screen.getByText('Scan'));
       expect(navigation.navigate).toHaveBeenCalledWith('QRScanner');
     });
 

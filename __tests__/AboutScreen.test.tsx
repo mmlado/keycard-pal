@@ -1,6 +1,6 @@
 import React from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Linking } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import AboutScreen from '../src/screens/AboutScreen';
 
@@ -57,6 +57,7 @@ function renderScreen() {
 
 describe('AboutScreen', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
     navigation.navigate.mockClear();
     mockUseNavigationNavigate.mockClear();
     mockSetString.mockClear();
@@ -64,6 +65,8 @@ describe('AboutScreen', () => {
   });
 
   afterEach(() => {
+    act(() => jest.runAllTimers());
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -102,17 +105,11 @@ describe('AboutScreen', () => {
   });
 
   it('clears pending copy timer when copy is pressed again', () => {
-    jest.useFakeTimers();
-    try {
-      renderScreen();
-      fireEvent.press(screen.getByLabelText('Copy Bitcoin address'));
-      fireEvent.press(screen.getByLabelText('Copy Bitcoin address'));
-      expect(mockSetString).toHaveBeenCalledTimes(2);
-      // Advance past the reset delay — copied should still be false (timer was cleared and restarted)
-      jest.runAllTimers();
-    } finally {
-      jest.useRealTimers();
-    }
+    renderScreen();
+    fireEvent.press(screen.getByLabelText('Copy Bitcoin address'));
+    fireEvent.press(screen.getByLabelText('Copy Bitcoin address'));
+    expect(mockSetString).toHaveBeenCalledTimes(2);
+    // afterEach drains timers via act — copied resets to false after the delay
   });
 
   it('opens support addresses as QR codes', () => {

@@ -67,6 +67,11 @@ jest.mock('../src/utils/ur', () => ({
   handleUR: (...args: any[]) => mockHandleUR(...args),
 }));
 
+const mockDetectWcUri = jest.fn();
+jest.mock('../src/utils/walletConnect/qrDetector.online', () => ({
+  detectWcUri: (...args: any[]) => mockDetectWcUri(...args),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -99,6 +104,8 @@ describe('QRScannerScreen', () => {
     mockResultUR.mockReturnValue(undefined);
     mockResultError.mockReturnValue('decode error');
     mockHandleUR.mockReset();
+    mockDetectWcUri.mockReset();
+    mockDetectWcUri.mockReturnValue(false);
     navigation.navigate.mockClear();
     navigation.setOptions.mockClear();
   });
@@ -107,7 +114,7 @@ describe('QRScannerScreen', () => {
     it('renders the scanner title', async () => {
       await renderScreen();
       expect(navigation.setOptions).toHaveBeenCalledWith(
-        expect.objectContaining({ title: 'Scan transaction QR' }),
+        expect.objectContaining({ title: 'Scan' }),
       );
     });
 
@@ -208,6 +215,50 @@ describe('QRScannerScreen', () => {
       });
 
       expect(navigation.navigate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('onCodeScanned — WalletConnect URI', () => {
+    it('sets scannedRef and returns early when detectWcUri returns true', async () => {
+      mockDetectWcUri.mockReturnValue(true);
+      await renderScreen();
+      await act(async () => {
+        scan('wc:abc123@2?relay-protocol=irn');
+        // second scan should be ignored because scannedRef is set
+        scan('wc:abc123@2?relay-protocol=irn');
+      });
+      // detectWcUri called once; second scan blocked by scannedRef guard
+      expect(mockDetectWcUri).toHaveBeenCalledTimes(1);
+      expect(mockReceivedPart).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('camera permission — Android denied', () => {
+    const { PermissionsAndroid, Platform } = require('react-native');
+    let originalOS: string;
+    let originalRequest: typeof PermissionsAndroid.request;
+
+    beforeEach(() => {
+      originalOS = Platform.OS;
+      originalRequest = PermissionsAndroid.request;
+      (Platform as any).OS = 'android';
+      PermissionsAndroid.request = jest
+        .fn()
+        .mockResolvedValue(PermissionsAndroid.RESULTS.DENIED);
+    });
+
+    afterEach(() => {
+      (Platform as any).OS = originalOS;
+      PermissionsAndroid.request = originalRequest;
+    });
+
+    it('shows the permission denied UI with Open Settings button', async () => {
+      const { getByText } = render(
+        <QRScannerScreen navigation={navigation} route={{} as any} />,
+      );
+      await act(async () => {});
+      expect(getByText('Camera Permission Required')).toBeTruthy();
+      expect(getByText('Open Settings')).toBeTruthy();
     });
   });
 });
