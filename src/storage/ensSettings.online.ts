@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import EncryptedStorage from 'react-native-encrypted-storage';
 
 export { DEFAULT_ENS_RPC_URL } from '../constants/ens';
 
@@ -14,7 +15,7 @@ export async function loadEnsSettings(): Promise<EnsSettings> {
   try {
     const [enabled, url] = await Promise.all([
       AsyncStorage.getItem(ENS_ENABLED_KEY),
-      AsyncStorage.getItem(ENS_RPC_URL_KEY),
+      EncryptedStorage.getItem(ENS_RPC_URL_KEY),
     ]);
     return {
       enabled: enabled === 'true',
@@ -30,5 +31,5 @@ export async function saveEnsEnabled(enabled: boolean): Promise<void> {
 }
 
 export async function saveEnsRpcUrl(url: string): Promise<void> {
-  await AsyncStorage.setItem(ENS_RPC_URL_KEY, url);
+  await EncryptedStorage.setItem(ENS_RPC_URL_KEY, url);
 }

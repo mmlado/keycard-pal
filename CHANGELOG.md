@@ -8,12 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- (online) Tenderly transaction simulation: opt-in tab on the transaction review screen showing success/revert, asset changes, and a trace link; credentials configured in Settings
 - (online) WalletConnect v2: connect a dApp via QR, sign `personal_sign` and `eth_signTypedData_v4` with Keycard, configure project ID in Settings
 - Show ERC-8213 verification digests (Calldata Digest for transactions, EIP-712 Digest for typed data) so you can independently verify what you're signing
 - (online) Add opt-in toggle in Settings to enable remote token image downloads; preference persisted via `preferencesStorage`, default off
 
 ### Changed
 
+- PIN entry modal promoted to full-screen `Modal` in `NFCBottomSheet` so it covers the whole screen regardless of nesting depth
+- Settings screen wrapped in `KeyboardAvoidingView` so bottom inputs are not hidden by the keyboard
 - Extract `usePinPadScramble` hook from `PinPad`; preference loading is no longer inlined in the component
 - Extract `keycardTlv.ts` with shared DER/TLV constants and `parseDerSignature`; removes duplication across `btcMessage`, `btcPsbt`, and `cryptoMultiAccounts`
 - Support `@/` import alias for `src/` to eliminate deep relative paths across the codebase

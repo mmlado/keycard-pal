@@ -97,13 +97,17 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
 
   return (
     <>
-      {showPinPad && (
-        <View
-          style={[StyleSheet.absoluteFill, { paddingBottom: insets.bottom }]}
-        >
+      <Modal
+        visible={showPinPad}
+        transparent={false}
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={onCancel}
+      >
+        <View style={[styles.pinModal, { paddingBottom: insets.bottom }]}>
           <PinPad onComplete={submitPin!} error={pinError ?? undefined} />
         </View>
-      )}
+      </Modal>
 
       {showIOSError && (
         <NFCError
@@ -172,5 +176,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginBottom: 24,
+  },
+  pinModal: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
   },
 });

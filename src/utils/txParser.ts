@@ -313,6 +313,7 @@ export function decodeCalldata(dataHex: string): DecodedCall | null {
 export type ParsedTx = {
   to?: string;
   value?: string; // in ETH, e.g. "0.01"
+  valueWei?: string; // raw value in Wei as decimal string, for simulation
   data?: string; // hex calldata
   decodedCall?: DecodedCall;
   nonce?: number;
@@ -404,6 +405,7 @@ function parseLegacy(bytes: Buffer, symbol: string): ParsedTx {
     nonce: Number(bufToBigInt(assertBytes(nonce, 'nonce'))),
     to: toAddress(assertBytes(to, 'to')),
     value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
+    valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
     data: dataHex,
     decodedCall: dataHex ? decodeCalldata(dataHex) ?? undefined : undefined,
     fees: {
@@ -448,6 +450,7 @@ function parseEIP1559(bytes: Buffer, symbol: string): ParsedTx {
     nonce: Number(bufToBigInt(assertBytes(nonce, 'nonce'))),
     to: toAddress(assertBytes(to, 'to')),
     value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
+    valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
     data: dataHexEip1559,
     decodedCall: dataHexEip1559
       ? decodeCalldata(dataHexEip1559) ?? undefined
@@ -487,6 +490,7 @@ function parseEIP2930(bytes: Buffer, symbol: string): ParsedTx {
     nonce: Number(bufToBigInt(assertBytes(nonce, 'nonce'))),
     to: toAddress(assertBytes(to, 'to')),
     value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
+    valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
     data: dataHexEip2930,
     decodedCall: dataHexEip2930
       ? decodeCalldata(dataHexEip2930) ?? undefined

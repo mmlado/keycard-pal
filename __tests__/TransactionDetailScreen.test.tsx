@@ -9,6 +9,29 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: jest.fn(), setItem: jest.fn() },
 }));
 
+jest.mock('../src/components/NFCBottomSheet', () => () => null);
+jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
+  useKeycardOp: () => ({
+    phase: 'idle',
+    status: '',
+    cardName: null,
+    pinError: null,
+    result: null,
+    start: jest.fn(),
+    cancel: jest.fn(),
+    submitPin: jest.fn(),
+    reset: jest.fn(),
+    retry: jest.fn(),
+    proceedWithNonGenuine: jest.fn(),
+  }),
+}));
+jest.mock('../src/hooks/useTenderlyConfig.online', () => ({
+  useTenderlyConfig: jest.fn(() => ({ credentials: null })),
+}));
+jest.mock('../src/utils/tenderly/client.online', () => ({
+  simulateTransaction: jest.fn(),
+}));
+
 const mockRespondError = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('../src/hooks/useWalletConnectSession.online', () => ({
