@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import EncryptedStorage from 'react-native-encrypted-storage';
 
 import { WC_PROJECT_ID } from '@/utils/buildConfig';
 
@@ -6,7 +6,7 @@ const WC_PROJECT_ID_OVERRIDE_KEY = 'wc_project_id_override';
 
 export async function loadWCProjectId(): Promise<string> {
   try {
-    const override = await AsyncStorage.getItem(WC_PROJECT_ID_OVERRIDE_KEY);
+    const override = await EncryptedStorage.getItem(WC_PROJECT_ID_OVERRIDE_KEY);
     if (override && override.trim()) {
       return override.trim();
     }
@@ -17,5 +17,5 @@ export async function loadWCProjectId(): Promise<string> {
 }
 
 export async function saveWCProjectId(id: string): Promise<void> {
-  await AsyncStorage.setItem(WC_PROJECT_ID_OVERRIDE_KEY, id.trim());
+  await EncryptedStorage.setItem(WC_PROJECT_ID_OVERRIDE_KEY, id.trim());
 }

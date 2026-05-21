@@ -121,6 +121,18 @@ describe('parseTx', () => {
       expect(tx?.value).toBe('1 ETH');
     });
 
+    it('parses valueWei as decimal string', () => {
+      const hex = buildLegacyTxHex({ value: 1_000_000_000_000_000_000n });
+      const tx = parseTx(hex, 1);
+      expect(tx?.valueWei).toBe('1000000000000000000');
+    });
+
+    it('parses valueWei as "0" for zero value', () => {
+      const hex = buildLegacyTxHex({ value: 0n });
+      const tx = parseTx(hex, 1);
+      expect(tx?.valueWei).toBe('0');
+    });
+
     it('parses fees as legacy kind', () => {
       const hex = buildLegacyTxHex();
       const tx = parseTx(hex, 1);
@@ -156,6 +168,12 @@ describe('parseTx', () => {
       const hex = buildEIP2930TxHex();
       const tx = parseTx(hex, 1);
       expect(tx?.value).toMatch(/ETH/);
+    });
+
+    it('parses valueWei as decimal string', () => {
+      const hex = buildEIP2930TxHex({ value: 500_000_000_000_000_000n });
+      const tx = parseTx(hex, 1);
+      expect(tx?.valueWei).toBe('500000000000000000');
     });
 
     it('parses fees as legacy kind (gasPrice)', () => {
@@ -198,6 +216,7 @@ describe('parseTx', () => {
       const tx = parseTx(buildEIP1559TxHex(), 4);
       expect(tx?.to).toBe('0x0000000000000000000000000000000000000001');
       expect(tx?.value).toBe('1 wei');
+      expect(tx?.valueWei).toBe('1');
       expect(tx?.data).toBeUndefined();
       expect(tx?.fees.kind).toBe('eip1559');
       if (tx?.fees.kind === 'eip1559') {

@@ -17,6 +17,7 @@ export default function TextInputSetting({
   error,
   placeholder,
   keyboardType,
+  disableSave,
   onChangeText,
   onRevert,
   onSave,
@@ -28,8 +29,9 @@ export default function TextInputSetting({
   error?: string | null;
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
+  disableSave?: boolean;
   onChangeText: (v: string) => void;
-  onRevert: () => void;
+  onRevert?: () => void;
   onSave: () => void;
 }) {
   return (
@@ -51,14 +53,17 @@ export default function TextInputSetting({
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {(dirty || saving) && (
         <View style={styles.buttonRow}>
-          {dirty && !saving && (
+          {dirty && !saving && onRevert && (
             <Text style={styles.revertButton} onPress={onRevert}>
               Revert
             </Text>
           )}
           <Text
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-            onPress={saving ? undefined : onSave}
+            style={[
+              styles.saveButton,
+              (saving || disableSave) && styles.saveButtonDisabled,
+            ]}
+            onPress={saving || disableSave ? undefined : onSave}
           >
             {saving ? (
               <ActivityIndicator size="small" color={theme.colors.primary} />

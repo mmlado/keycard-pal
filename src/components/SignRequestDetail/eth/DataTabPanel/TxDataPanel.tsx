@@ -4,15 +4,17 @@ import { SegmentedButtons } from 'react-native-paper';
 
 import type { EthSignRequest } from '@/types';
 
-import DecodedCallSection from './DecodedCallSection';
+import NFCBottomSheet from '@/components/NFCBottomSheet';
 import InfoRow from '@/components/InfoRow';
-
 import { computeCalldataDigest } from '@/utils/erc8213';
 import type { ParsedTx } from '@/utils/txParser';
 
 import { DigestRow } from './shared';
+import DecodedCallSection from './DecodedCallSection';
+import SimulationPanel from './SimulationPanel';
+import { useSimulation } from './useSimulation';
 
-type Tab = 'decoded' | 'digests' | 'raw';
+type Tab = 'decoded' | 'digests' | 'raw' | 'simulation';
 
 export default function TxDataPanel({
   tx,
@@ -30,27 +32,36 @@ export default function TxDataPanel({
   const initialTab: Tab = hasDecodedCall ? 'decoded' : 'digests';
   const [tab, setTab] = useState<Tab>(initialTab);
 
-  useEffect(() => {
-    if (!hasDecodedCall && tab === 'decoded') {
-      setTab('digests');
-    }
-  }, [hasDecodedCall, tab]);
+  const {
+    showSimulationTab,
+    simulationState,
+    addressOp,
+    handleSimulate,
+    handleCancelNfc,
+  } = useSimulation(request, tx, chainId);
 
   const calldataDigest = useMemo(
     () => computeCalldataDigest(calldata),
     [calldata],
   );
 
-  const buttons = hasDecodedCall
-    ? [
-        { value: 'decoded', label: 'Decoded' },
-        { value: 'digests', label: 'Digests' },
-        { value: 'raw', label: 'Raw' },
-      ]
-    : [
-        { value: 'digests', label: 'Digests' },
-        { value: 'raw', label: 'Raw' },
-      ];
+  useEffect(() => {
+    if (!hasDecodedCall && tab === 'decoded') {
+      setTab('digests');
+    }
+    if (!showSimulationTab && tab === 'simulation') {
+      setTab(hasDecodedCall ? 'decoded' : 'digests');
+    }
+  }, [hasDecodedCall, showSimulationTab, tab]);
+
+  const buttons = [
+    ...(hasDecodedCall ? [{ value: 'decoded', label: 'Decoded' }] : []),
+    { value: 'digests', label: 'Digests' },
+    { value: 'raw', label: 'Raw' },
+    ...(showSimulationTab
+      ? [{ value: 'simulation', label: 'Simulation' }]
+      : []),
+  ];
 
   return (
     <View style={styles.panel}>
@@ -75,7 +86,14 @@ export default function TxDataPanel({
             <InfoRow label="Data" value={request.signData} />
           </View>
         )}
+        {tab === 'simulation' && showSimulationTab && (
+          <SimulationPanel
+            state={simulationState}
+            onSimulate={handleSimulate}
+          />
+        )}
       </View>
+      <NFCBottomSheet nfc={addressOp} onCancel={handleCancelNfc} />
     </View>
   );
 }
