@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { APP_NAME } from '@/constants/app';
 import theme from '../../../theme';
 
 import DonationList from './List';
@@ -14,8 +15,7 @@ export default function DonationSection({ onShowQR }: Props) {
     <View style={styles.container}>
       <Text style={styles.title}>Buy me a coffee</Text>
       <Text style={styles.description}>
-        If GapSign keeps your funds safe, you can send a coffee my way. It helps
-        keep the project maintained and open-source.
+        {`If ${APP_NAME} keeps your funds safe, you can send a coffee my way. It helps keep the project maintained and open-source.`}
       </Text>
       <DonationList onShowQR={onShowQR} />
     </View>

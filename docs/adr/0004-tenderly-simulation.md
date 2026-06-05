@@ -8,7 +8,7 @@ Status: Accepted
 
 Users reviewing a transaction before signing can inspect calldata, fees, and digests, but cannot know whether the transaction will succeed or what assets will move without broadcasting it. A simulation step — sending the unsigned transaction to a third-party execution environment — lets users preview the outcome without committing to it.
 
-GapSign's offline build and air-gapped ethos prohibit ambient outbound calls. Any simulation feature must not weaken that promise for users who have not explicitly chosen it.
+Keycard Pal's offline build and air-gapped ethos prohibit ambient outbound calls. Any simulation feature must not weaken that promise for users who have not explicitly chosen it.
 
 Simulation requires at minimum: `from` address, `to` address, `value`, calldata, and `chainId`. The private key and the signed payload are never needed.
 

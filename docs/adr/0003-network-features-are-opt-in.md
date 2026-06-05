@@ -6,7 +6,7 @@ Status: Accepted
 
 ## Context
 
-GapSign's core promise is air-gapped operation. The online build adds network-backed features (ENS resolution, remote token images) to serve users who want those enhancements without switching to the offline flavor. However, enabling these features by default contradicts the air-gapped ethos and makes outbound requests on behalf of users who may not expect them.
+Keycard Pal's core promise is air-gapped operation. The online build adds network-backed features (ENS resolution, remote token images) to serve users who want those enhancements without switching to the offline flavor. However, enabling these features by default contradicts the air-gapped ethos and makes outbound requests on behalf of users who may not expect them.
 
 ENS resolution was already opt-in at launch. Token image fetching was opt-out (remote URLs were fetched by default in the online build), which is inconsistent.
 

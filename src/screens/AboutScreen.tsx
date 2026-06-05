@@ -10,6 +10,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../assets/icons';
+import { APP_NAME, PROJECT_GITHUB_URL } from '@/constants/app';
+import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
+import type { LicenseEntry } from '../data/licenses';
 import type { AboutScreenProps, DashboardAction } from '../navigation/types';
 import theme from '../theme';
 
@@ -18,11 +21,6 @@ import ContributorsList from '../components/about/ContributorsList';
 import DonationSection from '../components/about/Donation';
 import KeycardPurchaseCard from '../components/KeycardPurchaseCard';
 import LicenseList from '../components/about/LicenseList';
-
-import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
-import type { LicenseEntry } from '../data/licenses';
-
-const PROJECT_GITHUB_URL = 'https://github.com/mmlado/GapSign';
 
 export const dashboardEntry: DashboardAction = {
   label: 'About',
@@ -52,10 +50,7 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
       <AppIdentityHeader />
 
       <Text style={styles.description}>
-        GapSign is an open-source air-gapped hardware wallet companion for
-        Android and iOS. It communicates with a Keycard via NFC, scans and
-        produces animated QR codes in UR format, and supports Ethereum and
-        Bitcoin signing — keeping your private keys offline at all times.
+        {`${APP_NAME} is an open-source air-gapped hardware wallet companion for Android and iOS. It communicates with a Keycard via NFC, scans and produces animated QR codes in UR format, and supports Ethereum and Bitcoin signing — keeping your private keys offline at all times.`}
       </Text>
 
       <View style={styles.projectLinkRow}>

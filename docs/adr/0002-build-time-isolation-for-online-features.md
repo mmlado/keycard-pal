@@ -6,7 +6,7 @@ Status: Accepted
 
 ## Context
 
-GapSign has an offline Android flavor whose promise is stronger than "network code is not used": online-only features may exist in the repository, but they must be absent from the offline APK and its JavaScript bundle. This matters for network-backed features such as ENS resolution and WalletConnect because they introduce RPC clients, endpoint strings, settings screens, and sometimes optional packages that are inappropriate for the offline distribution.
+Keycard Pal has an offline Android flavor whose promise is stronger than "network code is not used": online-only features may exist in the repository, but they must be absent from the offline APK and its JavaScript bundle. This matters for network-backed features such as ENS resolution and WalletConnect because they introduce RPC clients, endpoint strings, settings screens, and sometimes optional packages that are inappropriate for the offline distribution.
 
 The existing `BuildConfig.INTERNET_ENABLED` flag is useful for small behavior differences in already-shared code. It is not sufficient for features whose code, dependencies, or endpoints should not be packaged into the offline artifact at all.
 
@@ -45,4 +45,4 @@ Negative:
 
 ## Revisit
 
-Reconsider this pattern if GapSign stops shipping an offline Android flavor, if React Native/Metro offers a cleaner first-class flavor mechanism, or if online features move to a separate package that can be excluded from offline installs and bundles more directly.
+Reconsider this pattern if Keycard Pal stops shipping an offline Android flavor, if React Native/Metro offers a cleaner first-class flavor mechanism, or if online features move to a separate package that can be excluded from offline installs and bundles more directly.

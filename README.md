@@ -1,33 +1,33 @@
-# GapSign
+# Keycard Pal
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/icon.png" width="96" alt="GapSign icon" />
+  <img src="fastlane/metadata/android/en-US/images/icon.png" width="96" alt="Keycard Pal icon" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/mmlado/GapSign/actions/workflows/ci.yml"><img src="https://github.com/mmlado/GapSign/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/mmlado/GapSign/actions/workflows/android-release.yml"><img src="https://github.com/mmlado/GapSign/actions/workflows/android-release.yml/badge.svg" alt="Build & Release" /></a>
+  <a href="https://github.com/mmlado/keycard-pal/actions/workflows/ci.yml"><img src="https://github.com/mmlado/keycard-pal/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/mmlado/keycard-pal/actions/workflows/android-release.yml"><img src="https://github.com/mmlado/keycard-pal/actions/workflows/android-release.yml/badge.svg" alt="Build & Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
-  <a href="https://codecov.io/gh/mmlado/GapSign"><img src="https://codecov.io/gh/mmlado/GapSign/branch/main/graph/badge.svg" alt="Test coverage" /></a>
+  <a href="https://codecov.io/gh/mmlado/keycard-pal"><img src="https://codecov.io/gh/mmlado/keycard-pal/branch/main/graph/badge.svg" alt="Test coverage" /></a>
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" /></a>
   <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/React%20Native-0.83-blue.svg" alt="React Native" /></a>
-  <a href="https://github.com/mmlado/GapSign/releases/latest"><img src="https://img.shields.io/github/v/release/mmlado/GapSign" alt="GitHub release" /></a>
-  <img src="https://img.shields.io/github/last-commit/mmlado/GapSign.svg" alt="Last commit" />
-  <img src="https://img.shields.io/github/stars/mmlado/GapSign.svg?style=social" alt="Stars" />
+  <a href="https://github.com/mmlado/keycard-pal/releases/latest"><img src="https://img.shields.io/github/v/release/mmlado/keycard-pal" alt="GitHub release" /></a>
+  <img src="https://img.shields.io/github/last-commit/mmlado/keycard-pal.svg" alt="Last commit" />
+  <img src="https://img.shields.io/github/stars/mmlado/keycard-pal.svg?style=social" alt="Stars" />
 </p>
 
-GapSign is an air-gapped Android companion app for [Status Keycard](https://keycard.tech). It lets you sign Ethereum and Bitcoin transactions over NFC, so your private keys never touch an internet-connected device.
+Keycard Pal is an air-gapped Android companion app for [Status Keycard](https://keycard.tech). It lets you sign Ethereum and Bitcoin transactions over NFC, so your private keys never touch an internet-connected device.
 
 All communication with your watch-only wallet happens through animated QR codes using the [Blockchain Commons UR](https://github.com/BlockchainCommons/bc-ur) standard. No telemetry.
 
-GapSign comes in two variants:
+Keycard Pal comes in two variants:
 
 | Variant | Package ID | Internet |
 |---------|-----------|----------|
-| **GapSign** | `tech.gapsign` | Optional — for future opt-in security features (ENS, simulation) |
-| **GapSign Offline** | `tech.gapsign.offline` | Never — `INTERNET` permission is absent from the manifest |
+| **Keycard Pal** | `com.keycardpal` | Optional — for future opt-in security features (ENS, simulation) |
+| **Keycard Pal Offline** | `com.keycardpal.offline` | Never — `INTERNET` permission is absent from the manifest |
 
-Both variants are fully functional for signing and key management. GapSign Offline is the right choice if you want a hard, manifest-level guarantee of no network access.
+Both variants are fully functional for signing and key management. Keycard Pal Offline is the right choice if you want a hard, manifest-level guarantee of no network access.
 
 ## Screenshots
 
@@ -57,7 +57,7 @@ Both variants are fully functional for signing and key management. GapSign Offli
 - Import a recovery phrase (BIP-39, 12 or 24 words, with optional passphrase)
 - Import SLIP-39 Shamir Secret Sharing shares
 - Genuine Keycard verification before first pairing
-- Two variants: GapSign Offline (no internet, manifest-level guarantee) and GapSign (optional internet for future security features)
+- Two variants: Keycard Pal Offline (no internet, manifest-level guarantee) and Keycard Pal (optional internet for future security features)
 
 ## Requirements
 
@@ -69,13 +69,13 @@ Both variants are fully functional for signing and key management. GapSign Offli
 Download the latest APK from [Releases](../../releases) and sideload it onto your device.
 
 <p>
-  <a href="https://github.com/mmlado/GapSign/releases/latest">
+  <a href="https://github.com/mmlado/keycard-pal/releases/latest">
     <img src="assets/badges/badge_github.png" alt="Get it on GitHub" height="70" />
   </a>
-  <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/mmlado/GapSign">
+  <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/mmlado/keycard-pal">
     <img src="assets/badges/badge_obtainium.png" alt="Get it on Obtainium" height="70" />
   </a>
-  <a href="https://fdroid.gapsign.tech/repo?fingerprint=24EB891A8A617F8BF20892CB0CF9267709BA94056E64242AD9EDF638C2FED3D2">
+  <a href="https://fdroid.keycardpal.com/repo?fingerprint=24EB891A8A617F8BF20892CB0CF9267709BA94056E64242AD9EDF638C2FED3D2">
     <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="70" />
   </a>
 </p>
@@ -84,14 +84,14 @@ For most users, install the universal APK. ABI-specific split APKs are also atta
 
 ### Verification info
 
-- Package ID: `tech.gapsign` (GapSign) / `tech.gapsign.offline` (GapSign Offline)
+- Package ID: `com.keycardpal` (Keycard Pal) / `com.keycardpal.offline` (Keycard Pal Offline)
 - SHA-256 hash of signing certificate: `A8:3C:11:4B:1F:42:01:DA:FB:D0:3E:22:1F:1C:29:28:EC:B5:2B:78:BD:A5:E9:3F:29:6F:ED:F2:29:8E:54:6B`
 - `SHA256SUMS.txt` is attached to each GitHub Release to verify APK file hashes.
 
 ### Install with Obtainium
 
 1. Install [Obtainium](https://github.com/ImranR98/Obtainium).
-2. Add `https://github.com/mmlado/GapSign` as a GitHub app source.
+2. Add `https://github.com/mmlado/keycard-pal` as a GitHub app source.
 3. Use GitHub Releases as the update source.
 4. Select the universal APK from the latest release.
 
@@ -99,7 +99,7 @@ For most users, install the universal APK. ABI-specific split APKs are also atta
 
 **Repository URL:**
 ```
-https://fdroid.gapsign.tech/repo/
+https://fdroid.keycardpal.com/repo/
 ```
 
 **Fingerprint:**
@@ -133,8 +133,8 @@ npm run android  # Terminal 2: build and install
 ### Release build
 
 ```sh
-cd android && ./gradlew assembleFullRelease      # GapSign (tech.gapsign)
-cd android && ./gradlew assembleOfflineRelease   # GapSign Offline (tech.gapsign.offline)
+cd android && ./gradlew assembleFullRelease      # Keycard Pal (com.keycardpal)
+cd android && ./gradlew assembleOfflineRelease   # Keycard Pal Offline (com.keycardpal.offline)
 ```
 
 ## Development
@@ -146,7 +146,7 @@ npm run lint  # ESLint
 
 ## Buy me a coffee
 
-If GapSign keeps your funds safe, you can send a coffee my way.
+If Keycard Pal keeps your funds safe, you can send a coffee my way.
 
 - Ethereum: `0xF665E3D58DABa87d741A347674DCc4C4b794cAc9`
 - Bitcoin: `bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf`
@@ -156,7 +156,7 @@ If GapSign keeps your funds safe, you can send a coffee my way.
 - Pairing data is stored in encrypted storage backed by the Android Keystore
 - Private keys never leave the Keycard; only the signature result is returned to the app
 - QR codes use [Blockchain Commons UR](https://github.com/BlockchainCommons/bc-ur) for structured binary encoding
-- GapSign Offline (`tech.gapsign.offline`) has no `INTERNET` permission at the manifest level — no runtime flag can enable networking
+- Keycard Pal Offline (`com.keycardpal.offline`) has no `INTERNET` permission at the manifest level — no runtime flag can enable networking
 
 ## License
 

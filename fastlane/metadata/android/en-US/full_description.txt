@@ -1,4 +1,4 @@
-GapSign is an air-gapped hardware wallet companion app that works with a Keycard NFC smart card to sign Ethereum and Bitcoin transactions without ever connecting to the internet.
+Keycard Pal is an air-gapped hardware wallet companion app that works with a Keycard NFC smart card to sign Ethereum and Bitcoin transactions without ever connecting to the internet.
 
 Requires a Keycard hardware smart card (keycard.tech). The app communicates with the card over NFC — no USB, no Bluetooth, no internet.
 
@@ -14,4 +14,4 @@ Features:
 - Communicate with Keycard via NFC
 - Fully air-gapped — no internet permission, no network calls, no telemetry
 
-GapSign is free and open-source software.
+Keycard Pal is free and open-source software.

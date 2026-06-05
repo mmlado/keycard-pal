@@ -17,6 +17,7 @@ import {
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { APP_NAME } from '@/constants/app';
 import type { Slip39ScreenProps } from '../../navigation/types';
 import theme from '../../theme';
 
@@ -389,7 +390,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.progressText}>Preparing key material...</Text>
             <Text style={styles.description}>
-              GapSign is combining your shares and deriving the key before it
+              {APP_NAME} is combining your shares and deriving the key before it
               asks you to tap the card.
             </Text>
           </View>
@@ -424,7 +425,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
                 targetShareCount
                   ? `${nextShareIndex} of ${targetShareCount}`
                   : '1'
-              }. After the first share, GapSign will tell you how many are needed.`}
+              }. After the first share, ${APP_NAME} will tell you how many are needed.`}
         </Text>
 
         {mode === 'generate' && !generatedSharesReady ? (

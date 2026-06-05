@@ -13,6 +13,7 @@ import { ripemd160 } from '@noble/hashes/legacy.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import Keycard from 'keycard-sdk';
 
+import { APP_NAME } from '@/constants/app';
 import {
   coinTypeFromPath,
   derivationPathToKeypath,
@@ -55,7 +56,7 @@ function buildHdKey(
     ),
     parentFingerprint: numberToFingerprintBuffer(descriptor.parentFingerprint),
     useInfo: new CryptoCoinInfo(CryptoCoinInfoType.bitcoin, network),
-    name: 'GapSign',
+    name: APP_NAME,
   });
 }
 

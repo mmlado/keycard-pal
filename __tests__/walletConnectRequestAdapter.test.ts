@@ -43,11 +43,11 @@ describe('wcRequestToScanResult — personal_sign', () => {
   it('hex-encodes plain UTF-8 message string', () => {
     const result = expectEthSignResult(
       wcRequestToScanResult(
-        makeReq('personal_sign', ['Hello GapSign', addr]),
+        makeReq('personal_sign', ['Hello Keycard Pal', addr]),
         addressToPath,
       ),
     );
-    // "Hello GapSign" → hex
+    // "Hello Keycard Pal" → hex
     expect(result.request.signData).toMatch(/^0x[0-9a-f]+$/);
     expect(result.request.signData).not.toBe('0x'); // non-empty
   });

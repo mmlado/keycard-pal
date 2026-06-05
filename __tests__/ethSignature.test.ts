@@ -183,11 +183,11 @@ describe('buildEthSignatureUR', () => {
   });
 
   describe('CBOR map structure', () => {
-    it('always includes signature (key 2) and origin "GapSign" (key 3)', () => {
+    it('always includes signature (key 2) and origin "Keycard Pal" (key 3)', () => {
       const ur = buildEthSignatureUR(tlvHex, HASH, 4, undefined, undefined);
       const decoded = decodeUR(ur);
       expect(Buffer.isBuffer(decoded[2])).toBe(true);
-      expect(decoded[3]).toBe('GapSign');
+      expect(decoded[3]).toBe('Keycard Pal');
     });
 
     it('signature is 65 bytes (r || s || v) for single-byte v values', () => {

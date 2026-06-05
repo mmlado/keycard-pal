@@ -1,5 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 
+import { APP_NAME } from '@/constants/app';
 import theme from '../../theme';
 
 import { version as APP_VERSION } from '../../../package.json';
@@ -11,9 +12,9 @@ export default function AppIdentityHeader() {
         <Image
           source={require('../../../fastlane/metadata/android/en-US/images/icon.png')}
           style={styles.appIcon}
-          accessibilityLabel="GapSign app icon"
+          accessibilityLabel={`${APP_NAME} app icon`}
         />
-        <Text style={styles.appName}>GapSign</Text>
+        <Text style={styles.appName}>{APP_NAME}</Text>
       </View>
       <Text style={styles.version}>v{APP_VERSION}</Text>
     </View>

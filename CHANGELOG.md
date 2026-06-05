@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Rename app from GapSign to Keycard Pal; package IDs changed to `com.keycardpal` / `com.keycardpal.offline`, domain to `keycardpal.com`, GitHub repo to `keycard-pal`
 - PIN entry modal promoted to full-screen `Modal` in `NFCBottomSheet` so it covers the whole screen regardless of nesting depth
 - Settings screen wrapped in `KeyboardAvoidingView` so bottom inputs are not hidden by the keyboard
 - Extract `usePinPadScramble` hook from `PinPad`; preference loading is no longer inlined in the component
@@ -257,25 +258,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/GapSign/compare/v1.6.2...HEAD
-[1.6.2]: https://github.com/mmlado/GapSign/compare/v1.6.1...v1.6.2
-[1.6.1]: https://github.com/mmlado/GapSign/compare/v1.6.0...v1.6.1
-[1.6.0]: https://github.com/mmlado/GapSign/compare/v1.5.0...v1.6.0
-[1.5.0]: https://github.com/mmlado/GapSign/compare/v1.4.0...v1.5.0
-[1.4.0]: https://github.com/mmlado/GapSign/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/mmlado/GapSign/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/mmlado/GapSign/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/mmlado/GapSign/compare/v1.0.3...v1.1.0
-[1.0.3]: https://github.com/mmlado/GapSign/compare/v1.0.2...v1.0.3
-[1.0.2]: https://github.com/mmlado/GapSign/compare/v1.0.1...v1.0.2
-[1.0.1]: https://github.com/mmlado/GapSign/compare/v1.0.0...v1.0.1
-[1.0.0]: https://github.com/mmlado/GapSign/compare/v0.9.0...v1.0.0
-[0.9.0]: https://github.com/mmlado/GapSign/compare/v0.8.0...v0.9.0
-[0.8.0]: https://github.com/mmlado/GapSign/compare/v0.7.0...v0.8.0
-[0.7.0]: https://github.com/mmlado/GapSign/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/mmlado/GapSign/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/mmlado/GapSign/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/mmlado/GapSign/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/mmlado/GapSign/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/mmlado/GapSign/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/mmlado/GapSign/compare/294c1212cfd8d1738b5eb90bbb33aa02adee139c...v0.1.0
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.6.2...HEAD
+[1.6.2]: https://github.com/mmlado/keycard-pal/compare/v1.6.1...v1.6.2
+[1.6.1]: https://github.com/mmlado/keycard-pal/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/mmlado/keycard-pal/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/mmlado/keycard-pal/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/mmlado/keycard-pal/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/mmlado/keycard-pal/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/mmlado/keycard-pal/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/mmlado/keycard-pal/compare/v1.0.3...v1.1.0
+[1.0.3]: https://github.com/mmlado/keycard-pal/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/mmlado/keycard-pal/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/mmlado/keycard-pal/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/mmlado/keycard-pal/compare/v0.9.0...v1.0.0
+[0.9.0]: https://github.com/mmlado/keycard-pal/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/mmlado/keycard-pal/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/mmlado/keycard-pal/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/mmlado/keycard-pal/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/mmlado/keycard-pal/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/mmlado/keycard-pal/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/mmlado/keycard-pal/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/mmlado/keycard-pal/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/mmlado/keycard-pal/compare/294c1212cfd8d1738b5eb90bbb33aa02adee139c...v0.1.0

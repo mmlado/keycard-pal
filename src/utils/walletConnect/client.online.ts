@@ -3,6 +3,7 @@ import '@walletconnect/react-native-compat';
 import { Core } from '@walletconnect/core';
 import { WalletKit, WalletKitTypes } from '@reown/walletkit';
 
+import { APP_NAME } from '@/constants/app';
 import { WC_PROJECT_ID } from '@/utils/buildConfig';
 
 let _client: Awaited<ReturnType<typeof WalletKit.init>> | null = null;
@@ -43,9 +44,9 @@ async function getClient(
   _initPromise = WalletKit.init({
     core,
     metadata: {
-      name: 'GapSign',
+      name: APP_NAME,
       description: 'Air-gapped hardware wallet companion',
-      url: 'https://gapsign.tech',
+      url: 'https://keycardpal.com',
       icons: [],
     },
   }).catch(e => {

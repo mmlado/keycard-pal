@@ -1,3 +1,5 @@
+import { APP_NAME } from '@/constants/app';
+
 export type LicenseEntry = {
   package: string;
   licenseType: string;
@@ -401,11 +403,11 @@ export const LICENSE_TEXTS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// GapSign own license + all 3rd-party packages
+// Keycard Pal own license + all 3rd-party packages
 // ---------------------------------------------------------------------------
 
 export const licenses: LicenseEntry[] = [
-  { package: 'GapSign', licenseType: 'MIT' },
+  { package: APP_NAME, licenseType: 'MIT' },
   { package: '@ethereumjs/rlp', licenseType: 'MPL-2.0' },
   { package: '@keystonehq/bc-ur-registry', licenseType: 'Apache-2.0' },
   { package: '@keystonehq/bc-ur-registry-eth', licenseType: 'ISC' },

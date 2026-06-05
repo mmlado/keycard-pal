@@ -166,8 +166,8 @@ describe('buildCryptoHdKeyUR', () => {
       expect(decoded[8]).toBe(PARENT_FINGERPRINT);
     });
 
-    it('key 9 (name) is "GapSign"', () => {
-      expect(decoded[9]).toBe('GapSign');
+    it('key 9 (name) is "Keycard Pal"', () => {
+      expect(decoded[9]).toBe('Keycard Pal');
     });
   });
 

@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 
 import AboutScreen from '../src/screens/AboutScreen';
+import { PROJECT_GITHUB_URL } from '../src/constants/app';
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -72,8 +73,8 @@ describe('AboutScreen', () => {
 
   it('renders the app, icon, project link, Keycard, support, contributors, and license sections', () => {
     renderScreen();
-    expect(screen.getAllByText('GapSign').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText('GapSign app icon')).toBeTruthy();
+    expect(screen.getAllByText('Keycard Pal').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Keycard Pal app icon')).toBeTruthy();
     expect(screen.getByText('GitHub project')).toBeTruthy();
     expect(screen.getByText(/Keycard required/)).toBeTruthy();
     expect(screen.getByText('Buy me a coffee')).toBeTruthy();
@@ -90,9 +91,7 @@ describe('AboutScreen', () => {
   it('opens the project GitHub page', () => {
     renderScreen();
     fireEvent.press(screen.getByText('GitHub project'));
-    expect(Linking.openURL).toHaveBeenCalledWith(
-      'https://github.com/mmlado/GapSign',
-    );
+    expect(Linking.openURL).toHaveBeenCalledWith(PROJECT_GITHUB_URL);
   });
 
   it('copies support addresses', () => {
@@ -142,7 +141,7 @@ describe('AboutScreen', () => {
     renderScreen();
     fireEvent.press(screen.getByLabelText('Show GitHub project QR code'));
     expect(navigation.navigate).toHaveBeenCalledWith('UrlQR', {
-      url: 'https://github.com/mmlado/GapSign',
+      url: PROJECT_GITHUB_URL,
       title: 'GitHub project',
     });
   });
