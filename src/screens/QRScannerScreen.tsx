@@ -17,6 +17,7 @@ import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { Text, Button, ActivityIndicator, Icon } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { APP_NAME } from '@/constants/app';
 import type { QRScannerScreenProps } from '../navigation/types';
 import theme from '../theme';
 
@@ -131,7 +132,7 @@ export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
           Camera Permission Required
         </Text>
         <Text variant="bodyMedium" style={styles.centeredSubtext}>
-          GapSign needs camera access to scan QR codes.
+          {`${APP_NAME} needs camera access to scan QR codes.`}
         </Text>
         <Button
           mode="contained"

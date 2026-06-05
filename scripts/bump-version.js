@@ -41,7 +41,7 @@ if (arg === 'major') {
 const [MAJOR, MINOR, PATCH] = newVersion.split('.').map(Number);
 const versionCode = MAJOR * 10000 + MINOR * 100 + PATCH;
 const today = new Date().toISOString().slice(0, 10);
-const repo = 'https://github.com/mmlado/GapSign';
+const repo = 'https://github.com/mmlado/keycard-pal';
 
 console.log(`Bumping ${pkg.version} → ${newVersion} (code: ${versionCode})`);
 
@@ -81,10 +81,10 @@ gradle = gradle
 fs.writeFileSync(gradlePath, gradle);
 
 // ---------------------------------------------------------------------------
-// ios/GapSign.xcodeproj/project.pbxproj
+// ios/KeycardPal.xcodeproj/project.pbxproj
 // ---------------------------------------------------------------------------
 
-const pbxPath = path.join(ROOT, 'ios/GapSign.xcodeproj/project.pbxproj');
+const pbxPath = path.join(ROOT, 'ios/KeycardPal.xcodeproj/project.pbxproj');
 let pbx = fs.readFileSync(pbxPath, 'utf8');
 pbx = pbx
   .replace(
@@ -132,7 +132,7 @@ fs.writeFileSync(changelogPath, changelog);
 // F-Droid metadata and Fastlane changelog
 // ---------------------------------------------------------------------------
 
-const fdroidMetadataPath = path.join(ROOT, 'fdroiddata-tech.gapsign.yml');
+const fdroidMetadataPath = path.join(ROOT, 'fdroiddata-com.keycardpal.yml');
 if (fs.existsSync(fdroidMetadataPath)) {
   let fdroidMetadata = fs.readFileSync(fdroidMetadataPath, 'utf8');
   fdroidMetadata = fdroidMetadata
@@ -161,7 +161,7 @@ fs.writeFileSync(
 const branch = `release/v${newVersion}`;
 execSync(`git checkout -b ${branch}`, { stdio: 'inherit' });
 execSync(
-  'git add package.json package-lock.json android/app/build.gradle ios/GapSign.xcodeproj/project.pbxproj CHANGELOG.md fdroiddata-tech.gapsign.yml fastlane/metadata/android/en-US/changelogs',
+  'git add package.json package-lock.json android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md fdroiddata-com.keycardpal.yml fastlane/metadata/android/en-US/changelogs',
   { stdio: 'inherit' },
 );
 execSync(`git commit -m "chore: bump version to ${newVersion}"`, {

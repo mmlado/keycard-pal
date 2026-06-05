@@ -92,9 +92,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "tech.gapsign"
+    namespace "com.keycardpal"
     defaultConfig {
-        applicationId "tech.gapsign"
+        applicationId "com.keycardpal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 10602
@@ -104,7 +104,7 @@ android {
     productFlavors {
         full {
             dimension "distribution"
-            applicationId "tech.gapsign"
+            applicationId "com.keycardpal"
             // BuildConfig.INTERNET_ENABLED == true
             // Usage in Java/Kotlin: if (BuildConfig.INTERNET_ENABLED) { ... }
             // Usage in JS: expose via a NativeModule when the first internet feature lands
@@ -113,7 +113,7 @@ android {
         }
         offline {
             dimension "distribution"
-            applicationId "tech.gapsign.offline"
+            applicationId "com.keycardpal.offline"
             // BuildConfig.INTERNET_ENABLED == false — INTERNET permission never declared
             buildConfigField "boolean", "INTERNET_ENABLED", "false"
             buildConfigField "String", "WC_PROJECT_ID", "\"\""

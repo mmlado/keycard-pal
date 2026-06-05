@@ -3,6 +3,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { Icons } from '../assets/icons';
+import { APP_NAME } from '@/constants/app';
 import {
   KEYCARD_PURCHASE_COUPON_CODE,
   KEYCARD_PURCHASE_COUPON_MINIMUM,
@@ -21,8 +22,7 @@ type KeycardPurchaseCardProps = {
 };
 
 const keycardPurchaseTitle = 'Keycard required';
-const keycardPurchaseDescription =
-  'GapSign requires a Keycard hardware wallet to initialize, export keys, view addresses, and sign with NFC. Keycard is an open-source, PIN-protected JavaCard applet that stores keys securely in hardware.';
+const keycardPurchaseDescription = `${APP_NAME} requires a Keycard hardware wallet to initialize, export keys, view addresses, and sign with NFC. Keycard is an open-source, PIN-protected JavaCard applet that stores keys securely in hardware.`;
 
 export default function KeycardPurchaseCard({
   buttonTestID,

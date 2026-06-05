@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Compiles the committed GapSign ABI snapshot into selector metadata for
+ * Compiles the committed Keycard Pal ABI snapshot into selector metadata for
  * offline contract call decoding.
  *
  * Source: scripts/abi.json, generated from scripts/abi-list.csv via the

@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RNKeycard from 'react-native-keycard';
 import Keycard from 'keycard-sdk';
 
+import { APP_NAME } from '@/constants/app';
+
 function toHex(arr: Uint8Array): string {
   return Array.from(arr)
     .map(b => b.toString(16).padStart(2, '0'))
@@ -181,7 +183,7 @@ export default function KeycardLogScreen() {
         },
       ]}
     >
-      <Text style={[styles.title, { color: textColor }]}>GapSign</Text>
+      <Text style={[styles.title, { color: textColor }]}>{APP_NAME}</Text>
       <Text style={[styles.subtitle, { color: textColor }]}>
         Keycard NFC Scanner
       </Text>

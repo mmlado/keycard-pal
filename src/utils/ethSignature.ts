@@ -3,6 +3,7 @@ import { ETHSignature } from '@keystonehq/bc-ur-registry-eth';
 import Keycard from 'keycard-sdk';
 import { hexToBytes } from 'viem';
 
+import { APP_NAME } from '@/constants/app';
 import { ensureHexPrefix } from './hex';
 
 // ── secp256k1 / Ethereum ─────────────────────────────────────────────────────
@@ -151,7 +152,7 @@ export function buildEthSignatureUR(
   const ethSig = new ETHSignature(
     Buffer.from(sigBytes),
     requestIdBuf,
-    'GapSign',
+    APP_NAME,
   );
   return ethSig.toUREncoder(1000).nextPart();
 }

@@ -4,7 +4,7 @@
  * writes a committed snapshot to scripts/abi.json.
  *
  * Source list: scripts/abi-list.csv, copied from keycard-tech/eth-abi-repo and
- * maintained by GapSign.
+ * maintained by Keycard Pal.
  * API: Etherscan API v2 getabi endpoint.
  *
  * Required env: ETHERSCAN_API_KEY. You can set it in the shell or in a root

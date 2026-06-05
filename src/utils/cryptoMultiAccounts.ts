@@ -9,6 +9,7 @@ import { encodeToUR } from './ur';
 import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
+import { APP_NAME } from '@/constants/app';
 import { pubKeyFingerprint } from './cryptoAccount';
 import { TLV_KEY_TEMPLATE, TLV_PUB_KEY } from './keycardTlv';
 import {
@@ -121,7 +122,7 @@ export function buildCryptoMultiAccountsUR(result: BitgetExportResult): string {
         ? new CryptoCoinInfo(keySpec.coinType, keySpec.network)
         : undefined,
       parentFingerprint: numberToFingerprintBuffer(keyData.parentFingerprint),
-      name: 'GapSign',
+      name: APP_NAME,
       note: keySpec.source,
     });
   });
@@ -133,7 +134,7 @@ export function buildCryptoMultiAccountsUR(result: BitgetExportResult): string {
   const cryptoMultiAccounts = new CryptoMultiAccounts(
     numberToFingerprintBuffer(result.masterFingerprint),
     hdKeys,
-    'GapSign',
+    APP_NAME,
     deviceId,
     undefined,
   );

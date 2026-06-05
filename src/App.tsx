@@ -1,5 +1,5 @@
 /**
- * GapSign - Air-Gap Android wallet that works with Keycards
+ * Keycard Pal - Air-Gap Android wallet that works with Keycards
  *
  * @format
  */

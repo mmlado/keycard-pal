@@ -10,9 +10,9 @@ import {
   derivationPathToKeypath,
   numberToFingerprintBuffer,
 } from './hdKeyUtils';
+import { APP_NAME } from '@/constants/app';
 
 const LEDGER_LEGACY_SOURCE = 'account.ledger_legacy';
-const CRYPTO_HDKEY_NAME = 'GapSign';
 
 /**
  * Parse the raw Keycard exportKey TLV response, encode it as a
@@ -40,7 +40,7 @@ export function buildCryptoHdKeyUR(
     chainCode: Buffer.from(parsed.chainCode),
     origin: derivationPathToKeypath(derivationPath, sourceFingerprint),
     parentFingerprint: numberToFingerprintBuffer(parentFingerprint),
-    name: CRYPTO_HDKEY_NAME,
+    name: APP_NAME,
     ...(source !== undefined && { note: source }),
     ...(source === LEDGER_LEGACY_SOURCE && {
       children: new CryptoKeypath([

@@ -207,8 +207,8 @@ describe('buildCryptoMultiAccountsUR', () => {
     expect(multiAccounts.getKeys()).toHaveLength(4);
   });
 
-  it('device name is "GapSign"', () => {
-    expect(multiAccounts.getDevice()).toBe('GapSign');
+  it('device name is "Keycard Pal"', () => {
+    expect(multiAccounts.getDevice()).toBe('Keycard Pal');
   });
 
   describe('individual keys', () => {
@@ -230,9 +230,9 @@ describe('buildCryptoMultiAccountsUR', () => {
       }
     });
 
-    it('each key has name "GapSign"', () => {
+    it('each key has name "Keycard Pal"', () => {
       for (const hdKey of multiAccounts.getKeys()) {
-        expect(hdKey.getName()).toBe('GapSign');
+        expect(hdKey.getName()).toBe('Keycard Pal');
       }
     });
 

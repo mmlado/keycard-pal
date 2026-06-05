@@ -195,7 +195,7 @@ jobs:
           mkdir -p pages
           cp -r fdroid/repo pages/repo
           cp -r fdroid/archive pages/archive 2>/dev/null || true
-          echo "fdroid.gapsign.tech" > pages/CNAME
+          echo "fdroid.keycardpal.com" > pages/CNAME
 
       - name: Clean up credentials
         if: always()
