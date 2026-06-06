@@ -175,6 +175,13 @@ afterEvaluate {
     }
 
     android.applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
+            outputFileName = "keycard-pal-${variant.flavorName}-${variant.buildType.name}-${abi}.apk"
+        }
+    }
+
+    android.applicationVariants.all { variant ->
         def isFull = variant.productFlavors.any { it.name == "full" }
         def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
         tasks.matching { it.name == taskName }.configureEach {

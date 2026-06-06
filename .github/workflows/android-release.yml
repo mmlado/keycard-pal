@@ -81,7 +81,7 @@ jobs:
       - name: Generate APK checksums
         run: |
           mkdir -p android/app/build/outputs/apk/release
-          find android/app/build/outputs/apk -name "app-*-release.apk" \
+          find android/app/build/outputs/apk -name "keycard-pal-*-release-*.apk" \
             | sort | xargs sha256sum > android/app/build/outputs/apk/release/SHA256SUMS.txt
 
       - name: Generate release notes
@@ -122,8 +122,8 @@ jobs:
           tag_name: ${{ steps.ver.outputs.tag }}
           body_path: android/app/build/outputs/apk/release/RELEASE_NOTES.md
           files: |
-            android/app/build/outputs/apk/full/release/app-*-release.apk
-            android/app/build/outputs/apk/offline/release/app-*-release.apk
+            android/app/build/outputs/apk/full/release/keycard-pal-*-release-*.apk
+            android/app/build/outputs/apk/offline/release/keycard-pal-*-release-*.apk
             android/app/build/outputs/apk/release/SHA256SUMS.txt
 
   fdroid:
@@ -157,8 +157,8 @@ jobs:
             | grep -v "^${RELEASE_TAG}$" \
             | while read tag; do
                 gh release download "$tag" \
-                  --pattern "app-offline-*-release.apk" \
-                  --pattern "app-full-*-release.apk" \
+                  --pattern "keycard-pal-offline-*-release-*.apk" \
+                  --pattern "keycard-pal-full-*-release-*.apk" \
                   --dir fdroid/repo/ \
                   --clobber 2>/dev/null || true
               done
@@ -170,8 +170,8 @@ jobs:
         run: |
           mkdir -p new-apks/
           gh release download "$RELEASE_TAG" \
-            --pattern "app-offline-*-release.apk" \
-            --pattern "app-full-*-release.apk" \
+            --pattern "keycard-pal-offline-*-release-*.apk" \
+            --pattern "keycard-pal-full-*-release-*.apk" \
             --dir new-apks/
           count=$(find new-apks -maxdepth 1 -name "*.apk" | wc -l)
           if [ "$count" -eq 0 ]; then
