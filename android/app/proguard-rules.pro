@@ -8,3 +8,7 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+
+# JNA references java.awt which doesn't exist on Android
+-dontwarn java.awt.**
+-dontwarn com.sun.jna.**
