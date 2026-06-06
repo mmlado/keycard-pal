@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-06-06
+
 ### Added
 
 - (online) Tenderly transaction simulation: opt-in tab on the transaction review screen showing success/revert, asset changes, and a trace link; credentials configured in Settings
@@ -18,14 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Rename app from GapSign to Keycard Pal; package IDs changed to `com.keycardpal` / `com.keycardpal.offline`, domain to `keycardpal.com`, GitHub repo to `keycard-pal`
 - PIN entry modal promoted to full-screen `Modal` in `NFCBottomSheet` so it covers the whole screen regardless of nesting depth
 - Settings screen wrapped in `KeyboardAvoidingView` so bottom inputs are not hidden by the keyboard
-- Extract `usePinPadScramble` hook from `PinPad`; preference loading is no longer inlined in the component
-- Extract `keycardTlv.ts` with shared DER/TLV constants and `parseDerSignature`; removes duplication across `btcMessage`, `btcPsbt`, and `cryptoMultiAccounts`
-- Support `@/` import alias for `src/` to eliminate deep relative paths across the codebase
-- Extract `encodeToUR` helper to `ur.ts`; consolidate repeated `new UREncoder(new UR(...))` pattern across `btcMessage`, `cryptoAccount`, `cryptoHdKey`, `cryptoMultiAccounts`, and `btcPsbt`; move `buildBtcResultUR` out of `KeycardScreen` into `btcPsbt` as `buildCryptoPsbtUR`
-- Extract `buildSignKeycardParams` to `src/utils/signNavigation.ts`; remove result-kind dispatch from `TransactionDetailScreen.handleSign`
-- Replace generic `preferenceKeys` + `loadBooleanPreference` with typed per-preference helpers; drop `loadEnsRpcUrl` in favour of `loadEnsSettings`
-- `useKeycardOperation` composes with `useNFCOperation` instead of bypassing it to `useNFCSession`
-- Add `useKeycardOp` factory; remove `keycard.execute` boilerplate from six operation hooks
 - Reorder Settings screen: PIN pad scramble first, token images second, ENS last
 
 ### Fixed
@@ -258,7 +252,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.6.2...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/mmlado/keycard-pal/compare/v1.6.2...v1.7.0
 [1.6.2]: https://github.com/mmlado/keycard-pal/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/mmlado/keycard-pal/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/mmlado/keycard-pal/compare/v1.5.0...v1.6.0
