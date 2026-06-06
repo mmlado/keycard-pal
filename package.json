@@ -1,6 +1,6 @@
 {
   "name": "KeycardPal",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "private": true,
   "scripts": {
     "android": "ONLINE_BUILD=true react-native run-android --mode fullDebug",
