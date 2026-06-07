@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import RNKeycard from 'react-native-keycard';
 import Keycard from 'keycard-sdk';
 import { Commandset } from 'keycard-sdk/dist/commandset';
@@ -11,6 +11,10 @@ export interface UseNFCSessionOperation {
   status: string;
   startNFC: () => void;
   reset: () => void;
+  openNFCSettings: (() => void) | undefined;
+  /** Override the action taken when NFC becomes available after being disabled.
+   *  If null, the default is to restart the NFC reader directly. */
+  onNFCAvailableRef: { current: (() => void) | null };
 }
 
 export default function useNFCSession(
@@ -22,11 +26,14 @@ export default function useNFCSession(
 ): UseNFCSessionOperation {
   const [phase, setPhase] = useState<Phase>('idle');
   const [status, setStatus] = useState('');
+  const [nfcDisabled, setNfcDisabled] = useState(false);
+  const onNFCAvailableRef = useRef<(() => void) | null>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const disconnectedRef = useRef(false);
   const realErrorRef = useRef(false);
   const inFlightRef = useRef(false);
+  const startAttemptRef = useRef(0);
 
   const handleCardConnected = useCallback(async () => {
     if (phaseRef.current !== 'nfc' && phaseRef.current !== 'error') {
@@ -132,12 +139,7 @@ export default function useNFCSession(
     };
   }, [handleCardConnected, handleCardDisconnected]);
 
-  const startNFC = useCallback(() => {
-    disconnectedRef.current = false;
-    realErrorRef.current = false;
-    inFlightRef.current = false;
-    setStatus('Tap your Keycard');
-    setPhase('nfc');
+  const doStartNFC = useCallback(() => {
     RNKeycard.Core.startNFC('Tap your Keycard')
       .then((result: any) => {
         if (result && result.isSuccess === false) {
@@ -152,11 +154,76 @@ export default function useNFCSession(
       });
   }, []);
 
+  // When the user returns from the NFC settings screen with NFC now enabled,
+  // invoke the registered handler (e.g. show PIN pad) or restart NFC directly.
+  useEffect(() => {
+    if (!nfcDisabled) return;
+    const sub = AppState.addEventListener('change', nextState => {
+      if (nextState !== 'active') return;
+      RNKeycard.Core.isNFCEnabled()
+        .then(enabled => {
+          if (!enabled) return;
+          setNfcDisabled(false);
+          const handler = onNFCAvailableRef.current;
+          if (handler) {
+            handler();
+          } else {
+            setStatus('Tap your Keycard');
+            setPhase('nfc');
+            doStartNFC();
+          }
+        })
+        .catch(() => {});
+    });
+    return () => sub.remove();
+  }, [nfcDisabled, doStartNFC]);
+
+  const startNFC = useCallback(() => {
+    const attempt = ++startAttemptRef.current;
+    disconnectedRef.current = false;
+    realErrorRef.current = false;
+    inFlightRef.current = false;
+
+    // Open the NFC sheet immediately so there is no empty-screen gap while the
+    // async isNFCEnabled() check runs. If NFC is off, we transition to 'error'
+    // inside the already-visible sheet.
+    setStatus('Tap your Keycard');
+    setPhase('nfc');
+
+    RNKeycard.Core.isNFCEnabled()
+      .then(enabled => {
+        if (attempt !== startAttemptRef.current) return;
+        if (!enabled) {
+          setNfcDisabled(true);
+          setStatus('NFC is turned off. Enable it in Settings to continue.');
+          setPhase('error');
+          return;
+        }
+        setNfcDisabled(false);
+        doStartNFC();
+      })
+      .catch(() => {
+        if (attempt !== startAttemptRef.current) return;
+        // isNFCEnabled() check failed — proceed and let startNFC surface the real error
+        setNfcDisabled(false);
+        doStartNFC();
+      });
+  }, [doStartNFC]);
+
   const reset = useCallback(() => {
+    startAttemptRef.current++;
     RNKeycard.Core.stopNFC().catch(() => {});
     setPhase('idle');
     setStatus('');
+    setNfcDisabled(false);
   }, []);
 
-  return { phase, status, startNFC, reset };
+  const openNFCSettings: (() => void) | undefined =
+    nfcDisabled && Platform.OS === 'android'
+      ? () => {
+          RNKeycard.Core.openNFCSettings().catch(() => {});
+        }
+      : undefined;
+
+  return { phase, status, startNFC, reset, openNFCSettings, onNFCAvailableRef };
 }

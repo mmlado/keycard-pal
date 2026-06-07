@@ -106,8 +106,9 @@ export default function PairingSlotsScreen({
       cancelUnpair();
     } else {
       cancelCheck();
+      navigation.goBack();
     }
-  }, [isUnpairing, cancelUnpair, cancelCheck]);
+  }, [isUnpairing, cancelUnpair, cancelCheck, navigation]);
 
   // Build the NFCOperation object passed to NFCBottomSheet.
   // The check flow maps 'checking' → 'nfc' so the bottom sheet shows.

@@ -8,6 +8,7 @@ import theme from '../../theme';
 type Props = {
   status: string;
   retry?: () => void;
+  openNFCSettings?: () => void;
   onCancel: () => void;
   paddingBottom?: number;
 };
@@ -15,6 +16,7 @@ type Props = {
 export default function NFCError({
   status,
   retry,
+  openNFCSettings,
   onCancel,
   paddingBottom = 24,
 }: Props) {
@@ -27,7 +29,14 @@ export default function NFCError({
       <Text variant="bodyMedium" style={styles.status}>
         {status}
       </Text>
-      {retry && (
+      {openNFCSettings && (
+        <Pressable style={styles.retryButton} onPress={openNFCSettings}>
+          <Text variant="labelLarge" style={styles.retryLabel}>
+            Open NFC Settings
+          </Text>
+        </Pressable>
+      )}
+      {!openNFCSettings && retry && (
         <Pressable style={styles.retryButton} onPress={retry}>
           <Text variant="labelLarge" style={styles.retryLabel}>
             Try again

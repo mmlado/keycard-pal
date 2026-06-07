@@ -11,6 +11,8 @@ export interface UseNFCOperation<T> {
   start: () => void;
   cancel: () => void;
   reset: () => void;
+  openNFCSettings: (() => void) | undefined;
+  onNFCAvailableRef: { current: (() => void) | null };
 }
 
 export function useNFCOperation<T>(
@@ -40,6 +42,8 @@ export function useNFCOperation<T>(
     status,
     startNFC,
     reset: nfcReset,
+    openNFCSettings,
+    onNFCAvailableRef,
   } = useNFCSession(handleCardConnected, handleCardDisconnected);
 
   const cancel = useCallback(() => {
@@ -53,5 +57,14 @@ export function useNFCOperation<T>(
     setResult(null);
   }, [nfcReset]);
 
-  return { phase, status, result, start: startNFC, cancel, reset };
+  return {
+    phase,
+    status,
+    result,
+    start: startNFC,
+    cancel,
+    reset,
+    openNFCSettings,
+    onNFCAvailableRef,
+  };
 }

@@ -1,6 +1,7 @@
 /* eslint-disable no-bitwise */
 
 import { act, renderHook } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 import {
   useKeycardOp,
   useKeycardOperation,
@@ -17,10 +18,12 @@ let capturedOnConnected: (() => Promise<void>) | null = null;
 let capturedOnDisconnected: (() => void) | null = null;
 let capturedOnCancelled: (() => void) | null = null;
 let capturedOnTimeout: (() => void) | null = null;
+let capturedAppStateListener: ((state: string) => void) | null = null;
 
 const mockStartNFC = jest.fn();
 const mockStopNFC = jest.fn();
 const mockStopNFCWithError = jest.fn();
+const mockIsNFCEnabled = jest.fn();
 
 jest.mock('react-native-keycard', () => ({
   __esModule: true,
@@ -45,6 +48,8 @@ jest.mock('react-native-keycard', () => ({
       startNFC: (msg: string) => mockStartNFC(msg),
       stopNFC: () => mockStopNFC(),
       stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
+      isNFCEnabled: () => mockIsNFCEnabled(),
+      openNFCSettings: () => Promise.resolve(true),
     },
     NFCCardChannel: class {},
   },
@@ -108,13 +113,22 @@ describe('useKeycardOperation', () => {
     mockStartNFC.mockResolvedValue(undefined);
     mockStopNFC.mockResolvedValue(undefined);
     mockStopNFCWithError.mockResolvedValue(undefined);
+    mockIsNFCEnabled.mockResolvedValue(true);
     mockStartNFC.mockClear();
     mockStopNFC.mockClear();
     mockStopNFCWithError.mockClear();
+    mockIsNFCEnabled.mockClear();
     capturedOnConnected = null;
     capturedOnDisconnected = null;
     capturedOnCancelled = null;
     capturedOnTimeout = null;
+    capturedAppStateListener = null;
+    (AppState.addEventListener as jest.Mock).mockImplementation(
+      (_event: string, cb: (state: string) => void) => {
+        capturedAppStateListener = cb;
+        return { remove: jest.fn() };
+      },
+    );
     mockCheckGenuine.mockClear();
     mockLoadPairing.mockClear();
   });
@@ -155,6 +169,28 @@ describe('useKeycardOperation', () => {
       expect(result.current.phase).toBe('pin_entry');
       expect(mockStartNFC).not.toHaveBeenCalled();
     });
+
+    it('falls back to pin_entry when isNFCEnabled check throws', async () => {
+      mockIsNFCEnabled.mockRejectedValue(new Error('check failed'));
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      await act(async () => {});
+      expect(result.current.phase).toBe('pin_entry');
+      expect(mockStartNFC).not.toHaveBeenCalled();
+    });
+
+    it('shows NFC error instead of PIN pad when NFC is disabled', async () => {
+      mockIsNFCEnabled.mockResolvedValue(false);
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      await act(async () => {});
+      expect(result.current.phase).toBe('error');
+      expect(mockStartNFC).not.toHaveBeenCalled(); // NFC reader not started (disabled)
+    });
   });
 
   describe('retry', () => {
@@ -176,6 +212,25 @@ describe('useKeycardOperation', () => {
         result.current.retry();
       });
       expect(mockStartNFC).toHaveBeenCalledWith('Tap your Keycard');
+    });
+
+    it('shows PIN pad instead of starting NFC when PIN required but not yet entered', async () => {
+      mockIsNFCEnabled.mockResolvedValue(false);
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      await act(async () => {});
+      // NFC was disabled — error shown, PIN never entered
+      expect(result.current.phase).toBe('error');
+      mockStartNFC.mockClear();
+
+      // Simulate NFC becoming available; retry should route to PIN pad
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('pin_entry');
+      expect(mockStartNFC).not.toHaveBeenCalled();
     });
   });
 
@@ -497,6 +552,34 @@ describe('useKeycardOperation', () => {
     });
   });
 
+  describe('empty PIN guard', () => {
+    beforeEach(() => {
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => makeMockCmdSet());
+    });
+
+    it('enters error phase when card connects before PIN is entered', async () => {
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      expect(result.current.phase).toBe('pin_entry');
+
+      await act(async () => {
+        result.current.submitPin('');
+      });
+      expect(result.current.phase).toBe('nfc');
+
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'Enter your PIN first — tap Retry to continue.',
+      );
+    });
+  });
+
   describe('clearPinError', () => {
     it('is exposed and callable without side effects when no error exists', async () => {
       const { result } = renderHook(() => useKeycardOperation<string>());
@@ -580,10 +663,50 @@ describe('useKeycardOperation', () => {
   });
 });
 
+describe('onNFCAvailableRef', () => {
+  beforeEach(() => {
+    mockStartNFC.mockResolvedValue(undefined);
+    mockIsNFCEnabled.mockResolvedValue(true);
+    mockStartNFC.mockClear();
+    mockIsNFCEnabled.mockClear();
+    capturedAppStateListener = null;
+    (AppState.addEventListener as jest.Mock).mockImplementation(
+      (_event: string, cb: (state: string) => void) => {
+        capturedAppStateListener = cb;
+        return { remove: jest.fn() };
+      },
+    );
+  });
+
+  it('starts NFC directly when NFC re-enables and PIN is not required', async () => {
+    mockIsNFCEnabled.mockResolvedValue(false);
+    const { result } = renderHook(() => useKeycardOperation<string>());
+
+    await act(async () => {
+      result.current.execute(jest.fn(), { requiresPin: false });
+    });
+    await act(async () => {});
+    expect(result.current.phase).toBe('error');
+
+    mockIsNFCEnabled.mockResolvedValue(true);
+    mockStartNFC.mockClear();
+
+    await act(async () => {
+      capturedAppStateListener?.('active');
+    });
+    await act(async () => {});
+
+    expect(result.current.phase).toBe('nfc');
+    expect(mockStartNFC).toHaveBeenCalledWith('Tap your Keycard');
+  });
+});
+
 describe('useKeycardOp', () => {
   beforeEach(() => {
     mockStartNFC.mockResolvedValue(undefined);
+    mockIsNFCEnabled.mockResolvedValue(true);
     mockStartNFC.mockClear();
+    mockIsNFCEnabled.mockClear();
   });
 
   it('start() transitions to nfc when requiresPin is false', async () => {

@@ -14,6 +14,51 @@ beforeEach(() => {
 });
 
 describe('NFCSheet', () => {
+  describe('openNFCSettings', () => {
+    it('shows "Open NFC Settings" button when openNFCSettings is provided', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="NFC off"
+          onCancel={onCancel}
+          openNFCSettings={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('Open NFC Settings')).toBeTruthy();
+    });
+
+    it('hides retry hint when openNFCSettings is provided', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="NFC off"
+          onCancel={onCancel}
+          openNFCSettings={jest.fn()}
+        />,
+      );
+      expect(screen.queryByText('Tap your card to try again')).toBeNull();
+    });
+
+    it('calls openNFCSettings when the button is pressed', () => {
+      const openNFCSettings = jest.fn();
+      render(
+        <NFCSheet
+          variant="error"
+          status="NFC off"
+          onCancel={onCancel}
+          openNFCSettings={openNFCSettings}
+        />,
+      );
+      fireEvent.press(screen.getByText('Open NFC Settings'));
+      expect(openNFCSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not show "Open NFC Settings" button when openNFCSettings is not provided', () => {
+      render(<NFCSheet variant="error" status="err" onCancel={onCancel} />);
+      expect(screen.queryByText('Open NFC Settings')).toBeNull();
+    });
+  });
+
   describe('retry hint', () => {
     it('shows "Tap your card to try again" when variant is error', () => {
       render(<NFCSheet variant="error" status="Bad MAC" onCancel={onCancel} />);
