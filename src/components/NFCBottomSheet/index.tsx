@@ -25,6 +25,7 @@ export type NFCOperation = {
   submitPin?: (pin: string) => void;
   proceedWithNonGenuine?: () => void;
   retry?: () => void;
+  openNFCSettings?: () => void;
 };
 
 type Props = {
@@ -43,6 +44,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
     submitPin,
     proceedWithNonGenuine,
     retry,
+    openNFCSettings,
   } = nfc;
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(400)).current;
@@ -113,6 +115,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
         <NFCError
           status={status}
           retry={retry}
+          openNFCSettings={openNFCSettings}
           onCancel={onCancel}
           paddingBottom={insets.bottom + 24}
         />
@@ -147,6 +150,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
                 status={status}
                 cardName={cardName}
                 onCancel={onCancel}
+                openNFCSettings={openNFCSettings}
               />
             </Animated.View>
           </View>

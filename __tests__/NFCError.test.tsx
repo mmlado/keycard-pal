@@ -54,6 +54,49 @@ describe('NFCError', () => {
     });
   });
 
+  describe('openNFCSettings button', () => {
+    it('shows "Open NFC Settings" button when openNFCSettings is provided', () => {
+      render(
+        <NFCError
+          status="NFC off"
+          openNFCSettings={jest.fn()}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('Open NFC Settings')).toBeTruthy();
+    });
+
+    it('hides "Try again" when openNFCSettings is provided (even with retry)', () => {
+      render(
+        <NFCError
+          status="NFC off"
+          openNFCSettings={jest.fn()}
+          retry={onRetry}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.queryByText('Try again')).toBeNull();
+    });
+
+    it('calls openNFCSettings when the button is pressed', () => {
+      const openNFCSettings = jest.fn();
+      render(
+        <NFCError
+          status="NFC off"
+          openNFCSettings={openNFCSettings}
+          onCancel={onCancel}
+        />,
+      );
+      fireEvent.press(screen.getByText('Open NFC Settings'));
+      expect(openNFCSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not show "Open NFC Settings" when prop is not provided', () => {
+      render(<NFCError status="err" onCancel={onCancel} />);
+      expect(screen.queryByText('Open NFC Settings')).toBeNull();
+    });
+  });
+
   describe('retry button', () => {
     it('shows "Try again" button when retry prop is provided', () => {
       render(<NFCError status="err" retry={onRetry} onCancel={onCancel} />);

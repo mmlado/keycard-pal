@@ -12,6 +12,7 @@ type Props = {
   status: string;
   cardName?: string | null;
   onCancel: () => void;
+  openNFCSettings?: () => void;
 };
 
 function PulseRing({ delay, size }: { delay: number; size: number }) {
@@ -64,6 +65,7 @@ export default function NFCSheet({
   status,
   cardName,
   onCancel,
+  openNFCSettings,
 }: Props) {
   const NfcIcon =
     variant === 'success'
@@ -94,10 +96,22 @@ export default function NFCSheet({
         {status}
       </Text>
 
-      {variant === 'error' && (
+      {variant === 'error' && !openNFCSettings && (
         <Text variant="bodyMedium" style={styles.retryHint}>
           Tap your card to try again
         </Text>
+      )}
+
+      {variant === 'error' && openNFCSettings && (
+        <Pressable
+          style={styles.settingsButton}
+          android_ripple={{ color: theme.colors.secondaryRipple }}
+          onPress={openNFCSettings}
+        >
+          <Text variant="labelLarge" style={styles.settingsText}>
+            Open NFC Settings
+          </Text>
+        </Pressable>
       )}
 
       {variant !== 'success' && (
@@ -151,5 +165,15 @@ const styles = StyleSheet.create({
     color: theme.colors.onSurfaceMuted,
     textAlign: 'center',
     marginBottom: 8,
+  },
+  settingsButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary,
+    marginBottom: 8,
+  },
+  settingsText: {
+    color: theme.colors.onSurface,
   },
 });

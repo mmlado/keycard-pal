@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import Keycard from 'keycard-sdk';
+import RNKeycard from 'react-native-keycard';
 import { WrongPINException } from 'keycard-sdk/dist/apdu-exception';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
@@ -41,6 +42,7 @@ export interface UseKeycardOperation<T> {
   reset: () => void;
   retry: () => void;
   proceedWithNonGenuine: () => void;
+  openNFCSettings: (() => void) | undefined;
 }
 
 export function useKeycardOperation<T>(): UseKeycardOperation<T> {
@@ -125,6 +127,12 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       cmdSet: Commandset,
       setStatus: (status: string) => void,
     ): Promise<T | null> => {
+      // Guard: PIN was required but user returned from NFC Settings before entering it.
+      // SELECT already ran (harmless); stop here to avoid sending verifyPIN('').
+      if (requiresPinRef.current && !pinRef.current) {
+        throw new Error('Enter your PIN first — tap Retry to continue.');
+      }
+
       const appInfo = cmdSet.applicationInfo;
       if (!appInfo) {
         throw new Error('No application info in SELECT response');
@@ -181,12 +189,24 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     start: startNFC,
     cancel: nfcCancel,
     reset: nfcReset,
+    openNFCSettings,
+    onNFCAvailableRef,
   } = useNFCOperation<T | null>(handleCardConnected);
+
+  // When the user returns from NFC Settings with NFC now enabled, go straight
+  // to PIN entry (if PIN hasn't been entered yet) or restart NFC directly.
+  onNFCAvailableRef.current = () => {
+    if (requiresPinRef.current && !pinRef.current) {
+      setWaitingForPin(true);
+    } else {
+      startNFC();
+    }
+  };
 
   // 'genuine_warning' takes priority over all other phase overrides.
   const phase: Phase = showGenuineWarning
     ? 'genuine_warning'
-    : (waitingForPin && nfcPhase === 'idle') ||
+    : (waitingForPin && (nfcPhase === 'idle' || nfcPhase === 'error')) ||
       (pinError !== null && nfcPhase === 'error')
     ? 'pin_entry'
     : nfcPhase;
@@ -200,9 +220,22 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
 
       if (!requiresPinRef.current) {
         startNFC();
-      } else {
-        setWaitingForPin(true);
+        return;
       }
+
+      // Check NFC before showing the PIN pad so users don't enter their PIN
+      // only to be told NFC is disabled immediately after.
+      RNKeycard.Core.isNFCEnabled()
+        .then(enabled => {
+          if (enabled) {
+            setWaitingForPin(true);
+          } else {
+            startNFC(); // startNFC handles the NFC-disabled error + openNFCSettings
+          }
+        })
+        .catch(() => {
+          setWaitingForPin(true); // can't check — fall back to PIN entry
+        });
     },
     [startNFC],
   );
@@ -231,9 +264,14 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     startNFC();
   }, [startNFC]);
 
-  // Re-starts NFC without PIN re-entry — uses the cached PIN from the previous attempt.
+  // Re-starts NFC. If PIN hasn't been entered yet (e.g. NFC was off before PIN entry),
+  // show the PIN pad instead of starting NFC directly.
   const retry = useCallback(() => {
     if (!operationRef.current) return;
+    if (requiresPinRef.current && !pinRef.current) {
+      setWaitingForPin(true);
+      return;
+    }
     startNFC();
   }, [startNFC]);
 
@@ -271,6 +309,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     reset,
     retry,
     proceedWithNonGenuine,
+    openNFCSettings,
   };
 }
 
