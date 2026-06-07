@@ -310,7 +310,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.keycardpal";
+				PRODUCT_BUNDLE_IDENTIFIER = com.keycardpal;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.keycardpal.dev.mmlado;
 				PRODUCT_NAME = KeycardPal;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -346,8 +346,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.keycardpal";
-				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = com.keycardpal.dev.mmlado;
+				PRODUCT_BUNDLE_IDENTIFIER = com.keycardpal;
 				PRODUCT_NAME = KeycardPal;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
