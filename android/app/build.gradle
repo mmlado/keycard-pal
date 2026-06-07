@@ -166,19 +166,26 @@ android {
     }
 }
 
+// AGP 8.x finalizes outputFileName before afterEvaluate runs; onVariants is the correct hook.
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.forEach { output ->
+            def abi = output.filters.find {
+                it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+            }?.identifier ?: "universal"
+            output.outputFileName.set(
+                "keycard-pal-${variant.flavorName}-${variant.buildType}-${abi}.apk"
+            )
+        }
+    }
+}
+
 afterEvaluate {
     // Decouple ktlint from check/build — run explicitly via 'npm run lint:android'
     tasks.matching { it.name == "check" }.configureEach { checkTask ->
         checkTask.setDependsOn(checkTask.dependsOn.findAll { dep ->
             !(dep instanceof TaskProvider && dep.name.startsWith("ktlint"))
         })
-    }
-
-    android.applicationVariants.all { variant ->
-        variant.outputs.all { output ->
-            def abi = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
-            outputFileName = "keycard-pal-${variant.flavorName}-${variant.buildType.name}-${abi}.apk"
-        }
     }
 
     android.applicationVariants.all { variant ->
