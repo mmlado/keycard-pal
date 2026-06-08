@@ -580,6 +580,196 @@ describe('useKeycardOperation', () => {
     });
   });
 
+  describe('pairing password', () => {
+    beforeEach(() => {
+      mockLoadPairing.mockResolvedValue(null);
+      mockCheckGenuine.mockResolvedValue(true);
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => makeMockCmdSet());
+    });
+
+    async function triggerCardConnect(_hook: UseKeycardOperation<string>) {
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+    }
+
+    it('enters pairing_password phase when autoPair throws cryptogram error', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest
+          .fn()
+          .mockRejectedValue(new APDUException('Invalid card cryptogram')),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {
+          requiresPin: false,
+        });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('pairing_password');
+      expect(result.current.pairingPasswordError).toBeNull();
+    });
+
+    it('transitions to nfc and calls startNFC after submitPairingPassword', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest
+          .fn()
+          .mockRejectedValue(new APDUException('Invalid card cryptogram')),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {
+          requiresPin: false,
+        });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('pairing_password');
+
+      mockStartNFC.mockClear();
+      await act(async () => {
+        result.current.submitPairingPassword('custom123');
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(mockStartNFC).toHaveBeenCalledWith('Tap your Keycard');
+    });
+
+    it('sets pairingPasswordError on second tap with wrong custom password', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest
+          .fn()
+          .mockRejectedValue(new APDUException('Invalid card cryptogram')),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {
+          requiresPin: false,
+        });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('pairing_password');
+
+      await act(async () => {
+        result.current.submitPairingPassword('custom123');
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('pairing_password');
+      expect(result.current.pairingPasswordError).toBe(
+        'Wrong pairing password. Try again.',
+      );
+    });
+
+    it('returns to idle on cancel from pairing_password', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest
+          .fn()
+          .mockRejectedValue(new APDUException('Invalid card cryptogram')),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('pairing_password');
+
+      await act(async () => {
+        result.current.cancel();
+      });
+      expect(result.current.phase).toBe('idle');
+      expect(result.current.pairingPasswordError).toBeNull();
+    });
+
+    it('enters error phase with friendly slots-full message on step-2 error', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest
+          .fn()
+          .mockRejectedValue(new APDUException('Pairing failed on step 2')),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard has no free pairing slots. Use another device to unpair a slot first.',
+      );
+    });
+
+    it('enters error phase with friendly slots-full message on step-1 error', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest
+          .fn()
+          .mockRejectedValue(new APDUException('Pairing failed on step 1')),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard has no free pairing slots. Use another device to unpair a slot first.',
+      );
+    });
+
+    it('completes operation when custom password succeeds on retry', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      let callCount = 0;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            return Promise.reject(new APDUException('Invalid card cryptogram'));
+          }
+          return Promise.resolve(undefined);
+        }),
+      }));
+
+      const mockOp = jest.fn().mockResolvedValue('done');
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(mockOp, { requiresPin: false });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('pairing_password');
+
+      await act(async () => {
+        result.current.submitPairingPassword('custom123');
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('done');
+      expect(result.current.result).toBe('done');
+      expect(mockOp).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('clearPinError', () => {
     it('is exposed and callable without side effects when no error exists', async () => {
       const { result } = renderHook(() => useKeycardOperation<string>());

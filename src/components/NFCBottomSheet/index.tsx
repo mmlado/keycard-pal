@@ -9,11 +9,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import theme from '../../theme';
-import PinPad from '../PinPad';
+import theme from '@/theme';
+
+import PinPad from '@/components/PinPad';
+
 import GenuineWarning from './GenuineWarning';
 import NFCError from './NFCError';
 import NFCSheet from './NFCSheet';
+import PairingPasswordEntry from './PairingPasswordEntry';
 
 export type NFCVariant = 'scanning' | 'success' | 'error' | 'genuine_warning';
 
@@ -23,6 +26,8 @@ export type NFCOperation = {
   cardName?: string | null;
   pinError?: string | null;
   submitPin?: (pin: string) => void;
+  pairingPasswordError?: string | null;
+  submitPairingPassword?: (password: string) => void;
   proceedWithNonGenuine?: () => void;
   retry?: () => void;
   openNFCSettings?: () => void;
@@ -42,6 +47,8 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
     cardName,
     pinError,
     submitPin,
+    pairingPasswordError,
+    submitPairingPassword,
     proceedWithNonGenuine,
     retry,
     openNFCSettings,
@@ -52,6 +59,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
 
   const showPinPad = phase === 'pin_entry';
   const showGenuineWarning = phase === 'genuine_warning';
+  const showPairingPassword = phase === 'pairing_password';
   const showIOSError = Platform.OS === 'ios' && phase === 'error';
   const showSheet =
     Platform.OS === 'android' &&
@@ -73,7 +81,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
       setModalVisible(false);
       return;
     }
-    if (showSheet || showGenuineWarning) {
+    if (showSheet || showGenuineWarning || showPairingPassword) {
       setModalVisible(true);
     }
     Animated.spring(slideAnim, {
@@ -82,11 +90,11 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
       tension: 60,
       friction: 12,
     }).start(({ finished }) => {
-      if (finished && !showSheet && !showGenuineWarning) {
+      if (finished && !showSheet && !showGenuineWarning && !showPairingPassword) {
         setModalVisible(false);
       }
     });
-  }, [showSheet, showGenuineWarning, showIOSError, slideAnim]);
+  }, [showSheet, showGenuineWarning, showPairingPassword, showIOSError, slideAnim]);
 
   const variant: NFCVariant =
     phase === 'genuine_warning'
@@ -132,6 +140,12 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
           <GenuineWarning
             onCancel={onCancel}
             onProceed={proceedWithNonGenuine}
+          />
+        ) : showPairingPassword && submitPairingPassword ? (
+          <PairingPasswordEntry
+            error={pairingPasswordError ?? null}
+            onSubmit={submitPairingPassword}
+            onCancel={onCancel}
           />
         ) : (
           <View style={styles.overlay}>
