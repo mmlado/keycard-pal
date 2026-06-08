@@ -179,6 +179,68 @@ describe('NFCBottomSheet — Android sheet', () => {
     });
   });
 
+  describe('pairing_password phase', () => {
+    const submitPairingPassword = jest.fn();
+
+    beforeEach(() => {
+      submitPairingPassword.mockClear();
+    });
+
+    it('shows the pairing password title', () => {
+      renderSheet(
+        makeNfc('pairing_password', { submitPairingPassword }),
+      );
+      expect(screen.getByText('Custom pairing password')).toBeTruthy();
+    });
+
+    it('shows Cancel and Continue buttons', () => {
+      renderSheet(
+        makeNfc('pairing_password', { submitPairingPassword }),
+      );
+      expect(screen.getByText('Cancel')).toBeTruthy();
+      expect(screen.getByText('Continue')).toBeTruthy();
+    });
+
+    it('calls onCancel when Cancel is pressed', () => {
+      renderSheet(
+        makeNfc('pairing_password', { submitPairingPassword }),
+      );
+      fireEvent.press(screen.getByText('Cancel'));
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows error message when pairingPasswordError is provided', () => {
+      renderSheet(
+        makeNfc('pairing_password', {
+          submitPairingPassword,
+          pairingPasswordError: 'Wrong pairing password. Try again.',
+        }),
+      );
+      expect(
+        screen.getByText('Wrong pairing password. Try again.'),
+      ).toBeTruthy();
+    });
+
+    it('calls submitPairingPassword with the entered password', () => {
+      renderSheet(
+        makeNfc('pairing_password', { submitPairingPassword }),
+      );
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Pairing password'),
+        'mySecret',
+      );
+      fireEvent.press(screen.getByText('Continue'));
+      expect(submitPairingPassword).toHaveBeenCalledWith('mySecret');
+    });
+
+    it('does not show the NFC icon area', () => {
+      renderSheet(
+        makeNfc('pairing_password', { submitPairingPassword }),
+      );
+      expect(screen.queryByText('Tap your Keycard')).toBeNull();
+    });
+  });
+
   describe('pin_entry phase', () => {
     it('renders PinPad instead of the bottom sheet', () => {
       const submitPin = jest.fn();

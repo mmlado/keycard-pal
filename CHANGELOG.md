@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Handle NFC availability
+- Prompt for custom pairing password when default pairing fails; loop on wrong password with error feedback; show friendly message when pairing slots are full
 
 ### Changed
 

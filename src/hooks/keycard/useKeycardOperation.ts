@@ -1,19 +1,20 @@
 import { useCallback, useRef, useState } from 'react';
 import Keycard from 'keycard-sdk';
-import RNKeycard from 'react-native-keycard';
 import { WrongPINException } from 'keycard-sdk/dist/apdu-exception';
 import { Commandset } from 'keycard-sdk/dist/commandset';
+import RNKeycard from 'react-native-keycard';
 
-import { PAIRING_PASSWORD } from '../../constants/keycard';
-import { loadPairing, savePairing } from '../../storage/pairingStorage';
-import { checkGenuine } from '../../utils/genuineCheck';
-import { toHex } from '../../utils/hex';
-import { displayKeycardName, parseKeycardName } from '../../utils/keycardName';
+import { loadPairing } from '@/storage/pairingStorage';
+import { toHex } from '@/utils/hex';
+import { displayKeycardName, parseKeycardName } from '@/utils/keycardName';
+import { useGenuineCheck } from './useGenuineCheck';
 import { useNFCOperation } from './useNFCOperation';
+import { usePairing } from './usePairing';
 
 export type Phase =
   | 'idle'
   | 'pin_entry'
+  | 'pairing_password'
   | 'nfc'
   | 'genuine_warning'
   | 'done'
@@ -35,8 +36,10 @@ export interface UseKeycardOperation<T> {
   cardName: string | null;
   result: T | null;
   pinError: string | null;
+  pairingPasswordError: string | null;
   execute: (op: KeycardOperationFn<T>, options?: ExecuteOptions) => void;
   submitPin: (pin: string) => void;
+  submitPairingPassword: (password: string) => void;
   clearPinError: () => void;
   cancel: () => void;
   reset: () => void;
@@ -49,63 +52,76 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [waitingForPin, setWaitingForPin] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
-  const [showGenuineWarning, setShowGenuineWarning] = useState(false);
 
   const pinRef = useRef('');
   const operationRef = useRef<KeycardOperationFn<T> | null>(null);
   const requiresPinRef = useRef(true);
   const requiresMasterKeyRef = useRef(true);
   const operationRunningRef = useRef(false);
-  const approvedNonGenuineUidsRef = useRef<Set<string>>(new Set());
-  const pendingUidRef = useRef<string | null>(null);
+
+  const {
+    showGenuineWarning,
+    checkOrSkipGenuine,
+    proceedWithNonGenuine: _proceedWithNonGenuine,
+    resetGenuineState,
+  } = useGenuineCheck();
+
+  const {
+    waitingForPairingPassword,
+    pairingPasswordError,
+    runAutoPair,
+    submitPairingPassword: _submitPairingPassword,
+    resetPairingState,
+  } = usePairing();
+
+  const verifyPin = useCallback(
+    async (cmdSet: Commandset, setStatus: (s: string) => void): Promise<void> => {
+      setStatus('Verifying PIN...');
+      const pinResp = await cmdSet.verifyPIN(pinRef.current);
+      console.log(
+        `[Keycard] verifyPIN SW: 0x${pinResp.sw.toString(16).toUpperCase()}`,
+      );
+      try {
+        pinResp.checkAuthOK();
+      } catch (e) {
+        if (e instanceof WrongPINException) {
+          const attempts = e.getRetryAttempts();
+          if (attempts === 0) {
+            throw new Error('Card is locked. Use Unblock Card option.');
+          }
+          setPinError(`PIN is not valid. ${attempts} attempts left.`);
+        }
+        pinRef.current = '';
+        throw e;
+      }
+    },
+    [],
+  );
 
   const doPairAndExecute = useCallback(
     async (
       cmdSet: Commandset,
       uid: string,
+      existingPairing: InstanceType<typeof Keycard.Pairing> | null,
       setStatus: (s: string) => void,
     ): Promise<T | null> => {
-      const existingPairing = await loadPairing(uid);
       if (existingPairing) {
         console.log(
           `[Keycard] Pairing found in storage (index: ${existingPairing.pairingIndex})`,
         );
         cmdSet.setPairing(existingPairing);
-        setStatus('Opening secure channel...');
       } else {
         console.log('[Keycard] No pairing found — running autoPair');
         setStatus('Pairing with card...');
-        await cmdSet.autoPair(PAIRING_PASSWORD);
-        const pairing = cmdSet.getPairing();
-        console.log(
-          `[Keycard] autoPair OK (index: ${pairing.pairingIndex}) — saving to storage`,
-        );
-        await savePairing(uid, pairing);
-        setStatus('Opening secure channel...');
+        const paired = await runAutoPair(cmdSet, uid);
+        if (!paired) return null;
       }
-
+      setStatus('Opening secure channel...');
       await cmdSet.autoOpenSecureChannel();
       console.log('[Keycard] Secure channel open');
 
       if (requiresPinRef.current) {
-        setStatus('Verifying PIN...');
-        const pinResp = await cmdSet.verifyPIN(pinRef.current);
-        console.log(
-          `[Keycard] verifyPIN SW: 0x${pinResp.sw.toString(16).toUpperCase()}`,
-        );
-        try {
-          pinResp.checkAuthOK();
-        } catch (e) {
-          if (e instanceof WrongPINException) {
-            const attempts = e.getRetryAttempts();
-            if (attempts === 0) {
-              throw new Error('Card is locked. Use Unblock Card option.');
-            }
-            setPinError(`PIN is not valid. ${attempts} attempts left.`);
-          }
-          pinRef.current = '';
-          throw e;
-        }
+        await verifyPin(cmdSet, setStatus);
       }
 
       if (operationRunningRef.current || !operationRef.current) {
@@ -119,7 +135,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         operationRunningRef.current = false;
       }
     },
-    [],
+    [runAutoPair, verifyPin],
   );
 
   const handleCardConnected = useCallback(
@@ -163,23 +179,17 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       setStatus(`Connected to ${displayKeycardName(name)}`);
 
       const existingPairing = await loadPairing(uid);
-      if (!existingPairing && !approvedNonGenuineUidsRef.current.has(uid)) {
-        setStatus('Verifying card...');
-        const isGenuine = await checkGenuine(cmdSet);
-        if (!isGenuine) {
-          console.log('[Keycard] Genuine check failed — showing warning');
-          pendingUidRef.current = uid;
-          setShowGenuineWarning(true);
-          // Return null: useNFCSession will set nfcPhase='done',
-          // but our phase computation overrides it to 'genuine_warning'.
-          return null;
-        }
-        console.log('[Keycard] Genuine check passed');
-      }
+      const shouldProceed = await checkOrSkipGenuine(
+        cmdSet,
+        uid,
+        !!existingPairing,
+        setStatus,
+      );
+      if (!shouldProceed) return null;
 
-      return await doPairAndExecute(cmdSet, uid, setStatus);
+      return await doPairAndExecute(cmdSet, uid, existingPairing, setStatus);
     },
-    [doPairAndExecute],
+    [checkOrSkipGenuine, doPairAndExecute],
   );
 
   const {
@@ -206,6 +216,9 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   // 'genuine_warning' takes priority over all other phase overrides.
   const phase: Phase = showGenuineWarning
     ? 'genuine_warning'
+    : waitingForPairingPassword ||
+      (pairingPasswordError !== null && nfcPhase === 'error')
+    ? 'pairing_password'
     : (waitingForPin && (nfcPhase === 'idle' || nfcPhase === 'error')) ||
       (pinError !== null && nfcPhase === 'error')
     ? 'pin_entry'
@@ -217,6 +230,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       requiresPinRef.current = options.requiresPin ?? true;
       requiresMasterKeyRef.current = options.requiresMasterKey ?? true;
       operationRunningRef.current = false;
+      resetPairingState();
 
       if (!requiresPinRef.current) {
         startNFC();
@@ -237,7 +251,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
           setWaitingForPin(true); // can't check — fall back to PIN entry
         });
     },
-    [startNFC],
+    [startNFC, resetPairingState],
   );
 
   const submitPin = useCallback(
@@ -250,19 +264,20 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     [startNFC],
   );
 
+  const submitPairingPassword = useCallback(
+    (password: string) => {
+      _submitPairingPassword(password, startNFC);
+    },
+    [_submitPairingPassword, startNFC],
+  );
+
   const clearPinError = useCallback(() => {
     setPinError(null);
   }, []);
 
   const proceedWithNonGenuine = useCallback(() => {
-    const uid = pendingUidRef.current;
-    if (uid) {
-      approvedNonGenuineUidsRef.current.add(uid);
-      pendingUidRef.current = null;
-    }
-    setShowGenuineWarning(false);
-    startNFC();
-  }, [startNFC]);
+    _proceedWithNonGenuine(startNFC);
+  }, [_proceedWithNonGenuine, startNFC]);
 
   // Re-starts NFC. If PIN hasn't been entered yet (e.g. NFC was off before PIN entry),
   // show the PIN pad instead of starting NFC directly.
@@ -279,12 +294,12 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     setWaitingForPin(false);
     setPinError(null);
     setCardName(null);
-    setShowGenuineWarning(false);
-    pendingUidRef.current = null;
     pinRef.current = '';
     operationRef.current = null;
     operationRunningRef.current = false;
-  }, []);
+    resetGenuineState();
+    resetPairingState();
+  }, [resetGenuineState, resetPairingState]);
 
   const cancel = useCallback(() => {
     nfcCancel();
@@ -302,8 +317,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     cardName,
     result,
     pinError,
+    pairingPasswordError,
     execute,
     submitPin,
+    submitPairingPassword,
     clearPinError,
     cancel,
     reset,
