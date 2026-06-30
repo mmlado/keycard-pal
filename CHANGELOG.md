@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Release APKs are now named `keycard-pal-<flavor>-<buildType>-<abi>.apk` instead of `app-<flavor>-<buildType>-<abi>.apk`
 
+### Fixed
+
+- iOS archives were bundling the offline flavor because Metro's online/offline resolver requires the `ONLINE_BUILD=true` env var; export it from `ios/.xcode.env` so all iOS builds (dev and Archive) resolve to `.online` settings sections
+
 ## [1.7.0] - 2026-06-06
 
 ### Added
