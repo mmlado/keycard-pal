@@ -97,8 +97,8 @@ android {
         applicationId "com.keycardpal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10700
-        versionName "1.7.0"
+        versionCode 10800
+        versionName "1.8.0"
     }
     flavorDimensions "distribution"
     productFlavors {

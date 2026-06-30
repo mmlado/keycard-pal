@@ -39,9 +39,9 @@ RepoType: git
 Repo: https://github.com/mmlado/keycard-pal
 
 Builds:
-  - versionName: 1.7.0
-    versionCode: 10700
-    commit: v1.7.0
+  - versionName: 1.8.0
+    versionCode: 10800
+    commit: v1.8.0
     subdir: android/app
     sudo:
       - apt-get install -y openjdk-17-jdk
@@ -60,5 +60,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.7.0
-CurrentVersionCode: 10700
+CurrentVersion: 1.8.0
+CurrentVersionCode: 10800
