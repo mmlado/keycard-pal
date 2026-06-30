@@ -5,6 +5,7 @@ import { Commandset } from 'keycard-sdk/dist/commandset';
 import RNKeycard from 'react-native-keycard';
 
 import { loadPairing } from '@/storage/pairingStorage';
+import { pubKeyFingerprint } from '@/utils/cryptoAccount';
 import { toHex } from '@/utils/hex';
 import { displayKeycardName, parseKeycardName } from '@/utils/keycardName';
 import { useGenuineCheck } from './useGenuineCheck';
@@ -34,6 +35,7 @@ export interface UseKeycardOperation<T> {
   phase: Phase;
   status: string;
   cardName: string | null;
+  cardFingerprint: number | null;
   result: T | null;
   pinError: string | null;
   pairingPasswordError: string | null;
@@ -52,6 +54,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [waitingForPin, setWaitingForPin] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
+  const [cardFingerprint, setCardFingerprint] = useState<number | null>(null);
 
   const pinRef = useRef('');
   const operationRef = useRef<KeycardOperationFn<T> | null>(null);
@@ -75,7 +78,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   } = usePairing();
 
   const verifyPin = useCallback(
-    async (cmdSet: Commandset, setStatus: (s: string) => void): Promise<void> => {
+    async (
+      cmdSet: Commandset,
+      setStatus: (s: string) => void,
+    ): Promise<void> => {
       setStatus('Verifying PIN...');
       const pinResp = await cmdSet.verifyPIN(pinRef.current);
       console.log(
@@ -104,6 +110,8 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       uid: string,
       existingPairing: InstanceType<typeof Keycard.Pairing> | null,
       setStatus: (s: string) => void,
+      name: string,
+      hasMasterKey: boolean,
     ): Promise<T | null> => {
       if (existingPairing) {
         console.log(
@@ -122,6 +130,24 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
 
       if (requiresPinRef.current) {
         await verifyPin(cmdSet, setStatus);
+      }
+
+      // Unnamed card: derive the master fingerprint for display, mirroring
+      // keycard-shell's `name[0] ? name : fingerprint` fallback. Display only —
+      // never written back to the card. Failure is non-fatal: the operation
+      // continues and the card stays shown as "Unnamed card".
+      if (name === '' && hasMasterKey) {
+        try {
+          const masterResp = await cmdSet.exportKey(0, true, 'm', false);
+          masterResp.checkOK();
+          const fingerprint = pubKeyFingerprint(
+            Keycard.BIP32KeyPair.fromTLV(masterResp.data).publicKey,
+          );
+          setCardFingerprint(fingerprint);
+          setStatus(`Connected to ${displayKeycardName(name, fingerprint)}`);
+        } catch (e) {
+          console.warn('[Keycard] master fingerprint export failed', e);
+        }
       }
 
       if (operationRunningRef.current || !operationRef.current) {
@@ -187,7 +213,14 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       );
       if (!shouldProceed) return null;
 
-      return await doPairAndExecute(cmdSet, uid, existingPairing, setStatus);
+      return await doPairAndExecute(
+        cmdSet,
+        uid,
+        existingPairing,
+        setStatus,
+        name,
+        appInfo.hasMasterKey(),
+      );
     },
     [checkOrSkipGenuine, doPairAndExecute],
   );
@@ -294,6 +327,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     setWaitingForPin(false);
     setPinError(null);
     setCardName(null);
+    setCardFingerprint(null);
     pinRef.current = '';
     operationRef.current = null;
     operationRunningRef.current = false;
@@ -315,6 +349,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     phase,
     status,
     cardName,
+    cardFingerprint,
     result,
     pinError,
     pairingPasswordError,

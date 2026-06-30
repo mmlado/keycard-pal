@@ -159,6 +159,33 @@ describe('NFCSheet', () => {
       );
       expect(screen.getByText('Unnamed card')).toBeTruthy();
     });
+
+    it('shows the master fingerprint when an unnamed card has one', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status="test"
+          cardName=""
+          cardFingerprint={0x1a2b3c4d}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('1a2b3c4d')).toBeTruthy();
+    });
+
+    it('prefers the card name over the fingerprint when both are present', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status="test"
+          cardName="My Card"
+          cardFingerprint={0x1a2b3c4d}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('My Card')).toBeTruthy();
+      expect(screen.queryByText('1a2b3c4d')).toBeNull();
+    });
   });
 
   describe('status text', () => {
