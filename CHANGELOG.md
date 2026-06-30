@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Handle NFC availability
 - Prompt for custom pairing password when default pairing fails; loop on wrong password with error feedback; show friendly message when pairing slots are full
+- Show the master fingerprint (8 hex chars) as the active card's name when the card has no stored name, matching keycard-shell; display only, never written to the card
 
 ### Changed
 

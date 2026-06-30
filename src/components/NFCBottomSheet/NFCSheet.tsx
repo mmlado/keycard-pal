@@ -11,6 +11,7 @@ type Props = {
   variant: NFCVariant;
   status: string;
   cardName?: string | null;
+  cardFingerprint?: number | null;
   onCancel: () => void;
   openNFCSettings?: () => void;
 };
@@ -64,6 +65,7 @@ export default function NFCSheet({
   variant,
   status,
   cardName,
+  cardFingerprint,
   onCancel,
   openNFCSettings,
 }: Props) {
@@ -90,7 +92,7 @@ export default function NFCSheet({
       <Text variant="titleLarge" style={styles.title}>
         {cardName === undefined || cardName === null
           ? 'Tap your Keycard'
-          : displayKeycardName(cardName)}
+          : displayKeycardName(cardName, cardFingerprint)}
       </Text>
       <Text variant="bodyMedium" style={styles.status}>
         {status}

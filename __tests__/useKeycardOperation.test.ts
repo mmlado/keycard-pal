@@ -60,7 +60,14 @@ jest.mock('keycard-sdk', () => ({
   default: {
     Commandset: jest.fn(),
     Certificate: { verifyIdentity: jest.fn() },
+    BIP32KeyPair: {
+      fromTLV: jest.fn(() => ({ publicKey: new Uint8Array([0x01]) })),
+    },
   },
+}));
+
+jest.mock('../src/utils/cryptoAccount', () => ({
+  pubKeyFingerprint: jest.fn(() => 0x1a2b3c4d),
 }));
 
 jest.mock('../src/utils/genuineCheck', () => ({
@@ -577,6 +584,118 @@ describe('useKeycardOperation', () => {
       expect(result.current.status).toBe(
         'Enter your PIN first — tap Retry to continue.',
       );
+    });
+  });
+
+  describe('master fingerprint fallback', () => {
+    beforeEach(() => {
+      mockLoadPairing.mockResolvedValue(null);
+      mockCheckGenuine.mockResolvedValue(true);
+    });
+
+    const makeUnnamedCmdSet = (overrides = {}) => ({
+      ...makeMockCmdSet(),
+      getData: jest.fn().mockResolvedValue({
+        sw: 0x9000,
+        data: new Uint8Array([0x20 | 0]), // length-0 name = unnamed card
+      }),
+      exportKey: jest
+        .fn()
+        .mockResolvedValue({
+          data: new Uint8Array([0x02]),
+          checkOK: jest.fn(),
+        }),
+      ...overrides,
+    });
+
+    async function triggerCardConnect() {
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+    }
+
+    it('derives and exposes the fingerprint for an unnamed card', async () => {
+      const cmdSet = makeUnnamedCmdSet();
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {
+          requiresPin: false,
+        });
+      });
+      await triggerCardConnect();
+
+      expect(cmdSet.exportKey).toHaveBeenCalledWith(0, true, 'm', false);
+      expect(result.current.cardName).toBe('');
+      expect(result.current.cardFingerprint).toBe(0x1a2b3c4d);
+    });
+
+    it('skips the fingerprint export for a named card', async () => {
+      const cmdSet = {
+        ...makeMockCmdSet(),
+        exportKey: jest.fn(),
+      };
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {
+          requiresPin: false,
+        });
+      });
+      await triggerCardConnect();
+
+      expect(cmdSet.exportKey).not.toHaveBeenCalled();
+      expect(result.current.cardFingerprint).toBeNull();
+    });
+
+    it('skips the fingerprint export when the card has no master key', async () => {
+      const cmdSet = makeUnnamedCmdSet({
+        applicationInfo: {
+          instanceUID: new Uint8Array([0xaa, 0xbb]),
+          initializedCard: true,
+          freePairingSlots: 5,
+          hasMasterKey: () => false,
+        },
+      });
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {
+          requiresPin: false,
+          requiresMasterKey: false,
+        });
+      });
+      await triggerCardConnect();
+
+      expect(cmdSet.exportKey).not.toHaveBeenCalled();
+      expect(result.current.cardFingerprint).toBeNull();
+    });
+
+    it('continues the operation when the fingerprint export fails', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      const cmdSet = makeUnnamedCmdSet({
+        exportKey: jest.fn().mockRejectedValue(new Error('export boom')),
+      });
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+
+      const mockOp = jest.fn().mockResolvedValue('done');
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(mockOp, { requiresPin: false });
+      });
+      await triggerCardConnect();
+
+      expect(mockOp).toHaveBeenCalledTimes(1);
+      expect(result.current.result).toBe('done');
+      expect(result.current.cardFingerprint).toBeNull();
+      warnSpy.mockRestore();
     });
   });
 

@@ -24,6 +24,7 @@ export type NFCOperation = {
   phase: string;
   status: string;
   cardName?: string | null;
+  cardFingerprint?: number | null;
   pinError?: string | null;
   submitPin?: (pin: string) => void;
   pairingPasswordError?: string | null;
@@ -45,6 +46,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
     phase,
     status,
     cardName,
+    cardFingerprint,
     pinError,
     submitPin,
     pairingPasswordError,
@@ -90,11 +92,22 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
       tension: 60,
       friction: 12,
     }).start(({ finished }) => {
-      if (finished && !showSheet && !showGenuineWarning && !showPairingPassword) {
+      if (
+        finished &&
+        !showSheet &&
+        !showGenuineWarning &&
+        !showPairingPassword
+      ) {
         setModalVisible(false);
       }
     });
-  }, [showSheet, showGenuineWarning, showPairingPassword, showIOSError, slideAnim]);
+  }, [
+    showSheet,
+    showGenuineWarning,
+    showPairingPassword,
+    showIOSError,
+    slideAnim,
+  ]);
 
   const variant: NFCVariant =
     phase === 'genuine_warning'
@@ -163,6 +176,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
                 variant={variant}
                 status={status}
                 cardName={cardName}
+                cardFingerprint={cardFingerprint}
                 onCancel={onCancel}
                 openNFCSettings={openNFCSettings}
               />
