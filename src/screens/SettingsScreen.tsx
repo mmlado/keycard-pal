@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DashboardAction, SettingsScreenProps } from '../navigation/types';
 import theme from '../theme';
 
+import Eip7730SettingsSection from '../components/settings/eip7730/Eip7730SettingsSection.online';
 import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
 import PinPadSettingsSection from '../components/settings/PinPadSettingsSection';
 import TenderlySettingsSection from '../components/settings/tenderly/TenderlySettingsSection.online';
@@ -48,6 +49,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           <EnsSettingsSection />
           <WalletConnectSettingsSection />
           <TenderlySettingsSection />
+          <Eip7730SettingsSection />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

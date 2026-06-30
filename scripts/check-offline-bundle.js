@@ -20,6 +20,15 @@ const FORBIDDEN_MARKERS = [
   'wc_project_id_override',
   '@reown/walletkit',
   'reown.com/privacy-policy',
+  // EIP-7730 auto-download (online only — manual import allowed in offline)
+  'Eip7730DownloadProvider',
+  'eip7730_etag',
+  'eip7730_last_modified',
+  'eip7730_source',
+  'eip7730_url',
+  'eip7730_wifi_only',
+  'Auto-download',
+  'Download on Wi-Fi only',
 ];
 
 function parseArgs(argv) {

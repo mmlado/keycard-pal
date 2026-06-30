@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Handle NFC availability
 - Prompt for custom pairing password when default pairing fails; loop on wrong password with error feedback; show friendly message when pairing slots are full
+- EIP-7730 clear signing: render human-readable intent and formatted fields (raw, tokenAmount, date, enum, addressName) for calldata and EIP-712 messages when a Ledger clear-signing descriptor matches the contract; bundled descriptor index regenerated via `npm run generate:eip7730`; user can import a Ledger registry zip via the system file picker on both builds; online build adds an auto-download mode in Settings with configurable URL, Wi-Fi-only option, ETag-conditional fetch, and a dashboard progress indicator
 
 ### Changed
 

@@ -392,8 +392,8 @@ describe('EthSignRequestDetail — amount row visibility', () => {
       derivationPath: "m/44'/60'/0'/0",
       chainId: 1,
     });
-    // DecodedCallSection renders, native amount row does not
-    expect(screen.getByText('ERC-20 Transfer')).toBeTruthy();
+    // Decoded section renders (EIP-7730 descriptor wins over Erc20TransferSection when present)
+    expect(screen.getByText(/Send|ERC-20 Transfer/)).toBeTruthy();
     // No formatted native value (e.g. "1 ETH") — zero-value native row is suppressed
     expect(screen.queryByText(/\d.*ETH/)).toBeNull();
   });
