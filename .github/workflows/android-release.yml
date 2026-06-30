@@ -157,8 +157,8 @@ jobs:
             | grep -v "^${RELEASE_TAG}$" \
             | while read tag; do
                 gh release download "$tag" \
-                  --pattern "keycard-pal-offline-*-release-*.apk" \
-                  --pattern "keycard-pal-full-*-release-*.apk" \
+                  --pattern "keycard-pal-offline-release-*.apk" \
+                  --pattern "keycard-pal-full-release-*.apk" \
                   --dir fdroid/repo/ \
                   --clobber 2>/dev/null || true
               done
@@ -170,8 +170,8 @@ jobs:
         run: |
           mkdir -p new-apks/
           gh release download "$RELEASE_TAG" \
-            --pattern "keycard-pal-offline-*-release-*.apk" \
-            --pattern "keycard-pal-full-*-release-*.apk" \
+            --pattern "keycard-pal-offline-release-*.apk" \
+            --pattern "keycard-pal-full-release-*.apk" \
             --dir new-apks/
           count=$(find new-apks -maxdepth 1 -name "*.apk" | wc -l)
           if [ "$count" -eq 0 ]; then
