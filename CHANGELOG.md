@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- Discount code from the Keycard purchase card on the About and welcome screens; the buy link stays
+
 ### Fixed
 
 - Scanning a SeedQR while importing a recovery phrase now asks for camera permission instead of opening a blank viewfinder, and the keyboard no longer covers the viewfinder
