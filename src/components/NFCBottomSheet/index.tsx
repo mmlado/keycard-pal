@@ -89,6 +89,14 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
     onCancel();
     buyKeycard();
   }, [onCancel, buyKeycard]);
+  // A card that has been on the antenna this session (connected, or moved and
+  // recoverable) proves the user owns one, so an error with the card present
+  // shows only the recovery actions. The shop link is for the session that
+  // never saw a card.
+  const onBuyKeycard =
+    cardPresence === undefined || cardPresence === 'waiting'
+      ? handleBuyKeycard
+      : undefined;
 
   const showPinPad = phase === 'pin_entry';
   const showGenuineWarning = phase === 'genuine_warning';
@@ -207,7 +215,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
           retry={retry}
           openNFCSettings={openNFCSettings}
           onCancel={onCancel}
-          onBuyKeycard={handleBuyKeycard}
+          onBuyKeycard={onBuyKeycard}
           paddingBottom={insets.bottom + 24}
         />
       )}
@@ -250,7 +258,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
                 onCancel={onCancel}
                 retry={retry}
                 openNFCSettings={openNFCSettings}
-                onBuyKeycard={handleBuyKeycard}
+                onBuyKeycard={onBuyKeycard}
               />
             </Animated.View>
           </View>
