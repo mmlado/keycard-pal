@@ -4,11 +4,7 @@ import { Text } from 'react-native-paper';
 
 import { Icons } from '../assets/icons';
 import { APP_NAME } from '@/constants/app';
-import {
-  KEYCARD_PURCHASE_COUPON_CODE,
-  KEYCARD_PURCHASE_COUPON_MINIMUM,
-  KEYCARD_PURCHASE_URL,
-} from '../constants/keycard';
+import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
 import theme from '../theme';
 
 import PrimaryButton from './PrimaryButton';
@@ -55,13 +51,6 @@ export default function KeycardPurchaseCard({
         {keycardPurchaseTitle}
       </Text>
       <Text style={styles.description}>{keycardPurchaseDescription}</Text>
-
-      {KEYCARD_PURCHASE_COUPON_CODE ? (
-        <Text style={styles.coupon}>
-          Use code {KEYCARD_PURCHASE_COUPON_CODE} on purchases over{' '}
-          {KEYCARD_PURCHASE_COUPON_MINIMUM}.
-        </Text>
-      ) : null}
 
       <View style={styles.button}>
         <PrimaryButton
@@ -115,13 +104,6 @@ const styles = StyleSheet.create({
   },
   description: {
     color: theme.colors.onSurfaceMuted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  coupon: {
-    color: theme.colors.primary,
-    fontFamily: 'Inter_18pt-SemiBold',
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',

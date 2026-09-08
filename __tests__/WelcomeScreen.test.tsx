@@ -113,11 +113,10 @@ describe('WelcomeScreen', () => {
     expect(Linking.openURL).not.toHaveBeenCalled();
   });
 
-  it('shows the buy button without a coupon code', () => {
+  it('shows the buy button', () => {
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
     expect(screen.getByText('Buy a Keycard')).toBeTruthy();
-    expect(screen.queryByText(/ShellSummer9746/)).toBeNull();
   });
 
   it('still navigates when persisting the flag fails', () => {

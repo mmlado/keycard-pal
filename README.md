@@ -62,7 +62,7 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 ## Requirements
 
 - Android 7.0+ (API 24)
-- A [Status Keycard](https://get.keycard.tech/vuxxnf) NFC smart card (use code **ShellSummer9746** for a discount on orders over $25)
+- A [Status Keycard](https://get.keycard.tech/vuxxnf) NFC smart card
 
 ## Getting the app
 
