@@ -4,7 +4,11 @@ export const PAIRING_PASSWORD = new Uint8Array([
   0x1e, 0x92, 0x48, 0x48, 0xbc, 0xf1,
 ]);
 
+// Affiliate link (applies a coupon on the shop side); deliberately not the
+// bare get-keycard URL Status Legacy uses.
 export const KEYCARD_PURCHASE_URL = 'https://get.keycard.tech/vuxxnf';
+
+export const BUY_KEYCARD_LABEL = 'Buy a Keycard';
 
 // Keycard CA public key — compressed secp256k1
 // Source: https://github.com/keycard-tech/keycard-shell/blob/master/app/storage/keys.c (_KEYCARD_CA_PUB)

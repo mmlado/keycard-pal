@@ -186,6 +186,74 @@ describe('NFCSheet', () => {
     });
   });
 
+  // #258: someone who reaches the tap prompt without owning a card needs a
+  // way out. It is a quiet link, shown only while the app is asking for a
+  // card — never once a card is connected, merely moved, or done.
+  describe('buy-a-Keycard link', () => {
+    const link = "Don't have a Keycard?";
+
+    it('shows the link while scanning when onBuyKeycard is provided', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status=""
+          onCancel={onCancel}
+          onBuyKeycard={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(link)).toBeTruthy();
+    });
+
+    it('shows the link in the error variant', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="Bad MAC"
+          onCancel={onCancel}
+          retry={jest.fn()}
+          onBuyKeycard={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(link)).toBeTruthy();
+      expect(screen.getByText('Try again')).toBeTruthy();
+    });
+
+    it('calls onBuyKeycard, not onCancel, when pressed', () => {
+      const onBuyKeycard = jest.fn();
+      render(
+        <NFCSheet
+          variant="scanning"
+          status=""
+          onCancel={onCancel}
+          onBuyKeycard={onBuyKeycard}
+        />,
+      );
+      fireEvent.press(screen.getByText(link));
+      expect(onBuyKeycard).toHaveBeenCalledTimes(1);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it.each(['connected', 'disconnected', 'success'] as const)(
+      'hides the link in the %s variant',
+      variant => {
+        render(
+          <NFCSheet
+            variant={variant}
+            status=""
+            onCancel={onCancel}
+            onBuyKeycard={jest.fn()}
+          />,
+        );
+        expect(screen.queryByText(link)).toBeNull();
+      },
+    );
+
+    it('hides the link when onBuyKeycard is not provided', () => {
+      render(<NFCSheet variant="scanning" status="" onCancel={onCancel} />);
+      expect(screen.queryByText(link)).toBeNull();
+    });
+  });
+
   describe('Cancel button', () => {
     it('shows Cancel for scanning variant', () => {
       render(<NFCSheet variant="scanning" status="" onCancel={onCancel} />);

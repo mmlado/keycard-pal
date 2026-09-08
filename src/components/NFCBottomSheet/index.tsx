@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   BackHandler,
@@ -18,6 +18,7 @@ import type {
   CardPresence,
   KeycardPhase,
 } from '@/hooks/keycard/useKeycardOperation';
+import { useBuyKeycard } from '@/hooks/useBuyKeycard';
 
 import GenuineWarning from './GenuineWarning';
 import NFCError from './NFCError';
@@ -79,6 +80,15 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
   // outgoing animation so the pad does not vanish the instant the phase flips.
   const pinSlide = useRef(new Animated.Value(PIN_SLIDE_DISTANCE)).current;
   const [pinMounted, setPinMounted] = useState(false);
+
+  // Someone without a card has no use for the tap prompt: end the session
+  // the same way Cancel does (which may also leave the host screen) before
+  // opening the shop, so the sheet never sits over the browser or QR screen.
+  const { buyKeycard } = useBuyKeycard();
+  const handleBuyKeycard = useCallback(() => {
+    onCancel();
+    buyKeycard();
+  }, [onCancel, buyKeycard]);
 
   const showPinPad = phase === 'pin_entry';
   const showGenuineWarning = phase === 'genuine_warning';
@@ -197,6 +207,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
           retry={retry}
           openNFCSettings={openNFCSettings}
           onCancel={onCancel}
+          onBuyKeycard={handleBuyKeycard}
           paddingBottom={insets.bottom + 24}
         />
       )}
@@ -239,6 +250,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
                 onCancel={onCancel}
                 retry={retry}
                 openNFCSettings={openNFCSettings}
+                onBuyKeycard={handleBuyKeycard}
               />
             </Animated.View>
           </View>

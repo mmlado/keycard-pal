@@ -6,8 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Buy-a-Keycard link in Settings and on the tap-your-Keycard prompt; opens the browser when the phone has a network connection, otherwise shows the link as a QR code (always a QR code in the offline build)
+
 ### Changed
 
+- The welcome screen's buy button now shows the QR code instead of opening the browser when the phone has no network connection
 - The offline build no longer includes WalletConnect's native module, JNA, the Yttrium bindings, or NetInfo, and no longer declares `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`
 
 ### Removed

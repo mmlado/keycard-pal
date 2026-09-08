@@ -19,6 +19,10 @@ type Props = {
    *  restart can recover. */
   retry?: () => void;
   openNFCSettings?: () => void;
+  /** Quiet exit for someone who reached the tap prompt without owning a
+   *  card. Shown only while the app is asking for a card (scanning, error);
+   *  a card that is connected or merely moved needs no shop link. */
+  onBuyKeycard?: () => void;
 };
 
 function PulseRing({ delay, size }: { delay: number; size: number }) {
@@ -74,7 +78,12 @@ export default function NFCSheet({
   onCancel,
   retry,
   openNFCSettings,
+  onBuyKeycard,
 }: Props) {
+  const showBuyKeycard =
+    onBuyKeycard !== undefined &&
+    (variant === 'scanning' || variant === 'error');
+
   // 'disconnected' deliberately keeps the default icon, not the failure one:
   // a card that moved is a recoverable event, and presenting it as a failure
   // is exactly what this variant exists to stop.
@@ -154,6 +163,19 @@ export default function NFCSheet({
           </Text>
         </Pressable>
       )}
+
+      {showBuyKeycard && (
+        <Pressable
+          style={styles.buyKeycardLink}
+          hitSlop={8}
+          accessibilityRole="link"
+          onPress={onBuyKeycard}
+        >
+          <Text variant="bodySmall" style={styles.buyKeycardText}>
+            Don't have a Keycard?
+          </Text>
+        </Pressable>
+      )}
     </>
   );
 }
@@ -204,5 +226,12 @@ const styles = StyleSheet.create({
   },
   settingsText: {
     color: theme.colors.onSurface,
+  },
+  buyKeycardLink: {
+    marginTop: 16,
+  },
+  buyKeycardText: {
+    color: theme.colors.onSurfaceMuted,
+    textDecorationLine: 'underline',
   },
 });

@@ -12,6 +12,7 @@ import type { DashboardAction, SettingsScreenProps } from '../navigation/types';
 import theme from '../theme';
 
 import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
+import KeycardSettingsSection from '../components/settings/KeycardSettingsSection';
 import PinPadSettingsSection from '../components/settings/PinPadSettingsSection';
 import TenderlySettingsSection from '../components/settings/tenderly/TenderlySettingsSection.online';
 import TokenImagesSettingsSection from '../components/settings/TokenImagesSettingsSection.online';
@@ -43,6 +44,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
+          <KeycardSettingsSection />
           <PinPadSettingsSection />
           <TokenImagesSettingsSection />
           <EnsSettingsSection />

@@ -10,6 +10,9 @@ type Props = {
   retry?: () => void;
   openNFCSettings?: () => void;
   onCancel: () => void;
+  /** Quiet exit for someone who reached the tap prompt without owning a
+   *  card (on iOS the system sheet times out into this overlay). */
+  onBuyKeycard?: () => void;
   paddingBottom?: number;
 };
 
@@ -18,6 +21,7 @@ export default function NFCError({
   retry,
   openNFCSettings,
   onCancel,
+  onBuyKeycard,
   paddingBottom = 24,
 }: Props) {
   return (
@@ -48,6 +52,13 @@ export default function NFCError({
           Cancel
         </Text>
       </Pressable>
+      {onBuyKeycard && (
+        <Pressable hitSlop={8} accessibilityRole="link" onPress={onBuyKeycard}>
+          <Text variant="bodySmall" style={styles.buyKeycardText}>
+            Don't have a Keycard?
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -91,5 +102,9 @@ const styles = StyleSheet.create({
   },
   cancelLabel: {
     color: theme.colors.onSurfaceMuted,
+  },
+  buyKeycardText: {
+    color: theme.colors.onSurfaceMuted,
+    textDecorationLine: 'underline',
   },
 });

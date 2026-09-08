@@ -1,6 +1,7 @@
 import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { Linking, Platform, StyleSheet } from 'react-native';
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -15,6 +16,30 @@ import type { KeycardPhase } from '../src/hooks/keycard/useKeycardOperation';
 // ---------------------------------------------------------------------------
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
+let mockConnected = true;
+jest.mock('../src/utils/connectivity.online', () => ({
+  getNetworkConnected: () => mockConnected,
+  subscribeNetworkConnected: () => () => {},
+  isNetworkConnected: () => Promise.resolve(mockConnected),
+}));
+
+const mockNavigate = jest.fn();
+jest.mock('../src/navigation/navigationRef', () => ({
+  navigationRef: {
+    isReady: () => true,
+    navigate: (...args: any[]) => mockNavigate(...args),
+  },
+}));
+
+const BUY_KEYCARD_LINK = "Don't have a Keycard?";
+const PURCHASE_URL = 'https://get.keycard.tech/vuxxnf';
+
+async function pressBuyKeycardLink() {
+  await act(async () => {
+    fireEvent.press(screen.getByText(BUY_KEYCARD_LINK));
+  });
+}
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
@@ -49,7 +74,15 @@ function makeNfc(
 
 beforeEach(() => {
   onCancel.mockClear();
+  mockNavigate.mockClear();
+  mockConnected = true;
   mockInsets.bottom = 0;
+  jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+  (Linking.openURL as jest.Mock).mockClear();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 function renderSheet(nfc: NFCOperation, showOnDone?: boolean) {
@@ -170,6 +203,41 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(
         screen.queryByText('Hold your Keycard against the phone again'),
       ).toBeNull();
+    });
+  });
+
+  // #258: the no-card exit ends the session exactly like Cancel (which may
+  // also leave the host screen) before opening the shop, so the sheet never
+  // sits over the browser or the QR screen.
+  describe('buy-a-Keycard link', () => {
+    it('shows the link while waiting for a card', () => {
+      renderSheet(makeNfc('nfc'));
+      expect(screen.getByText(BUY_KEYCARD_LINK)).toBeTruthy();
+    });
+
+    it('hides the link once a card is connected', () => {
+      renderSheet(makeNfc('nfc', { cardPresence: 'connected' }));
+      expect(screen.queryByText(BUY_KEYCARD_LINK)).toBeNull();
+    });
+
+    it('cancels the session, then opens the browser when there is a network', async () => {
+      renderSheet(makeNfc('nfc'));
+      await pressBuyKeycardLink();
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(Linking.openURL).toHaveBeenCalledWith(PURCHASE_URL);
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('cancels the session, then shows the QR screen without a network (always in the offline build)', async () => {
+      mockConnected = false;
+      renderSheet(makeNfc('error', { retry: jest.fn() }));
+      await pressBuyKeycardLink();
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
+        url: PURCHASE_URL,
+        title: 'Buy a Keycard',
+      });
+      expect(Linking.openURL).not.toHaveBeenCalled();
     });
   });
 
@@ -412,6 +480,17 @@ describe('NFCBottomSheet — iOS error overlay', () => {
   it('hides Try again button when retry prop is absent', () => {
     renderSheet(makeNfc('error', { status: 'err' }));
     expect(screen.queryByText('Try again')).toBeNull();
+  });
+
+  it('offers the no-card exit and cancels before opening the shop', async () => {
+    mockConnected = false;
+    renderSheet(makeNfc('error', { status: 'Session timed out' }));
+    await pressBuyKeycardLink();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
+      url: PURCHASE_URL,
+      title: 'Buy a Keycard',
+    });
   });
 
   it('does not show iOS error overlay when phase is nfc', () => {

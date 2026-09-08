@@ -121,6 +121,47 @@ describe('NFCError', () => {
     });
   });
 
+  // #258: on iOS the system sheet times out into this overlay, so it is where
+  // a user without a card lands. The link is quiet and never competes with
+  // Try again.
+  describe('buy-a-Keycard link', () => {
+    const link = "Don't have a Keycard?";
+
+    it('shows the link when onBuyKeycard is provided', () => {
+      render(
+        <NFCError
+          status="err"
+          retry={onRetry}
+          onCancel={onCancel}
+          onBuyKeycard={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(link)).toBeTruthy();
+      expect(screen.getByText('Try again')).toBeTruthy();
+    });
+
+    it('hides the link when onBuyKeycard is not provided', () => {
+      render(<NFCError status="err" onCancel={onCancel} />);
+      expect(screen.queryByText(link)).toBeNull();
+    });
+
+    it('calls onBuyKeycard only when pressed', () => {
+      const onBuyKeycard = jest.fn();
+      render(
+        <NFCError
+          status="err"
+          retry={onRetry}
+          onCancel={onCancel}
+          onBuyKeycard={onBuyKeycard}
+        />,
+      );
+      fireEvent.press(screen.getByText(link));
+      expect(onBuyKeycard).toHaveBeenCalledTimes(1);
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(onRetry).not.toHaveBeenCalled();
+    });
+  });
+
   describe('paddingBottom', () => {
     it('applies default paddingBottom of 24 when not specified', () => {
       const { toJSON } = render(<NFCError status="err" onCancel={onCancel} />);

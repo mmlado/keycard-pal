@@ -1,6 +1,6 @@
 import React from 'react';
 import { Linking } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import WelcomeScreen from '../src/screens/WelcomeScreen';
 
@@ -38,24 +38,40 @@ jest.mock('../src/storage/preferencesStorage', () => ({
   saveWelcomeSeen: (...args: any[]) => mockSaveWelcomeSeen(...args),
 }));
 
-let mockInternetEnabled = true;
-jest.mock('../src/utils/buildConfig', () => ({
-  get INTERNET_ENABLED() {
-    return mockInternetEnabled;
-  },
+// The buy button goes through useBuyKeycard: live network state decides
+// between browser and QR code, and the offline build's stub always reports
+// disconnected.
+let mockConnected = true;
+jest.mock('../src/utils/connectivity.online', () => ({
+  getNetworkConnected: () => mockConnected,
+  subscribeNetworkConnected: () => () => {},
+  isNetworkConnected: () => Promise.resolve(mockConnected),
 }));
 
 const mockNavigate = jest.fn();
+jest.mock('../src/navigation/navigationRef', () => ({
+  navigationRef: {
+    isReady: () => true,
+    navigate: (...args: any[]) => mockNavigate(...args),
+  },
+}));
+
 const mockReplace = jest.fn();
-const navigation = { navigate: mockNavigate, replace: mockReplace } as any;
+const navigation = { replace: mockReplace } as any;
 const route = { key: 'Welcome-1', name: 'Welcome' } as any;
+
+async function pressBuy() {
+  await act(async () => {
+    fireEvent.press(screen.getByTestId('welcome-buy-keycard'));
+  });
+}
 
 describe('WelcomeScreen', () => {
   beforeEach(() => {
     mockSaveWelcomeSeen.mockClear();
     mockNavigate.mockClear();
     mockReplace.mockClear();
-    mockInternetEnabled = true;
+    mockConnected = true;
     // The RN jest preset already mocks Linking.openURL, so spyOn returns that
     // shared mock; clear it to keep call history per-test.
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
@@ -89,10 +105,10 @@ describe('WelcomeScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('Dashboard');
   });
 
-  it('opens the affiliate purchase link in the browser (online build)', () => {
+  it('opens the affiliate purchase link in the browser when there is a network', async () => {
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
-    fireEvent.press(screen.getByTestId('welcome-buy-keycard'));
+    await pressBuy();
 
     expect(Linking.openURL).toHaveBeenCalledWith(
       'https://get.keycard.tech/vuxxnf',
@@ -100,11 +116,11 @@ describe('WelcomeScreen', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('shows the purchase link as a QR code instead (offline build)', () => {
-    mockInternetEnabled = false;
+  it('shows the purchase link as a QR code without a network (always in the offline build)', async () => {
+    mockConnected = false;
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
-    fireEvent.press(screen.getByTestId('welcome-buy-keycard'));
+    await pressBuy();
 
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
       url: 'https://get.keycard.tech/vuxxnf',
