@@ -20,6 +20,9 @@ const FORBIDDEN_MARKERS = [
   'wc_project_id_override',
   '@reown/walletkit',
   'reown.com/privacy-policy',
+  // NetInfo (native module name; reached only via connectivity.online.ts or
+  // the WalletConnect compat shim, both online-only)
+  'RNCNetInfo',
 ];
 
 function parseArgs(argv) {

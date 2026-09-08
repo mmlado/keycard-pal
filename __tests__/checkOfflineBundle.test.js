@@ -80,6 +80,16 @@ describe('check-offline-bundle', () => {
     }
   });
 
+  it('fails on a fixture containing the NetInfo native module name', () => {
+    const filePath = writeFixture('TurboModuleRegistry.get("RNCNetInfo")');
+    try {
+      const result = run('--bundle', filePath);
+      expect(result.status).not.toBe(0);
+    } finally {
+      fs.rmSync(path.dirname(filePath), { recursive: true, force: true });
+    }
+  });
+
   it('fails when --bundle argument is missing', () => {
     const result = run();
     expect(result.status).not.toBe(0);

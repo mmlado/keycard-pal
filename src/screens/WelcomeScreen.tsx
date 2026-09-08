@@ -1,18 +1,19 @@
 import React, { useCallback } from 'react';
-import { Image, Linking, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../assets/icons';
 import { APP_NAME } from '../constants/app';
-import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
+import { BUY_KEYCARD_LABEL } from '../constants/keycard';
 import type { WelcomeScreenProps } from '../navigation/types';
 import theme from '../theme';
 
 import PrimaryButton from '../components/PrimaryButton';
 
+import { useBuyKeycard } from '../hooks/useBuyKeycard';
+
 import { saveWelcomeSeen } from '../storage/preferencesStorage';
-import { INTERNET_ENABLED } from '../utils/buildConfig';
 
 type Feature = {
   icon: React.ComponentType<{
@@ -47,22 +48,11 @@ const features: Feature[] = [
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const insets = useSafeAreaInsets();
 
+  const { buyKeycard, opensInBrowser } = useBuyKeycard();
+
   const handleGetStarted = useCallback(() => {
     saveWelcomeSeen(true).catch(() => {});
     navigation.replace('Dashboard');
-  }, [navigation]);
-
-  // The offline build targets air-gapped phones: show the link as a QR code
-  // to scan with another device instead of opening a browser.
-  const handleBuyKeycard = useCallback(() => {
-    if (INTERNET_ENABLED) {
-      Linking.openURL(KEYCARD_PURCHASE_URL);
-    } else {
-      navigation.navigate('UrlQR', {
-        url: KEYCARD_PURCHASE_URL,
-        title: 'Buy a Keycard',
-      });
-    }
   }, [navigation]);
 
   return (
@@ -101,9 +91,9 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
 
       <View style={styles.actions}>
         <PrimaryButton
-          label="Buy a Keycard"
-          onPress={handleBuyKeycard}
-          icon={INTERNET_ENABLED ? Icons.openInBrowser : Icons.qr}
+          label={BUY_KEYCARD_LABEL}
+          onPress={buyKeycard}
+          icon={opensInBrowser ? Icons.openInBrowser : Icons.qr}
           testID="welcome-buy-keycard"
         />
         <PrimaryButton
