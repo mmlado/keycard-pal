@@ -220,6 +220,26 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(screen.queryByText(BUY_KEYCARD_LINK)).toBeNull();
     });
 
+    // An error raised with the card still on the antenna (wrong PIN, bad
+    // MAC, uninitialised card) proves the user owns one: recovery only.
+    it('hides the link on an error while the card is still present', () => {
+      renderSheet(
+        makeNfc('error', { cardPresence: 'connected', retry: jest.fn() }),
+      );
+      expect(screen.getByText('Try again')).toBeTruthy();
+      expect(screen.queryByText(BUY_KEYCARD_LINK)).toBeNull();
+    });
+
+    it('hides the link on an error after the card was seen and lost', () => {
+      renderSheet(makeNfc('error', { cardPresence: 'lost' }));
+      expect(screen.queryByText(BUY_KEYCARD_LINK)).toBeNull();
+    });
+
+    it('keeps the link on an error before any card was seen', () => {
+      renderSheet(makeNfc('error', { cardPresence: 'waiting' }));
+      expect(screen.getByText(BUY_KEYCARD_LINK)).toBeTruthy();
+    });
+
     it('cancels the session, then opens the browser when there is a network', async () => {
       renderSheet(makeNfc('nfc'));
       await pressBuyKeycardLink();

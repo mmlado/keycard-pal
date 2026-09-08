@@ -42,6 +42,8 @@ export async function isNetworkConnected(): Promise<boolean> {
     lastKnown = connectedFrom(await NetInfo.fetch());
     return lastKnown;
   } catch {
+    // Keep the snapshot in step with the decision just taken.
+    lastKnown = false;
     return false;
   }
 }

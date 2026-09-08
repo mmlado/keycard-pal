@@ -56,9 +56,14 @@ describe('connectivity.online', () => {
       await expect(online.isNetworkConnected()).resolves.toBe(false);
     });
 
-    it('treats a NetInfo failure as disconnected', async () => {
+    it('treats a NetInfo failure as disconnected, snapshot included', async () => {
+      mockNetInfo.fetch.mockResolvedValue(stateWith(true));
+      await online.isNetworkConnected();
+      expect(online.getNetworkConnected()).toBe(true);
+
       mockNetInfo.fetch.mockRejectedValue(new Error('no native module'));
       await expect(online.isNetworkConnected()).resolves.toBe(false);
+      expect(online.getNetworkConnected()).toBe(false);
     });
 
     it('updates the synchronous snapshot', async () => {
