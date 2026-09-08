@@ -87,6 +87,17 @@ def releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
 def releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
 def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias
 
+// Online-only native modules (listed in settings.gradle, excluded from
+// autolinking by react-native.config.js) link into the full flavor only: their
+// Gradle projects as fullImplementation below, their ReactPackages via
+// src/full/java/com/keycardpal/OnlineNativePackages.kt, and their codegen'd
+// TurboModule specs through src/main/jni/CMakeLists.txt, which receives the
+// codegen directories as a CMake argument on the full flavor.
+def onlineOnlyNativeModules = gradle.ext.has("onlineOnlyNativeModules") ? gradle.ext.onlineOnlyNativeModules : []
+def onlineCodegenDirs = onlineOnlyNativeModules.collect { name ->
+    "${project(":${name}").projectDir}/build/generated/source/codegen/jni"
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -110,6 +121,12 @@ android {
             // Usage in JS: expose via a NativeModule when the first internet feature lands
             buildConfigField "boolean", "INTERNET_ENABLED", "true"
             buildConfigField "String", "WC_PROJECT_ID", "\"${wcProjectId}\""
+            externalNativeBuild {
+                cmake {
+                    // Consumed by src/main/jni/CMakeLists.txt; absent on offline.
+                    arguments "-DKEYCARDPAL_ONLINE_CODEGEN_DIRS=${onlineCodegenDirs.join('|')}"
+                }
+            }
         }
         offline {
             dimension "distribution"
@@ -121,6 +138,13 @@ android {
     }
     buildFeatures {
         buildConfig true
+    }
+    externalNativeBuild {
+        cmake {
+            // React Native's default app CMake plus the full flavor's online-only
+            // TurboModule specs; the RN Gradle plugin only sets a path when none is given.
+            path "src/main/jni/CMakeLists.txt"
+        }
     }
     signingConfigs {
         debug {
@@ -231,4 +255,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:${camerax_version}")
     implementation("androidx.camera:camera-lifecycle:${camerax_version}")
     implementation("androidx.camera:camera-view:${camerax_version}")
+
+    // Online-only native modules: full flavor only (see settings.gradle)
+    onlineOnlyNativeModules.each { name ->
+        add("fullImplementation", project(":${name}"))
+    }
 }

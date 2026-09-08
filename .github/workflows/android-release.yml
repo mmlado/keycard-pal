@@ -78,6 +78,11 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: cd android && ./gradlew clean assembleFullRelease assembleOfflineRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
 
+      # Autolinking is not flavor-aware; the offline APK must not carry the
+      # online-only native modules the full flavor links by hand (#270).
+      - name: Check offline APK for online-only native code
+        run: node scripts/check-offline-apk.js --apk android/app/build/outputs/apk/offline/release/keycard-pal-offline-release-universal.apk
+
       - name: Generate APK checksums
         run: |
           mkdir -p android/app/build/outputs/apk/release

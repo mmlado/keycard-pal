@@ -13,6 +13,7 @@ class MainApplication : Application(), ReactApplication {
             context = applicationContext,
             packageList =
                 PackageList(this).packages.apply {
+                    addAll(onlineNativePackages())
                     add(BuildConfigPackage())
                     add(CameraPackage())
                 },

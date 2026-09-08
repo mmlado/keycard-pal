@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The offline build no longer includes WalletConnect's native module, JNA, the Yttrium bindings, or NetInfo, and no longer declares `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`
+
 ### Removed
 
 - Discount code from the Keycard purchase card on the About and welcome screens; the buy link stays
