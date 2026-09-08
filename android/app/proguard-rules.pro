@@ -21,12 +21,12 @@
 # builds are unminified and were unaffected, which is why this shipped).
 #
 # JNA arrives through @walletconnect/react-native-compat, whose Android module
-# pulls net.java.dev.jna and the Yttrium uniffi bindings. Autolinking is NOT
-# flavor-aware, so RNWalletConnectPayModule is registered — and these classes
-# ship — in BOTH flavors, including offline. Only the full flavor crashed
-# because only its JS touches the module, which is what triggers the class
-# init; offline is spared by accident, not by absence, so these rules are
-# load-bearing there too (verified on device, 2026-09-04).
+# pulls net.java.dev.jna and the Yttrium uniffi bindings. Since #270 that module
+# is linked into the full flavor only (react-native.config.js keeps it out of
+# autolinking, which is not flavor-aware; android/app/build.gradle adds it as
+# fullImplementation), so the offline APK carries none of these classes and
+# these rules have nothing to keep there. They stay load-bearing for full,
+# which crashed at launch without them (verified on device, 2026-09-04).
 #
 # The -dontwarn above silenced the build warning about exactly this while
 # nothing kept the classes, so the failure only ever appeared at runtime.

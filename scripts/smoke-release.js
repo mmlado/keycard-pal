@@ -102,6 +102,25 @@ const apk = fs
 if (!apk) fail(`No APK for ${abi} (or universal) in ${outDir}`);
 console.log(`\nAPK: ${apk}`);
 
+// The offline APK must not carry the online-only native modules (#270).
+// Autolinking is not flavor-aware, so this is checked on the artifact itself.
+if (flavor === 'offline') {
+  console.log('\nChecking the offline APK for online-only native code...');
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        path.join(ROOT, 'scripts/check-offline-apk.js'),
+        '--apk',
+        path.join(outDir, apk),
+      ],
+      { stdio: 'inherit' },
+    );
+  } catch {
+    fail(`${apk} contains online-only native code (see above).`);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Install and launch
 // ---------------------------------------------------------------------------

@@ -4,3 +4,21 @@ extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autoli
 rootProject.name = 'KeycardPal'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// Online-only native modules. react-native.config.js keeps these out of
+// autolinking (which is not flavor-aware and would put them in the offline APK,
+// #270), so they are included here by hand under the same project names
+// autolinking would have used, and app/build.gradle links them into the full
+// flavor only. A package that is not installed is skipped so offline builds
+// still evaluate; the full flavor then fails at compile time, loudly.
+def onlineOnlyNativeModules = [
+    'walletconnect_react-native-compat': '@walletconnect/react-native-compat',
+    'react-native-community_netinfo': '@react-native-community/netinfo',
+]
+gradle.ext.onlineOnlyNativeModules = onlineOnlyNativeModules.findAll { name, npmName ->
+    file("../node_modules/${npmName}/android").exists()
+}.collect { name, npmName ->
+    include(":${name}")
+    project(":${name}").projectDir = file("../node_modules/${npmName}/android")
+    name
+}
