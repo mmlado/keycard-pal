@@ -13,7 +13,7 @@ import theme from '@/theme';
 import { MenuList } from '@/components/Menu';
 import TileGrid, { gridMetrics } from '@/components/TileGrid';
 
-import { useDashboardLayout } from '@/hooks/useDashboardLayout';
+import { usePreferences } from '@/hooks/usePreferences';
 
 export type EntryListItem = {
   label: string;
@@ -48,17 +48,11 @@ type Props = {
  * renders several lists or grids and they have to scroll as one.
  */
 export default function EntryList({ entries, sections, footer }: Props) {
-  const { layout, loaded } = useDashboardLayout();
+  const { preferences } = usePreferences();
   const { width } = useWindowDimensions();
 
-  // Hold the space until the preference is in, so nothing flashes the wrong
-  // layout and anything anchored below does not jump.
-  if (!loaded) {
-    return <View style={styles.fill} />;
-  }
-
   const groups: EntryListSection[] = sections ?? [{ entries: entries ?? [] }];
-  const list = layout === 'list';
+  const list = preferences.dashboardLayout === 'list';
   const grouped = groups.length > 1;
 
   // A tile group's heading has to line up with the tiles, whose margin varies

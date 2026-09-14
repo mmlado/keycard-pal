@@ -1,9 +1,7 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { APP_NAME } from '@/constants/app';
+import { APP_NAME, APP_VERSION } from '@/constants/app';
 import theme from '../../theme';
-
-import { version as APP_VERSION } from '../../../package.json';
 
 export default function AppIdentityHeader() {
   return (

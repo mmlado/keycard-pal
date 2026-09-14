@@ -1,12 +1,7 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
+import { PreferencesProvider } from '../src/providers/preferences/Provider';
 import ExportKeyScreen, {
   dashboardEntry,
 } from '../src/screens/ExportKeyScreen';
@@ -26,18 +21,14 @@ jest.mock('react-native-paper', () => {
 
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
-// These assertions describe the list layout's rows, so pin the preference.
-jest.mock('../src/hooks/useDashboardLayout', () => ({
-  useDashboardLayout: () => ({ layout: 'list', loaded: true }),
-}));
-
-const mockLoadXpubNoticeDismissed = jest.fn();
-const mockSaveXpubNoticeDismissed = jest.fn();
+// The screen reads and writes the xpub notice through the real provider, so
+// only storage is mocked. These assertions describe the list layout's rows,
+// so the stored preferences pin it.
+const mockLoadPreferences = jest.fn();
+const mockSavePreference = jest.fn();
 jest.mock('../src/storage/preferencesStorage', () => ({
-  loadXpubNoticeDismissed: (...args: unknown[]) =>
-    mockLoadXpubNoticeDismissed(...args),
-  saveXpubNoticeDismissed: (...args: unknown[]) =>
-    mockSaveXpubNoticeDismissed(...args),
+  loadPreferences: () => mockLoadPreferences(),
+  savePreference: (...args: unknown[]) => mockSavePreference(...args),
 }));
 
 // ExportKeyScreen imports dashboardActions for border-style calculation.
@@ -51,19 +42,27 @@ jest.mock('../src/navigation/dashboardActions', () => ({
 
 const navigation = { navigate: jest.fn() } as any;
 
-function renderScreenRaw() {
-  return render(
-    <ExportKeyScreen
-      navigation={navigation}
-      route={{ key: 'ExportKey', name: 'ExportKey' } as any}
-    />,
-  );
+function storedPreferences(xpubNoticeDismissed: boolean) {
+  mockLoadPreferences.mockResolvedValue({
+    dashboardLayout: 'list',
+    pinPadScramble: false,
+    tokenImagesEnabled: false,
+    welcomeSeen: true,
+    xpubNoticeDismissed,
+  });
 }
 
-// Renders and waits for the async xpub-notice preference load to settle.
+// Renders under the provider and waits for the startup preference read.
 async function renderScreen() {
-  const result = renderScreenRaw();
-  await screen.findByText(/extended public key \(xpub\)/);
+  const result = render(
+    <PreferencesProvider>
+      <ExportKeyScreen
+        navigation={navigation}
+        route={{ key: 'ExportKey', name: 'ExportKey' } as any}
+      />
+    </PreferencesProvider>,
+  );
+  await act(async () => {});
   return result;
 }
 
@@ -74,8 +73,9 @@ async function renderScreen() {
 describe('ExportKeyScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
-    mockLoadXpubNoticeDismissed.mockReset().mockResolvedValue(false);
-    mockSaveXpubNoticeDismissed.mockReset().mockResolvedValue(undefined);
+    mockLoadPreferences.mockReset();
+    mockSavePreference.mockReset().mockResolvedValue(undefined);
+    storedPreferences(false);
   });
 
   describe('layout', () => {
@@ -95,31 +95,23 @@ describe('ExportKeyScreen', () => {
     });
 
     it('does not show the xpub notice when it was previously dismissed', async () => {
-      let resolveLoad!: (dismissed: boolean) => void;
-      mockLoadXpubNoticeDismissed.mockReturnValue(
-        new Promise<boolean>(resolve => {
-          resolveLoad = resolve;
-        }),
-      );
-      renderScreenRaw();
-      await waitFor(() =>
-        expect(mockLoadXpubNoticeDismissed).toHaveBeenCalled(),
-      );
-
-      await act(async () => {
-        resolveLoad(true);
-      });
-
+      storedPreferences(true);
+      await renderScreen();
       expect(screen.queryByText(/extended public key \(xpub\)/)).toBeNull();
     });
 
     it('hides the xpub notice and persists dismissal when the close button is pressed', async () => {
       await renderScreen();
 
-      fireEvent.press(screen.getByTestId('xpub-notice-close'));
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('xpub-notice-close'));
+      });
 
       expect(screen.queryByText(/extended public key \(xpub\)/)).toBeNull();
-      expect(mockSaveXpubNoticeDismissed).toHaveBeenCalledWith(true);
+      expect(mockSavePreference).toHaveBeenCalledWith(
+        'xpubNoticeDismissed',
+        true,
+      );
     });
 
     it('shows the NFC indicator for every export option', async () => {

@@ -31,10 +31,12 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 let mockLayout: 'tiles' | 'list' = 'tiles';
-let mockLoaded = true;
 
-jest.mock('../src/hooks/useDashboardLayout', () => ({
-  useDashboardLayout: () => ({ layout: mockLayout, loaded: mockLoaded }),
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: { dashboardLayout: mockLayout },
+    setPreference: jest.fn(),
+  }),
 }));
 
 // Capture the useFocusEffect callback so tests can fire focus events.
@@ -116,7 +118,6 @@ describe('DashboardScreen', () => {
     mockDashboardActions.length = 0;
     focusCallback = null;
     mockLayout = 'tiles';
-    mockLoaded = true;
     // mockImplementation alone leaves call history from earlier tests in place.
     (AppState.addEventListener as jest.Mock).mockClear();
     setAppState('active');
@@ -227,16 +228,6 @@ describe('DashboardScreen', () => {
       await renderScreen();
       expect(screen.getByTestId('tile-grid')).toBeTruthy();
       expect(screen.queryByTestId('menu-icon-0')).toBeNull();
-    });
-
-    it('holds the destinations back until the preference is loaded', async () => {
-      mockLoaded = false;
-      mockDashboardActions.push(action('One'));
-      await renderScreen();
-      expect(screen.queryByText('One')).toBeNull();
-      expect(screen.queryByTestId('tile-grid')).toBeNull();
-      // The action area stays put so the button does not jump on load.
-      expect(screen.getByText('Scan')).toBeTruthy();
     });
   });
 

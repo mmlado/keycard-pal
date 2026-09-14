@@ -33,9 +33,13 @@ jest.mock('../src/assets/icons', () => {
   };
 });
 
-const mockSaveWelcomeSeen = jest.fn().mockResolvedValue(undefined);
-jest.mock('../src/storage/preferencesStorage', () => ({
-  saveWelcomeSeen: (...args: any[]) => mockSaveWelcomeSeen(...args),
+// Get started writes the flag through the preferences context.
+const mockSetPreference = jest.fn().mockResolvedValue(undefined);
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: { welcomeSeen: false },
+    setPreference: (...args: any[]) => mockSetPreference(...args),
+  }),
 }));
 
 // The buy button goes through useBuyKeycard: live network state decides
@@ -68,7 +72,7 @@ async function pressBuy() {
 
 describe('WelcomeScreen', () => {
   beforeEach(() => {
-    mockSaveWelcomeSeen.mockClear();
+    mockSetPreference.mockClear();
     mockNavigate.mockClear();
     mockReplace.mockClear();
     mockConnected = true;
@@ -101,7 +105,7 @@ describe('WelcomeScreen', () => {
 
     fireEvent.press(screen.getByTestId('welcome-get-started'));
 
-    expect(mockSaveWelcomeSeen).toHaveBeenCalledWith(true);
+    expect(mockSetPreference).toHaveBeenCalledWith('welcomeSeen', true);
     expect(mockReplace).toHaveBeenCalledWith('Dashboard');
   });
 
@@ -133,14 +137,5 @@ describe('WelcomeScreen', () => {
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
     expect(screen.getByText('Buy a Keycard')).toBeTruthy();
-  });
-
-  it('still navigates when persisting the flag fails', () => {
-    mockSaveWelcomeSeen.mockRejectedValueOnce(new Error('storage failure'));
-    render(<WelcomeScreen navigation={navigation} route={route} />);
-
-    fireEvent.press(screen.getByTestId('welcome-get-started'));
-
-    expect(mockReplace).toHaveBeenCalledWith('Dashboard');
   });
 });

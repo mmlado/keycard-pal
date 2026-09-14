@@ -11,10 +11,12 @@ import EntryList, { EntryListItem } from '../src/components/EntryList';
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 let mockLayout: 'tiles' | 'list' = 'tiles';
-let mockLoaded = true;
 
-jest.mock('../src/hooks/useDashboardLayout', () => ({
-  useDashboardLayout: () => ({ layout: mockLayout, loaded: mockLoaded }),
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: { dashboardLayout: mockLayout },
+    setPreference: jest.fn(),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -30,7 +32,6 @@ function entry(label: string, onPress = jest.fn()): EntryListItem {
 
 beforeEach(() => {
   mockLayout = 'tiles';
-  mockLoaded = true;
 });
 
 // ---------------------------------------------------------------------------
@@ -71,25 +72,6 @@ describe('EntryList', () => {
         <EntryList entries={[entry('One')]} footer={<Text>Footer</Text>} />,
       );
       expect(screen.getByText('Footer')).toBeTruthy();
-    });
-  });
-
-  // Painting before the preference is in would flash the wrong layout and
-  // shift anything anchored below.
-  describe('before the preference loads', () => {
-    it('renders neither layout', () => {
-      mockLoaded = false;
-      render(<EntryList entries={[entry('One')]} />);
-      expect(screen.queryByTestId('tile-grid')).toBeNull();
-      expect(screen.queryByText('One')).toBeNull();
-    });
-
-    it('holds back the footer too', () => {
-      mockLoaded = false;
-      render(
-        <EntryList entries={[entry('One')]} footer={<Text>Footer</Text>} />,
-      );
-      expect(screen.queryByText('Footer')).toBeNull();
     });
   });
 

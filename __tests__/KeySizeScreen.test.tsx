@@ -19,8 +19,11 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // These assertions describe the list layout's rows, so pin the preference.
-jest.mock('../src/hooks/useDashboardLayout', () => ({
-  useDashboardLayout: () => ({ layout: 'list', loaded: true }),
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: { dashboardLayout: 'list' },
+    setPreference: jest.fn(),
+  }),
 }));
 
 // ---------------------------------------------------------------------------

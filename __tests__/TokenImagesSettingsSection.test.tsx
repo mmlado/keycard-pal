@@ -1,14 +1,21 @@
-import React, { act } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import React from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import TokenImagesSettingsSection from '../src/components/settings/TokenImagesSettingsSection.online';
+import { PreferencesProvider } from '../src/providers/preferences/Provider';
 
-const mockLoad = jest.fn();
-const mockSave = jest.fn();
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+// The section reads and writes through the real provider; only storage is
+// mocked, so a failed write exercises the provider's rollback.
+const mockLoadPreferences = jest.fn();
+const mockSavePreference = jest.fn();
 
 jest.mock('../src/storage/preferencesStorage', () => ({
-  loadTokenImagesEnabled: (...args: any[]) => mockLoad(...args),
-  saveTokenImagesEnabled: (...args: any[]) => mockSave(...args),
+  loadPreferences: () => mockLoadPreferences(),
+  savePreference: (...args: unknown[]) => mockSavePreference(...args),
 }));
 
 jest.mock('react-native-paper', () => {
@@ -20,17 +27,39 @@ jest.mock('react-native-paper', () => {
   };
 });
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function storedEnabled(tokenImagesEnabled: boolean) {
+  mockLoadPreferences.mockResolvedValue({
+    dashboardLayout: 'tiles',
+    pinPadScramble: false,
+    tokenImagesEnabled,
+    welcomeSeen: true,
+    xpubNoticeDismissed: false,
+  });
+}
+
 async function renderSection() {
-  render(<TokenImagesSettingsSection />);
+  render(
+    <PreferencesProvider>
+      <TokenImagesSettingsSection />
+    </PreferencesProvider>,
+  );
   await act(async () => {});
 }
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 describe('TokenImagesSettingsSection', () => {
   beforeEach(() => {
-    mockLoad.mockReset();
-    mockSave.mockReset();
-    mockLoad.mockResolvedValue(false);
-    mockSave.mockResolvedValue(undefined);
+    mockLoadPreferences.mockReset();
+    mockSavePreference.mockReset();
+    storedEnabled(false);
+    mockSavePreference.mockResolvedValue(undefined);
   });
 
   it('renders the toggle with label', async () => {
@@ -44,7 +73,7 @@ describe('TokenImagesSettingsSection', () => {
   });
 
   it('reflects stored preference when enabled', async () => {
-    mockLoad.mockResolvedValue(true);
+    storedEnabled(true);
     await renderSection();
     expect(screen.getByRole('switch').props.value).toBe(true);
   });
@@ -54,49 +83,16 @@ describe('TokenImagesSettingsSection', () => {
     await act(async () => {
       fireEvent(screen.getByRole('switch'), 'valueChange', true);
     });
-    expect(mockSave).toHaveBeenCalledWith(true);
+    expect(mockSavePreference).toHaveBeenCalledWith('tokenImagesEnabled', true);
     expect(screen.getByRole('switch').props.value).toBe(true);
   });
 
   it('reverts state when save rejects', async () => {
-    mockLoad.mockResolvedValue(true);
-    mockSave.mockRejectedValue(new Error('storage error'));
+    storedEnabled(true);
+    mockSavePreference.mockRejectedValue(new Error('storage error'));
     await renderSection();
     await act(async () => {
       fireEvent(screen.getByRole('switch'), 'valueChange', false);
-    });
-    expect(screen.getByRole('switch').props.value).toBe(true);
-  });
-
-  it('does not revert when state already changed before catch runs', async () => {
-    mockLoad.mockResolvedValue(true);
-    let rejectFirstSave!: (e: Error) => void;
-    mockSave.mockReturnValueOnce(
-      new Promise<void>((_, rej) => (rejectFirstSave = rej)),
-    );
-    mockSave.mockResolvedValueOnce(undefined);
-    await renderSection();
-    await act(async () => {
-      fireEvent(screen.getByRole('switch'), 'valueChange', false);
-    });
-    await act(async () => {
-      fireEvent(screen.getByRole('switch'), 'valueChange', true);
-    });
-    await act(async () => {
-      rejectFirstSave(new Error('storage error'));
-    });
-    expect(screen.getByRole('switch').props.value).toBe(true);
-  });
-
-  it('stale storage load does not override user interaction', async () => {
-    let resolveLoad!: (v: boolean) => void;
-    mockLoad.mockReturnValue(new Promise(res => (resolveLoad = res)));
-    render(<TokenImagesSettingsSection />);
-    await act(async () => {
-      fireEvent(screen.getByRole('switch'), 'valueChange', true);
-    });
-    await act(async () => {
-      resolveLoad(false);
     });
     expect(screen.getByRole('switch').props.value).toBe(true);
   });
