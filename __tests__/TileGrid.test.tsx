@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import TileGrid, {
@@ -26,7 +26,9 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-const Icon = () => null;
+// Renders a marker rather than null, so a tile that stopped drawing its icon
+// would fail rather than pass silently.
+const Icon = (props: any) => <View {...props} testID="entry-icon" />;
 
 function entry(label: string, onPress = jest.fn(), detail?: string): TileEntry {
   return { label, detail, icon: Icon, onPress };
@@ -103,6 +105,17 @@ describe('TileGrid', () => {
       render(<TileGrid entries={[entry('One'), entry('Two')]} />);
       expect(screen.getByText('One')).toBeTruthy();
       expect(screen.getByText('Two')).toBeTruthy();
+    });
+
+    it('draws the entry icon on both tile variants', () => {
+      render(
+        <TileGrid entries={[entry('One'), entry('Two'), entry('Three')]} />,
+      );
+
+      // One hero plus two standard tiles, each with its own icon.
+      const icons = screen.getAllByTestId('entry-icon');
+      expect(icons).toHaveLength(3);
+      expect(icons[0].props.width).toBe(32);
     });
 
     // The hero spans the full width, so it has to stand exactly one standard

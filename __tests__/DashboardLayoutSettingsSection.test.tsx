@@ -105,6 +105,28 @@ describe('DashboardLayoutSettingsSection', () => {
     expect(segment('list').props.accessibilityState.selected).toBe(false);
   });
 
+  // The stored value can land after the user has already tapped, and it must
+  // not undo their choice.
+  it('keeps a choice made before the stored value arrives', async () => {
+    let resolveLoad!: (value: string) => void;
+    mockLoadPreference.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      }),
+    );
+
+    render(<DashboardLayoutSettingsSection />);
+    await act(async () => {
+      fireEvent.press(segment('list'));
+    });
+    await act(async () => {
+      resolveLoad('tiles');
+    });
+
+    expect(segment('list').props.accessibilityState.selected).toBe(true);
+    expect(segment('tiles').props.accessibilityState.selected).toBe(false);
+  });
+
   it('marks the segments as radios', async () => {
     await renderSection();
     expect(segment('tiles').props.accessibilityRole).toBe('radio');

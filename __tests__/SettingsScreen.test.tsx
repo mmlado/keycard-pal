@@ -97,6 +97,9 @@ describe('SettingsScreen', () => {
   it('keeps Buy a Keycard above the layout section', () => {
     const { toJSON } = renderScreen();
     const rendered = JSON.stringify(toJSON());
+    // Both have to be present, or a missing section would make indexOf return
+    // -1 and the ordering assertion would pass for the wrong reason.
+    expect(rendered).toContain('Buy a Keycard');
     expect(rendered).toContain('Layout');
     expect(rendered.indexOf('Buy a Keycard')).toBeLessThan(
       rendered.indexOf('Layout'),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
@@ -29,15 +29,28 @@ const OPTIONS: Option[] = [
  */
 export default function DashboardLayoutSettingsSection() {
   const [layout, setLayout] = useState<DashboardLayout>('tiles');
+  // Counts selections so a late arrival cannot undo a newer one: the stored
+  // value is dropped if the user already chose, and only the most recent save
+  // may roll back.
+  const selectionRef = useRef(0);
 
   useEffect(() => {
-    loadDashboardLayout().then(setLayout);
+    let active = true;
+    loadDashboardLayout().then(value => {
+      if (active && selectionRef.current === 0) setLayout(value);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleSelect = (value: DashboardLayout) => {
+    const selection = ++selectionRef.current;
     const previous = layout;
     setLayout(value);
-    setDashboardLayout(value).catch(() => setLayout(previous));
+    setDashboardLayout(value).catch(() => {
+      if (selectionRef.current === selection) setLayout(previous);
+    });
   };
 
   return (
