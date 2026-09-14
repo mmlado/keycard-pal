@@ -234,7 +234,7 @@ describe('PreferencesProvider', () => {
       expect(result.current.preferences.dashboardLayout).toBe('list');
     });
 
-    it('rolls the latest write back to the value it replaced', async () => {
+    it('rolls the latest write back to the last stored value', async () => {
       const { result } = await renderPreferences();
       await act(async () => {
         await result.current.setPreference('dashboardLayout', 'tiles');
@@ -250,6 +250,78 @@ describe('PreferencesProvider', () => {
         second.reject(new Error('storage full'));
       });
       expect(result.current.preferences.dashboardLayout).toBe('tiles');
+    });
+
+    // A rollback targets what storage holds, not the value that was on
+    // screen: after two failed writes the value it replaced is itself an
+    // optimistic value that never reached storage, and restoring it would
+    // show something the user never chose and the card never stored.
+    it('rolls back to the stored value when consecutive writes fail', async () => {
+      const first = deferredSave();
+      const second = deferredSave();
+      const { result } = await renderPreferences();
+
+      await act(async () => {
+        result.current.setPreference('tokenImagesEnabled', true);
+      });
+      await act(async () => {
+        result.current.setPreference('tokenImagesEnabled', false);
+      });
+
+      await act(async () => {
+        first.reject(new Error('storage full'));
+      });
+      await act(async () => {
+        second.reject(new Error('storage full'));
+      });
+
+      expect(result.current.preferences.tokenImagesEnabled).toBe(
+        STORED.tokenImagesEnabled,
+      );
+    });
+
+    // Same two failures, settling in the other order.
+    it('rolls back to the stored value when the newer write fails first', async () => {
+      const first = deferredSave();
+      const second = deferredSave();
+      const { result } = await renderPreferences();
+
+      await act(async () => {
+        result.current.setPreference('tokenImagesEnabled', true);
+      });
+      await act(async () => {
+        result.current.setPreference('tokenImagesEnabled', false);
+      });
+
+      await act(async () => {
+        second.reject(new Error('storage full'));
+      });
+      await act(async () => {
+        first.reject(new Error('storage full'));
+      });
+
+      expect(result.current.preferences.tokenImagesEnabled).toBe(
+        STORED.tokenImagesEnabled,
+      );
+    });
+
+    // A write that succeeded is what storage holds, so a later failure goes
+    // back to it rather than to whatever preceded the successful one.
+    it('rolls back to a value an earlier write stored successfully', async () => {
+      const { result } = await renderPreferences();
+      await act(async () => {
+        await result.current.setPreference('tokenImagesEnabled', true);
+      });
+
+      const failing = deferredSave();
+      await act(async () => {
+        result.current.setPreference('tokenImagesEnabled', false);
+      });
+      await act(async () => {
+        failing.reject(new Error('storage full'));
+      });
+
+      expect(result.current.preferences.tokenImagesEnabled).toBe(true);
     });
 
     // Consecutive writes to different preferences must compose: the second

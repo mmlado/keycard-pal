@@ -33,9 +33,14 @@ export function PreferencesProvider({
 }) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [loadingMounted, setLoadingMounted] = useState(true);
-  // Mirror of the state for the writer, which composes consecutive writes and
-  // decides a rollback against whatever is current at that moment.
+  // Mirror of the state for the writer, which composes consecutive writes on
+  // top of whatever is on screen at that moment.
   const currentRef = useRef<Preferences | null>(null);
+  // What storage is known to hold. A rollback targets this rather than the
+  // value the failed write replaced on screen: after two failed writes to one
+  // key, that value is itself an optimistic one that never reached storage,
+  // and restoring it would show something the user never chose.
+  const confirmedRef = useRef<Preferences | null>(null);
   // Counts writes per preference so only the most recent one may roll back;
   // a slow failure must not undo a choice the user made after it.
   const writeSeqRef = useRef<Partial<Record<keyof Preferences, number>>>({});
@@ -49,6 +54,7 @@ export function PreferencesProvider({
     let active = true;
     loadPreferences().then(loaded => {
       if (active) {
+        confirmedRef.current = loaded;
         commit(loaded);
       }
     });
@@ -64,16 +70,23 @@ export function PreferencesProvider({
         return;
       }
 
-      const previous = current[key];
       const seq = (writeSeqRef.current[key] ?? 0) + 1;
       writeSeqRef.current[key] = seq;
       commit({ ...current, [key]: value });
 
       try {
         await savePreference(key, value);
+        if (confirmedRef.current) {
+          confirmedRef.current = { ...confirmedRef.current, [key]: value };
+        }
       } catch {
-        if (writeSeqRef.current[key] === seq && currentRef.current) {
-          commit({ ...currentRef.current, [key]: previous });
+        const confirmed = confirmedRef.current;
+        if (
+          writeSeqRef.current[key] === seq &&
+          currentRef.current &&
+          confirmed
+        ) {
+          commit({ ...currentRef.current, [key]: confirmed[key] });
         }
       }
     },
