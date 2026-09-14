@@ -27,8 +27,15 @@ read resolves the first screen mounts underneath it and it fades out, so the
 hand-over is a crossfade rather than a pop. Consumers call
 `usePreferences()` and get the values synchronously; `setPreference(key,
 value)` shows the new value at once in every consumer, writes it, and rolls
-back if the write fails. Only the most recent write to a key may roll back, so
-a slow failure cannot undo a later choice.
+back if the write fails.
+
+Two rules keep a rollback honest. Only the most recent write to a key may
+roll back, so a slow failure cannot undo a later choice. And it rolls back to
+the last value storage is known to hold, not to the value the failed write
+replaced on screen: after two failed writes to one key the replaced value is
+itself an optimistic one that never reached storage, so restoring it would
+leave the app showing something the user never chose and the phone never
+stored.
 
 `preferencesStorage` exposes only `loadPreferences()` and
 `savePreference(key, value)`, typed on the `Preferences` keys. There is no

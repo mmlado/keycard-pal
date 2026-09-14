@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Launch now paints the app background from the first frame until the loading screen takes over, on both platforms; iOS no longer shows a white launch screen
 - Layout setting: choose tiles or a list for every menu screen with a two-icon control in Settings. Tiles is the default
 - Buy-a-Keycard link in Settings and on the tap-your-Keycard prompt; opens the browser when the phone has a network connection, otherwise shows the link as a QR code (always a QR code in the offline build)
 

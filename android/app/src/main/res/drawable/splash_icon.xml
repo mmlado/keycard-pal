@@ -1,0 +1,11 @@
+<!--
+  Deliberately empty. The splash is the app background and nothing else, so it
+  cannot disagree with the loading screen that follows it. Leaving
+  `windowSplashScreenAnimatedIcon` unset is not the same thing: the platform
+  falls back to the launcher icon, and it masks whatever it draws there to a
+  192dp circle, which no artwork of ours is shaped for.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>
