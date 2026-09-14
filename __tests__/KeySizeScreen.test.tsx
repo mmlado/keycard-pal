@@ -16,16 +16,12 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      chevronRight: Icon,
-      nfcActivate: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+// These assertions describe the list layout's rows, so pin the preference.
+jest.mock('../src/hooks/useDashboardLayout', () => ({
+  useDashboardLayout: () => ({ layout: 'list', loaded: true }),
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,6 +62,13 @@ describe('KeySizeScreen', () => {
     it('renders the "24 word + passphrase" option', () => {
       renderScreen();
       expect(screen.getByText('24 word + passphrase')).toBeTruthy();
+    });
+
+    it('shows a leading icon on every option', () => {
+      renderScreen();
+      for (const index of [0, 1, 2, 3]) {
+        expect(screen.getByTestId(`menu-icon-${index}`)).toBeTruthy();
+      }
     });
   });
 

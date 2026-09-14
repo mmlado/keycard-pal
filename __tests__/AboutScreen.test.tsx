@@ -30,20 +30,7 @@ jest.mock('@react-native-clipboard/clipboard', () => ({
   },
 }));
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      checkmark: Icon,
-      chevronRight: Icon,
-      close: Icon,
-      copy: Icon,
-      openInBrowser: Icon,
-      qr: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 const bitcoinAddress = 'bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf';
 const ethereumAddress = '0xF665E3D58DABa87d741A347674DCc4C4b794cAc9';
@@ -86,6 +73,12 @@ describe('AboutScreen', () => {
       .filter(text => text === 'Ethereum' || text === 'Bitcoin');
     expect(labels).toEqual(['Ethereum', 'Bitcoin']);
     expect(screen.getByText('Open-source licenses')).toBeTruthy();
+  });
+
+  it('shows a coin icon on each donation address', () => {
+    renderScreen();
+    expect(screen.getByTestId('donation-icon-Ethereum')).toBeTruthy();
+    expect(screen.getByTestId('donation-icon-Bitcoin')).toBeTruthy();
   });
 
   it('opens the project GitHub page', () => {

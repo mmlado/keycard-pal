@@ -9,9 +9,9 @@ import { dashboardActions } from '../navigation/dashboardActions';
 import { DashboardScreenProps } from '../navigation/types';
 import theme from '../theme';
 
-import WalletConnectDashboardCard from '../components/walletConnect/DashboardCard.online';
-import Menu from '../components/Menu';
+import EntryList from '../components/EntryList';
 import PrimaryButton from '../components/PrimaryButton';
+import WalletConnectDashboardCard from '../components/walletConnect/DashboardCard.online';
 
 /**
  * How long the confirmation toast stays up on iOS.
@@ -56,6 +56,8 @@ export default function DashboardScreen({
 
   const entries = dashboardActions.map(action => ({
     label: action.label,
+    detail: action.detail,
+    icon: action.icon,
     onPress: () => action.navigate(navigation),
   }));
 
@@ -66,9 +68,7 @@ export default function DashboardScreen({
         { paddingTop: insets.top, paddingBottom: insets.bottom },
       ]}
     >
-      <Menu entries={entries} />
-
-      <WalletConnectDashboardCard />
+      <EntryList entries={entries} footer={<WalletConnectDashboardCard />} />
 
       <View style={styles.actions}>
         <PrimaryButton label="Scan" onPress={handleSign} icon={Icons.scan} />

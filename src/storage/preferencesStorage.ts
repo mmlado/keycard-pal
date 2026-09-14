@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const DASHBOARD_LAYOUT = 'preference_dashboard_layout';
 const PIN_PAD_SCRAMBLE = 'preference_pinpad_scramble';
 const TOKEN_IMAGES_ENABLED = 'preference_token_images_enabled';
 const WELCOME_SEEN = 'preference_welcome_seen';
@@ -15,6 +16,27 @@ async function loadBoolean(key: string): Promise<boolean> {
 
 async function saveBoolean(key: string, value: boolean): Promise<void> {
   await AsyncStorage.setItem(key, value ? '1' : '0');
+}
+
+/** How the dashboard renders its destinations. */
+export type DashboardLayout = 'tiles' | 'list';
+
+/** Anything but an explicit 'list' means tiles, so the default survives a
+ * missing, empty or unrecognised value. */
+export async function loadDashboardLayout(): Promise<DashboardLayout> {
+  try {
+    return (await AsyncStorage.getItem(DASHBOARD_LAYOUT)) === 'list'
+      ? 'list'
+      : 'tiles';
+  } catch {
+    return 'tiles';
+  }
+}
+
+export async function saveDashboardLayout(
+  value: DashboardLayout,
+): Promise<void> {
+  await AsyncStorage.setItem(DASHBOARD_LAYOUT, value);
 }
 
 export async function loadPinPadScramble(): Promise<boolean> {

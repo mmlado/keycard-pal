@@ -24,6 +24,7 @@ import LicenseList from '../components/about/LicenseList';
 
 export const dashboardEntry: DashboardAction = {
   label: 'About',
+  icon: Icons.info,
   navigate: nav => nav.navigate('About'),
 };
 

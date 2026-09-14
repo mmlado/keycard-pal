@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icons } from '../assets/icons';
 import { DashboardAction, ExportKeyScreenProps } from '../navigation/types';
 import theme from '../theme';
 
-import Menu from '../components/Menu';
+import EntryList from '../components/EntryList';
 
-import { Icons } from '../assets/icons';
 import { XPUB_EXPLAINER } from '../constants/exportKey';
 import {
   loadXpubNoticeDismissed,
@@ -17,6 +17,8 @@ import { EXPORT_TARGETS } from '../utils/exportTargets';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Connect software wallet',
+  detail: 'Export a public key by QR',
+  icon: Icons.connectWallet,
   navigate: nav => nav.navigate('ExportKey'),
 };
 
@@ -47,6 +49,7 @@ export default function ExportKeyScreen({ navigation }: ExportKeyScreenProps) {
 
   const entries = EXPORT_TARGETS.map(target => ({
     label: target.label,
+    icon: target.icon,
     requiresNfc: true,
     onPress: () =>
       navigation.navigate('Keycard', {
@@ -76,7 +79,7 @@ export default function ExportKeyScreen({ navigation }: ExportKeyScreenProps) {
           </Pressable>
         </View>
       ) : null}
-      <Menu entries={entries} />
+      <EntryList entries={entries} />
     </View>
   );
 }

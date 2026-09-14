@@ -3,6 +3,8 @@ import {
   CryptoCoinInfoType,
 } from '@keystonehq/bc-ur-registry';
 
+import { Icons, type IconComponent } from '@/assets/icons';
+
 import {
   buildCryptoAccountUR,
   type BitcoinAccountDescriptor,
@@ -28,10 +30,10 @@ export type ExportTargetId =
   | 'ledger-legacy';
 
 /**
- * One wallet a key can be exported to: the menu label, the exact BIP32 paths
- * to export (with the parent paths their fingerprints come from), and the
- * pure UR builder for the exported keys. Adding a wallet target is one entry
- * here — the card-session executor (exportKeysForTarget) and the Keycard
+ * One wallet a key can be exported to: the menu label and row icon, the exact
+ * BIP32 paths to export (with the parent paths their fingerprints come from),
+ * and the pure UR builder for the exported keys. Adding a wallet target is one
+ * entry here — the card-session executor (exportKeysForTarget) and the Keycard
  * screen are generic.
  *
  * The plan entries drive both the export order and the build: the executor
@@ -42,6 +44,8 @@ export type ExportTargetId =
 export type ExportTarget = {
   id: ExportTargetId;
   label: string;
+  /** Leading icon for the row: the chain's currency mark where it has one. */
+  icon: IconComponent;
   keys: readonly ExportPlanEntry[];
   buildUr: (result: ExportKeysResult) => string;
 };
@@ -54,6 +58,7 @@ function ethereumTarget(
   return {
     id,
     label,
+    icon: Icons.ethereum,
     keys: [{ derivationPath: "m/44'/60'/0'", parentPath: "m/44'/60'" }],
     buildUr: ({ masterFingerprint, keys: [key] }) =>
       buildCryptoHdKeyUR(
@@ -78,6 +83,7 @@ function bitcoinTarget(
   return {
     id,
     label,
+    icon: Icons.bitcoin,
     keys,
     buildUr: result =>
       buildCryptoAccountUR({
@@ -131,6 +137,8 @@ const BITGET_KEYS: readonly BitgetEntry[] = [
 const BITGET_TARGET: ExportTarget = {
   id: 'bitget',
   label: 'Bitget',
+  // Exports Bitcoin and Ethereum keys together, so no one currency mark fits.
+  icon: Icons.wallet,
   keys: BITGET_KEYS,
   buildUr: result =>
     buildCryptoMultiAccountsUR(

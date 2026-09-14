@@ -24,17 +24,12 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      chevronRight: Icon,
-      close: Icon,
-      nfcActivate: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+// These assertions describe the list layout's rows, so pin the preference.
+jest.mock('../src/hooks/useDashboardLayout', () => ({
+  useDashboardLayout: () => ({ layout: 'list', loaded: true }),
+}));
 
 const mockLoadXpubNoticeDismissed = jest.fn();
 const mockSaveXpubNoticeDismissed = jest.fn();
@@ -132,6 +127,16 @@ describe('ExportKeyScreen', () => {
 
       for (const index of [0, 1, 2, 3, 4, 5, 6]) {
         expect(screen.getByTestId(`menu-nfc-indicator-${index}`)).toBeTruthy();
+      }
+    });
+
+    // Each target carries its own icon, so the screen stays generic over the
+    // table rather than mapping ids to icons itself.
+    it('shows a leading icon for every export option', async () => {
+      await renderScreen();
+
+      for (const index of [0, 1, 2, 3, 4, 5, 6]) {
+        expect(screen.getByTestId(`menu-icon-${index}`)).toBeTruthy();
       }
     });
   });

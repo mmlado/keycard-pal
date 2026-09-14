@@ -14,16 +14,12 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      chevronRight: Icon,
-      nfcActivate: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+// These assertions describe the list layout's rows, so pin the preference.
+jest.mock('../src/hooks/useDashboardLayout', () => ({
+  useDashboardLayout: () => ({ layout: 'list', loaded: true }),
+}));
 
 const navigation = { navigate: jest.fn() } as any;
 const route = { key: 'KeycardMenu', name: 'KeycardMenu' } as any;
@@ -45,6 +41,13 @@ describe('KeycardMenuScreen', () => {
     expect(screen.getByText('Secrets')).toBeTruthy();
     expect(screen.getByText('Manage pairing slots')).toBeTruthy();
     expect(screen.getByText('Factory reset')).toBeTruthy();
+  });
+
+  it('shows a leading icon on every row', () => {
+    renderScreen();
+    for (const index of [0, 1, 2, 3, 4, 5]) {
+      expect(screen.getByTestId(`menu-icon-${index}`)).toBeTruthy();
+    }
   });
 
   it('shows the NFC indicator only for direct NFC actions', () => {

@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icons } from '../assets/icons';
 import type { DashboardAction, SettingsScreenProps } from '../navigation/types';
 import theme from '../theme';
 
+import DashboardLayoutSettingsSection from '../components/settings/DashboardLayoutSettingsSection';
 import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
 import KeycardSettingsSection from '../components/settings/KeycardSettingsSection';
 import PinPadSettingsSection from '../components/settings/PinPadSettingsSection';
@@ -20,6 +22,7 @@ import WalletConnectSettingsSection from '../components/settings/WalletConnectSe
 
 export const dashboardEntry: DashboardAction = {
   label: 'Settings',
+  icon: Icons.settings,
   navigate: nav => nav.navigate('Settings'),
 };
 
@@ -45,6 +48,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       >
         <View style={styles.section}>
           <KeycardSettingsSection />
+          <DashboardLayoutSettingsSection />
           <PinPadSettingsSection />
           <TokenImagesSettingsSection />
           <EnsSettingsSection />

@@ -2,19 +2,21 @@ import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icons } from '../assets/icons';
 import { DashboardAction, InitCardScreenProps } from '../navigation/types';
+import theme from '../theme';
+
+import ConfirmPrompt from '../components/ConfirmPropmpt';
+import NFCBottomSheet from '../components/NFCBottomSheet';
+import PinPad from '../components/PinPad';
 
 import { useInitCard } from '../hooks/keycard/useInitCard';
 import { useConfirmedEntry } from '../hooks/useConfirmedEntry';
 import { useKeycardScreen } from '../hooks/useKeycardScreen';
 
-import theme from '../theme';
-import ConfirmPrompt from '../components/ConfirmPropmpt';
-import NFCBottomSheet from '../components/NFCBottomSheet';
-import PinPad from '../components/PinPad';
-
 export const dashboardEntry: DashboardAction = {
   label: 'Initialize',
+  icon: Icons.cardInit,
   navigate: nav => nav.navigate('InitCard'),
 };
 

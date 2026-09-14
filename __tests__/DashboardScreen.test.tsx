@@ -1,5 +1,5 @@
 import React, { act } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardScreen from '../src/screens/DashboardScreen';
@@ -21,25 +21,21 @@ jest.mock('react-native-paper', () => {
     Text,
     Snackbar: ({ visible, children, duration }: any) => {
       lastSnackDuration = duration;
-      return visible ? require('react').createElement(Text, null, children) : null;
+      return visible
+        ? require('react').createElement(Text, null, children)
+        : null;
     },
   };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      chevronRight: Icon,
-      close: Icon,
-      nfcActivate: Icon,
-      openInBrowser: Icon,
-      qr: Icon,
-      scan: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+let mockLayout: 'tiles' | 'list' = 'tiles';
+let mockLoaded = true;
+
+jest.mock('../src/hooks/useDashboardLayout', () => ({
+  useDashboardLayout: () => ({ layout: mockLayout, loaded: mockLoaded }),
+}));
 
 // Capture the useFocusEffect callback so tests can fire focus events.
 let focusCallback: (() => void) | null = null;
@@ -51,8 +47,26 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockUseNavigationNavigate }),
 }));
 
-const mockDashboardActions: { label: string; navigate: (nav: any) => void }[] =
-  [];
+type MockAction = {
+  label: string;
+  detail?: string;
+  icon: React.ComponentType<any>;
+  navigate: (nav: any) => void;
+};
+
+const mockDashboardActions: MockAction[] = [];
+
+// Forwards its props so the rendered icon carries a findable testID, the same
+// way the shared icon mock behaves.
+const Icon = (props: any) => <View {...props} />;
+
+function action(
+  label: string,
+  navigate: (nav: any) => void = jest.fn(),
+  detail?: string,
+): MockAction {
+  return { label, detail, icon: Icon, navigate };
+}
 
 jest.mock('../src/navigation/dashboardActions', () => ({
   get dashboardActions() {
@@ -101,6 +115,8 @@ describe('DashboardScreen', () => {
     mockUseNavigationNavigate.mockClear();
     mockDashboardActions.length = 0;
     focusCallback = null;
+    mockLayout = 'tiles';
+    mockLoaded = true;
     // mockImplementation alone leaves call history from earlier tests in place.
     (AppState.addEventListener as jest.Mock).mockClear();
     setAppState('active');
@@ -117,7 +133,7 @@ describe('DashboardScreen', () => {
     });
 
     it('renders one fewer pressable when action list is empty', async () => {
-      mockDashboardActions.push({ label: 'Sentinel', navigate: jest.fn() });
+      mockDashboardActions.push(action('Sentinel'));
       await renderScreen();
       expect(screen.getByText('Sentinel')).toBeTruthy();
 
@@ -130,10 +146,7 @@ describe('DashboardScreen', () => {
 
   describe('action list', () => {
     it('renders items with their labels', async () => {
-      mockDashboardActions.push(
-        { label: 'Action One', navigate: jest.fn() },
-        { label: 'Action Two', navigate: jest.fn() },
-      );
+      mockDashboardActions.push(action('Action One'), action('Action Two'));
       await renderScreen();
       expect(screen.getByText('Action One')).toBeTruthy();
       expect(screen.getByText('Action Two')).toBeTruthy();
@@ -141,10 +154,7 @@ describe('DashboardScreen', () => {
 
     it('calls the action navigate when an item is pressed', async () => {
       const mockNavigate = jest.fn();
-      mockDashboardActions.push({
-        label: 'Test Action',
-        navigate: mockNavigate,
-      });
+      mockDashboardActions.push(action('Test Action', mockNavigate));
       await renderScreen();
       fireEvent.press(screen.getByText('Test Action'));
       expect(mockNavigate).toHaveBeenCalledTimes(1);
@@ -155,13 +165,78 @@ describe('DashboardScreen', () => {
       const mockFirst = jest.fn();
       const mockSecond = jest.fn();
       mockDashboardActions.push(
-        { label: 'First', navigate: mockFirst },
-        { label: 'Second', navigate: mockSecond },
+        action('First', mockFirst),
+        action('Second', mockSecond),
       );
       await renderScreen();
       fireEvent.press(screen.getByText('Second'));
       expect(mockSecond).toHaveBeenCalledTimes(1);
       expect(mockFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  // An odd number of entries would leave a dangling half-row, so the first one
+  // is promoted to a full-width hero tile.
+  describe('tile grid', () => {
+    it('renders the first entry as a hero tile when the count is odd', async () => {
+      mockDashboardActions.push(
+        action('One', jest.fn(), 'Hero detail'),
+        action('Two'),
+        action('Three'),
+      );
+      await renderScreen();
+      expect(screen.getByTestId('tile-hero')).toBeTruthy();
+      expect(screen.getByTestId('tile-0')).toBeTruthy();
+      expect(screen.getByTestId('tile-1')).toBeTruthy();
+      expect(screen.queryByTestId('tile-2')).toBeNull();
+    });
+
+    it('renders only standard tiles when the count is even', async () => {
+      mockDashboardActions.push(action('One'), action('Two'));
+      await renderScreen();
+      expect(screen.queryByTestId('tile-hero')).toBeNull();
+      expect(screen.getByTestId('tile-0')).toBeTruthy();
+      expect(screen.getByTestId('tile-1')).toBeTruthy();
+    });
+
+    it('shows the detail line on the hero tile only', async () => {
+      mockDashboardActions.push(
+        action('One', jest.fn(), 'Hero detail'),
+        action('Two', jest.fn(), 'Standard detail'),
+        action('Three'),
+      );
+      await renderScreen();
+      expect(screen.getByText('Hero detail')).toBeTruthy();
+      expect(screen.queryByText('Standard detail')).toBeNull();
+    });
+  });
+
+  describe('layout preference', () => {
+    it('renders the list instead of tiles when the preference says list', async () => {
+      mockLayout = 'list';
+      mockDashboardActions.push(action('One'), action('Two'));
+      await renderScreen();
+      expect(screen.queryByTestId('tile-grid')).toBeNull();
+      expect(screen.getByTestId('menu-icon-0')).toBeTruthy();
+      expect(screen.getByText('One')).toBeTruthy();
+    });
+
+    it('renders tiles when the preference says tiles', async () => {
+      mockLayout = 'tiles';
+      mockDashboardActions.push(action('One'), action('Two'));
+      await renderScreen();
+      expect(screen.getByTestId('tile-grid')).toBeTruthy();
+      expect(screen.queryByTestId('menu-icon-0')).toBeNull();
+    });
+
+    it('holds the destinations back until the preference is loaded', async () => {
+      mockLoaded = false;
+      mockDashboardActions.push(action('One'));
+      await renderScreen();
+      expect(screen.queryByText('One')).toBeNull();
+      expect(screen.queryByTestId('tile-grid')).toBeNull();
+      // The action area stays put so the button does not jump on load.
+      expect(screen.getByText('Scan')).toBeTruthy();
     });
   });
 
@@ -173,7 +248,7 @@ describe('DashboardScreen', () => {
     });
 
     it('does not call navigation.navigate when an action item is pressed', async () => {
-      mockDashboardActions.push({ label: 'Some Action', navigate: jest.fn() });
+      mockDashboardActions.push(action('Some Action'));
       await renderScreen();
       fireEvent.press(screen.getByText('Some Action'));
       expect(navigation.navigate).not.toHaveBeenCalled();

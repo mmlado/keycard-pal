@@ -24,6 +24,11 @@ jest.mock('../src/assets/icons', () => {
   return { Icons: { openInBrowser: Icon, qr: Icon } };
 });
 
+jest.mock('../src/components/settings/DashboardLayoutSettingsSection', () => {
+  const { Text } = require('react-native');
+  return () => <Text>Layout</Text>;
+});
+
 jest.mock(
   '../src/components/settings/ens/EnsSettingsSection.online',
   () => () => null,
@@ -85,6 +90,17 @@ describe('SettingsScreen', () => {
   it('sets the header title', () => {
     renderScreen();
     expect(navigation.setOptions).toHaveBeenCalledWith({ title: 'Settings' });
+  });
+
+  // The purchase link is the one section that always stays at the top; every
+  // other section is added below it.
+  it('keeps Buy a Keycard above the layout section', () => {
+    const { toJSON } = renderScreen();
+    const rendered = JSON.stringify(toJSON());
+    expect(rendered).toContain('Layout');
+    expect(rendered.indexOf('Buy a Keycard')).toBeLessThan(
+      rendered.indexOf('Layout'),
+    );
   });
 
   it('renders on Android with the height keyboard behaviour', () => {
