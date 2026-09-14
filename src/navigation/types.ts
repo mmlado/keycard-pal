@@ -1,6 +1,7 @@
 import { NavigationProp } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import type { IconComponent } from '../assets/icons';
 import type { WCContext } from '../constants/walletConnect';
 import type { ScanResult } from '../types';
 import type { ExportTargetId } from '../utils/exportTargets';
@@ -221,5 +222,8 @@ export type WalletConnectPairingScreenProps = NativeStackScreenProps<
 
 export type DashboardAction = {
   label: string;
+  /** Shown only when the entry renders as the full-width hero tile. */
+  detail?: string;
+  icon: IconComponent;
   navigate: (navigation: NavigationProp<RootStackParamList>) => void;
 };

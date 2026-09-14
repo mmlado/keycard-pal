@@ -1,8 +1,10 @@
 import {
+  loadDashboardLayout,
   loadPinPadScramble,
   loadTokenImagesEnabled,
   loadWelcomeSeen,
   loadXpubNoticeDismissed,
+  saveDashboardLayout,
   savePinPadScramble,
   saveTokenImagesEnabled,
   saveWelcomeSeen,
@@ -65,6 +67,52 @@ describe('preferencesStorage', () => {
       expect(mockSetItem).toHaveBeenCalledWith(
         'preference_pinpad_scramble',
         '0',
+      );
+    });
+  });
+
+  describe('loadDashboardLayout', () => {
+    it('reads the correct storage key', async () => {
+      mockGetItem.mockResolvedValue(null);
+      await loadDashboardLayout();
+      expect(mockGetItem).toHaveBeenCalledWith('preference_dashboard_layout');
+    });
+
+    it('returns list when stored value is "list"', async () => {
+      mockGetItem.mockResolvedValue('list');
+      expect(await loadDashboardLayout()).toBe('list');
+    });
+
+    it('returns tiles when nothing stored', async () => {
+      mockGetItem.mockResolvedValue(null);
+      expect(await loadDashboardLayout()).toBe('tiles');
+    });
+
+    // Anything unrecognised falls back rather than rendering an empty screen.
+    it('returns tiles for an unrecognised value', async () => {
+      mockGetItem.mockResolvedValue('grid');
+      expect(await loadDashboardLayout()).toBe('tiles');
+    });
+
+    it('returns tiles when storage throws', async () => {
+      mockGetItem.mockRejectedValue(new Error('storage failure'));
+      expect(await loadDashboardLayout()).toBe('tiles');
+    });
+  });
+
+  describe('saveDashboardLayout', () => {
+    it('stores the chosen layout verbatim', async () => {
+      mockSetItem.mockResolvedValue(undefined);
+      await saveDashboardLayout('list');
+      expect(mockSetItem).toHaveBeenCalledWith(
+        'preference_dashboard_layout',
+        'list',
+      );
+
+      await saveDashboardLayout('tiles');
+      expect(mockSetItem).toHaveBeenCalledWith(
+        'preference_dashboard_layout',
+        'tiles',
       );
     });
   });

@@ -25,6 +25,7 @@ const theme = {
     outlineActive: '#C6C6C6',
     overlay: 'rgba(0,0,0,0.55)',
     secondaryRipple: 'rgba(28,138,128,0.15)',
+    ripple: 'rgba(255,255,255,0.2)',
     progressTrack: '#FFFFFF1A',
     error: '#E95460',
     errorDark: '#BA434D',

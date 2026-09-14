@@ -1,18 +1,21 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { DashboardAction, FactoryResetSreenProps } from '../navigation/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icons } from '../assets/icons';
+import { DashboardAction, FactoryResetSreenProps } from '../navigation/types';
 import theme from '../theme';
+
 import NFCBottomSheet from '../components/NFCBottomSheet';
 import PrimaryButton from '../components/PrimaryButton';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFactoryReset } from '../hooks/keycard/useFactoryReset';
 import { useKeycardScreen } from '../hooks/useKeycardScreen';
-import { Icons } from '../assets/icons';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Factory reset',
+  icon: Icons.factoryReset,
   navigate: nav => nav.navigate('FactoryReset'),
 };
 

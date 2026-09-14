@@ -8,10 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Layout setting: choose tiles or a list for every menu screen with a two-icon control in Settings. Tiles is the default
 - Buy-a-Keycard link in Settings and on the tap-your-Keycard prompt; opens the browser when the phone has a network connection, otherwise shows the link as a QR code (always a QR code in the offline build)
 
 ### Changed
 
+- Menu screens now show icon tiles by default, with a full-width tile leading when the count is odd; Scan stays the button at the bottom of the dashboard
+- Menu rows and the About donation addresses now show a leading icon; coins use their currency symbol
+- Key pair is split into BIP39 and SLIP39 groups under their own headings, and the entries drop the format from their labels
 - The welcome screen's buy button now shows the QR code instead of opening the browser when the phone has no network connection
 - The offline build no longer includes WalletConnect's native module, JNA, the Yttrium bindings, or NetInfo, and no longer declares `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`
 

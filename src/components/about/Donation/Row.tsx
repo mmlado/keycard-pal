@@ -2,17 +2,24 @@ import Clipboard from '@react-native-clipboard/clipboard';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Icons } from '../../../assets/icons';
-import AddressText from '../../AddressText';
+import { IconComponent, Icons } from '../../../assets/icons';
 import theme from '../../../theme';
+
+import AddressText from '../../AddressText';
 
 interface Props {
   label: string;
   address: string;
+  icon: IconComponent;
   onShowQR: (label: string, address: string) => void;
 }
 
-export default function DonationRow({ label, address, onShowQR }: Props) {
+export default function DonationRow({
+  label,
+  address,
+  icon: Icon,
+  onShowQR,
+}: Props) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -32,6 +39,12 @@ export default function DonationRow({ label, address, onShowQR }: Props) {
 
   return (
     <View style={styles.row}>
+      <Icon
+        testID={`donation-icon-${label}`}
+        width={24}
+        height={24}
+        color={theme.colors.onSurfaceVariant}
+      />
       <View style={styles.text}>
         <Text style={styles.label}>{label}</Text>
         <AddressText address={address} style={styles.address} selectable />
