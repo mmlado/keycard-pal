@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,11 +8,9 @@ import theme from '../theme';
 
 import EntryList from '../components/EntryList';
 
+import { usePreferences } from '../hooks/usePreferences';
+
 import { XPUB_EXPLAINER } from '../constants/exportKey';
-import {
-  loadXpubNoticeDismissed,
-  saveXpubNoticeDismissed,
-} from '../storage/preferencesStorage';
 import { EXPORT_TARGETS } from '../utils/exportTargets';
 
 export const dashboardEntry: DashboardAction = {
@@ -24,28 +22,12 @@ export const dashboardEntry: DashboardAction = {
 
 export default function ExportKeyScreen({ navigation }: ExportKeyScreenProps) {
   const insets = useSafeAreaInsets();
-  const [noticeVisible, setNoticeVisible] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    loadXpubNoticeDismissed()
-      .then(dismissed => {
-        if (isMounted) setNoticeVisible(!dismissed);
-      })
-      .catch(() => {
-        if (isMounted) setNoticeVisible(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { preferences, setPreference } = usePreferences();
+  const noticeVisible = !preferences.xpubNoticeDismissed;
 
   const handleDismissNotice = useCallback(() => {
-    setNoticeVisible(false);
-    saveXpubNoticeDismissed(true).catch(() => {});
-  }, []);
+    setPreference('xpubNoticeDismissed', true);
+  }, [setPreference]);
 
   const entries = EXPORT_TARGETS.map(target => ({
     label: target.label,

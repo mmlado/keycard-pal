@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardLayoutSettingsSection from '../src/components/settings/DashboardLayoutSettingsSection';
+import { PreferencesProvider } from '../src/providers/preferences/Provider';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -14,30 +15,42 @@ jest.mock('react-native-paper', () => {
 
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
-const mockLoadPreference = jest.fn().mockResolvedValue('tiles');
-const mockSavePreference = jest.fn().mockResolvedValue(undefined);
+// The section reads and writes through the real provider; only storage is
+// mocked, so a failed write exercises the provider's rollback.
+const mockLoadPreferences = jest.fn();
+const mockSavePreference = jest.fn();
 
 jest.mock('../src/storage/preferencesStorage', () => ({
-  loadDashboardLayout: () => mockLoadPreference(),
-}));
-
-// Writes go through the hook module so every mounted screen is told to re-read.
-jest.mock('../src/hooks/useDashboardLayout', () => ({
-  setDashboardLayout: (v: string) => mockSavePreference(v),
+  loadPreferences: () => mockLoadPreferences(),
+  savePreference: (...args: unknown[]) => mockSavePreference(...args),
 }));
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+function storedLayout(dashboardLayout: 'tiles' | 'list') {
+  mockLoadPreferences.mockResolvedValue({
+    dashboardLayout,
+    pinPadScramble: false,
+    tokenImagesEnabled: false,
+    welcomeSeen: true,
+    xpubNoticeDismissed: false,
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
-  mockLoadPreference.mockResolvedValue('tiles');
+  storedLayout('tiles');
   mockSavePreference.mockResolvedValue(undefined);
 });
 
 async function renderSection() {
-  const view = render(<DashboardLayoutSettingsSection />);
+  const view = render(
+    <PreferencesProvider>
+      <DashboardLayoutSettingsSection />
+    </PreferencesProvider>,
+  );
   await act(async () => {});
   return view;
 }
@@ -69,7 +82,7 @@ describe('DashboardLayoutSettingsSection', () => {
   });
 
   it('selects the persisted layout on mount', async () => {
-    mockLoadPreference.mockResolvedValue('list');
+    storedLayout('list');
     await renderSection();
     expect(segment('list').props.accessibilityState.selected).toBe(true);
     expect(segment('tiles').props.accessibilityState.selected).toBe(false);
@@ -80,17 +93,17 @@ describe('DashboardLayoutSettingsSection', () => {
     await act(async () => {
       fireEvent.press(segment('list'));
     });
-    expect(mockSavePreference).toHaveBeenCalledWith('list');
+    expect(mockSavePreference).toHaveBeenCalledWith('dashboardLayout', 'list');
     expect(segment('list').props.accessibilityState.selected).toBe(true);
   });
 
   it('saves tiles when switching back', async () => {
-    mockLoadPreference.mockResolvedValue('list');
+    storedLayout('list');
     await renderSection();
     await act(async () => {
       fireEvent.press(segment('tiles'));
     });
-    expect(mockSavePreference).toHaveBeenCalledWith('tiles');
+    expect(mockSavePreference).toHaveBeenCalledWith('dashboardLayout', 'tiles');
   });
 
   // The control shows the selection immediately, so a failed write has to put
@@ -103,28 +116,6 @@ describe('DashboardLayoutSettingsSection', () => {
     });
     expect(segment('tiles').props.accessibilityState.selected).toBe(true);
     expect(segment('list').props.accessibilityState.selected).toBe(false);
-  });
-
-  // The stored value can land after the user has already tapped, and it must
-  // not undo their choice.
-  it('keeps a choice made before the stored value arrives', async () => {
-    let resolveLoad!: (value: string) => void;
-    mockLoadPreference.mockReturnValue(
-      new Promise(resolve => {
-        resolveLoad = resolve;
-      }),
-    );
-
-    render(<DashboardLayoutSettingsSection />);
-    await act(async () => {
-      fireEvent.press(segment('list'));
-    });
-    await act(async () => {
-      resolveLoad('tiles');
-    });
-
-    expect(segment('list').props.accessibilityState.selected).toBe(true);
-    expect(segment('tiles').props.accessibilityState.selected).toBe(false);
   });
 
   it('marks the segments as radios', async () => {

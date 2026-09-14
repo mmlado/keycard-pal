@@ -1,41 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-
-import {
-  loadTokenImagesEnabled,
-  saveTokenImagesEnabled,
-} from '@/storage/preferencesStorage';
+import { usePreferences } from '@/hooks/usePreferences';
 
 import SettingsToggleRow from './SettingsToggleRow';
 
 export default function TokenImagesSettingsSection(): React.JSX.Element | null {
-  const [enabled, setEnabled] = useState(false);
-  const didInteractRef = useRef(false);
-
-  useEffect(() => {
-    let active = true;
-    loadTokenImagesEnabled().then(value => {
-      if (active && !didInteractRef.current) {
-        setEnabled(value);
-      }
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const handleToggle = useCallback((value: boolean) => {
-    didInteractRef.current = true;
-    setEnabled(value);
-    saveTokenImagesEnabled(value).catch(() => {
-      setEnabled(current => (current === value ? !value : current));
-    });
-  }, []);
+  const { preferences, setPreference } = usePreferences();
 
   return (
     <SettingsToggleRow
       label="Load token images"
-      value={enabled}
-      onValueChange={handleToggle}
+      value={preferences.tokenImagesEnabled}
+      onValueChange={value => setPreference('tokenImagesEnabled', value)}
     />
   );
 }

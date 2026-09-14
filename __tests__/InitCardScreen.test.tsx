@@ -28,9 +28,12 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-jest.mock('../src/storage/preferencesStorage', () => ({
-  loadPinPadScramble: jest.fn().mockResolvedValue(false),
-  savePinPadScramble: jest.fn().mockResolvedValue(undefined),
+// PinPad reads the scramble preference from context.
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: { pinPadScramble: false },
+    setPreference: jest.fn(),
+  }),
 }));
 
 const mockStart = jest.fn();

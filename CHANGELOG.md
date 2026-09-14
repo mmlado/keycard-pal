@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Stored preferences are read once at startup behind a loading screen showing the Keycard, the app name and the version, which fades into the first screen; menus, the PIN pad and the export-key notice no longer flicker from a default to the stored value
 - Menu screens now show icon tiles by default, with a full-width tile leading when the count is odd; Scan stays the button at the bottom of the dashboard
 - Menu rows and the About donation addresses now show a leading icon; coins use their currency symbol
 - Key pair is split into BIP39 and SLIP39 groups under their own headings, and the entries drop the format from their labels

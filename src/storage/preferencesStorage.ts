@@ -1,72 +1,80 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DASHBOARD_LAYOUT = 'preference_dashboard_layout';
-const PIN_PAD_SCRAMBLE = 'preference_pinpad_scramble';
-const TOKEN_IMAGES_ENABLED = 'preference_token_images_enabled';
-const WELCOME_SEEN = 'preference_welcome_seen';
-const XPUB_NOTICE_DISMISSED = 'preference_xpub_notice_dismissed';
-
-async function loadBoolean(key: string): Promise<boolean> {
-  try {
-    return (await AsyncStorage.getItem(key)) === '1';
-  } catch {
-    return false;
-  }
-}
-
-async function saveBoolean(key: string, value: boolean): Promise<void> {
-  await AsyncStorage.setItem(key, value ? '1' : '0');
-}
-
 /** How the dashboard renders its destinations. */
 export type DashboardLayout = 'tiles' | 'list';
 
-/** Anything but an explicit 'list' means tiles, so the default survives a
- * missing, empty or unrecognised value. */
-export async function loadDashboardLayout(): Promise<DashboardLayout> {
+/**
+ * Every persisted, non-sensitive UI preference. Resolved once at startup by
+ * `PreferencesProvider` and handed down by context; nothing reads a single
+ * preference later, so no screen can paint a default and then flicker to the
+ * stored value.
+ */
+export type Preferences = {
+  dashboardLayout: DashboardLayout;
+  pinPadScramble: boolean;
+  tokenImagesEnabled: boolean;
+  welcomeSeen: boolean;
+  xpubNoticeDismissed: boolean;
+};
+
+export const DEFAULT_PREFERENCES: Preferences = {
+  dashboardLayout: 'tiles',
+  pinPadScramble: false,
+  tokenImagesEnabled: false,
+  welcomeSeen: false,
+  xpubNoticeDismissed: false,
+};
+
+/**
+ * Storage key per preference. Opt-in network features use the `_enabled`
+ * suffix so the unset state reads as disabled (ADR-0003). Booleans are stored
+ * as '1' / '0'; the layout is stored verbatim.
+ */
+const KEYS: Record<keyof Preferences, string> = {
+  dashboardLayout: 'preference_dashboard_layout',
+  pinPadScramble: 'preference_pinpad_scramble',
+  tokenImagesEnabled: 'preference_token_images_enabled',
+  welcomeSeen: 'preference_welcome_seen',
+  xpubNoticeDismissed: 'preference_xpub_notice_dismissed',
+};
+
+/**
+ * Reads every preference in one round trip. Never rejects: a failed read
+ * yields the defaults, so startup cannot stall on storage.
+ */
+export async function loadPreferences(): Promise<Preferences> {
   try {
-    return (await AsyncStorage.getItem(DASHBOARD_LAYOUT)) === 'list'
-      ? 'list'
-      : 'tiles';
+    const stored = await AsyncStorage.getMany(Object.values(KEYS));
+    const flag = (key: keyof Preferences) => stored[KEYS[key]] === '1';
+    return {
+      // Anything but an explicit 'list' means tiles, so the default survives
+      // a missing, empty or unrecognised value.
+      dashboardLayout:
+        stored[KEYS.dashboardLayout] === 'list' ? 'list' : 'tiles',
+      pinPadScramble: flag('pinPadScramble'),
+      tokenImagesEnabled: flag('tokenImagesEnabled'),
+      welcomeSeen: flag('welcomeSeen'),
+      xpubNoticeDismissed: flag('xpubNoticeDismissed'),
+    };
   } catch {
-    return 'tiles';
+    return { ...DEFAULT_PREFERENCES };
   }
 }
 
-export async function saveDashboardLayout(
-  value: DashboardLayout,
+function encode(value: Preferences[keyof Preferences]): string {
+  if (typeof value === 'boolean') {
+    return value ? '1' : '0';
+  }
+  return value;
+}
+
+/**
+ * Writes one preference. Rejects when storage does; `PreferencesProvider`
+ * turns that into a rollback of the value it shows.
+ */
+export async function savePreference<K extends keyof Preferences>(
+  key: K,
+  value: Preferences[K],
 ): Promise<void> {
-  await AsyncStorage.setItem(DASHBOARD_LAYOUT, value);
-}
-
-export async function loadPinPadScramble(): Promise<boolean> {
-  return loadBoolean(PIN_PAD_SCRAMBLE);
-}
-
-export async function savePinPadScramble(value: boolean): Promise<void> {
-  return saveBoolean(PIN_PAD_SCRAMBLE, value);
-}
-
-export async function loadTokenImagesEnabled(): Promise<boolean> {
-  return loadBoolean(TOKEN_IMAGES_ENABLED);
-}
-
-export async function saveTokenImagesEnabled(value: boolean): Promise<void> {
-  return saveBoolean(TOKEN_IMAGES_ENABLED, value);
-}
-
-export async function loadWelcomeSeen(): Promise<boolean> {
-  return loadBoolean(WELCOME_SEEN);
-}
-
-export async function saveWelcomeSeen(value: boolean): Promise<void> {
-  return saveBoolean(WELCOME_SEEN, value);
-}
-
-export async function loadXpubNoticeDismissed(): Promise<boolean> {
-  return loadBoolean(XPUB_NOTICE_DISMISSED);
-}
-
-export async function saveXpubNoticeDismissed(value: boolean): Promise<void> {
-  return saveBoolean(XPUB_NOTICE_DISMISSED, value);
+  await AsyncStorage.setItem(KEYS[key], encode(value));
 }

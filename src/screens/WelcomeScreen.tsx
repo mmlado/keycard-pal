@@ -12,8 +12,7 @@ import theme from '../theme';
 import PrimaryButton from '../components/PrimaryButton';
 
 import { useBuyKeycard } from '../hooks/useBuyKeycard';
-
-import { saveWelcomeSeen } from '../storage/preferencesStorage';
+import { usePreferences } from '../hooks/usePreferences';
 
 type Feature = {
   icon: React.ComponentType<{
@@ -49,11 +48,12 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const insets = useSafeAreaInsets();
 
   const { buyKeycard, opensInBrowser } = useBuyKeycard();
+  const { setPreference } = usePreferences();
 
   const handleGetStarted = useCallback(() => {
-    saveWelcomeSeen(true).catch(() => {});
+    setPreference('welcomeSeen', true);
     navigation.replace('Dashboard');
-  }, [navigation]);
+  }, [navigation, setPreference]);
 
   return (
     <View
