@@ -5,6 +5,9 @@ import { Text } from 'react-native-paper';
 import { Icons } from '../../assets/icons';
 import theme from '../../theme';
 import { displayKeycardName } from '../../utils/keycardName';
+
+import AffiliateDisclosure from '../AffiliateDisclosure';
+
 import type { NFCVariant } from './index';
 
 type Props = {
@@ -165,16 +168,19 @@ export default function NFCSheet({
       )}
 
       {showBuyKeycard && (
-        <Pressable
-          style={styles.buyKeycardLink}
-          hitSlop={8}
-          accessibilityRole="link"
-          onPress={onBuyKeycard}
-        >
-          <Text variant="bodySmall" style={styles.buyKeycardText}>
-            Don't have a Keycard?
-          </Text>
-        </Pressable>
+        <>
+          <Pressable
+            style={styles.buyKeycardLink}
+            hitSlop={8}
+            accessibilityRole="link"
+            onPress={onBuyKeycard}
+          >
+            <Text variant="bodySmall" style={styles.buyKeycardText}>
+              Don't have a Keycard?
+            </Text>
+          </Pressable>
+          <AffiliateDisclosure short style={styles.buyKeycardDisclosure} />
+        </>
       )}
     </>
   );
@@ -233,5 +239,10 @@ const styles = StyleSheet.create({
   buyKeycardText: {
     color: theme.colors.onSurfaceMuted,
     textDecorationLine: 'underline',
+  },
+  buyKeycardDisclosure: {
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

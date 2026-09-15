@@ -10,6 +10,11 @@ import {
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import type { NFCOperation } from '../src/components/NFCBottomSheet';
 import type { KeycardPhase } from '../src/hooks/keycard/useKeycardOperation';
+import {
+  AFFILIATE_DISCLOSURE,
+  BUY_KEYCARD_LABEL,
+  KEYCARD_PURCHASE_URL,
+} from '../src/constants/keycard';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -33,7 +38,7 @@ jest.mock('../src/navigation/navigationRef', () => ({
 }));
 
 const BUY_KEYCARD_LINK = "Don't have a Keycard?";
-const PURCHASE_URL = 'https://get.keycard.tech/vuxxnf';
+const PURCHASE_URL = KEYCARD_PURCHASE_URL;
 
 async function pressBuyKeycardLink() {
   await act(async () => {
@@ -213,6 +218,7 @@ describe('NFCBottomSheet — Android sheet', () => {
     it('shows the link while waiting for a card', () => {
       renderSheet(makeNfc('nfc'));
       expect(screen.getByText(BUY_KEYCARD_LINK)).toBeTruthy();
+      expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
     });
 
     it('hides the link once a card is connected', () => {
@@ -255,7 +261,8 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(onCancel).toHaveBeenCalledTimes(1);
       expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
         url: PURCHASE_URL,
-        title: 'Buy a Keycard',
+        title: BUY_KEYCARD_LABEL,
+        note: AFFILIATE_DISCLOSURE,
       });
       expect(Linking.openURL).not.toHaveBeenCalled();
     });
@@ -509,7 +516,8 @@ describe('NFCBottomSheet — iOS error overlay', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
       url: PURCHASE_URL,
-      title: 'Buy a Keycard',
+      title: BUY_KEYCARD_LABEL,
+      note: AFFILIATE_DISCLOSURE,
     });
   });
 

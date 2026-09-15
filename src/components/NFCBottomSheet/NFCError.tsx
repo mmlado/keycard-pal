@@ -5,6 +5,8 @@ import { Text } from 'react-native-paper';
 import { Icons } from '../../assets/icons';
 import theme from '../../theme';
 
+import AffiliateDisclosure from '../AffiliateDisclosure';
+
 type Props = {
   status: string;
   retry?: () => void;
@@ -53,11 +55,18 @@ export default function NFCError({
         </Text>
       </Pressable>
       {onBuyKeycard && (
-        <Pressable hitSlop={8} accessibilityRole="link" onPress={onBuyKeycard}>
-          <Text variant="bodySmall" style={styles.buyKeycardText}>
-            Don't have a Keycard?
-          </Text>
-        </Pressable>
+        <>
+          <Pressable
+            hitSlop={8}
+            accessibilityRole="link"
+            onPress={onBuyKeycard}
+          >
+            <Text variant="bodySmall" style={styles.buyKeycardText}>
+              Don't have a Keycard?
+            </Text>
+          </Pressable>
+          <AffiliateDisclosure short style={styles.buyKeycardDisclosure} />
+        </>
       )}
     </View>
   );
@@ -106,5 +115,9 @@ const styles = StyleSheet.create({
   buyKeycardText: {
     color: theme.colors.onSurfaceMuted,
     textDecorationLine: 'underline',
+  },
+  buyKeycardDisclosure: {
+    marginTop: -8,
+    textAlign: 'center',
   },
 });

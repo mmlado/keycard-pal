@@ -9,6 +9,7 @@ import { BUY_KEYCARD_LABEL } from '../constants/keycard';
 import type { WelcomeScreenProps } from '../navigation/types';
 import theme from '../theme';
 
+import AffiliateDisclosure from '../components/AffiliateDisclosure';
 import PrimaryButton from '../components/PrimaryButton';
 
 import { useBuyKeycard } from '../hooks/useBuyKeycard';
@@ -96,6 +97,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
           icon={opensInBrowser ? Icons.openInBrowser : Icons.qr}
           testID="welcome-buy-keycard"
         />
+        <AffiliateDisclosure style={styles.disclosure} />
         <PrimaryButton
           label="Get started"
           onPress={handleGetStarted}
@@ -167,5 +169,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     backgroundColor: theme.colors.background,
     gap: 8,
+  },
+  disclosure: {
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
 });

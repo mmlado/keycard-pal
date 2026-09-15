@@ -3,6 +3,11 @@ import { Linking } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import WelcomeScreen from '../src/screens/WelcomeScreen';
+import {
+  AFFILIATE_DISCLOSURE,
+  BUY_KEYCARD_LABEL,
+  KEYCARD_PURCHASE_URL,
+} from '../src/constants/keycard';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -114,9 +119,7 @@ describe('WelcomeScreen', () => {
 
     await pressBuy();
 
-    expect(Linking.openURL).toHaveBeenCalledWith(
-      'https://get.keycard.tech/vuxxnf',
-    );
+    expect(Linking.openURL).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -127,8 +130,9 @@ describe('WelcomeScreen', () => {
     await pressBuy();
 
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
-      url: 'https://get.keycard.tech/vuxxnf',
-      title: 'Buy a Keycard',
+      url: KEYCARD_PURCHASE_URL,
+      title: BUY_KEYCARD_LABEL,
+      note: AFFILIATE_DISCLOSURE,
     });
     expect(Linking.openURL).not.toHaveBeenCalled();
   });
@@ -137,5 +141,6 @@ describe('WelcomeScreen', () => {
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
     expect(screen.getByText('Buy a Keycard')).toBeTruthy();
+    expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
   });
 });

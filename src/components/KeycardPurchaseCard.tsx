@@ -1,20 +1,20 @@
-import { useCallback } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { Icons } from '../assets/icons';
 import { APP_NAME } from '@/constants/app';
-import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
+import { BUY_KEYCARD_LABEL } from '../constants/keycard';
 import theme from '../theme';
 
+import AffiliateDisclosure from './AffiliateDisclosure';
 import PrimaryButton from './PrimaryButton';
+
+import { useBuyKeycard } from '@/hooks/useBuyKeycard';
 
 type KeycardPurchaseCardProps = {
   buttonTestID?: string;
   closeButtonTestID?: string;
-  qrButtonTestID?: string;
   onClose?: () => void;
-  onShowQR?: () => void;
 };
 
 const keycardPurchaseTitle = 'Keycard required';
@@ -23,13 +23,13 @@ const keycardPurchaseDescription = `${APP_NAME} requires a Keycard hardware wall
 export default function KeycardPurchaseCard({
   buttonTestID,
   closeButtonTestID,
-  qrButtonTestID,
   onClose,
-  onShowQR,
 }: KeycardPurchaseCardProps) {
-  const handlePressPurchase = useCallback(() => {
-    Linking.openURL(KEYCARD_PURCHASE_URL);
-  }, []);
+  // Through the hook, never Linking directly. openURL fires an external
+  // intent and needs no INTERNET permission of its own, so calling it here
+  // sent the offline build to a browser, which is what that flavour exists
+  // to avoid. The hook routes to the QR screen instead.
+  const { buyKeycard, opensInBrowser } = useBuyKeycard();
 
   return (
     <View style={styles.card}>
@@ -54,25 +54,13 @@ export default function KeycardPurchaseCard({
 
       <View style={styles.button}>
         <PrimaryButton
-          label="Buy a Keycard"
-          onPress={handlePressPurchase}
-          icon={Icons.openInBrowser}
+          label={BUY_KEYCARD_LABEL}
+          onPress={buyKeycard}
+          icon={opensInBrowser ? Icons.openInBrowser : Icons.qr}
           testID={buttonTestID}
         />
-        {onShowQR ? (
-          <Pressable
-            style={styles.qrIconButton}
-            onPress={onShowQR}
-            testID={qrButtonTestID}
-          >
-            <Icons.qr
-              width={22}
-              height={22}
-              color={theme.colors.onSurfaceMuted}
-            />
-          </Pressable>
-        ) : null}
       </View>
+      <AffiliateDisclosure style={styles.disclosure} />
     </View>
   );
 }
@@ -115,7 +103,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  qrIconButton: {
-    padding: 8,
+  disclosure: {
+    textAlign: 'center',
   },
 });
