@@ -3,6 +3,11 @@ import { Linking } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import KeycardSettingsSection from '../src/components/settings/KeycardSettingsSection';
+import {
+  AFFILIATE_DISCLOSURE,
+  BUY_KEYCARD_LABEL,
+  KEYCARD_PURCHASE_URL,
+} from '../src/constants/keycard';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -40,7 +45,7 @@ jest.mock('../src/navigation/navigationRef', () => ({
   },
 }));
 
-const PURCHASE_URL = 'https://get.keycard.tech/vuxxnf';
+const PURCHASE_URL = KEYCARD_PURCHASE_URL;
 
 async function pressRow() {
   await act(async () => {
@@ -63,6 +68,7 @@ describe('KeycardSettingsSection', () => {
   it('renders the Buy a Keycard row', () => {
     render(<KeycardSettingsSection />);
     expect(screen.getByText('Buy a Keycard')).toBeTruthy();
+    expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
   });
 
   describe('with a network connection (online build)', () => {
@@ -96,7 +102,8 @@ describe('KeycardSettingsSection', () => {
       await pressRow();
       expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
         url: PURCHASE_URL,
-        title: 'Buy a Keycard',
+        title: BUY_KEYCARD_LABEL,
+        note: AFFILIATE_DISCLOSURE,
       });
       expect(Linking.openURL).not.toHaveBeenCalled();
     });

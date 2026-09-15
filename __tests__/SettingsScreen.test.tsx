@@ -3,6 +3,11 @@ import { Linking, Platform } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import SettingsScreen, { dashboardEntry } from '../src/screens/SettingsScreen';
+import {
+  AFFILIATE_DISCLOSURE,
+  BUY_KEYCARD_LABEL,
+  KEYCARD_PURCHASE_URL,
+} from '../src/constants/keycard';
 
 // ---------------------------------------------------------------------------
 // Mocks — every other section is a stub so this test only proves the screen
@@ -104,6 +109,7 @@ describe('SettingsScreen', () => {
     expect(rendered.indexOf('Buy a Keycard')).toBeLessThan(
       rendered.indexOf('Layout'),
     );
+    expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
   });
 
   it('renders on Android with the height keyboard behaviour', () => {
@@ -127,9 +133,7 @@ describe('SettingsScreen', () => {
   it('offers the Keycard purchase link in the browser when there is a network', async () => {
     renderScreen();
     await pressBuy();
-    expect(Linking.openURL).toHaveBeenCalledWith(
-      'https://get.keycard.tech/vuxxnf',
-    );
+    expect(Linking.openURL).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
   });
 
   it('offers the Keycard purchase link as a QR code without a network (always in the offline build)', async () => {
@@ -137,8 +141,9 @@ describe('SettingsScreen', () => {
     renderScreen();
     await pressBuy();
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
-      url: 'https://get.keycard.tech/vuxxnf',
-      title: 'Buy a Keycard',
+      url: KEYCARD_PURCHASE_URL,
+      title: BUY_KEYCARD_LABEL,
+      note: AFFILIATE_DISCLOSURE,
     });
     expect(Linking.openURL).not.toHaveBeenCalled();
   });

@@ -2,6 +2,11 @@ import { Linking } from 'react-native';
 import { act, renderHook } from '@testing-library/react-native';
 
 import { useBuyKeycard } from '../src/hooks/useBuyKeycard';
+import {
+  AFFILIATE_DISCLOSURE,
+  BUY_KEYCARD_LABEL,
+  KEYCARD_PURCHASE_URL,
+} from '../src/constants/keycard';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -23,7 +28,7 @@ jest.mock('../src/navigation/navigationRef', () => ({
   },
 }));
 
-const PURCHASE_URL = 'https://get.keycard.tech/vuxxnf';
+const PURCHASE_URL = KEYCARD_PURCHASE_URL;
 
 describe('useBuyKeycard', () => {
   beforeEach(() => {
@@ -56,7 +61,8 @@ describe('useBuyKeycard', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
       url: PURCHASE_URL,
-      title: 'Buy a Keycard',
+      title: BUY_KEYCARD_LABEL,
+      note: AFFILIATE_DISCLOSURE,
     });
     expect(Linking.openURL).not.toHaveBeenCalled();
     expect(result.current.opensInBrowser).toBe(false);

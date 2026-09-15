@@ -11,7 +11,7 @@ import { Icons } from '../assets/icons';
 import PrimaryButton from '../components/PrimaryButton';
 
 export default function UrlQRScreen({ route, navigation }: UrlQRScreenProps) {
-  const { url, title } = route.params;
+  const { url, title, note } = route.params;
   const insets = useSafeAreaInsets();
 
   useLayoutEffect(() => {
@@ -38,6 +38,11 @@ export default function UrlQRScreen({ route, navigation }: UrlQRScreenProps) {
         <Text selectable style={styles.url}>
           {url}
         </Text>
+        {note ? (
+          <Text style={styles.note} testID="url-qr-note">
+            {note}
+          </Text>
+        ) : null}
       </View>
       <PrimaryButton label="Copy URL" onPress={handleCopy} icon={Icons.copy} />
     </View>
@@ -66,6 +71,13 @@ const styles = StyleSheet.create({
   url: {
     color: theme.colors.onSurface,
     fontFamily: 'monospace',
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  note: {
+    color: theme.colors.onSurfaceMuted,
+    fontSize: 13,
+    lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 8,
   },

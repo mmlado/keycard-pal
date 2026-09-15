@@ -1,7 +1,11 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { Linking } from 'react-native';
 
-import { BUY_KEYCARD_LABEL, KEYCARD_PURCHASE_URL } from '@/constants/keycard';
+import {
+  AFFILIATE_DISCLOSURE,
+  BUY_KEYCARD_LABEL,
+  KEYCARD_PURCHASE_URL,
+} from '@/constants/keycard';
 import { navigationRef } from '@/navigation/navigationRef';
 
 import {
@@ -18,6 +22,9 @@ import {
  * so the tap is never a dead end. The offline build's connectivity stub
  * always reports disconnected, so it never calls Linking.openURL.
  * `opensInBrowser` tracks the live network state for the matching icon.
+ *
+ * The QR route carries the affiliate disclosure as `note`: offline that
+ * screen is the placement, and a caller cannot be trusted to remember it.
  *
  * Navigation goes through the container ref rather than the caller's route:
  * the NFC sheet leaves its screen before this resolves, and a popped route's
@@ -41,6 +48,7 @@ export function useBuyKeycard(): {
       navigationRef.navigate('UrlQR', {
         url: KEYCARD_PURCHASE_URL,
         title: BUY_KEYCARD_LABEL,
+        note: AFFILIATE_DISCLOSURE,
       });
     }
   }, []);
