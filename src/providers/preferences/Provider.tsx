@@ -44,6 +44,13 @@ export function PreferencesProvider({
   // Counts writes per preference so only the most recent one may roll back;
   // a slow failure must not undo a choice the user made after it.
   const writeSeqRef = useRef<Partial<Record<keyof Preferences, number>>>({});
+  // One write to a key at a time. Android's AsyncStorage runs each write as
+  // its own IO job, so two in flight can settle out of order: a failure
+  // landing before an earlier success would roll the screen back past the
+  // value that success went on to leave in storage.
+  const writeChainRef = useRef<
+    Partial<Record<keyof Preferences, Promise<void>>>
+  >({});
 
   const commit = useCallback((next: Preferences) => {
     currentRef.current = next;
@@ -74,8 +81,14 @@ export function PreferencesProvider({
       writeSeqRef.current[key] = seq;
       commit({ ...current, [key]: value });
 
+      // The stored link is the swallowed one, so a failed write still lets
+      // the next write to that key run.
+      const previous = writeChainRef.current[key] ?? Promise.resolve();
+      const write = previous.then(() => savePreference(key, value));
+      writeChainRef.current[key] = write.catch(() => {});
+
       try {
-        await savePreference(key, value);
+        await write;
         if (confirmedRef.current) {
           confirmedRef.current = { ...confirmedRef.current, [key]: value };
         }

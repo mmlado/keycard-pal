@@ -249,6 +249,9 @@ dependencies {
     // ZXing barcode scanner — Apache 2.0, zero network dependencies
     implementation("com.google.zxing:core:3.5.3")
 
+    // Splash screen: the system API on Android 12+, a backport below it
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     // CameraX (previously transitive via react-native-camera-kit, now declared explicitly)
     def camerax_version = "1.4.1"
     implementation("androidx.camera:camera-core:${camerax_version}")

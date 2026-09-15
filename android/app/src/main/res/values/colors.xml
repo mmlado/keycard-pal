@@ -1,0 +1,7 @@
+<resources>
+
+    <!-- theme.ts `background`: the splash, the window and the first JS frame all
+         paint the same black, so the handoff between them is invisible. -->
+    <color name="app_background">#121212</color>
+
+</resources>

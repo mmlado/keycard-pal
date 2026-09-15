@@ -60,6 +60,18 @@ function deferredSave() {
   return { resolve: () => resolve(), reject: (e: Error) => reject(e) };
 }
 
+/**
+ * A write that has already failed by the time the provider gets to issue it,
+ * which is how a newer write's failure can reach the provider before an older
+ * write's success.
+ */
+function failedSave() {
+  const failure = Promise.reject(new Error('storage full'));
+  // Handled here too, so the rejection is never loose while it waits its turn.
+  failure.catch(() => {});
+  mockSave.mockReturnValueOnce(failure);
+}
+
 beforeEach(() => {
   mockLoad.mockReset();
   mockSave.mockReset();
@@ -224,8 +236,10 @@ describe('PreferencesProvider', () => {
       await act(async () => {
         result.current.setPreference('dashboardLayout', 'tiles');
       });
+      // Not awaited: the second write is queued behind the first, so its
+      // promise cannot settle until the first one has.
       await act(async () => {
-        await result.current.setPreference('dashboardLayout', 'list');
+        result.current.setPreference('dashboardLayout', 'list');
       });
       await act(async () => {
         first.reject(new Error('storage full'));
@@ -280,10 +294,10 @@ describe('PreferencesProvider', () => {
       );
     });
 
-    // Same two failures, settling in the other order.
-    it('rolls back to the stored value when the newer write fails first', async () => {
+    // Two writes to one key never race: the second is issued only once the
+    // first has settled, so they cannot reach storage out of order.
+    it('holds a write to a key until the write before it settles', async () => {
       const first = deferredSave();
-      const second = deferredSave();
       const { result } = await renderPreferences();
 
       await act(async () => {
@@ -292,17 +306,36 @@ describe('PreferencesProvider', () => {
       await act(async () => {
         result.current.setPreference('tokenImagesEnabled', false);
       });
+      expect(mockSave).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        second.reject(new Error('storage full'));
+        first.resolve();
+      });
+      expect(mockSave).toHaveBeenCalledTimes(2);
+      expect(mockSave).toHaveBeenLastCalledWith('tokenImagesEnabled', false);
+    });
+
+    // The ordering is what makes the rollback land in the right place. Run
+    // unordered, the newer write's failure is handled while the older write
+    // is still in flight, so the screen goes back to the value from before
+    // either of them while storage keeps what the older write put there.
+    it('rolls a failed write back to what the write before it stored', async () => {
+      const first = deferredSave();
+      failedSave();
+      const { result } = await renderPreferences();
+
+      await act(async () => {
+        result.current.setPreference('dashboardLayout', 'tiles');
       });
       await act(async () => {
-        first.reject(new Error('storage full'));
+        result.current.setPreference('dashboardLayout', 'list');
       });
 
-      expect(result.current.preferences.tokenImagesEnabled).toBe(
-        STORED.tokenImagesEnabled,
-      );
+      await act(async () => {
+        first.resolve();
+      });
+
+      expect(result.current.preferences.dashboardLayout).toBe('tiles');
     });
 
     // A write that succeeded is what storage holds, so a later failure goes
