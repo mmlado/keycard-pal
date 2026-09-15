@@ -1,0 +1,5 @@
+# No github: entry on purpose. GitHub Sponsors' additional terms forbid raising funds
+# involving cryptocurrency, and non-subscription sponsorships require a Stripe merchant
+# account. No Keycard purchase link either: it is an affiliate link, and GitHub excludes
+# funding links used for advertising.
+custom: ['https://github.com/mmlado/keycard-pal/blob/main/DONATE.md']
