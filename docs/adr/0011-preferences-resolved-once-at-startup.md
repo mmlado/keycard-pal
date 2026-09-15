@@ -35,7 +35,10 @@ the last value storage is known to hold, not to the value the failed write
 replaced on screen: after two failed writes to one key the replaced value is
 itself an optimistic one that never reached storage, so restoring it would
 leave the app showing something the user never chose and the phone never
-stored.
+stored. For either rule to hold, writes to one key run one at a time:
+Android's AsyncStorage runs each write as its own IO job, so two in flight
+can settle out of order, and a failure landing before an earlier success
+would roll the screen back past the value that success left in storage.
 
 `preferencesStorage` exposes only `loadPreferences()` and
 `savePreference(key, value)`, typed on the `Preferences` keys. There is no
