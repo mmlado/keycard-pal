@@ -146,10 +146,9 @@ npm run lint  # ESLint
 
 ## Buy me a coffee
 
-If Keycard Pal keeps your funds safe, you can send a coffee my way.
-
-- Ethereum: `0xF665E3D58DABa87d741A347674DCc4C4b794cAc9`
-- Bitcoin: `bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf`
+If Keycard Pal keeps your funds safe, you can send a coffee my way. Addresses are in
+[DONATE.md](DONATE.md), and on the app's About screen. Donations are voluntary and nothing
+is unlocked, changed or promised in return.
 
 ## Security
 
