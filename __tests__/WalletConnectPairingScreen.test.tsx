@@ -132,7 +132,8 @@ jest.mock('keycard-sdk', () => ({
 }));
 
 jest.mock('../src/utils/hdAddress', () => ({
-  deriveAddresses: (...args: unknown[]) => mockDeriveAddresses(...args),
+  deriveAddresses: (...args: Parameters<typeof mockDeriveAddresses>) =>
+    mockDeriveAddresses(...args),
 }));
 
 jest.mock('../src/utils/ethereumAddress', () => ({

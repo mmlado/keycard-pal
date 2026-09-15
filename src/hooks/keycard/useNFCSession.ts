@@ -260,7 +260,13 @@ export default function useNFCSession(
         }
       }
     }
-  }, [onCardConnected, onTagLost, clearWatchdog, reportStatus, stopWithSuccess]);
+  }, [
+    onCardConnected,
+    onTagLost,
+    clearWatchdog,
+    reportStatus,
+    stopWithSuccess,
+  ]);
 
   // Lets the finally above re-enter the latest handler without making the
   // callback depend on itself.
