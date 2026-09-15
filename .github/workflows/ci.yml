@@ -30,6 +30,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Format check
+        run: npm run format:check
+
       - name: Run tests with coverage
         run: npm test -- --watchAll=false --coverage --coverageReporters=lcov --coverageReporters=text-summary
 

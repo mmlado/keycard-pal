@@ -1,4 +1,4 @@
-import { createPublicClient, getAddress, http } from 'viem';
+import { type Address, createPublicClient, getAddress, http } from 'viem';
 
 import {
   resolveEnsName as resolveOffline,
@@ -53,7 +53,7 @@ describe('client.online', () => {
     });
 
     it('returns confirmed name on reverse + forward match', async () => {
-      mockedGetAddress.mockImplementation((addr: string) => addr);
+      mockedGetAddress.mockImplementation(addr => addr as Address);
       mockGetEnsName.mockResolvedValue('vitalik.eth');
       mockGetEnsAddress.mockResolvedValue(address);
 
@@ -63,7 +63,7 @@ describe('client.online', () => {
     });
 
     it('returns mismatch when forward resolves to different address', async () => {
-      mockedGetAddress.mockImplementation((addr: string) => addr);
+      mockedGetAddress.mockImplementation(addr => addr as Address);
       mockGetEnsName.mockResolvedValue('vitalik.eth');
       mockGetEnsAddress.mockResolvedValue(
         '0xabcdef1234567890abcdef1234567890abcdef12',
@@ -75,7 +75,7 @@ describe('client.online', () => {
     });
 
     it('returns not-found when no reverse record', async () => {
-      mockedGetAddress.mockImplementation((addr: string) => addr);
+      mockedGetAddress.mockImplementation(addr => addr as Address);
       mockGetEnsName.mockResolvedValue(null);
 
       const result = await resolveEnsName(address, rpcUrl);
@@ -84,7 +84,7 @@ describe('client.online', () => {
     });
 
     it('returns rpc-error on network failure', async () => {
-      mockedGetAddress.mockImplementation((addr: string) => addr);
+      mockedGetAddress.mockImplementation(addr => addr as Address);
       mockGetEnsName.mockRejectedValue(new Error('network error'));
 
       const result = await resolveEnsName(address, rpcUrl);

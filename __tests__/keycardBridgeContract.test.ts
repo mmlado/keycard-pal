@@ -60,9 +60,9 @@ describe('installed react-native-keycard carries the tag-loss contract', () => {
       'stopNFCWithMessage',
     );
     expect(read('ios/Keycard.mm')).toContain('stopNFCWithSuccessMessage:');
-    expect(read('android/src/main/java/com/keycard/KeycardModule.kt')).toContain(
-      'override fun stopNFCWithMessage',
-    );
+    expect(
+      read('android/src/main/java/com/keycard/KeycardModule.kt'),
+    ).toContain('override fun stopNFCWithMessage');
   });
 
   it('built lib wraps APDUResponse construction inside the try', () => {
