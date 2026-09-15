@@ -3,6 +3,16 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 
+/// theme.ts `background`. LaunchScreen.storyboard and the Android splash paint
+/// the same colour, so every hand-over on the way to the first JS frame is
+/// invisible.
+private let appBackground = UIColor(
+  red: 0x12 / 255.0,
+  green: 0x12 / 255.0,
+  blue: 0x12 / 255.0,
+  alpha: 1
+)
+
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
   var window: UIWindow?
@@ -28,6 +38,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       in: window,
       launchOptions: launchOptions
     )
+
+    // React Native paints its root view `systemBackground`, which is white on a
+    // phone set to light appearance. The app is dark only, so that white would
+    // show from the moment the launch screen goes away until JavaScript mounts
+    // its first component: the very gap the launch screen exists to cover. The
+    // window is not on screen until this method returns, so repainting it here
+    // is still ahead of the first frame.
+    window?.rootViewController?.view.backgroundColor = appBackground
 
     return true
   }
