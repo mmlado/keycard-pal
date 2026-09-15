@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-15
+
 ### Added
 
 - Launch now paints the app background from the first frame until the loading screen takes over, on both platforms; iOS no longer shows a white launch screen
@@ -343,7 +345,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.9.3...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/mmlado/keycard-pal/compare/v1.9.3...v1.10.0
 [1.9.3]: https://github.com/mmlado/keycard-pal/compare/v1.9.2...v1.9.3
 [1.9.2]: https://github.com/mmlado/keycard-pal/compare/v1.9.1...v1.9.2
 [1.9.1]: https://github.com/mmlado/keycard-pal/compare/v1.9.0...v1.9.1
