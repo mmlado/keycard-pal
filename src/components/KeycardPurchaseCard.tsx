@@ -25,10 +25,10 @@ export default function KeycardPurchaseCard({
   closeButtonTestID,
   onClose,
 }: KeycardPurchaseCardProps) {
-  // Through the hook, never Linking directly: the offline build has no
-  // INTERNET permission and its connectivity stub always reports
-  // disconnected, so openURL here was a dead end. The hook falls back to
-  // the QR screen, which is the only working path for an air-gapped user.
+  // Through the hook, never Linking directly. openURL fires an external
+  // intent and needs no INTERNET permission of its own, so calling it here
+  // sent the offline build to a browser, which is what that flavour exists
+  // to avoid. The hook routes to the QR screen instead.
   const { buyKeycard, opensInBrowser } = useBuyKeycard();
 
   return (

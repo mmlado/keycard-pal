@@ -19,34 +19,37 @@ export default function KeycardSettingsSection() {
   const Icon = opensInBrowser ? Icons.openInBrowser : Icons.qr;
 
   return (
-    <Pressable
-      style={styles.row}
-      onPress={buyKeycard}
-      accessibilityRole="link"
-      accessibilityLabel={BUY_KEYCARD_LABEL}
-      testID="settings-buy-keycard"
-    >
-      <View style={styles.labelColumn}>
+    <View style={styles.section}>
+      <Pressable
+        style={styles.row}
+        onPress={buyKeycard}
+        accessibilityRole="link"
+        accessibilityLabel={BUY_KEYCARD_LABEL}
+        testID="settings-buy-keycard"
+      >
         <Text variant="bodyMedium" style={styles.label}>
           {BUY_KEYCARD_LABEL}
         </Text>
-        <AffiliateDisclosure short />
-      </View>
-      <Icon width={20} height={20} color={theme.colors.onSurfaceMuted} />
-    </Pressable>
+        <Icon width={20} height={20} color={theme.colors.onSurfaceMuted} />
+      </Pressable>
+      {/* Outside the Pressable on purpose: a disclosure is a label, and
+          tapping it must not open the shop it is disclosing. */}
+      <AffiliateDisclosure short />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  section: {
+    gap: 2,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-  },
-  labelColumn: {
-    flex: 1,
-    gap: 2,
+    // Matches the height of the Switch in SettingsToggleRow.
+    minHeight: 31,
   },
   label: {
     color: theme.colors.onSurface,

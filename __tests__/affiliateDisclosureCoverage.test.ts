@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import ts from 'typescript';
 
 /**
  * Every surface that shows the affiliate link must show the disclosure next
@@ -33,6 +34,39 @@ const ALLOWLIST: Record<string, string> = {
     'builds onBuyKeycard and hands it to NFCSheet and NFCError, both of which label it',
 };
 
+/**
+ * True only if the file RENDERS <AffiliateDisclosure />. Importing it, or
+ * naming it in a comment, does not count: a placement that imports the
+ * component and forgets to render it is exactly the bug this guard exists
+ * to catch, so the check has to look at JSX rather than at text.
+ */
+function rendersDisclosure(source: string, fileName: string): boolean {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) {
+      return;
+    }
+    if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
+      if (node.tagName.getText(sourceFile) === 'AffiliateDisclosure') {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(sourceFile, visit);
+
+  return found;
+}
+
 function walk(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const full = path.join(dir, entry.name);
@@ -56,12 +90,35 @@ describe('affiliate disclosure coverage', () => {
     const touchesAffiliate = AFFILIATE_MARKERS.some(marker =>
       source.includes(marker),
     );
-    if (touchesAffiliate && !source.includes('AffiliateDisclosure')) {
+    if (touchesAffiliate && !rendersDisclosure(source, file)) {
       offenders.push(relative);
     }
   }
 
   it('every file that surfaces the affiliate link also renders a disclosure', () => {
     expect(offenders).toEqual([]);
+  });
+
+  it('does not accept an import without a render', () => {
+    const importedButUnused = [
+      "import AffiliateDisclosure from '@/components/AffiliateDisclosure';",
+      'export function Buy() {',
+      '  return <Text>{BUY_KEYCARD_LABEL}</Text>;',
+      '}',
+    ].join('\n');
+
+    expect(rendersDisclosure(importedButUnused, 'Buy.tsx')).toBe(false);
+    expect(
+      rendersDisclosure('const x = <AffiliateDisclosure short />;', 'x.tsx'),
+    ).toBe(true);
+  });
+
+  it('does not accept the name in a comment or a string', () => {
+    expect(
+      rendersDisclosure('// TODO: add AffiliateDisclosure here', 'c.tsx'),
+    ).toBe(false);
+    expect(rendersDisclosure('const s = "AffiliateDisclosure";', 's.tsx')).toBe(
+      false,
+    );
   });
 });
