@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../assets/icons';
 import { APP_NAME, PROJECT_GITHUB_URL } from '@/constants/app';
-import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
 import type { LicenseEntry } from '../data/licenses';
 import type { AboutScreenProps, DashboardAction } from '../navigation/types';
 import theme from '../theme';
@@ -84,14 +83,7 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
         </Pressable>
       </View>
 
-      <KeycardPurchaseCard
-        onShowQR={() =>
-          navigation.navigate('UrlQR', {
-            url: KEYCARD_PURCHASE_URL,
-            title: 'Buy a Keycard',
-          })
-        }
-      />
+      <KeycardPurchaseCard />
 
       <DonationSection
         onShowQR={(label, address) =>

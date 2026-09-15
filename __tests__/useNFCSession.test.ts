@@ -544,7 +544,6 @@ describe('useNFCSession', () => {
         expect(mockStopNFC).toHaveBeenCalled();
         expect(mockStopNFCWithMessage).not.toHaveBeenCalled();
       });
-
     });
 
     it('ignores card connected when phase is done', async () => {
