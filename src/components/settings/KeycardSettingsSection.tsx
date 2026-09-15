@@ -1,9 +1,11 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { Icons } from '@/assets/icons';
 import { BUY_KEYCARD_LABEL } from '@/constants/keycard';
 import theme from '@/theme';
+
+import AffiliateDisclosure from '@/components/AffiliateDisclosure';
 
 import { useBuyKeycard } from '@/hooks/useBuyKeycard';
 
@@ -24,9 +26,12 @@ export default function KeycardSettingsSection() {
       accessibilityLabel={BUY_KEYCARD_LABEL}
       testID="settings-buy-keycard"
     >
-      <Text variant="bodyMedium" style={styles.label}>
-        {BUY_KEYCARD_LABEL}
-      </Text>
+      <View style={styles.labelColumn}>
+        <Text variant="bodyMedium" style={styles.label}>
+          {BUY_KEYCARD_LABEL}
+        </Text>
+        <AffiliateDisclosure short />
+      </View>
       <Icon width={20} height={20} color={theme.colors.onSurfaceMuted} />
     </Pressable>
   );
@@ -37,8 +42,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // Matches the height of the Switch in SettingsToggleRow.
-    minHeight: 31,
+    gap: 12,
+  },
+  labelColumn: {
+    flex: 1,
+    gap: 2,
   },
   label: {
     color: theme.colors.onSurface,

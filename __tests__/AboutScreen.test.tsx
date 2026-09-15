@@ -14,6 +14,23 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockUseNavigationNavigate }),
 }));
 
+// The purchase card routes through useBuyKeycard, which reaches the
+// container ref rather than the screen's own navigation object.
+let mockConnected = true;
+jest.mock('../src/utils/connectivity.online', () => ({
+  getNetworkConnected: () => mockConnected,
+  subscribeNetworkConnected: () => () => {},
+  isNetworkConnected: () => Promise.resolve(mockConnected),
+}));
+
+const mockRefNavigate = jest.fn();
+jest.mock('../src/navigation/navigationRef', () => ({
+  navigationRef: {
+    isReady: () => true,
+    navigate: (...args: any[]) => mockRefNavigate(...args),
+  },
+}));
+
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
   return {

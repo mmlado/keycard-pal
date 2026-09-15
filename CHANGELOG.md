@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Launch now paints the app background from the first frame until the loading screen takes over, on both platforms; iOS no longer shows a white launch screen
 - Layout setting: choose tiles or a list for every menu screen with a two-icon control in Settings. Tiles is the default
 - Buy-a-Keycard link in Settings and on the tap-your-Keycard prompt; opens the browser when the phone has a network connection, otherwise shows the link as a QR code (always a QR code in the offline build)
+- Advertisement label next to every Buy a Keycard link, in the app, the README and the store listing
 
 ### Changed
 
@@ -29,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Scanning a SeedQR while importing a recovery phrase now asks for camera permission instead of opening a blank viewfinder, and the keyboard no longer covers the viewfinder
 - The PIN keypad's bottom row (the 0 key) was hidden behind the Android navigation. The keypad now sits above it in both 3-button and gesture navigation
+- Buy a Keycard on the About screen opened a browser even in the offline build; it now shows the link as a QR code like every other buy link
 
 ## [1.9.3] - 2026-09-04
 
