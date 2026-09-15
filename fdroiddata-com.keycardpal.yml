@@ -39,9 +39,9 @@ RepoType: git
 Repo: https://github.com/mmlado/keycard-pal
 
 Builds:
-  - versionName: 1.9.3
-    versionCode: 10903
-    commit: v1.9.3
+  - versionName: 1.10.0
+    versionCode: 11000
+    commit: v1.10.0
     subdir: android/app
     sudo:
       - apt-get install -y openjdk-17-jdk
@@ -60,5 +60,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.9.3
-CurrentVersionCode: 10903
+CurrentVersion: 1.10.0
+CurrentVersionCode: 11000
