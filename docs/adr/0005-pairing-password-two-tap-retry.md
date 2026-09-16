@@ -1,7 +1,14 @@
 # ADR 0005: Two-tap retry for custom pairing password
 
 **Date:** 2026-06-07
-**Status:** Accepted
+**Status:** Superseded by [0012](0012-dual-generation-keycard-support.md)
+
+> Superseded 2026-09-16. The two-tap flow below still describes what happens on a
+> Secure Channel V1 card, and the constraint it records (the NFC layer cannot keep
+> a session alive across input) still holds. ADR-0012 generalises it: pairing does
+> not exist on applet 4.0, and "identify on the first tap, operate on the second"
+> became the pattern for every operation a card's generation does not support,
+> rather than a one-off for the pairing password.
 
 ## Context
 
