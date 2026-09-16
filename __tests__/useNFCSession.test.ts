@@ -656,6 +656,56 @@ describe('useNFCSession', () => {
     });
   });
 
+  describe('minimum applet version', () => {
+    const TOO_OLD =
+      'This Keycard runs applet 3.0. Keycard Pal needs applet 3.1 or newer.';
+
+    // The real SDK assigns applicationInfo inside select(), so the mock does
+    // the same rather than handing the hook a pre-built command set.
+    function selectReturning(applicationInfo: object) {
+      mockSelect.mockImplementation(function (this: {
+        applicationInfo?: object;
+      }) {
+        this.applicationInfo = applicationInfo;
+        return Promise.resolve({ sw: 0x9000 });
+      });
+    }
+
+    async function tapCard() {
+      const hook = makeHook();
+      await act(async () => {
+        hook.result.current.startNFC();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return hook;
+    }
+
+    it('refuses a card below 3.1 before the operation sees it', async () => {
+      selectReturning({ appVersion: 0x0300 });
+      const { result } = await tapCard();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(TOO_OLD);
+      expect(mockStopNFCWithError).toHaveBeenCalledWith(TOO_OLD);
+      expect(mockOnCardConnected).not.toHaveBeenCalled();
+    });
+
+    it('hands a 3.1 card to the operation', async () => {
+      selectReturning({ appVersion: 0x0301 });
+      const { result } = await tapCard();
+      expect(mockOnCardConnected).toHaveBeenCalled();
+      expect(result.current.phase).toBe('done');
+    });
+
+    it('does not refuse a card that reports no version', async () => {
+      selectReturning({});
+      const { result } = await tapCard();
+      expect(mockOnCardConnected).toHaveBeenCalled();
+      expect(result.current.phase).toBe('done');
+    });
+  });
+
   describe('NFC events', () => {
     it('user-cancelled resets to idle when in nfc phase', async () => {
       const { result } = makeHook();

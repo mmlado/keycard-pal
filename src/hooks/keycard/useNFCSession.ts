@@ -4,6 +4,11 @@ import RNKeycard from 'react-native-keycard';
 import Keycard from 'keycard-sdk';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
+import {
+  formatAppletVersion,
+  isBelowMinimumVersion,
+  MIN_SUPPORTED_APPLET_VERSION,
+} from '@/utils/cardGeneration';
 import { isTagLostError } from '@/utils/keycardErrors';
 
 export type NFCSessionPhase = 'idle' | 'nfc' | 'done' | 'error';
@@ -216,6 +221,18 @@ export default function useNFCSession(
       // Forward progress: only a successful SELECT resets the loss bound. A card
       // that connects and instantly drops must not reset it (R11).
       tagLossCountRef.current = 0;
+
+      // Every card operation passes through here, so this is the one place the
+      // floor is enforced. Only a reported version below it is refused: an
+      // uninitialized 3.x card reports none and goes on to initialization.
+      const appInfo = cmdSet.applicationInfo;
+      if (appInfo && isBelowMinimumVersion(appInfo)) {
+        const found = formatAppletVersion(appInfo.appVersion);
+        const needed = formatAppletVersion(MIN_SUPPORTED_APPLET_VERSION);
+        throw new Error(
+          `This Keycard runs applet ${found}. Keycard Pal needs applet ${needed} or newer.`,
+        );
+      }
 
       await onCardConnected(cmdSet, reportStatus);
       outcome = 'done';
