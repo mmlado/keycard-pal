@@ -92,9 +92,12 @@ a second type that would need the field too.
 - `KeycardLogScreen` is deleted. It was unreachable (absent from the route table
   and from the param list, imported by nothing) and predates every current
   convention. A card info screen replaces it, built the supported way.
-- Generation vocabulary stays out of the UI. Shell has no user-visible string
-  naming a version or a channel, and the user's word for the trust verdict is
-  "genuine". Pal follows that.
+- The words "generation" and "secure channel" stay out of the UI, and the
+  user's word for the trust verdict is "genuine", as in shell. Applet versions
+  are shown, though, where shell shows none: as major.minor on the card info
+  screen, in the Settings picker, and in the message refusing a card below the
+  floor, because telling the user which card they hold is the point of those
+  surfaces.
 
 ## Revisit if
 
