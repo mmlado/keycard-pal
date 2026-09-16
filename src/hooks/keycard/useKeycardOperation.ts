@@ -162,7 +162,9 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         }
         throw e;
       }
-      const pairing = cmdSet.getPairing();
+      // Nullable since SDK 4, because Secure Channel V2 has no pairing. A V1
+      // autoPair that returned without throwing always leaves one.
+      const pairing = cmdSet.getPairing()!;
       console.log(
         `[Keycard] autoPair OK (index: ${pairing.pairingIndex}), saving to storage`,
       );
