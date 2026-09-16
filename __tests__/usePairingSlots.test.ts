@@ -115,7 +115,7 @@ describe('usePairingSlots', () => {
         totalSlots: 10,
         freeSlots: 7,
         ourSlotIndex: 3,
-        cardUid: 'abcd',
+        cardKey: 'abcd',
       });
       expect(mockLoadPairing).toHaveBeenCalledWith('abcd');
     });
@@ -162,6 +162,23 @@ describe('usePairingSlots', () => {
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe(
         'No application info in SELECT response',
+      );
+    });
+
+    it('transitions to error when the card is not initialized', async () => {
+      (mockCmdSet as any).applicationInfo = { initializedCard: false };
+      const { result } = renderHook(() => usePairingSlots());
+
+      await act(async () => {
+        result.current.checkSlots();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard is not initialized. Initialize it first.',
       );
     });
   });
@@ -229,7 +246,7 @@ describe('usePairingSlots', () => {
         totalSlots: 10,
         freeSlots: 5,
         ourSlotIndex: 2,
-        cardUid: 'abcd',
+        cardKey: 'abcd',
       });
     });
   });

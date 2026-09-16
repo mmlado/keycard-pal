@@ -9,9 +9,9 @@ import RNKeycard from 'react-native-keycard';
 
 import { PAIRING_PASSWORD } from '@/constants/keycard';
 import { loadPairing, savePairing } from '@/storage/pairingStorage';
+import { getCardKey } from '@/utils/cardIdentity';
 import { pubKeyFingerprint } from '@/utils/cryptoAccount';
 import { checkGenuine } from '@/utils/genuineCheck';
-import { toHex } from '@/utils/hex';
 import { isTagLostError } from '@/utils/keycardErrors';
 import { displayKeycardName, parseKeycardName } from '@/utils/keycardName';
 import {
@@ -86,10 +86,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   >(null);
   const customPairingPasswordRef = useRef<string | null>(null);
 
-  // Genuine check: non-genuine cards need explicit per-UID approval.
+  // Genuine check: non-genuine cards need explicit per-card approval.
   const [showGenuineWarning, setShowGenuineWarning] = useState(false);
-  const approvedNonGenuineUidsRef = useRef<Set<string>>(new Set());
-  const pendingGenuineUidRef = useRef<string | null>(null);
+  const approvedNonGenuineCardKeysRef = useRef<Set<string>>(new Set());
+  const pendingGenuineCardKeyRef = useRef<string | null>(null);
 
   const pinRef = useRef('');
   /** True once this PIN has been accepted by the card in this session, which
@@ -136,7 +136,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   // Runs autoPair. Returns true on success (pairing saved), false if
   // interrupted for pairing password entry.
   const runAutoPair = useCallback(
-    async (cmdSet: Commandset, uid: string): Promise<boolean> => {
+    async (cmdSet: Commandset, cardKey: string): Promise<boolean> => {
       const password = customPairingPasswordRef.current;
       try {
         await cmdSet.autoPair(password ?? PAIRING_PASSWORD);
@@ -168,7 +168,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       console.log(
         `[Keycard] autoPair OK (index: ${pairing.pairingIndex}), saving to storage`,
       );
-      await savePairing(uid, pairing);
+      await savePairing(cardKey, pairing);
       return true;
     },
     [],
@@ -179,18 +179,21 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const checkOrSkipGenuine = useCallback(
     async (
       cmdSet: Commandset,
-      uid: string,
+      cardKey: string,
       hasExistingPairing: boolean,
       setStatus: (s: string) => void,
     ): Promise<boolean> => {
-      if (hasExistingPairing || approvedNonGenuineUidsRef.current.has(uid)) {
+      if (
+        hasExistingPairing ||
+        approvedNonGenuineCardKeysRef.current.has(cardKey)
+      ) {
         return true;
       }
       setStatus('Verifying card...');
       const isGenuine = await checkGenuine(cmdSet);
       if (!isGenuine) {
         console.log('[Keycard] Genuine check failed, showing warning');
-        pendingGenuineUidRef.current = uid;
+        pendingGenuineCardKeyRef.current = cardKey;
         setShowGenuineWarning(true);
         return false;
       }
@@ -203,7 +206,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const doPairAndExecute = useCallback(
     async (
       cmdSet: Commandset,
-      uid: string,
+      cardKey: string,
       existingPairing: InstanceType<typeof Keycard.Pairing> | null,
       setStatus: (s: string) => void,
       name: string,
@@ -226,7 +229,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         // throw path the session clears the flag in the next startNFC/reset.
         const retryUnsafeRef = retryUnsafeHolderRef.current;
         if (retryUnsafeRef) retryUnsafeRef.current = true;
-        const paired = await runAutoPair(cmdSet, uid);
+        const paired = await runAutoPair(cmdSet, cardKey);
         if (retryUnsafeRef) retryUnsafeRef.current = false;
         if (!paired) return null;
       }
@@ -318,9 +321,14 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         throw new Error('No application info in SELECT response');
       }
 
-      const uid = toHex(appInfo.instanceUID);
+      const cardKey = getCardKey(appInfo);
+      if (cardKey === null) {
+        throw new Error(
+          'This Keycard is not initialized. Initialize it first.',
+        );
+      }
       console.log(
-        `[Keycard] SELECT OK — UID: ${uid}, initialized: ${appInfo.initializedCard}, ` +
+        `[Keycard] SELECT OK — card key: ${cardKey}, initialized: ${appInfo.initializedCard}, ` +
           `freePairingSlots: ${
             appInfo.freePairingSlots
           }, hasMasterKey: ${appInfo.hasMasterKey()}`,
@@ -342,10 +350,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       setCardName(name);
       setStatus(`Connected to ${displayKeycardName(name)}`);
 
-      const existingPairing = await loadPairing(uid);
+      const existingPairing = await loadPairing(cardKey);
       const shouldProceed = await checkOrSkipGenuine(
         cmdSet,
-        uid,
+        cardKey,
         !!existingPairing,
         setStatus,
       );
@@ -353,7 +361,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
 
       return await doPairAndExecute(
         cmdSet,
-        uid,
+        cardKey,
         existingPairing,
         setStatus,
         name,
@@ -461,10 +469,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
 
   // Approves the pending non-genuine card and starts the second tap.
   const proceedWithNonGenuine = useCallback(() => {
-    const uid = pendingGenuineUidRef.current;
-    if (uid) {
-      approvedNonGenuineUidsRef.current.add(uid);
-      pendingGenuineUidRef.current = null;
+    const cardKey = pendingGenuineCardKeyRef.current;
+    if (cardKey) {
+      approvedNonGenuineCardKeysRef.current.add(cardKey);
+      pendingGenuineCardKeyRef.current = null;
     }
     setShowGenuineWarning(false);
     startNFC();
@@ -492,7 +500,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     operationRef.current = null;
     operationRunningRef.current = false;
     setShowGenuineWarning(false);
-    pendingGenuineUidRef.current = null;
+    pendingGenuineCardKeyRef.current = null;
     setWaitingForPairingPassword(false);
     setPairingPasswordError(null);
     customPairingPasswordRef.current = null;

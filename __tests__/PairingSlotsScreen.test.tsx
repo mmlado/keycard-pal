@@ -140,7 +140,7 @@ function makeCheckHook(
     totalSlots: number;
     freeSlots: number;
     ourSlotIndex: number | null;
-    cardUid: string;
+    cardKey: string;
   } | null = null,
 ) {
   return {
@@ -212,7 +212,7 @@ describe('PairingSlotsScreen', () => {
         totalSlots: 10,
         freeSlots: 7,
         ourSlotIndex: 3,
-        cardUid: 'abcd',
+        cardKey: 'abcd',
       };
       renderScreen('done', slotInfo);
       expect(mockCheckSlots).not.toHaveBeenCalled();
@@ -252,7 +252,7 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('renders slot summary', () => {
@@ -279,7 +279,7 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('shows ConfirmPrompt with correct slot number when a row is pressed', () => {
@@ -390,7 +390,7 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('resets unpair hook and resets NFC state when unpair finishes', () => {
@@ -430,7 +430,7 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('shows snackbar with slot number after unpair operation runs', async () => {

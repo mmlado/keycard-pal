@@ -1,6 +1,3 @@
-/* eslint-disable no-bitwise */
-import { ApplicationInfo } from 'keycard-sdk/dist/application-info';
-
 import {
   appletVersion,
   cardGeneration,
@@ -8,51 +5,10 @@ import {
   GENERATIONS,
   isBelowMinimumVersion,
   MIN_SUPPORTED_APPLET_VERSION,
+  secureChannelVersion,
 } from '../src/utils/cardGeneration';
 
-function tlv(tag: number, value: number[]): number[] {
-  return [tag, value.length, ...value];
-}
-
-function filler(length: number): number[] {
-  return new Array(length).fill(0x01);
-}
-
-function versionBytes(version: number): number[] {
-  return [version >> 8, version & 0xff];
-}
-
-/** An initialized 3.x SELECT response: instance UID, secure channel key,
- *  version, free pairing slots, key UID, capabilities. */
-function v3Select(version: number): ApplicationInfo {
-  const body = [
-    ...tlv(0x8f, filler(16)),
-    ...tlv(0x80, filler(65)),
-    ...tlv(0x02, versionBytes(version)),
-    ...tlv(0x02, [5]),
-    ...tlv(0x8e, []),
-    ...tlv(0x8d, [0x1f]),
-  ];
-  return new ApplicationInfo(new Uint8Array(tlv(0xa4, body)));
-}
-
-/** A 4.0 SELECT response: version, status, key UID, capabilities,
- *  certificate. No instance UID, no secure channel key, no pairing slots. */
-function v4Select(version: number, status = 0x13): ApplicationInfo {
-  const body = [
-    ...tlv(0x02, versionBytes(version)),
-    ...tlv(0x8c, [status]),
-    ...tlv(0x8e, []),
-    ...tlv(0x8d, [0x1f]),
-    ...tlv(0x8a, filler(98)),
-  ];
-  return new ApplicationInfo(new Uint8Array(tlv(0xa4, body)));
-}
-
-/** An uninitialized 3.x card answers with a bare secure channel key. */
-function blankV3Select(): ApplicationInfo {
-  return new ApplicationInfo(new Uint8Array(tlv(0x80, filler(65))));
-}
+import { blankV3Select, v3Select, v4Select } from './selectResponse.testUtils';
 
 describe('formatAppletVersion', () => {
   it('renders major.minor', () => {
@@ -105,7 +61,7 @@ describe('cardGeneration', () => {
   });
 
   it('puts a blank 4.0 card in the 4.0 generation, since it still reports a version', () => {
-    expect(cardGeneration(v4Select(0x0400, 0x00))).toBe('4.0');
+    expect(cardGeneration(v4Select(0x0400, { status: 0x00 }))).toBe('4.0');
   });
 
   it('puts a newer applet in the newest known generation', () => {
@@ -126,5 +82,20 @@ describe('isBelowMinimumVersion', () => {
 
   it('does not refuse an uninitialized 3.x card', () => {
     expect(isBelowMinimumVersion(blankV3Select())).toBe(false);
+  });
+});
+
+describe('secureChannelVersion', () => {
+  it('is V1 below applet 4.0', () => {
+    expect(secureChannelVersion(v3Select(0x0302))).toBe('v1');
+  });
+
+  it('is V2 from applet 4.0, including newer applets', () => {
+    expect(secureChannelVersion(v4Select(0x0400))).toBe('v2');
+    expect(secureChannelVersion(v4Select(0x0500))).toBe('v2');
+  });
+
+  it('is V1 for an uninitialized 3.x card, which reports no version', () => {
+    expect(secureChannelVersion(blankV3Select())).toBe('v1');
   });
 });

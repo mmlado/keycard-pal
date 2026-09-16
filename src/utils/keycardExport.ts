@@ -1,8 +1,8 @@
 import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
+import { getKeyUid } from './cardIdentity';
 import { pubKeyFingerprint } from './cryptoAccount';
-import { toHex } from './hex';
 
 /** One key an export target wants: the path to export and the parent path its fingerprint comes from. */
 export type ExportPlanEntry = {
@@ -26,13 +26,15 @@ export type ExportKeysResult<E extends ExportPlanEntry = ExportPlanEntry> = {
  * Checkpoint for resuming a multi-key export after a mid-operation tag loss:
  * the session handshake (SELECT, pairing, secure channel, PIN) must re-run on
  * every tap, but exported keys are deterministic reads, so keys fetched before
- * the loss are reused and only the remainder is fetched. Bound to one physical
- * card: the re-tap may be a DIFFERENT card, and merging keys from two cards
- * would corrupt the export, so the cache self-invalidates on a UID change.
+ * the loss are reused and only the remainder is fetched. Bound to one seed, not
+ * one card: the re-tap may be a DIFFERENT card, or the same card after a factory
+ * reset with a new seed, and merging keys from two seeds would corrupt the
+ * export, so the cache self-invalidates when the key UID changes. Two cards
+ * holding the same seed export identical keys, so resuming across them is safe.
  * Create one per prepared flow (screen visit), never share or persist it.
  */
 export type ExportResumeCache = {
-  cardUid: string | null;
+  keyUid: string | null;
   masterFingerprint: number | null;
   parentFingerprints: Map<string, number>;
   keys: Map<string, ExportedKey>;
@@ -40,7 +42,7 @@ export type ExportResumeCache = {
 
 export function makeExportResumeCache(): ExportResumeCache {
   return {
-    cardUid: null,
+    keyUid: null,
     masterFingerprint: null,
     parentFingerprints: new Map(),
     keys: new Map(),
@@ -67,9 +69,9 @@ export async function exportKeysForTarget<E extends ExportPlanEntry>(
 ): Promise<ExportKeysResult<E>> {
   if (cache) {
     const appInfo = cmdSet.applicationInfo;
-    const uid = appInfo ? toHex(appInfo.instanceUID) : null;
-    if (uid === null || cache.cardUid !== uid) {
-      cache.cardUid = uid;
+    const keyUid = appInfo ? getKeyUid(appInfo) : null;
+    if (keyUid === null || cache.keyUid !== keyUid) {
+      cache.keyUid = keyUid;
       cache.masterFingerprint = null;
       cache.parentFingerprints.clear();
       cache.keys.clear();

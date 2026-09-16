@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
-import { loadPairing } from '../../storage/pairingStorage';
-import { toHex } from '../../utils/hex';
+import { loadPairing } from '@/storage/pairingStorage';
+import { getCardKey } from '@/utils/cardIdentity';
 import {
   useNFCOperation,
   type CardPresence,
@@ -15,7 +15,7 @@ export interface SlotInfo {
   totalSlots: number;
   freeSlots: number;
   ourSlotIndex: number | null;
-  cardUid: string;
+  cardKey: string;
 }
 
 export interface UsePairingSlots {
@@ -38,13 +38,16 @@ export function usePairingSlots(): UsePairingSlots {
     if (!appInfo) {
       throw new Error('No application info in SELECT response');
     }
-    const uid = toHex(appInfo.instanceUID);
-    const existingPairing = await loadPairing(uid);
+    const cardKey = getCardKey(appInfo);
+    if (cardKey === null) {
+      throw new Error('This Keycard is not initialized. Initialize it first.');
+    }
+    const existingPairing = await loadPairing(cardKey);
     setSlotInfo({
       totalSlots: TOTAL_SLOTS,
       freeSlots: appInfo.freePairingSlots,
       ourSlotIndex: existingPairing?.pairingIndex ?? null,
-      cardUid: uid,
+      cardKey,
     });
   }, []);
 

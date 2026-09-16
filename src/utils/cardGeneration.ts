@@ -66,3 +66,28 @@ export function cardGeneration(appInfo: ApplicationInfo): Generation | null {
 export function isBelowMinimumVersion(appInfo: ApplicationInfo): boolean {
   return cardGeneration(appInfo) === null;
 }
+
+/**
+ * Which secure channel protocol a card speaks. Derived from the applet version
+ * today, but deliberately a separate attribute from the generation: a later
+ * applet could keep V2 while starting a new generation, so anything that
+ * depends on the channel asks this, never the generation.
+ */
+export type SecureChannelVersion = 'v1' | 'v2';
+
+/** The first applet to speak V2, by the same rule the SDK uses to pick its
+ *  channel, so Pal and the SDK always agree on which one was opened. */
+const SECURE_CHANNEL_V2_MIN_APPLET_VERSION = 0x0400;
+
+/**
+ * The secure channel the tapped card speaks. A card that reports no version is
+ * an uninitialized 3.x card, which speaks V1.
+ */
+export function secureChannelVersion(
+  appInfo: ApplicationInfo,
+): SecureChannelVersion {
+  const version = appletVersion(appInfo);
+  return version !== null && version >= SECURE_CHANNEL_V2_MIN_APPLET_VERSION
+    ? 'v2'
+    : 'v1';
+}

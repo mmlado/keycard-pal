@@ -24,7 +24,7 @@ jest.mock('../src/utils/btcMessage', () => ({
 jest.mock('../src/utils/keycardExport', () => ({
   exportKeysForTarget: jest.fn(),
   makeExportResumeCache: jest.fn(() => ({
-    cardUid: null,
+    keyUid: null,
     masterFingerprint: null,
     parentFingerprints: new Map(),
     keys: new Map(),
@@ -258,7 +258,7 @@ describe('export key flow', () => {
       getExportTarget('ethereum').keys,
       setStatus,
       // The per-flow resume cache: created in prepare, reused across re-taps.
-      expect.objectContaining({ cardUid: null }),
+      expect.objectContaining({ keyUid: null }),
     );
   });
 

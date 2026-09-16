@@ -559,6 +559,26 @@ describe('useKeycardOperation', () => {
         'No application info in SELECT response',
       );
     });
+
+    // An uninitialized 3.x card reports neither an instance UID nor a
+    // version, so there is no card key to look a pairing up by.
+    it('enters error phase when the card is not initialized', async () => {
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        applicationInfo: { initializedCard: false },
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard is not initialized. Initialize it first.',
+      );
+    });
   });
 
   describe('empty PIN guard', () => {

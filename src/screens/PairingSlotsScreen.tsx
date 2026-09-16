@@ -84,7 +84,7 @@ export default function PairingSlotsScreen({
         await cmdSet.unpair(slotIndex);
         if (slotInfo?.ourSlotIndex === slotIndex) {
           try {
-            await deletePairing(slotInfo.cardUid);
+            await deletePairing(slotInfo.cardKey);
           } catch {
             // Card-side unpair already succeeded; local cleanup is best-effort.
           }
