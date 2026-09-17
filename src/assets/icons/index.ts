@@ -100,6 +100,11 @@ export const Icons = {
   // Export target that spans both chains and so has no single currency mark
   wallet: mdi('wallet-outline', onSurface),
 
+  // A screen that picks one of its entries marks the current one by glyph,
+  // since a tile and a row both tint their icon themselves.
+  optionSelected: mdi('radiobox-marked', onSurface),
+  optionUnselected: mdi('radiobox-blank', onSurface),
+
   // Layout picker: two squares side by side vs two stacked rows.
   // Custom SVGs because MDI has the stacked pair but no two-squares glyph.
   layoutTiles: LayoutTilesIcon,

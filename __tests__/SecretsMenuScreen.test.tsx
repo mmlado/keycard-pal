@@ -21,9 +21,11 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // These assertions describe the list layout's rows, so pin the preference.
+let mockMinGeneration: '3.1' | '4.0' | 'any' = 'any';
+
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: 'list' },
+    preferences: { dashboardLayout: 'list', minGeneration: mockMinGeneration },
     setPreference: jest.fn(),
   }),
 }));
@@ -46,6 +48,7 @@ function renderScreen() {
 describe('SecretsMenuScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
+    mockMinGeneration = 'any';
   });
 
   describe('layout', () => {
@@ -95,6 +98,23 @@ describe('SecretsMenuScreen', () => {
       expect(navigation.navigate).toHaveBeenCalledWith('ChangeSecret', {
         secretType: 'pairing',
       });
+    });
+  });
+
+  // The pairing secret went away with applet 4.0. PIN and PUK did not.
+  describe('pairing secret entry', () => {
+    it('is hidden once the user has declared 4.0 cards', () => {
+      mockMinGeneration = '4.0';
+      renderScreen();
+      expect(screen.queryByText('Change Pairing Secret')).toBeNull();
+      expect(screen.getByText('Change PIN')).toBeTruthy();
+      expect(screen.getByText('Change PUK')).toBeTruthy();
+    });
+
+    it('stays for 3.1 cards', () => {
+      mockMinGeneration = '3.1';
+      renderScreen();
+      expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
     });
   });
 

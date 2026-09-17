@@ -11,10 +11,14 @@ import EntryList, { EntryListItem } from '../src/components/EntryList';
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 let mockLayout: 'tiles' | 'list' = 'tiles';
+let mockMinGeneration: '3.1' | '4.0' | 'any' = 'any';
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: mockLayout },
+    preferences: {
+      dashboardLayout: mockLayout,
+      minGeneration: mockMinGeneration,
+    },
     setPreference: jest.fn(),
   }),
 }));
@@ -30,8 +34,14 @@ function entry(label: string, onPress = jest.fn()): EntryListItem {
   return { label, icon: Icon, onPress };
 }
 
+/** An entry only cards older than 4.0 have. */
+function legacyEntry(label: string): EntryListItem {
+  return { ...entry(label), generationBoundRoute: 'PairingSlots' };
+}
+
 beforeEach(() => {
   mockLayout = 'tiles';
+  mockMinGeneration = 'any';
 });
 
 // ---------------------------------------------------------------------------
@@ -126,6 +136,117 @@ describe('EntryList', () => {
       expect(screen.getByText('Generate')).toBeTruthy();
       expect(screen.getByText('Recover')).toBeTruthy();
     });
+  });
+
+  // The user's declared cards are a preference, not the tapped card, so this
+  // only decides what is drawn. A hidden entry has to look as if it was never
+  // passed in, because ids, the hero tile and the grouped flag all come from
+  // what is left.
+  describe('generation-bound entries', () => {
+    it('shows them while nothing is declared', () => {
+      render(<EntryList entries={[entry('One'), legacyEntry('Legacy')]} />);
+      expect(screen.getByText('Legacy')).toBeTruthy();
+    });
+
+    it('shows them for cards of their own generation', () => {
+      mockMinGeneration = '3.1';
+      render(<EntryList entries={[entry('One'), legacyEntry('Legacy')]} />);
+      expect(screen.getByText('Legacy')).toBeTruthy();
+    });
+
+    it('hides them once the user has declared newer cards', () => {
+      mockMinGeneration = '4.0';
+      render(<EntryList entries={[entry('One'), legacyEntry('Legacy')]} />);
+      expect(screen.queryByText('Legacy')).toBeNull();
+      expect(screen.getByText('One')).toBeTruthy();
+    });
+
+    it('renumbers the rows that follow a hidden one', () => {
+      mockLayout = 'list';
+      mockMinGeneration = '4.0';
+      render(
+        <EntryList
+          entries={[entry('One'), legacyEntry('Legacy'), entry('Three')]}
+        />,
+      );
+      expect(screen.getByTestId('menu-icon-0')).toBeTruthy();
+      expect(screen.getByTestId('menu-icon-1')).toBeTruthy();
+      expect(screen.queryByTestId('menu-icon-2')).toBeNull();
+    });
+
+    // Three entries promote the first to a hero tile; hiding one leaves an
+    // even count, so the grid must lay out as two plain tiles.
+    it('lays the tiles out for the count that is left', () => {
+      mockMinGeneration = '4.0';
+      render(
+        <EntryList
+          entries={[
+            { ...entry('One'), detail: 'Only a hero shows this' },
+            legacyEntry('Legacy'),
+            entry('Three'),
+          ]}
+        />,
+      );
+      expect(screen.queryByText('Only a hero shows this')).toBeNull();
+    });
+
+    it('drops a group that is left empty, heading included', () => {
+      mockMinGeneration = '4.0';
+      render(
+        <EntryList
+          sections={[
+            { title: 'Current', entries: [entry('One'), entry('Two')] },
+            { title: 'Pairing', entries: [legacyEntry('Legacy')] },
+          ]}
+        />,
+      );
+      expect(screen.queryByText('Pairing')).toBeNull();
+      expect(screen.getByText('Current')).toBeTruthy();
+      // One group left, so the grid takes the ungrouped id.
+      expect(screen.getByTestId('tile-grid')).toBeTruthy();
+    });
+  });
+
+  // A screen that picks one of its entries has to say which one is current to
+  // a screen reader too, not only by swapping the glyph.
+  describe('selected entries', () => {
+    it.each([
+      ['tiles', 'tile-0', 'tile-1'],
+      ['list', 'menu-row-0', 'menu-row-1'],
+    ] as const)(
+      'reports the current choice in %s layout',
+      (layout, chosen, other) => {
+        mockLayout = layout;
+        render(
+          <EntryList
+            entries={[
+              { ...entry('Chosen'), selected: true },
+              { ...entry('Other'), selected: false },
+            ]}
+          />,
+        );
+        expect(
+          screen.getByTestId(chosen).props.accessibilityState.selected,
+        ).toBe(true);
+        expect(
+          screen.getByTestId(other).props.accessibilityState.selected,
+        ).toBe(false);
+      },
+    );
+
+    it.each([
+      ['tiles', 'tile-0'],
+      ['list', 'menu-row-0'],
+    ] as const)(
+      'says nothing about selection on an ordinary %s menu',
+      (layout, id) => {
+        mockLayout = layout;
+        render(<EntryList entries={[entry('One'), entry('Two')]} />);
+        expect(
+          screen.getByTestId(id).props.accessibilityState?.selected,
+        ).toBeUndefined();
+      },
+    );
   });
 
   describe('press handling', () => {

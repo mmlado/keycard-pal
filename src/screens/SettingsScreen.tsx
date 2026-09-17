@@ -12,6 +12,7 @@ import { Icons } from '../assets/icons';
 import type { DashboardAction, SettingsScreenProps } from '../navigation/types';
 import theme from '../theme';
 
+import AppletVersionSettingsSection from '../components/settings/AppletVersionSettingsSection';
 import DashboardLayoutSettingsSection from '../components/settings/DashboardLayoutSettingsSection';
 import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
 import KeycardSettingsSection from '../components/settings/KeycardSettingsSection';
@@ -49,6 +50,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         <View style={styles.section}>
           <KeycardSettingsSection />
           <DashboardLayoutSettingsSection />
+          <AppletVersionSettingsSection
+            onPress={() => navigation.navigate('MinAppletVersion')}
+          />
           <PinPadSettingsSection />
           <TokenImagesSettingsSection />
           <EnsSettingsSection />

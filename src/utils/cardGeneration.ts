@@ -68,6 +68,66 @@ export function isBelowMinimumVersion(appInfo: ApplicationInfo): boolean {
 }
 
 /**
+ * The oldest generation the user says their cards belong to, or 'any' when they
+ * have not said. It only ever hides menu entries: no card is refused because of
+ * it, which is the floor's job alone.
+ */
+export type MinGeneration = Generation | 'any';
+
+/**
+ * A stored minimum generation, or 'any' for anything unrecognised. A stale or
+ * corrupt value must fall back to hiding nothing, or it could hide entries the
+ * user then has no way to reach.
+ */
+export function parseMinGeneration(stored: unknown): MinGeneration {
+  const known = GENERATIONS.find(entry => entry.generation === stored);
+  return known ? known.generation : 'any';
+}
+
+/**
+ * The generation a minimum stands for. 'any', or anything unrecognised, is the
+ * floor: nothing below the first generation is driven at all, so declaring it
+ * and declaring nothing show the same menus.
+ */
+function minGenerationEntry(minGeneration: MinGeneration) {
+  return (
+    GENERATIONS.find(entry => entry.generation === minGeneration) ??
+    GENERATIONS[0]
+  );
+}
+
+export function effectiveMinGeneration(
+  minGeneration: MinGeneration,
+): Generation {
+  return minGenerationEntry(minGeneration).generation;
+}
+
+/** How a minimum reads to the user, e.g. "3.1 or newer". */
+export function minGenerationLabel(minGeneration: MinGeneration): string {
+  const { minAppletVersion } = minGenerationEntry(minGeneration);
+  return `${formatAppletVersion(minAppletVersion)} or newer`;
+}
+
+/**
+ * True when every card the user declared is newer than `lastGeneration`, the
+ * last generation that still has some feature.
+ */
+export function isPastGeneration(
+  minGeneration: MinGeneration,
+  lastGeneration: Generation,
+): boolean {
+  // Parsed again rather than trusted: a caller can hand over a value that never
+  // went through storage, and an unknown one has to hide nothing.
+  const min = parseMinGeneration(minGeneration);
+  if (min === 'any') {
+    return false;
+  }
+  const rank = (generation: Generation) =>
+    GENERATIONS.findIndex(entry => entry.generation === generation);
+  return rank(min) > rank(lastGeneration);
+}
+
+/**
  * Which secure channel protocol a card speaks. Derived from the applet version
  * today, but deliberately a separate attribute from the generation: a later
  * applet could keep V2 while starting a new generation, so anything that

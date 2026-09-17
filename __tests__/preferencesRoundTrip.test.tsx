@@ -2,12 +2,15 @@ import React from 'react';
 import { Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
+import AppletVersionSettingsSection from '../src/components/settings/AppletVersionSettingsSection';
 import DashboardLayoutSettingsSection from '../src/components/settings/DashboardLayoutSettingsSection';
 import PinPadSettingsSection from '../src/components/settings/PinPadSettingsSection';
 import TokenImagesSettingsSection from '../src/components/settings/TokenImagesSettingsSection.online';
 import { usePreferences } from '../src/hooks/usePreferences';
 import useTokenImagesEnabled from '../src/hooks/useTokenImagesEnabled.online';
 import { PreferencesProvider } from '../src/providers/preferences/Provider';
+import MinAppletVersionScreen from '../src/screens/MinAppletVersionScreen';
+import SecretsMenuScreen from '../src/screens/secrets/SecretsMenuScreen';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -57,6 +60,33 @@ function Probe() {
       {`layout:${preferences.dashboardLayout} scramble:${preferences.pinPadScramble} images:${images}`}
     </Text>
   );
+}
+
+/** Its own line, so the existing assertions keep reading one string. */
+function GenerationProbe() {
+  const { preferences } = usePreferences();
+  return <Text>{`generation:${preferences.minGeneration}`}</Text>;
+}
+
+const pickerNavigation = { goBack: jest.fn() } as any;
+
+/**
+ * The picker screen beside the Settings row that shows its value, the two
+ * ends of the one preference that is chosen on a screen of its own.
+ */
+async function renderAppletVersion() {
+  const view = render(
+    <PreferencesProvider>
+      <AppletVersionSettingsSection onPress={jest.fn()} />
+      <MinAppletVersionScreen
+        navigation={pickerNavigation}
+        route={{ key: 'MinAppletVersion', name: 'MinAppletVersion' } as any}
+      />
+      <GenerationProbe />
+    </PreferencesProvider>,
+  );
+  await act(async () => {});
+  return view;
 }
 
 async function renderSettings() {
@@ -168,6 +198,72 @@ describe('changing a setting', () => {
       screen.getByText('layout:tiles scramble:false images:false'),
     ).toBeTruthy();
     expect(await AsyncStorage.getItem('preference_pinpad_scramble')).toBe('0');
+  });
+
+  // Both options read "N or newer" on the picker and the Settings row repeats
+  // the current one, so the option is pressed by id, not by text.
+  it('writes the minimum generation and updates the Settings row', async () => {
+    await renderAppletVersion();
+    expect(screen.getByText('generation:any')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Keycard applet version, 3.1 or newer'),
+    ).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('tile-1'));
+    });
+    await flush();
+
+    expect(screen.getByText('generation:4.0')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Keycard applet version, 4.0 or newer'),
+    ).toBeTruthy();
+    expect(await AsyncStorage.getItem('preference_min_generation')).toBe('4.0');
+  });
+
+  // The whole point of the preference: a menu elsewhere in the tree drops
+  // what only older cards have, the moment the user says they have none.
+  it('hides the pairing secret entry once 4.0 cards are declared', async () => {
+    render(
+      <PreferencesProvider>
+        <MinAppletVersionScreen
+          navigation={pickerNavigation}
+          route={{ key: 'MinAppletVersion', name: 'MinAppletVersion' } as any}
+        />
+        <SecretsMenuScreen
+          navigation={{ navigate: jest.fn() } as any}
+          route={{ key: 'SecretsMenu', name: 'SecretsMenu' } as any}
+        />
+      </PreferencesProvider>,
+    );
+    await flush();
+    expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('4.0 or newer'));
+    });
+    await flush();
+
+    expect(screen.queryByText('Change Pairing Secret')).toBeNull();
+    expect(screen.getByText('Change PIN')).toBeTruthy();
+  });
+
+  it('keeps the minimum generation across a remount', async () => {
+    const first = await renderAppletVersion();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('tile-1'));
+    });
+    await flush();
+    first.unmount();
+
+    render(
+      <PreferencesProvider>
+        <GenerationProbe />
+      </PreferencesProvider>,
+    );
+    await flush();
+
+    expect(screen.getByText('generation:4.0')).toBeTruthy();
   });
 
   // What a restart sees: a fresh provider reads back exactly what the

@@ -25,6 +25,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const KEYS = {
   dashboardLayout: 'preference_dashboard_layout',
+  minGeneration: 'preference_min_generation',
   pinPadScramble: 'preference_pinpad_scramble',
   tokenImagesEnabled: 'preference_token_images_enabled',
   welcomeSeen: 'preference_welcome_seen',
@@ -67,6 +68,7 @@ describe('loadPreferences', () => {
   it('decodes every stored value', async () => {
     stored({
       [KEYS.dashboardLayout]: 'list',
+      [KEYS.minGeneration]: '4.0',
       [KEYS.pinPadScramble]: '1',
       [KEYS.tokenImagesEnabled]: '1',
       [KEYS.welcomeSeen]: '1',
@@ -74,6 +76,7 @@ describe('loadPreferences', () => {
     });
     expect(await loadPreferences()).toEqual({
       dashboardLayout: 'list',
+      minGeneration: '4.0',
       pinPadScramble: true,
       tokenImagesEnabled: true,
       welcomeSeen: true,
@@ -93,6 +96,16 @@ describe('loadPreferences', () => {
     stored({ [KEYS.dashboardLayout]: 'grid' });
     expect((await loadPreferences()).dashboardLayout).toBe('tiles');
   });
+
+  // A value that names no known generation must hide nothing: it could
+  // otherwise hide entries the user then has no way to reach.
+  it.each(['5.0', '3.0', 'undefined', ''])(
+    'reads an unrecognised minimum generation %p as any',
+    async value => {
+      stored({ [KEYS.minGeneration]: value });
+      expect((await loadPreferences()).minGeneration).toBe('any');
+    },
+  );
 
   // Startup gates on this read, so a storage failure must resolve, not
   // reject, or the app never gets past the loading screen.
@@ -124,6 +137,14 @@ describe('savePreference', () => {
 
     await savePreference('dashboardLayout', 'tiles');
     expect(mockSetItem).toHaveBeenCalledWith(KEYS.dashboardLayout, 'tiles');
+  });
+
+  it('stores the minimum generation verbatim', async () => {
+    await savePreference('minGeneration', '4.0');
+    expect(mockSetItem).toHaveBeenCalledWith(KEYS.minGeneration, '4.0');
+
+    await savePreference('minGeneration', 'any');
+    expect(mockSetItem).toHaveBeenCalledWith(KEYS.minGeneration, 'any');
   });
 
   // The provider decides what a failed write means for the UI, so the

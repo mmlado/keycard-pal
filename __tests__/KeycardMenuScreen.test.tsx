@@ -17,9 +17,11 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // These assertions describe the list layout's rows, so pin the preference.
+let mockMinGeneration: '3.1' | '4.0' | 'any' = 'any';
+
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: 'list' },
+    preferences: { dashboardLayout: 'list', minGeneration: mockMinGeneration },
     setPreference: jest.fn(),
   }),
 }));
@@ -34,6 +36,7 @@ function renderScreen() {
 describe('KeycardMenuScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
+    mockMinGeneration = 'any';
   });
 
   it('renders the requested submenu items', () => {
@@ -83,6 +86,23 @@ describe('KeycardMenuScreen', () => {
       fireEvent.press(screen.getByText(label));
       expect(navigation.navigate).toHaveBeenCalledWith(destination);
     }
+  });
+
+  // Pairing slots went away with applet 4.0. The entry stays for everyone who
+  // has not said otherwise, because the menu cannot know the card.
+  describe('pairing slots entry', () => {
+    it('is hidden once the user has declared 4.0 cards', () => {
+      mockMinGeneration = '4.0';
+      renderScreen();
+      expect(screen.queryByText('Manage pairing slots')).toBeNull();
+      expect(screen.getByText('Factory reset')).toBeTruthy();
+    });
+
+    it('stays for 3.1 cards', () => {
+      mockMinGeneration = '3.1';
+      renderScreen();
+      expect(screen.getByText('Manage pairing slots')).toBeTruthy();
+    });
   });
 
   describe('dashboardEntry', () => {

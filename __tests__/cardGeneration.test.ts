@@ -1,10 +1,14 @@
 import {
   appletVersion,
   cardGeneration,
+  effectiveMinGeneration,
   formatAppletVersion,
   GENERATIONS,
   isBelowMinimumVersion,
+  isPastGeneration,
   MIN_SUPPORTED_APPLET_VERSION,
+  minGenerationLabel,
+  parseMinGeneration,
   secureChannelVersion,
 } from '../src/utils/cardGeneration';
 
@@ -82,6 +86,69 @@ describe('isBelowMinimumVersion', () => {
 
   it('does not refuse an uninitialized 3.x card', () => {
     expect(isBelowMinimumVersion(blankV3Select())).toBe(false);
+  });
+});
+
+describe('parseMinGeneration', () => {
+  it('keeps a known generation', () => {
+    expect(parseMinGeneration('3.1')).toBe('3.1');
+    expect(parseMinGeneration('4.0')).toBe('4.0');
+  });
+
+  // Hiding nothing is the only safe reading of a value nobody recognises.
+  it.each([null, undefined, '', 'any', '5.0', '3.0', 4])(
+    'reads %p as any',
+    value => {
+      expect(parseMinGeneration(value)).toBe('any');
+    },
+  );
+});
+
+describe('effectiveMinGeneration', () => {
+  it('treats any as the floor, since nothing older is driven at all', () => {
+    expect(effectiveMinGeneration('any')).toBe(GENERATIONS[0].generation);
+  });
+
+  it('keeps a declared generation', () => {
+    expect(effectiveMinGeneration('4.0')).toBe('4.0');
+  });
+
+  it('falls back to the floor for a value it does not know', () => {
+    expect(effectiveMinGeneration('9.9' as any)).toBe('3.1');
+  });
+});
+
+describe('minGenerationLabel', () => {
+  it('names the minimum applet version', () => {
+    expect(minGenerationLabel('3.1')).toBe('3.1 or newer');
+    expect(minGenerationLabel('4.0')).toBe('4.0 or newer');
+  });
+
+  it('names the floor when nothing was declared', () => {
+    expect(minGenerationLabel('any')).toBe('3.1 or newer');
+  });
+});
+
+describe('isPastGeneration', () => {
+  it('is false while nothing is declared', () => {
+    expect(isPastGeneration('any', '3.1')).toBe(false);
+  });
+
+  it('is false when the declared cards still belong to that generation', () => {
+    expect(isPastGeneration('3.1', '3.1')).toBe(false);
+    expect(isPastGeneration('3.1', '4.0')).toBe(false);
+    expect(isPastGeneration('4.0', '4.0')).toBe(false);
+  });
+
+  it('is true once every declared card is newer', () => {
+    expect(isPastGeneration('4.0', '3.1')).toBe(true);
+  });
+
+  // Screen tests hand over partial preferences, and a corrupt value must not
+  // hide anything either.
+  it('is false for a minimum it does not know', () => {
+    expect(isPastGeneration(undefined as any, '3.1')).toBe(false);
+    expect(isPastGeneration('9.9' as any, '3.1')).toBe(false);
   });
 });
 

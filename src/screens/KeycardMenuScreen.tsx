@@ -4,7 +4,7 @@ import { Icons } from '../assets/icons';
 import { DashboardAction, KeycardMenuScreenProps } from '../navigation/types';
 import theme from '../theme';
 
-import EntryList from '../components/EntryList';
+import EntryList, { EntryListItem } from '../components/EntryList';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Keycard',
@@ -15,7 +15,7 @@ export const dashboardEntry: DashboardAction = {
 export default function KeycardMenuScreen({
   navigation,
 }: KeycardMenuScreenProps) {
-  const entries = [
+  const entries: EntryListItem[] = [
     {
       label: 'Initialize',
       icon: Icons.cardInit,
@@ -41,6 +41,7 @@ export default function KeycardMenuScreen({
       label: 'Manage pairing slots',
       icon: Icons.pairingSlots,
       requiresNfc: true,
+      generationBoundRoute: 'PairingSlots',
       onPress: () => navigation.navigate('PairingSlots'),
     },
     {

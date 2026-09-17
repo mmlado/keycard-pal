@@ -8,12 +8,18 @@ import {
 } from 'react-native';
 
 import { IconComponent } from '@/assets/icons';
+import {
+  GenerationBoundRoute,
+  isRouteHidden,
+} from '@/navigation/generationBoundRoutes';
 import theme from '@/theme';
 
 import { MenuList } from '@/components/Menu';
 import TileGrid, { gridMetrics } from '@/components/TileGrid';
 
 import { usePreferences } from '@/hooks/usePreferences';
+
+import { MinGeneration } from '@/utils/cardGeneration';
 
 export type EntryListItem = {
   label: string;
@@ -22,6 +28,13 @@ export type EntryListItem = {
   icon: IconComponent;
   /** Marks a row that starts an NFC flow, per the app's NFC icon rule. */
   requiresNfc?: boolean;
+  /**
+   * Set on an entry newer cards no longer have. The entry is then dropped once
+   * the user has declared cards that new in Settings.
+   */
+  generationBoundRoute?: GenerationBoundRoute;
+  /** Marks the current choice on a screen that picks one of its entries. */
+  selected?: boolean;
   onPress: () => void;
 };
 
@@ -40,6 +53,32 @@ type Props = {
 };
 
 /**
+ * Drops the entries the user's declared cards do not have, and any group that
+ * leaves empty. This runs before anything else is derived from the groups:
+ * testIDs are positional, the tile grid promotes its first entry on an odd
+ * count, and the grouped flag counts groups, so a hidden entry has to look as
+ * if it was never passed in.
+ */
+function visibleGroups(
+  groups: EntryListSection[],
+  minGeneration: MinGeneration,
+): EntryListSection[] {
+  return groups
+    .map(group => ({
+      ...group,
+      entries: group.entries.filter(
+        entry =>
+          !entry.generationBoundRoute ||
+          !isRouteHidden(entry.generationBoundRoute, minGeneration),
+      ),
+    }))
+    .filter(
+      (group, index) =>
+        group.entries.length > 0 || groups[index].entries.length === 0,
+    );
+}
+
+/**
  * Renders a screen's destinations in whichever layout the user picked. Every
  * navigation menu goes through this rather than choosing a component itself,
  * so the setting cannot apply to some screens and not others.
@@ -51,7 +90,10 @@ export default function EntryList({ entries, sections, footer }: Props) {
   const { preferences } = usePreferences();
   const { width } = useWindowDimensions();
 
-  const groups: EntryListSection[] = sections ?? [{ entries: entries ?? [] }];
+  const groups = visibleGroups(
+    sections ?? [{ entries: entries ?? [] }],
+    preferences.minGeneration,
+  );
   const list = preferences.dashboardLayout === 'list';
   const grouped = groups.length > 1;
 

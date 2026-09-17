@@ -29,6 +29,13 @@ jest.mock('../src/assets/icons', () => {
   return { Icons: { openInBrowser: Icon, qr: Icon } };
 });
 
+jest.mock('../src/components/settings/AppletVersionSettingsSection', () => {
+  const { Text } = require('react-native');
+  return ({ onPress }: { onPress: () => void }) => (
+    <Text onPress={onPress}>Keycard applet version</Text>
+  );
+});
+
 jest.mock('../src/components/settings/DashboardLayoutSettingsSection', () => {
   const { Text } = require('react-native');
   return () => <Text>Layout</Text>;
@@ -67,7 +74,7 @@ jest.mock('../src/navigation/navigationRef', () => ({
   },
 }));
 
-const navigation = { setOptions: jest.fn() } as any;
+const navigation = { setOptions: jest.fn(), navigate: jest.fn() } as any;
 
 function renderScreen() {
   return render(<SettingsScreen navigation={navigation} route={{} as any} />);
@@ -83,6 +90,7 @@ describe('SettingsScreen', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     navigation.setOptions.mockClear();
+    navigation.navigate.mockClear();
     mockConnected = true;
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     (Linking.openURL as jest.Mock).mockClear();
@@ -110,6 +118,14 @@ describe('SettingsScreen', () => {
       rendered.indexOf('Layout'),
     );
     expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
+  });
+
+  // The row only shows the value; choosing one needs words and room, so it
+  // opens a screen of its own.
+  it('opens the applet version picker from its row', () => {
+    renderScreen();
+    fireEvent.press(screen.getByText('Keycard applet version'));
+    expect(navigation.navigate).toHaveBeenCalledWith('MinAppletVersion');
   });
 
   it('renders on Android with the height keyboard behaviour', () => {

@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { MinGeneration, parseMinGeneration } from '@/utils/cardGeneration';
+
 /** How the dashboard renders its destinations. */
 export type DashboardLayout = 'tiles' | 'list';
 
@@ -11,6 +13,8 @@ export type DashboardLayout = 'tiles' | 'list';
  */
 export type Preferences = {
   dashboardLayout: DashboardLayout;
+  /** Hides menu entries older cards alone have; never refuses a card. */
+  minGeneration: MinGeneration;
   pinPadScramble: boolean;
   tokenImagesEnabled: boolean;
   welcomeSeen: boolean;
@@ -19,6 +23,7 @@ export type Preferences = {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   dashboardLayout: 'tiles',
+  minGeneration: 'any',
   pinPadScramble: false,
   tokenImagesEnabled: false,
   welcomeSeen: false,
@@ -28,10 +33,11 @@ export const DEFAULT_PREFERENCES: Preferences = {
 /**
  * Storage key per preference. Opt-in network features use the `_enabled`
  * suffix so the unset state reads as disabled (ADR-0003). Booleans are stored
- * as '1' / '0'; the layout is stored verbatim.
+ * as '1' / '0'; the layout and the minimum generation are stored verbatim.
  */
 const KEYS: Record<keyof Preferences, string> = {
   dashboardLayout: 'preference_dashboard_layout',
+  minGeneration: 'preference_min_generation',
   pinPadScramble: 'preference_pinpad_scramble',
   tokenImagesEnabled: 'preference_token_images_enabled',
   welcomeSeen: 'preference_welcome_seen',
@@ -51,6 +57,7 @@ export async function loadPreferences(): Promise<Preferences> {
       // a missing, empty or unrecognised value.
       dashboardLayout:
         stored[KEYS.dashboardLayout] === 'list' ? 'list' : 'tiles',
+      minGeneration: parseMinGeneration(stored[KEYS.minGeneration]),
       pinPadScramble: flag('pinPadScramble'),
       tokenImagesEnabled: flag('tokenImagesEnabled'),
       welcomeSeen: flag('welcomeSeen'),

@@ -81,6 +81,7 @@ export type RootStackParamList = {
     note?: string;
   };
   Settings: undefined;
+  MinAppletVersion: undefined;
 };
 
 export type WelcomeScreenProps = NativeStackScreenProps<
@@ -216,6 +217,11 @@ export type UrlQRScreenProps = NativeStackScreenProps<
 export type SettingsScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'Settings'
+>;
+
+export type MinAppletVersionScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'MinAppletVersion'
 >;
 
 export type WalletConnectPairingScreenProps = NativeStackScreenProps<

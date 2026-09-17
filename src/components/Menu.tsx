@@ -9,6 +9,8 @@ export type Entry = {
   icon?: IconComponent;
   requiresNfc?: boolean;
   detail?: string;
+  /** Marks the current choice on a screen that picks one of its rows. */
+  selected?: boolean;
 };
 
 type ListProps = {
@@ -32,6 +34,12 @@ export function MenuList({ entries, indexOffset = 0 }: ListProps) {
             style={[styles.item, i < entries.length - 1 && styles.itemBorder]}
             key={i}
             onPress={action.onPress}
+            testID={`menu-row-${id}`}
+            accessibilityState={
+              action.selected === undefined
+                ? undefined
+                : { selected: action.selected }
+            }
           >
             <View style={styles.labelRow}>
               {Icon ? (

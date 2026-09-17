@@ -7,7 +7,7 @@ import {
 } from '../../navigation/types';
 import theme from '../../theme';
 
-import EntryList from '../../components/EntryList';
+import EntryList, { EntryListItem } from '../../components/EntryList';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Secrets',
@@ -18,7 +18,7 @@ export const dashboardEntry: DashboardAction = {
 export default function SecretsMenuScreen({
   navigation,
 }: SecretsMenuScreenProps) {
-  const entries = [
+  const entries: EntryListItem[] = [
     {
       label: 'Change PIN',
       icon: Icons.pin,
@@ -32,6 +32,7 @@ export default function SecretsMenuScreen({
     {
       label: 'Change Pairing Secret',
       icon: Icons.pairingSecret,
+      generationBoundRoute: 'ChangePairingSecret',
       onPress: () =>
         navigation.navigate('ChangeSecret', { secretType: 'pairing' }),
     },
