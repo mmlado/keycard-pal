@@ -11,6 +11,7 @@ import theme from '../theme';
 
 import EntryList from '../components/EntryList';
 import PrimaryButton from '../components/PrimaryButton';
+import UnselectedKeycardReminder from '../components/UnselectedKeycardReminder';
 import WalletConnectDashboardCard from '../components/walletConnect/DashboardCard.online';
 
 /**
@@ -68,6 +69,9 @@ export default function DashboardScreen({
         { paddingTop: insets.top, paddingBottom: insets.bottom },
       ]}
     >
+      {/* Above the grid, not in its footer: it follows a tap the user just
+          made, and below the tiles it would sit off screen on a small phone. */}
+      <UnselectedKeycardReminder />
       <EntryList entries={entries} footer={<WalletConnectDashboardCard />} />
 
       <View style={styles.actions}>

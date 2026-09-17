@@ -25,7 +25,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const KEYS = {
   dashboardLayout: 'preference_dashboard_layout',
-  minGeneration: 'preference_min_generation',
+  generationsInUse: 'preference_generations_in_use',
+  generationRemindersDismissed: 'preference_generation_reminders_dismissed',
   pinPadScramble: 'preference_pinpad_scramble',
   tokenImagesEnabled: 'preference_token_images_enabled',
   welcomeSeen: 'preference_welcome_seen',
@@ -68,7 +69,8 @@ describe('loadPreferences', () => {
   it('decodes every stored value', async () => {
     stored({
       [KEYS.dashboardLayout]: 'list',
-      [KEYS.minGeneration]: '4.0',
+      [KEYS.generationsInUse]: '4.0',
+      [KEYS.generationRemindersDismissed]: '3.1',
       [KEYS.pinPadScramble]: '1',
       [KEYS.tokenImagesEnabled]: '1',
       [KEYS.welcomeSeen]: '1',
@@ -76,7 +78,8 @@ describe('loadPreferences', () => {
     });
     expect(await loadPreferences()).toEqual({
       dashboardLayout: 'list',
-      minGeneration: '4.0',
+      generationsInUse: ['4.0'],
+      generationRemindersDismissed: ['3.1'],
       pinPadScramble: true,
       tokenImagesEnabled: true,
       welcomeSeen: true,
@@ -97,15 +100,36 @@ describe('loadPreferences', () => {
     expect((await loadPreferences()).dashboardLayout).toBe('tiles');
   });
 
-  // A value that names no known generation must hide nothing: it could
-  // otherwise hide entries the user then has no way to reach.
-  it.each(['5.0', '3.0', 'undefined', ''])(
-    'reads an unrecognised minimum generation %p as any',
+  // A selection nobody recognises must leave nothing out: it could otherwise
+  // hide entries the user then has no way to reach.
+  it.each(['5.0', '3.0', 'any', 'undefined', ''])(
+    'reads an unrecognised selection %p as every generation',
     async value => {
-      stored({ [KEYS.minGeneration]: value });
-      expect((await loadPreferences()).minGeneration).toBe('any');
+      stored({ [KEYS.generationsInUse]: value });
+      expect((await loadPreferences()).generationsInUse).toEqual([
+        '3.1',
+        '4.0',
+      ]);
     },
   );
+
+  // A saved selection is kept as it is, so a generation a later version adds
+  // arrives unticked: most users will not own the new card when it ships.
+  it('keeps a saved selection narrower than the table', async () => {
+    stored({ [KEYS.generationsInUse]: '3.1' });
+    expect((await loadPreferences()).generationsInUse).toEqual(['3.1']);
+  });
+
+  it('reads no dismissed reminders when nothing usable is stored', async () => {
+    stored({ [KEYS.generationRemindersDismissed]: 'garbage' });
+    expect((await loadPreferences()).generationRemindersDismissed).toEqual([]);
+  });
+
+  it('hands out its own copy of the default selection', async () => {
+    const first = await loadPreferences();
+    first.generationsInUse.pop();
+    expect((await loadPreferences()).generationsInUse).toEqual(['3.1', '4.0']);
+  });
 
   // Startup gates on this read, so a storage failure must resolve, not
   // reject, or the app never gets past the loading screen.
@@ -139,12 +163,15 @@ describe('savePreference', () => {
     expect(mockSetItem).toHaveBeenCalledWith(KEYS.dashboardLayout, 'tiles');
   });
 
-  it('stores the minimum generation verbatim', async () => {
-    await savePreference('minGeneration', '4.0');
-    expect(mockSetItem).toHaveBeenCalledWith(KEYS.minGeneration, '4.0');
+  it('stores a list of generations comma-separated', async () => {
+    await savePreference('generationsInUse', ['3.1', '4.0']);
+    expect(mockSetItem).toHaveBeenCalledWith(KEYS.generationsInUse, '3.1,4.0');
 
-    await savePreference('minGeneration', 'any');
-    expect(mockSetItem).toHaveBeenCalledWith(KEYS.minGeneration, 'any');
+    await savePreference('generationRemindersDismissed', ['4.0']);
+    expect(mockSetItem).toHaveBeenCalledWith(
+      KEYS.generationRemindersDismissed,
+      '4.0',
+    );
   });
 
   // The provider decides what a failed write means for the UI, so the

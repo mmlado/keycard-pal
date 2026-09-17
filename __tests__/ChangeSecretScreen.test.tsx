@@ -32,10 +32,16 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-// PinPad reads the scramble preference from context.
+// PinPad reads the scramble preference from context, and the screen reads
+// which cards the user ticked to decide whether the identify tap is needed.
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
+
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { pinPadScramble: false },
+    preferences: {
+      pinPadScramble: false,
+      generationsInUse: mockGenerationsInUse,
+    },
     setPreference: jest.fn(),
   }),
 }));
@@ -149,6 +155,7 @@ describe('ChangeSecretScreen', () => {
     mockIdentifyStart.mockClear();
     mockIdentifyCancel.mockClear();
     mockUseChangeSecret.mockClear();
+    mockGenerationsInUse = ['3.1', '4.0'];
     // A card that has a pairing secret, already identified: the state every
     // test below starts from unless it is about the identify tap itself.
     mockIdentify = { phase: 'done', generation: '3.1' };
@@ -425,6 +432,40 @@ describe('ChangeSecretScreen', () => {
         expect(mockIdentifyCancel).toHaveBeenCalledTimes(1);
         expect(mockCancel).not.toHaveBeenCalled();
       });
+    });
+
+    // A user who ticked only cards that have a pairing secret has told the app
+    // what the first tap would find out. The operation still checks the card.
+    describe('when every card in use has a pairing secret', () => {
+      beforeEach(() => {
+        mockGenerationsInUse = ['3.1'];
+        mockIdentify = { phase: 'idle', generation: null };
+      });
+
+      it('skips the identify tap and asks for the secret at once', async () => {
+        await renderScreen('pairing');
+        expect(mockIdentifyStart).not.toHaveBeenCalled();
+        expect(screen.UNSAFE_getByType(TextInput)).toBeTruthy();
+        expect(screen.queryByText(IDENTIFY_EXPLAINER)).toBeNull();
+        expect(navigation.setOptions).toHaveBeenCalledWith({
+          title: 'Enter new pairing secret',
+        });
+      });
+
+      it('drives the sheet from the change itself', async () => {
+        await renderScreen('pairing', 'nfc');
+        expect(lastSheetProps().showOnDone).toBe(true);
+        lastSheetProps().onCancel();
+        expect(mockCancel).toHaveBeenCalledTimes(1);
+        expect(mockIdentifyCancel).not.toHaveBeenCalled();
+      });
+    });
+
+    it('keeps the identify tap when a ticked card has no pairing secret', async () => {
+      mockGenerationsInUse = ['3.1', '4.0'];
+      mockIdentify = { phase: 'idle', generation: null };
+      await renderScreen('pairing');
+      expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
     });
 
     describe('on a card that has a pairing secret', () => {

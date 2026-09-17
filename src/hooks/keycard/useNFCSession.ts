@@ -5,11 +5,13 @@ import Keycard from 'keycard-sdk';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
 import {
+  cardGeneration,
   formatAppletVersion,
   isBelowMinimumVersion,
   MIN_SUPPORTED_APPLET_VERSION,
 } from '@/utils/cardGeneration';
 import { isTagLostError } from '@/utils/keycardErrors';
+import { noteTappedGeneration } from '@/utils/lastTappedGeneration';
 
 export type NFCSessionPhase = 'idle' | 'nfc' | 'done' | 'error';
 
@@ -232,6 +234,14 @@ export default function useNFCSession(
         throw new Error(
           `This Keycard runs applet ${found}. Keycard Pal needs applet ${needed} or newer.`,
         );
+      }
+
+      // For the dashboard reminder only: a card outside the user's selection
+      // in Settings was tapped. Held in memory and never acted on here; the
+      // selection never refuses a card, so the operation goes ahead as usual.
+      const generation = appInfo ? cardGeneration(appInfo) : null;
+      if (generation !== null) {
+        noteTappedGeneration(generation);
       }
 
       await onCardConnected(cmdSet, reportStatus);

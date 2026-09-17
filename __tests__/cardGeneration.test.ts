@@ -1,16 +1,17 @@
 import {
   appletVersion,
+  ALL_GENERATIONS,
   cardGeneration,
-  effectiveMinGeneration,
   formatAppletVersion,
+  generationLabel,
   GENERATIONS,
   isBelowMinimumVersion,
   isNewerGeneration,
-  isPastGeneration,
   MIN_SUPPORTED_APPLET_VERSION,
-  minGenerationLabel,
-  parseMinGeneration,
+  parseGenerations,
+  parseGenerationsInUse,
   secureChannelVersion,
+  serializeGenerations,
 } from '../src/utils/cardGeneration';
 
 import { blankV3Select, v3Select, v4Select } from './selectResponse.testUtils';
@@ -90,43 +91,21 @@ describe('isBelowMinimumVersion', () => {
   });
 });
 
-describe('parseMinGeneration', () => {
-  it('keeps a known generation', () => {
-    expect(parseMinGeneration('3.1')).toBe('3.1');
-    expect(parseMinGeneration('4.0')).toBe('4.0');
+describe('generationLabel', () => {
+  it('names a generation the way the user reads it', () => {
+    expect(generationLabel('3.1')).toBe('3.x');
+    expect(generationLabel('4.0')).toBe('4.x');
   });
 
-  // Hiding nothing is the only safe reading of a value nobody recognises.
-  it.each([null, undefined, '', 'any', '5.0', '3.0', 4])(
-    'reads %p as any',
-    value => {
-      expect(parseMinGeneration(value)).toBe('any');
-    },
-  );
-});
-
-describe('effectiveMinGeneration', () => {
-  it('treats any as the floor, since nothing older is driven at all', () => {
-    expect(effectiveMinGeneration('any')).toBe(GENERATIONS[0].generation);
+  // The label is written by hand, so every generation has to have one.
+  it('has a label for every generation', () => {
+    for (const { label } of GENERATIONS) {
+      expect(label.length).toBeGreaterThan(0);
+    }
   });
 
-  it('keeps a declared generation', () => {
-    expect(effectiveMinGeneration('4.0')).toBe('4.0');
-  });
-
-  it('falls back to the floor for a value it does not know', () => {
-    expect(effectiveMinGeneration('9.9' as any)).toBe('3.1');
-  });
-});
-
-describe('minGenerationLabel', () => {
-  it('names the minimum applet version', () => {
-    expect(minGenerationLabel('3.1')).toBe('3.1 or newer');
-    expect(minGenerationLabel('4.0')).toBe('4.0 or newer');
-  });
-
-  it('names the floor when nothing was declared', () => {
-    expect(minGenerationLabel('any')).toBe('3.1 or newer');
+  it('falls back to the name for a generation it does not know', () => {
+    expect(generationLabel('9.9' as any)).toBe('9.9');
   });
 });
 
@@ -139,26 +118,56 @@ describe('isNewerGeneration', () => {
   });
 });
 
-describe('isPastGeneration', () => {
-  it('is false while nothing is declared', () => {
-    expect(isPastGeneration('any', '3.1')).toBe(false);
+describe('parseGenerations', () => {
+  it('reads a comma-separated list', () => {
+    expect(parseGenerations('3.1,4.0')).toEqual(['3.1', '4.0']);
+    expect(parseGenerations('4.0')).toEqual(['4.0']);
   });
 
-  it('is false when the declared cards still belong to that generation', () => {
-    expect(isPastGeneration('3.1', '3.1')).toBe(false);
-    expect(isPastGeneration('3.1', '4.0')).toBe(false);
-    expect(isPastGeneration('4.0', '4.0')).toBe(false);
+  it('returns them in table order, without repeats', () => {
+    expect(parseGenerations('4.0,3.1,4.0')).toEqual(['3.1', '4.0']);
   });
 
-  it('is true once every declared card is newer', () => {
-    expect(isPastGeneration('4.0', '3.1')).toBe(true);
+  // A name from a newer or older version of the app can be neither shown nor
+  // acted on, so it is dropped rather than kept around.
+  it('drops what it does not know', () => {
+    expect(parseGenerations('3.1,9.9')).toEqual(['3.1']);
+    expect(parseGenerations('any')).toEqual([]);
   });
 
-  // Screen tests hand over partial preferences, and a corrupt value must not
-  // hide anything either.
-  it('is false for a minimum it does not know', () => {
-    expect(isPastGeneration(undefined as any, '3.1')).toBe(false);
-    expect(isPastGeneration('9.9' as any, '3.1')).toBe(false);
+  it.each([null, undefined, '', 4, {}])('reads %p as none', value => {
+    expect(parseGenerations(value)).toEqual([]);
+  });
+});
+
+describe('parseGenerationsInUse', () => {
+  it('keeps a saved selection as it is', () => {
+    expect(parseGenerationsInUse('3.1')).toEqual(['3.1']);
+    expect(parseGenerationsInUse('4.0')).toEqual(['4.0']);
+  });
+
+  // The fresh install, and the only safe reading of a value nobody
+  // recognises: leaving entries out on the strength of a corrupt preference
+  // could hide what the user then has no way to reach.
+  it.each([null, undefined, '', 'any', '9.9', 4])(
+    'reads %p as every generation',
+    value => {
+      expect(parseGenerationsInUse(value)).toEqual([...ALL_GENERATIONS]);
+    },
+  );
+
+  it('does not hand out the shared list itself', () => {
+    expect(parseGenerationsInUse(null)).not.toBe(ALL_GENERATIONS);
+  });
+});
+
+describe('serializeGenerations', () => {
+  it('round-trips through the parser', () => {
+    expect(parseGenerations(serializeGenerations(['3.1', '4.0']))).toEqual([
+      '3.1',
+      '4.0',
+    ]);
+    expect(serializeGenerations([])).toBe('');
   });
 });
 

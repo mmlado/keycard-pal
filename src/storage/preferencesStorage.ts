@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { MinGeneration, parseMinGeneration } from '@/utils/cardGeneration';
+import {
+  ALL_GENERATIONS,
+  Generation,
+  parseGenerations,
+  parseGenerationsInUse,
+  serializeGenerations,
+} from '@/utils/cardGeneration';
 
 /** How the dashboard renders its destinations. */
 export type DashboardLayout = 'tiles' | 'list';
@@ -13,8 +19,13 @@ export type DashboardLayout = 'tiles' | 'list';
  */
 export type Preferences = {
   dashboardLayout: DashboardLayout;
-  /** Hides menu entries older cards alone have; never refuses a card. */
-  minGeneration: MinGeneration;
+  /**
+   * The generations of the cards the user holds, all of them by default.
+   * Leaves out menu entries and identify taps; never refuses a card.
+   */
+  generationsInUse: Generation[];
+  /** Generations whose dashboard reminder the user closed for good. */
+  generationRemindersDismissed: Generation[];
   pinPadScramble: boolean;
   tokenImagesEnabled: boolean;
   welcomeSeen: boolean;
@@ -23,7 +34,8 @@ export type Preferences = {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   dashboardLayout: 'tiles',
-  minGeneration: 'any',
+  generationsInUse: [...ALL_GENERATIONS],
+  generationRemindersDismissed: [],
   pinPadScramble: false,
   tokenImagesEnabled: false,
   welcomeSeen: false,
@@ -33,11 +45,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
 /**
  * Storage key per preference. Opt-in network features use the `_enabled`
  * suffix so the unset state reads as disabled (ADR-0003). Booleans are stored
- * as '1' / '0'; the layout and the minimum generation are stored verbatim.
+ * as '1' / '0'; the layout is stored verbatim and a list of generations comma-separated.
  */
 const KEYS: Record<keyof Preferences, string> = {
   dashboardLayout: 'preference_dashboard_layout',
-  minGeneration: 'preference_min_generation',
+  generationsInUse: 'preference_generations_in_use',
+  generationRemindersDismissed: 'preference_generation_reminders_dismissed',
   pinPadScramble: 'preference_pinpad_scramble',
   tokenImagesEnabled: 'preference_token_images_enabled',
   welcomeSeen: 'preference_welcome_seen',
@@ -57,7 +70,10 @@ export async function loadPreferences(): Promise<Preferences> {
       // a missing, empty or unrecognised value.
       dashboardLayout:
         stored[KEYS.dashboardLayout] === 'list' ? 'list' : 'tiles',
-      minGeneration: parseMinGeneration(stored[KEYS.minGeneration]),
+      generationsInUse: parseGenerationsInUse(stored[KEYS.generationsInUse]),
+      generationRemindersDismissed: parseGenerations(
+        stored[KEYS.generationRemindersDismissed],
+      ),
       pinPadScramble: flag('pinPadScramble'),
       tokenImagesEnabled: flag('tokenImagesEnabled'),
       welcomeSeen: flag('welcomeSeen'),
@@ -72,7 +88,10 @@ function encode(value: Preferences[keyof Preferences]): string {
   if (typeof value === 'boolean') {
     return value ? '1' : '0';
   }
-  return value;
+  if (typeof value === 'string') {
+    return value;
+  }
+  return serializeGenerations(value);
 }
 
 /**

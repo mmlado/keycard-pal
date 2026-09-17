@@ -3,7 +3,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '@/assets/icons';
-import { cardHasRoute, routeAbsence } from '@/navigation/generationBoundRoutes';
+import {
+  cardHasRoute,
+  everyCardInUseHasRoute,
+  routeAbsence,
+} from '@/navigation/generationBoundRoutes';
 import type { ChangeSecretScreenProps, SecretType } from '@/navigation/types';
 import theme from '@/theme';
 
@@ -16,6 +20,7 @@ import { useChangeSecret } from '@/hooks/keycard/useChangeSecret';
 import { useIdentifyCard } from '@/hooks/keycard/useIdentifyCard';
 import { useConfirmedEntry } from '@/hooks/useConfirmedEntry';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
+import { usePreferences } from '@/hooks/usePreferences';
 
 type SecretConfig = {
   inputType: 'numeric' | 'text';
@@ -70,7 +75,17 @@ export default function ChangeSecretScreen({
   // this one secret is identify-then-operate (ADR-0012): a first tap that only
   // reads the card, then the input, then the tap that changes it. Nothing is
   // asked of the user for a change the card cannot make.
-  const needsIdentify = secretType === 'pairing';
+  //
+  // A user who ticked only cards that have a pairing secret skips the first
+  // tap. If they tap another card anyway, `requiresRoute` on the operation
+  // still stops it right after SELECT.
+  const { preferences } = usePreferences();
+  const needsIdentify =
+    secretType === 'pairing' &&
+    !everyCardInUseHasRoute(
+      'ChangePairingSecret',
+      preferences.generationsInUse,
+    );
   const identify = useIdentifyCard();
   const { generation, phase: identifyPhase, start: startIdentify } = identify;
 

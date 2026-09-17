@@ -11,8 +11,6 @@ export type TileEntry = {
   icon: IconComponent;
   /** Marks a tile that starts an NFC flow; draws the NFC badge. */
   requiresNfc?: boolean;
-  /** Marks the current choice on a screen that picks one of its tiles. */
-  selected?: boolean;
   onPress: () => void;
 };
 
@@ -38,7 +36,7 @@ const TILE_MIN_HEIGHT = 112;
  * first entry when the grid has an odd count.
  */
 export default function Tile({ entry, variant, testID }: Props) {
-  const { label, detail, icon: Icon, requiresNfc, selected, onPress } = entry;
+  const { label, detail, icon: Icon, requiresNfc, onPress } = entry;
   const hero = variant === 'hero';
   const showDetail = hero && !!detail;
 
@@ -65,7 +63,6 @@ export default function Tile({ entry, variant, testID }: Props) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={showDetail ? `${label}. ${detail}` : label}
-      accessibilityState={selected === undefined ? undefined : { selected }}
       testID={testID}
     >
       <Icon

@@ -19,7 +19,7 @@ import TileGrid, { gridMetrics } from '@/components/TileGrid';
 
 import { usePreferences } from '@/hooks/usePreferences';
 
-import { MinGeneration } from '@/utils/cardGeneration';
+import { Generation } from '@/utils/cardGeneration';
 
 export type EntryListItem = {
   label: string;
@@ -29,12 +29,10 @@ export type EntryListItem = {
   /** Marks a row that starts an NFC flow, per the app's NFC icon rule. */
   requiresNfc?: boolean;
   /**
-   * Set on an entry newer cards no longer have. The entry is then dropped once
-   * the user has declared cards that new in Settings.
+   * Set on an entry only some cards have. The entry is then dropped when none
+   * of the cards the user ticked in Settings is one of them.
    */
   generationBoundRoute?: GenerationBoundRoute;
-  /** Marks the current choice on a screen that picks one of its entries. */
-  selected?: boolean;
   onPress: () => void;
 };
 
@@ -53,7 +51,7 @@ type Props = {
 };
 
 /**
- * Drops the entries the user's declared cards do not have, and any group that
+ * Drops the entries none of the user's cards has, and any group that
  * leaves empty. This runs before anything else is derived from the groups:
  * testIDs are positional, the tile grid promotes its first entry on an odd
  * count, and the grouped flag counts groups, so a hidden entry has to look as
@@ -61,7 +59,7 @@ type Props = {
  */
 function visibleGroups(
   groups: EntryListSection[],
-  minGeneration: MinGeneration,
+  generationsInUse: Generation[],
 ): EntryListSection[] {
   return groups
     .map(group => ({
@@ -69,7 +67,7 @@ function visibleGroups(
       entries: group.entries.filter(
         entry =>
           !entry.generationBoundRoute ||
-          !isRouteHidden(entry.generationBoundRoute, minGeneration),
+          !isRouteHidden(entry.generationBoundRoute, generationsInUse),
       ),
     }))
     .filter(
@@ -92,7 +90,7 @@ export default function EntryList({ entries, sections, footer }: Props) {
 
   const groups = visibleGroups(
     sections ?? [{ entries: entries ?? [] }],
-    preferences.minGeneration,
+    preferences.generationsInUse,
   );
   const list = preferences.dashboardLayout === 'list';
   const grouped = groups.length > 1;

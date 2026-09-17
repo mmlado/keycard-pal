@@ -9,13 +9,20 @@ import type { ApplicationInfo } from 'keycard-sdk/dist/application-info';
  */
 export type Generation = '3.1' | '4.0';
 
-/** Every generation, oldest first. The first one is the floor. */
+/**
+ * Every generation, oldest first. The first one is the floor.
+ *
+ * `label` is how the generation is named to the user. It is written by hand
+ * rather than derived from the version: a generation can start mid-major, where
+ * a computed "4.x" would name two of them.
+ */
 export const GENERATIONS: readonly {
   generation: Generation;
   minAppletVersion: number;
+  label: string;
 }[] = [
-  { generation: '3.1', minAppletVersion: 0x0301 },
-  { generation: '4.0', minAppletVersion: 0x0400 },
+  { generation: '3.1', minAppletVersion: 0x0301, label: '3.x' },
+  { generation: '4.0', minAppletVersion: 0x0400, label: '4.x' },
 ];
 
 /**
@@ -67,45 +74,12 @@ export function isBelowMinimumVersion(appInfo: ApplicationInfo): boolean {
   return cardGeneration(appInfo) === null;
 }
 
-/**
- * The oldest generation the user says their cards belong to, or 'any' when they
- * have not said. It only ever hides menu entries: no card is refused because of
- * it, which is the floor's job alone.
- */
-export type MinGeneration = Generation | 'any';
-
-/**
- * A stored minimum generation, or 'any' for anything unrecognised. A stale or
- * corrupt value must fall back to hiding nothing, or it could hide entries the
- * user then has no way to reach.
- */
-export function parseMinGeneration(stored: unknown): MinGeneration {
-  const known = GENERATIONS.find(entry => entry.generation === stored);
-  return known ? known.generation : 'any';
-}
-
-/**
- * The generation a minimum stands for. 'any', or anything unrecognised, is the
- * floor: nothing below the first generation is driven at all, so declaring it
- * and declaring nothing show the same menus.
- */
-function minGenerationEntry(minGeneration: MinGeneration) {
+/** How a generation is named to the user, e.g. "3.x". */
+export function generationLabel(generation: Generation): string {
   return (
-    GENERATIONS.find(entry => entry.generation === minGeneration) ??
-    GENERATIONS[0]
+    GENERATIONS.find(entry => entry.generation === generation)?.label ??
+    generation
   );
-}
-
-export function effectiveMinGeneration(
-  minGeneration: MinGeneration,
-): Generation {
-  return minGenerationEntry(minGeneration).generation;
-}
-
-/** How a minimum reads to the user, e.g. "3.1 or newer". */
-export function minGenerationLabel(minGeneration: MinGeneration): string {
-  const { minAppletVersion } = minGenerationEntry(minGeneration);
-  return `${formatAppletVersion(minAppletVersion)} or newer`;
 }
 
 /** True when `generation` is strictly newer than `other`. */
@@ -118,21 +92,38 @@ export function isNewerGeneration(
   return rank(generation) > rank(other);
 }
 
+/** Every generation, in order. What a user who never chose has ticked. */
+export const ALL_GENERATIONS: readonly Generation[] = GENERATIONS.map(
+  entry => entry.generation,
+);
+
 /**
- * True when every card the user declared is newer than `lastGeneration`, the
- * last generation that still has some feature.
+ * A stored list of generations, as the known ones among its comma-separated
+ * parts, in table order and without repeats. Anything else in it is dropped:
+ * a name this version does not know cannot be shown or acted on.
  */
-export function isPastGeneration(
-  minGeneration: MinGeneration,
-  lastGeneration: Generation,
-): boolean {
-  // Parsed again rather than trusted: a caller can hand over a value that never
-  // went through storage, and an unknown one has to hide nothing.
-  const min = parseMinGeneration(minGeneration);
-  if (min === 'any') {
-    return false;
-  }
-  return isNewerGeneration(min, lastGeneration);
+export function parseGenerations(stored: unknown): Generation[] {
+  const parts = typeof stored === 'string' ? stored.split(',') : [];
+  return ALL_GENERATIONS.filter(generation => parts.includes(generation));
+}
+
+/**
+ * The generations the user ticked as the cards they hold, from storage.
+ *
+ * Nothing usable stored means all of them. That is the fresh install, and it
+ * is also the only safe reading of a value nobody recognises: leaving entries
+ * out on the strength of a corrupt preference could hide what the user then
+ * has no way to reach. A saved selection is kept as it is, so a generation
+ * added by a later version arrives unticked: most users will not own the new
+ * card when it ships, and tapping one is what asks them.
+ */
+export function parseGenerationsInUse(stored: unknown): Generation[] {
+  const known = parseGenerations(stored);
+  return known.length > 0 ? known : [...ALL_GENERATIONS];
+}
+
+export function serializeGenerations(generations: Generation[]): string {
+  return generations.join(',');
 }
 
 /**

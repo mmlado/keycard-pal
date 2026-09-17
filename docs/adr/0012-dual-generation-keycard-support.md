@@ -50,15 +50,35 @@ costs nothing.
   there is no `IDENTIFY CARD`, so those cards would otherwise work in a degraded,
   never-verified way. What the app can drive at all is a safety property and is a
   constant, not a setting.
-- A **Settings picker** lets the user declare a generation, which hides menu
-  entries below it. It is cosmetic: it never refuses a card. A user set to 4.0+
-  who taps a 3.x card gets a working card, just without the legacy entries.
+- A **Settings selection** lets the user tick the generations of the cards they
+  use, all of them by default. It shapes the app around those cards and nothing
+  else: a menu entry is left out when no ticked generation has it, and an
+  identify tap is left out when every ticked generation has the operation. It
+  never refuses a card. A user who ticked only 4.x and taps a 3.x card gets a
+  working card, just without the legacy entries.
 - A **tap-time check** is the correctness backstop under both, because only the
   tap can know the truth.
 
-The floor and the picker are not merged. They answer different questions, and a
-merged control would let a user with two cards lock themselves out of one through
-a preference they set months earlier and forgot.
+The floor and the selection are not merged. They answer different questions, and
+a merged control would let a user with two cards lock themselves out of one
+through a preference they set months earlier and forgot.
+
+The selection started as a single minimum, which could only hide what older cards
+alone have. That left the user with only 3.x cards no way to say so, and they are
+the ones who pay the identify tap. A set of generations says both, and also "3.x
+and 5.x, not 4.x", which a range cannot.
+
+**A selection that turns out wrong corrects itself from a tap, never from an
+update.** Tapping a card of an unticked generation leaves a reminder on the
+dashboard with a button that ticks it and a close button that silences it for
+that generation. A tap is evidence the user holds such a card; an app update
+that adds a generation is not, and most users will not own the new card when it
+ships. So a new generation arrives unticked for anyone who has saved a selection,
+and ticked for anyone who never touched it. The reminder keeps the tapped
+generation in memory only, as a pending question rather than a fact the app acts
+on, which is as far as "never remembered" bends. A button in Settings reads a
+card and ticks only its generation, for the user who would rather tap than read
+version numbers.
 
 **Operations a card's generation does not support are two-step.** The first tap
 is SELECT only: it reads the generation and ends. The app then collects whatever
@@ -78,9 +98,12 @@ a second type that would need the field too.
 
 - Adding a generation means adding a row to the ordered table and, if it changes
   the menu, a row to the route table. No screen changes.
-- Only Change pairing secret pays a second tap, and only for users who have not
-  narrowed the picker. Manage pairing slots stays one tap: it needs no PIN and
-  already taps as part of its own screen.
+- Only Change pairing secret pays a second tap, and only for users whose
+  selection includes a generation without a pairing secret. With only 3.x ticked
+  it is one tap again. The check on the operating tap stays either way, so a
+  wrong selection costs the user a typed PIN and an explanation, never a command
+  sent to a card that lacks it. Manage pairing slots stays one tap: it needs no
+  PIN and already taps as part of its own screen.
 - The instance UID is gone on 4.0, so trust-shaped state keys on the card key
   (see 0013) and key-shaped state keys on the key UID. The export resume cache
   moves to the key UID, which also fixes a latent 3.x bug: a factory reset with a
@@ -94,9 +117,12 @@ a second type that would need the field too.
   in #305, along with deleting the unreachable `KeycardLogScreen`.
 - The words "generation" and "secure channel" stay out of the UI, and the
   user's word for the trust verdict is "genuine", as in shell. Applet versions
-  are shown, though, where shell shows none: as major.minor in the Settings
-  picker and in the message refusing a card below the floor, because telling
-  the user which card they hold is the point of those surfaces.
+  are shown, though, where shell shows none: as a hand-written label per
+  generation ("Applet 3.x") in Settings and on the reminder, and as major.minor
+  in the message refusing a card below the floor, because telling the user which
+  card they hold is the point of those surfaces. The label is written by hand
+  because a generation can start mid-major, where a computed "4.x" would name
+  two of them.
 
 ## Revisit if
 

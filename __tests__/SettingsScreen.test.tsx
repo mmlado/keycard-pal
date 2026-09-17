@@ -29,12 +29,56 @@ jest.mock('../src/assets/icons', () => {
   return { Icons: { openInBrowser: Icon, qr: Icon } };
 });
 
-jest.mock('../src/components/settings/AppletVersionSettingsSection', () => {
+// Stubbed like every other section, but it keeps its two props: they are how
+// the screen's tap reaches it.
+jest.mock('../src/components/settings/KeycardsInUseSettingsSection', () => {
   const { Text } = require('react-native');
-  return ({ onPress }: { onPress: () => void }) => (
-    <Text onPress={onPress}>Keycard applet version</Text>
+  return ({
+    onSetFromCard,
+    readingCard,
+  }: {
+    onSetFromCard: () => void;
+    readingCard: boolean;
+  }) => (
+    <Text onPress={onSetFromCard}>
+      {readingCard ? 'Reading card' : 'Set from my Keycard'}
+    </Text>
   );
 });
+
+jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
+
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: jest.fn(),
+}));
+
+const mockSetPreference = jest.fn();
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: {},
+    setPreference: (...args: unknown[]) => mockSetPreference(...args),
+  }),
+}));
+
+const mockIdentifyStart = jest.fn();
+const mockIdentifyCancel = jest.fn();
+let mockIdentify: {
+  phase: 'idle' | 'nfc' | 'done' | 'error';
+  generation: '3.1' | '4.0' | null;
+};
+
+jest.mock('../src/hooks/keycard/useIdentifyCard', () => ({
+  useIdentifyCard: () => ({
+    phase: mockIdentify.phase,
+    status: '',
+    cardPresence: 'waiting',
+    generation: mockIdentify.generation,
+    start: mockIdentifyStart,
+    retry: mockIdentifyStart,
+    cancel: mockIdentifyCancel,
+    openNFCSettings: undefined,
+  }),
+}));
 
 jest.mock('../src/components/settings/DashboardLayoutSettingsSection', () => {
   const { Text } = require('react-native');
@@ -74,7 +118,19 @@ jest.mock('../src/navigation/navigationRef', () => ({
   },
 }));
 
-const navigation = { setOptions: jest.fn(), navigate: jest.fn() } as any;
+const navigation = {
+  setOptions: jest.fn(),
+  navigate: jest.fn(),
+  goBack: jest.fn(),
+  addListener: jest.fn(() => jest.fn()),
+} as any;
+
+const MockNFCBottomSheet = jest.requireMock('../src/components/NFCBottomSheet');
+
+function lastSheetProps() {
+  const calls = MockNFCBottomSheet.mock.calls;
+  return calls[calls.length - 1][0];
+}
 
 function renderScreen() {
   return render(<SettingsScreen navigation={navigation} route={{} as any} />);
@@ -91,6 +147,12 @@ describe('SettingsScreen', () => {
     mockNavigate.mockClear();
     navigation.setOptions.mockClear();
     navigation.navigate.mockClear();
+    navigation.goBack.mockClear();
+    mockSetPreference.mockClear();
+    mockIdentifyStart.mockClear();
+    mockIdentifyCancel.mockClear();
+    MockNFCBottomSheet.mockClear();
+    mockIdentify = { phase: 'idle', generation: null };
     mockConnected = true;
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     (Linking.openURL as jest.Mock).mockClear();
@@ -120,12 +182,72 @@ describe('SettingsScreen', () => {
     expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
   });
 
-  // The row only shows the value; choosing one needs words and room, so it
-  // opens a screen of its own.
-  it('opens the applet version picker from its row', () => {
-    renderScreen();
-    fireEvent.press(screen.getByText('Keycard applet version'));
-    expect(navigation.navigate).toHaveBeenCalledWith('MinAppletVersion');
+  // For the user who would rather tap a card than read applet versions.
+  describe('set from my Keycard', () => {
+    it('starts a read of the card from the section', () => {
+      renderScreen();
+      fireEvent.press(screen.getByText('Set from my Keycard'));
+      expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('tells the section while a card is being read', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(screen.getByText('Reading card')).toBeTruthy();
+    });
+
+    it('gives the NFC sheet the read', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(lastSheetProps().nfc.phase).toBe('nfc');
+      expect(lastSheetProps().nfc.retry).toBe(mockIdentifyStart);
+    });
+
+    it('ticks only the generation of the card that was read', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      renderScreen();
+      expect(mockSetPreference).toHaveBeenCalledWith('generationsInUse', [
+        '3.1',
+      ]);
+    });
+
+    it('changes nothing until a card has been read', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(mockSetPreference).not.toHaveBeenCalled();
+    });
+
+    // Reading a second card of the same generation has to narrow the
+    // selection again, though the generation it found has not changed.
+    it('narrows again when another card of the same generation is read', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      const view = renderScreen();
+      mockSetPreference.mockClear();
+
+      mockIdentify = { phase: 'nfc', generation: '3.1' };
+      view.rerender(
+        <SettingsScreen navigation={navigation} route={{} as any} />,
+      );
+      expect(mockSetPreference).not.toHaveBeenCalled();
+
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      view.rerender(
+        <SettingsScreen navigation={navigation} route={{} as any} />,
+      );
+      expect(mockSetPreference).toHaveBeenCalledWith('generationsInUse', [
+        '3.1',
+      ]);
+    });
+
+    // The user is in Settings to change settings; cancelling a read is not a
+    // reason to leave, and a finished one has nowhere to go either.
+    it('stays in Settings when the read is cancelled', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      lastSheetProps().onCancel();
+      expect(mockIdentifyCancel).toHaveBeenCalledTimes(1);
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
   });
 
   it('renders on Android with the height keyboard behaviour', () => {

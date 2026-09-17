@@ -1,4 +1,4 @@
-import React, { useLayoutEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,14 +12,19 @@ import { Icons } from '../assets/icons';
 import type { DashboardAction, SettingsScreenProps } from '../navigation/types';
 import theme from '../theme';
 
-import AppletVersionSettingsSection from '../components/settings/AppletVersionSettingsSection';
+import NFCBottomSheet from '../components/NFCBottomSheet';
 import DashboardLayoutSettingsSection from '../components/settings/DashboardLayoutSettingsSection';
 import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
 import KeycardSettingsSection from '../components/settings/KeycardSettingsSection';
+import KeycardsInUseSettingsSection from '../components/settings/KeycardsInUseSettingsSection';
 import PinPadSettingsSection from '../components/settings/PinPadSettingsSection';
 import TenderlySettingsSection from '../components/settings/tenderly/TenderlySettingsSection.online';
 import TokenImagesSettingsSection from '../components/settings/TokenImagesSettingsSection.online';
 import WalletConnectSettingsSection from '../components/settings/WalletConnectSettingsSection.online';
+
+import { useIdentifyCard } from '../hooks/keycard/useIdentifyCard';
+import { useKeycardScreen } from '../hooks/useKeycardScreen';
+import { usePreferences } from '../hooks/usePreferences';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Settings',
@@ -29,10 +34,30 @@ export const dashboardEntry: DashboardAction = {
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const insets = useSafeAreaInsets();
+  const { setPreference } = usePreferences();
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: 'Settings' });
-  }, [navigation]);
+  // "Set from my Keycard": the SELECT-only identify tap, for the user who
+  // would rather tap a card than read applet versions.
+  const identify = useIdentifyCard();
+  const { phase: identifyPhase, generation, start: startIdentify } = identify;
+
+  // Keyed on the tap finishing, not on the generation alone: reading a second
+  // card of the same generation has to narrow the selection again, and the
+  // generation would not have changed.
+  useEffect(() => {
+    if (identifyPhase === 'done' && generation !== null) {
+      setPreference('generationsInUse', [generation]);
+    }
+  }, [identifyPhase, generation, setPreference]);
+
+  // Owns the header title and the back guard. There is no `done` here, so a
+  // finished tap leaves the user in Settings, looking at what it ticked.
+  const { onCancel } = useKeycardScreen({
+    keycard: identify,
+    navigation,
+    title: 'Settings',
+    stayOnCancel: true,
+  });
 
   return (
     <KeyboardAvoidingView
@@ -50,8 +75,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         <View style={styles.section}>
           <KeycardSettingsSection />
           <DashboardLayoutSettingsSection />
-          <AppletVersionSettingsSection
-            onPress={() => navigation.navigate('MinAppletVersion')}
+          <KeycardsInUseSettingsSection
+            onSetFromCard={startIdentify}
+            readingCard={identifyPhase === 'nfc'}
           />
           <PinPadSettingsSection />
           <TokenImagesSettingsSection />
@@ -60,6 +86,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           <TenderlySettingsSection />
         </View>
       </ScrollView>
+
+      <NFCBottomSheet nfc={identify} onCancel={onCancel} />
     </KeyboardAvoidingView>
   );
 }

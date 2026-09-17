@@ -1,5 +1,6 @@
 import {
   cardHasRoute,
+  everyCardInUseHasRoute,
   isRouteHidden,
   routeAbsence,
 } from '../src/navigation/generationBoundRoutes';
@@ -10,17 +11,37 @@ const ROUTES = ['PairingSlots', 'ChangePairingSecret'] as const;
 describe('isRouteHidden', () => {
   // Pairing went away with applet 4.0, so both pairing destinations are the
   // ones a user with only newer cards never needs to see.
-  it.each(ROUTES)('hides %s once the user has declared 4.0 cards', route => {
-    expect(isRouteHidden(route, '4.0')).toBe(true);
+  it.each(ROUTES)('hides %s when only 4.x cards are ticked', route => {
+    expect(isRouteHidden(route, ['4.0'])).toBe(true);
   });
 
-  it.each(ROUTES)(
-    'shows %s for 3.1 cards and when nothing is declared',
-    route => {
-      expect(isRouteHidden(route, '3.1')).toBe(false);
-      expect(isRouteHidden(route, 'any')).toBe(false);
-    },
-  );
+  it.each(ROUTES)('shows %s as long as one ticked card has it', route => {
+    expect(isRouteHidden(route, ['3.1'])).toBe(false);
+    expect(isRouteHidden(route, ['3.1', '4.0'])).toBe(false);
+  });
+
+  // An empty selection says nothing about the user's cards. An entry hidden on
+  // no evidence could not be reached at all.
+  it.each(ROUTES)('shows %s for an empty selection', route => {
+    expect(isRouteHidden(route, [])).toBe(false);
+  });
+});
+
+// Also a preference: decides whether the tap that reads the card is needed.
+describe('everyCardInUseHasRoute', () => {
+  it.each(ROUTES)('is true for %s when only 3.x cards are ticked', route => {
+    expect(everyCardInUseHasRoute(route, ['3.1'])).toBe(true);
+  });
+
+  it.each(ROUTES)('is false for %s once a 4.x card is ticked', route => {
+    expect(everyCardInUseHasRoute(route, ['3.1', '4.0'])).toBe(false);
+    expect(everyCardInUseHasRoute(route, ['4.0'])).toBe(false);
+  });
+
+  // Nothing ticked proves nothing, so the card is read first.
+  it.each(ROUTES)('is false for %s on an empty selection', route => {
+    expect(everyCardInUseHasRoute(route, [])).toBe(false);
+  });
 });
 
 // What the card on the antenna actually has. This one does refuse.

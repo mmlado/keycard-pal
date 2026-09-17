@@ -1,9 +1,4 @@
-import {
-  Generation,
-  isNewerGeneration,
-  isPastGeneration,
-  MinGeneration,
-} from '@/utils/cardGeneration';
+import { Generation, isNewerGeneration } from '@/utils/cardGeneration';
 
 /**
  * Menu destinations that newer cards no longer have. Each names the route it
@@ -17,9 +12,10 @@ export type GenerationBoundRoute = 'PairingSlots' | 'ChangePairingSecret';
  * whole list on purpose: a menu entry only says which destination it is, so
  * what is bound, and to what, is read in one place.
  *
- * Two questions are asked of it, and they are not the same question.
- * `isRouteHidden` answers a preference: what the user said about their cards.
- * `cardHasRoute` answers the card: what the one on the antenna actually has.
+ * Two kinds of question are asked of it, and they are not the same kind.
+ * `isRouteHidden` and `everyCardInUseHasRoute` answer a preference: what the
+ * user said about their cards. `cardHasRoute` answers the card: what the one
+ * on the antenna actually has. Only the last one ever refuses anything.
  */
 const LAST_GENERATION: Record<GenerationBoundRoute, Generation> = {
   PairingSlots: '3.1',
@@ -27,15 +23,35 @@ const LAST_GENERATION: Record<GenerationBoundRoute, Generation> = {
 };
 
 /**
- * True when the user has declared cards too new to have this destination. The
- * declaration is a preference, not a fact about the tapped card, so this only
- * decides what a menu shows; the tap still checks the card itself.
+ * True when none of the cards the user ticked has this destination, so its
+ * menu entry is left out. The selection is a preference, not a fact about the
+ * tapped card, so this only decides what a menu shows; the tap still checks
+ * the card itself. An empty selection hides nothing: it says nothing about the
+ * user's cards, and an entry hidden on no evidence cannot be reached at all.
  */
 export function isRouteHidden(
   route: GenerationBoundRoute,
-  minGeneration: MinGeneration,
+  generationsInUse: readonly Generation[],
 ): boolean {
-  return isPastGeneration(minGeneration, LAST_GENERATION[route]);
+  return (
+    generationsInUse.length > 0 &&
+    !generationsInUse.some(generation => cardHasRoute(route, generation))
+  );
+}
+
+/**
+ * True when every card the user ticked has this destination, so the identify
+ * tap that would find out can be left out. An empty selection proves nothing
+ * and keeps the tap. The operating tap checks the card either way.
+ */
+export function everyCardInUseHasRoute(
+  route: GenerationBoundRoute,
+  generationsInUse: readonly Generation[],
+): boolean {
+  return (
+    generationsInUse.length > 0 &&
+    generationsInUse.every(generation => cardHasRoute(route, generation))
+  );
 }
 
 /**

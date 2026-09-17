@@ -2,15 +2,19 @@ import React from 'react';
 import { Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import AppletVersionSettingsSection from '../src/components/settings/AppletVersionSettingsSection';
 import DashboardLayoutSettingsSection from '../src/components/settings/DashboardLayoutSettingsSection';
+import KeycardsInUseSettingsSection from '../src/components/settings/KeycardsInUseSettingsSection';
 import PinPadSettingsSection from '../src/components/settings/PinPadSettingsSection';
 import TokenImagesSettingsSection from '../src/components/settings/TokenImagesSettingsSection.online';
 import { usePreferences } from '../src/hooks/usePreferences';
 import useTokenImagesEnabled from '../src/hooks/useTokenImagesEnabled.online';
 import { PreferencesProvider } from '../src/providers/preferences/Provider';
-import MinAppletVersionScreen from '../src/screens/MinAppletVersionScreen';
 import SecretsMenuScreen from '../src/screens/secrets/SecretsMenuScreen';
+import UnselectedKeycardReminder from '../src/components/UnselectedKeycardReminder';
+import {
+  noteTappedGeneration,
+  resetLastTappedGeneration,
+} from '../src/utils/lastTappedGeneration';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -65,22 +69,30 @@ function Probe() {
 /** Its own line, so the existing assertions keep reading one string. */
 function GenerationProbe() {
   const { preferences } = usePreferences();
-  return <Text>{`generation:${preferences.minGeneration}`}</Text>;
+  return (
+    <Text>
+      {`in-use:${preferences.generationsInUse.join('+')} dismissed:${
+        preferences.generationRemindersDismissed.join('+') || 'none'
+      }`}
+    </Text>
+  );
 }
 
-const pickerNavigation = { goBack: jest.fn() } as any;
-
 /**
- * The picker screen beside the Settings row that shows its value, the two
- * ends of the one preference that is chosen on a screen of its own.
+ * The Settings checkboxes beside the two things they act on: a menu that
+ * leaves entries out, and the dashboard reminder.
  */
-async function renderAppletVersion() {
+async function renderKeycardsInUse() {
   const view = render(
     <PreferencesProvider>
-      <AppletVersionSettingsSection onPress={jest.fn()} />
-      <MinAppletVersionScreen
-        navigation={pickerNavigation}
-        route={{ key: 'MinAppletVersion', name: 'MinAppletVersion' } as any}
+      <KeycardsInUseSettingsSection
+        onSetFromCard={jest.fn()}
+        readingCard={false}
+      />
+      <UnselectedKeycardReminder />
+      <SecretsMenuScreen
+        navigation={{ navigate: jest.fn() } as any}
+        route={{ key: 'SecretsMenu', name: 'SecretsMenu' } as any}
       />
       <GenerationProbe />
     </PreferencesProvider>,
@@ -200,70 +212,97 @@ describe('changing a setting', () => {
     expect(await AsyncStorage.getItem('preference_pinpad_scramble')).toBe('0');
   });
 
-  // Both options read "N or newer" on the picker and the Settings row repeats
-  // the current one, so the option is pressed by id, not by text.
-  it('writes the minimum generation and updates the Settings row', async () => {
-    await renderAppletVersion();
-    expect(screen.getByText('generation:any')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Keycard applet version, 3.1 or newer'),
-    ).toBeTruthy();
-
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('tile-1'));
+  describe('Keycards in use', () => {
+    beforeEach(() => {
+      resetLastTappedGeneration();
     });
-    await flush();
 
-    expect(screen.getByText('generation:4.0')).toBeTruthy();
-    expect(
-      screen.getByLabelText('Keycard applet version, 4.0 or newer'),
-    ).toBeTruthy();
-    expect(await AsyncStorage.getItem('preference_min_generation')).toBe('4.0');
-  });
-
-  // The whole point of the preference: a menu elsewhere in the tree drops
-  // what only older cards have, the moment the user says they have none.
-  it('hides the pairing secret entry once 4.0 cards are declared', async () => {
-    render(
-      <PreferencesProvider>
-        <MinAppletVersionScreen
-          navigation={pickerNavigation}
-          route={{ key: 'MinAppletVersion', name: 'MinAppletVersion' } as any}
-        />
-        <SecretsMenuScreen
-          navigation={{ navigate: jest.fn() } as any}
-          route={{ key: 'SecretsMenu', name: 'SecretsMenu' } as any}
-        />
-      </PreferencesProvider>,
-    );
-    await flush();
-    expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
-
-    await act(async () => {
-      fireEvent.press(screen.getByText('4.0 or newer'));
+    it('starts with every Keycard ticked and nothing left out', async () => {
+      await renderKeycardsInUse();
+      expect(screen.getByText('in-use:3.1+4.0 dismissed:none')).toBeTruthy();
+      expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
     });
-    await flush();
 
-    expect(screen.queryByText('Change Pairing Secret')).toBeNull();
-    expect(screen.getByText('Change PIN')).toBeTruthy();
-  });
+    // The whole point of the preference: a menu elsewhere in the tree drops
+    // what none of the user's cards has, the moment they say so.
+    it('unticking 3.x stores it and hides the pairing secret entry', async () => {
+      await renderKeycardsInUse();
 
-  it('keeps the minimum generation across a remount', async () => {
-    const first = await renderAppletVersion();
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('tile-1'));
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await flush();
+
+      expect(screen.getByText('in-use:4.0 dismissed:none')).toBeTruthy();
+      expect(screen.queryByText('Change Pairing Secret')).toBeNull();
+      expect(screen.getByText('Change PIN')).toBeTruthy();
+      expect(await AsyncStorage.getItem('preference_generations_in_use')).toBe(
+        '4.0',
+      );
     });
-    await flush();
-    first.unmount();
 
-    render(
-      <PreferencesProvider>
-        <GenerationProbe />
-      </PreferencesProvider>,
-    );
-    await flush();
+    it('the reminder ticks the tapped generation back on', async () => {
+      await renderKeycardsInUse();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await flush();
 
-    expect(screen.getByText('generation:4.0')).toBeTruthy();
+      await act(async () => {
+        noteTappedGeneration('3.1');
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('unselected-keycard-reminder-use'));
+      });
+      await flush();
+
+      expect(screen.getByText('in-use:3.1+4.0 dismissed:none')).toBeTruthy();
+      expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
+      expect(screen.queryByTestId('unselected-keycard-reminder')).toBeNull();
+      expect(await AsyncStorage.getItem('preference_generations_in_use')).toBe(
+        '3.1,4.0',
+      );
+    });
+
+    it('closing the reminder is remembered and changes no selection', async () => {
+      await renderKeycardsInUse();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await act(async () => {
+        noteTappedGeneration('3.1');
+      });
+      await act(async () => {
+        fireEvent.press(
+          screen.getByTestId('unselected-keycard-reminder-close'),
+        );
+      });
+      await flush();
+
+      expect(screen.getByText('in-use:4.0 dismissed:3.1')).toBeTruthy();
+      expect(screen.queryByTestId('unselected-keycard-reminder')).toBeNull();
+      expect(
+        await AsyncStorage.getItem('preference_generation_reminders_dismissed'),
+      ).toBe('3.1');
+    });
+
+    it('survives a remount, so the next launch reads the same selection', async () => {
+      const first = await renderKeycardsInUse();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await flush();
+      first.unmount();
+
+      render(
+        <PreferencesProvider>
+          <GenerationProbe />
+        </PreferencesProvider>,
+      );
+      await flush();
+
+      expect(screen.getByText('in-use:4.0 dismissed:none')).toBeTruthy();
+    });
   });
 
   // What a restart sees: a fresh provider reads back exactly what the

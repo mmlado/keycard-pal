@@ -4,6 +4,10 @@ import { AppState } from 'react-native';
 import useNFCSession, {
   CARD_MOVED_STATUS,
 } from '../src/hooks/keycard/useNFCSession';
+import {
+  getLastTappedGeneration,
+  resetLastTappedGeneration,
+} from '../src/utils/lastTappedGeneration';
 
 const ANDROID_TAG_LOST = 'CardIO Error: Error: Tag was lost.';
 const IOS_TAG_LOST = 'CardIO Error: Error: NFCError:100';
@@ -703,6 +707,47 @@ describe('useNFCSession', () => {
       const { result } = await tapCard();
       expect(mockOnCardConnected).toHaveBeenCalled();
       expect(result.current.phase).toBe('done');
+    });
+
+    // The dashboard reminder reads this. It is a note, not a gate: the card
+    // goes on to the operation whatever the user ticked in Settings.
+    describe('noting the tapped generation', () => {
+      beforeEach(() => {
+        resetLastTappedGeneration();
+      });
+
+      it('notes a 3.x card', async () => {
+        selectReturning({ appVersion: 0x0302 });
+        await tapCard();
+        expect(getLastTappedGeneration()).toBe('3.1');
+      });
+
+      it('notes a 4.0 card', async () => {
+        selectReturning({ appVersion: 0x0400 });
+        await tapCard();
+        expect(getLastTappedGeneration()).toBe('4.0');
+      });
+
+      it('notes it before the operation, so a failed one still counts', async () => {
+        selectReturning({ appVersion: 0x0400 });
+        mockOnCardConnected.mockRejectedValueOnce(
+          new Error('operation failed'),
+        );
+        await tapCard();
+        expect(getLastTappedGeneration()).toBe('4.0');
+      });
+
+      it('notes nothing for a card it refused', async () => {
+        selectReturning({ appVersion: 0x0300 });
+        await tapCard();
+        expect(getLastTappedGeneration()).toBeNull();
+      });
+
+      it('notes nothing when SELECT told it nothing', async () => {
+        mockSelect.mockResolvedValue({ sw: 0x9000 });
+        await tapCard();
+        expect(getLastTappedGeneration()).toBeNull();
+      });
     });
   });
 

@@ -14,7 +14,6 @@ import InitCardScreen from '../screens/InitCardScreen';
 import KeycardMenuScreen from '../screens/KeycardMenuScreen';
 import KeycardScreen from '../screens/KeycardScreen';
 import LicenseDetailScreen from '../screens/LicenseDetailScreen';
-import MinAppletVersionScreen from '../screens/MinAppletVersionScreen';
 import PairingSlotsScreen from '../screens/PairingSlotsScreen';
 import QRResultScreen from '../screens/QRResultScreen';
 import QRScannerScreen from '../screens/QRScannerScreen';
@@ -195,11 +194,6 @@ export const routes: Route[] = [
     name: 'Settings',
     component: SettingsScreen,
     options: { ...defaultHeaderOptions, title: 'Settings' },
-  },
-  {
-    name: 'MinAppletVersion',
-    component: MinAppletVersionScreen,
-    options: { ...defaultHeaderOptions, title: 'Keycard applet version' },
   },
 
   ...onlineRoutes,
