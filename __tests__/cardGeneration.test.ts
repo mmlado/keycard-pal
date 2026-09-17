@@ -5,6 +5,7 @@ import {
   formatAppletVersion,
   GENERATIONS,
   isBelowMinimumVersion,
+  isNewerGeneration,
   isPastGeneration,
   MIN_SUPPORTED_APPLET_VERSION,
   minGenerationLabel,
@@ -126,6 +127,15 @@ describe('minGenerationLabel', () => {
 
   it('names the floor when nothing was declared', () => {
     expect(minGenerationLabel('any')).toBe('3.1 or newer');
+  });
+});
+
+describe('isNewerGeneration', () => {
+  it('is true only for a strictly newer generation', () => {
+    expect(isNewerGeneration('4.0', '3.1')).toBe(true);
+    expect(isNewerGeneration('3.1', '4.0')).toBe(false);
+    expect(isNewerGeneration('3.1', '3.1')).toBe(false);
+    expect(isNewerGeneration('4.0', '4.0')).toBe(false);
   });
 });
 

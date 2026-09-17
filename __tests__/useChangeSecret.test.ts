@@ -8,6 +8,8 @@ let capturedOperation: OperationFn | null = null;
 let capturedOptions: {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
+  requiresRoute?: string;
+  retryOnTagLoss?: boolean;
   successMessage?: string;
 } | null = null;
 
@@ -17,6 +19,8 @@ const mockExecute = jest.fn(
     opts: {
       requiresPin?: boolean;
       requiresMasterKey?: boolean;
+      requiresRoute?: string;
+      retryOnTagLoss?: boolean;
       successMessage?: string;
     },
   ) => {
@@ -59,6 +63,36 @@ describe('useChangeSecret', () => {
       successMessage: 'PIN changed',
     });
   });
+
+  // Newer cards have no pairing secret. The screen identifies the card first;
+  // this is what stops a different card being tapped the second time.
+  it('binds only the pairing secret to cards that have one', async () => {
+    const pairing = renderHook(() => useChangeSecret('pairing'));
+    await act(async () => {
+      pairing.result.current.start('newpassword');
+    });
+    expect(capturedOptions?.requiresRoute).toBe('ChangePairingSecret');
+
+    for (const secretType of ['pin', 'puk'] as const) {
+      const { result } = renderHook(() => useChangeSecret(secretType));
+      await act(async () => {
+        result.current.start('123456');
+      });
+      expect(capturedOptions?.requiresRoute).toBeUndefined();
+    }
+  });
+
+  // A replayed write could land twice, so none of the three may opt in.
+  it.each(['pin', 'puk', 'pairing'] as const)(
+    'never retries a %s change on tag loss',
+    async secretType => {
+      const { result } = renderHook(() => useChangeSecret(secretType));
+      await act(async () => {
+        result.current.start('123456');
+      });
+      expect(capturedOptions?.retryOnTagLoss).toBeUndefined();
+    },
+  );
 
   it('changes PIN', async () => {
     const { result } = renderHook(() => useChangeSecret('pin'));

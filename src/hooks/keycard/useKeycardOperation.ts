@@ -8,7 +8,13 @@ import { Commandset } from 'keycard-sdk/dist/commandset';
 import RNKeycard from 'react-native-keycard';
 
 import { PAIRING_PASSWORD } from '@/constants/keycard';
+import {
+  cardHasRoute,
+  routeAbsence,
+  type GenerationBoundRoute,
+} from '@/navigation/generationBoundRoutes';
 import { loadPairing, savePairing } from '@/storage/pairingStorage';
+import { cardGeneration } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
 import { pubKeyFingerprint } from '@/utils/cryptoAccount';
 import { checkGenuine } from '@/utils/genuineCheck';
@@ -41,6 +47,13 @@ export type KeycardOperationFn<T> = (
 export interface ExecuteOptions {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
+  /**
+   * The destination this operation belongs to, when newer cards do not have
+   * it. The tapped card is checked right after SELECT, before anything else is
+   * sent: the second tap of an identify-then-operate flow can land on a
+   * different card than the first. Omit for operations every card has.
+   */
+  requiresRoute?: GenerationBoundRoute;
   /** Wait for a re-tap instead of failing when the card leaves the field
    *  mid-operation. Default false — only read-only operations may opt in;
    *  a replayed write can burn pairing slots or overwrite card state (R9). */
@@ -98,6 +111,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const operationRef = useRef<KeycardOperationFn<T> | null>(null);
   const requiresPinRef = useRef(true);
   const requiresMasterKeyRef = useRef(true);
+  const requiresRouteRef = useRef<GenerationBoundRoute | undefined>(undefined);
   const operationRunningRef = useRef(false);
   const retryOnTagLossRef = useRef(false);
   const successMessageRef = useRef<string | undefined>(undefined);
@@ -321,6 +335,17 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         throw new Error('No application info in SELECT response');
       }
 
+      // Before the card key, the name read, the genuine check, pairing and the
+      // PIN: a card without this operation is sent nothing beyond SELECT, so
+      // no PIN attempt is spent and no command it lacks ever reaches it.
+      const requiredRoute = requiresRouteRef.current;
+      if (
+        requiredRoute &&
+        !cardHasRoute(requiredRoute, cardGeneration(appInfo))
+      ) {
+        throw new Error(routeAbsence(requiredRoute).sheetError);
+      }
+
       const cardKey = getCardKey(appInfo);
       if (cardKey === null) {
         throw new Error(
@@ -414,6 +439,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       operationRef.current = op;
       requiresPinRef.current = options.requiresPin ?? true;
       requiresMasterKeyRef.current = options.requiresMasterKey ?? true;
+      requiresRouteRef.current = options.requiresRoute;
       retryOnTagLossRef.current = options.retryOnTagLoss ?? false;
       successMessageRef.current = options.successMessage;
       operationRunningRef.current = false;

@@ -108,6 +108,16 @@ export function minGenerationLabel(minGeneration: MinGeneration): string {
   return `${formatAppletVersion(minAppletVersion)} or newer`;
 }
 
+/** True when `generation` is strictly newer than `other`. */
+export function isNewerGeneration(
+  generation: Generation,
+  other: Generation,
+): boolean {
+  const rank = (known: Generation) =>
+    GENERATIONS.findIndex(entry => entry.generation === known);
+  return rank(generation) > rank(other);
+}
+
 /**
  * True when every card the user declared is newer than `lastGeneration`, the
  * last generation that still has some feature.
@@ -122,9 +132,7 @@ export function isPastGeneration(
   if (min === 'any') {
     return false;
   }
-  const rank = (generation: Generation) =>
-    GENERATIONS.findIndex(entry => entry.generation === generation);
-  return rank(min) > rank(lastGeneration);
+  return isNewerGeneration(min, lastGeneration);
 }
 
 /**

@@ -9,6 +9,9 @@ import {
 import type { UseKeycardOperation } from '../src/hooks/keycard/useKeycardOperation';
 import { checkGenuine } from '../src/utils/genuineCheck';
 import { loadPairing } from '../src/storage/pairingStorage';
+import { routeAbsence } from '../src/navigation/generationBoundRoutes';
+
+import { filler, v3Select, v4Select } from './selectResponse.testUtils';
 
 // ---------------------------------------------------------------------------
 // RNKeycard mock — captures event callbacks so tests can trigger them
@@ -577,6 +580,132 @@ describe('useKeycardOperation', () => {
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe(
         'This Keycard is not initialized. Initialize it first.',
+      );
+    });
+  });
+
+  // The second tap of an identify-then-operate flow can land on a different
+  // card than the first. By then the PIN is typed, so the check has to come
+  // before anything that could spend an attempt or send a command the card
+  // does not have.
+  describe('requiresRoute', () => {
+    const CERTIFICATE = [...filler(33, 0x02), ...filler(65, 0x09)];
+
+    function useCard(applicationInfo: unknown) {
+      const cmdSet = { ...makeMockCmdSet(), applicationInfo };
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+      return cmdSet;
+    }
+
+    async function tapWithPin(
+      options: Parameters<UseKeycardOperation<string>['execute']>[1],
+    ) {
+      const op = jest.fn().mockResolvedValue('result');
+      const hook = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        hook.result.current.execute(op, options);
+      });
+      await act(async () => {
+        hook.result.current.submitPin('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return { ...hook, op };
+    }
+
+    it('refuses a card that lacks the operation, in plain words', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        routeAbsence('ChangePairingSecret').sheetError,
+      );
+    });
+
+    it('sends that card nothing beyond SELECT', async () => {
+      const cmdSet = useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { op } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      expect(cmdSet.getData).not.toHaveBeenCalled();
+      expect(mockCheckGenuine).not.toHaveBeenCalled();
+      expect(cmdSet.autoPair).not.toHaveBeenCalled();
+      expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+      expect(cmdSet.verifyPIN).not.toHaveBeenCalled();
+      expect(op).not.toHaveBeenCalled();
+    });
+
+    // The right card is one tap away, so the typed PIN is kept.
+    it('lets the user tap the right card without typing the PIN again', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result, op } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      mockStartNFC.mockClear();
+
+      useCard(v3Select(0x0302));
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs on a card that has the operation', async () => {
+      const cmdSet = useCard(v3Select(0x0302));
+      const { result, op } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      expect(cmdSet.verifyPIN).toHaveBeenCalledWith('123456');
+      expect(op).toHaveBeenCalledTimes(1);
+      expect(result.current.phase).toBe('done');
+    });
+
+    // An operation every card has must not be held to this check.
+    it('is not applied to an operation that names no route', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result } = await tapWithPin({ requiresMasterKey: false });
+      expect(result.current.status).not.toBe(
+        routeAbsence('ChangePairingSecret').sheetError,
+      );
+    });
+
+    // The option is per execute: a bound operation must not leave its route
+    // behind for whatever this hook instance runs next.
+    it('does not carry over to the next operation', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result } = await tapWithPin({
+        requiresRoute: 'PairingSlots',
+        requiresMasterKey: false,
+      });
+      expect(result.current.status).toBe(
+        routeAbsence('PairingSlots').sheetError,
+      );
+
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('next'), {
+          requiresPin: false,
+          requiresMasterKey: false,
+        });
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.status).not.toBe(
+        routeAbsence('PairingSlots').sheetError,
       );
     });
   });

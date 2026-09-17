@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
+import { cardHasRoute } from '@/navigation/generationBoundRoutes';
 import { loadPairing } from '@/storage/pairingStorage';
+import { cardGeneration } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
+import { UNREADABLE_CARD_STATUS } from './useIdentifyCard';
 import {
   useNFCOperation,
   type CardPresence,
@@ -22,6 +25,11 @@ export interface UsePairingSlots {
   phase: NFCSessionPhase;
   cardPresence: CardPresence;
   slotInfo: SlotInfo | null;
+  /**
+   * True once a tap has shown a card that has no pairing slots at all. The
+   * read still ends in 'done': nothing failed, there is just nothing to list.
+   */
+  noPairingSlots: boolean;
   status: string;
   checkSlots: () => void;
   cancel: () => void;
@@ -32,11 +40,19 @@ export interface UsePairingSlots {
 
 export function usePairingSlots(): UsePairingSlots {
   const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
+  const [noPairingSlots, setNoPairingSlots] = useState(false);
 
   const readSlotInfo = useCallback(async (cmdSet: Commandset) => {
     const appInfo = cmdSet.applicationInfo;
     if (!appInfo) {
-      throw new Error('No application info in SELECT response');
+      throw new Error(UNREADABLE_CARD_STATUS);
+    }
+    // Before the card key: a card without pairing reports no free slot count
+    // and must not be mistaken for one that is merely not initialized.
+    if (!cardHasRoute('PairingSlots', cardGeneration(appInfo))) {
+      setNoPairingSlots(true);
+      setSlotInfo(null);
+      return;
     }
     const cardKey = getCardKey(appInfo);
     if (cardKey === null) {
@@ -72,6 +88,7 @@ export function usePairingSlots(): UsePairingSlots {
 
   const checkSlots = useCallback(() => {
     setSlotInfo(null);
+    setNoPairingSlots(false);
     start();
   }, [start]);
 
@@ -81,6 +98,7 @@ export function usePairingSlots(): UsePairingSlots {
 
   const reset = useCallback(() => {
     setSlotInfo(null);
+    setNoPairingSlots(false);
     nfcReset();
   }, [nfcReset]);
 
@@ -108,6 +126,7 @@ export function usePairingSlots(): UsePairingSlots {
     phase,
     cardPresence,
     slotInfo,
+    noPairingSlots,
     status,
     checkSlots,
     cancel,

@@ -9,6 +9,7 @@ import { Snackbar, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { routeAbsence } from '../navigation/generationBoundRoutes';
 import type { PairingSlotsScreenProps } from '../navigation/types';
 import theme from '../theme';
 
@@ -33,6 +34,7 @@ export default function PairingSlotsScreen({
     phase: checkPhase,
     cardPresence: checkCardPresence,
     slotInfo,
+    noPairingSlots,
     status: checkStatus,
     checkSlots,
     cancel: cancelCheck,
@@ -57,10 +59,12 @@ export default function PairingSlotsScreen({
   // Auto-start NFC check when the screen is focused and we have no data yet.
   useFocusEffect(
     useCallback(() => {
-      if (checkPhase === 'idle' && !slotInfo) {
+      // A card without pairing slots leaves slotInfo empty for good, so it
+      // has to stop this from asking for another tap every time.
+      if (checkPhase === 'idle' && !slotInfo && !noPairingSlots) {
         checkSlots();
       }
-    }, [checkPhase, slotInfo, checkSlots]),
+    }, [checkPhase, slotInfo, noPairingSlots, checkSlots]),
   );
 
   useEffect(() => {
@@ -94,7 +98,12 @@ export default function PairingSlotsScreen({
         await readSlotInfoFromCmdSet(cmdSet);
         setUnpairNotice(`Slot ${slotIndex + 1} was unpaired`);
       },
-      { requiresPin: true, requiresMasterKey: false },
+      // The slots were read from one card; the unpair tap can land on another.
+      {
+        requiresPin: true,
+        requiresMasterKey: false,
+        requiresRoute: 'PairingSlots',
+      },
     );
   }, [pendingSlotIndex, executeUnpair, slotInfo, readSlotInfoFromCmdSet]);
 
@@ -153,6 +162,8 @@ export default function PairingSlotsScreen({
     !isUnpairing &&
     (checkPhase === 'idle' || checkPhase === 'done' || checkPhase === 'error');
 
+  const absence = routeAbsence('PairingSlots');
+
   const menuEntries = slotInfo?.totalSlots
     ? Array.from({ length: slotInfo.totalSlots }, (_, i) => {
         const isOurSlot = i === slotInfo.ourSlotIndex;
@@ -168,7 +179,18 @@ export default function PairingSlotsScreen({
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
       {showContent && (
         <View style={styles.content}>
-          {!slotInfo && checkPhase !== 'error' && (
+          {noPairingSlots && (
+            <View style={styles.centeredContent}>
+              <Text style={styles.absenceTitle}>{absence.title}</Text>
+              <Text style={styles.description}>{absence.detail}</Text>
+              <PrimaryButton
+                label="Go back"
+                onPress={() => navigation.goBack()}
+              />
+            </View>
+          )}
+
+          {!slotInfo && !noPairingSlots && checkPhase !== 'error' && (
             <View style={styles.centeredContent}>
               <Text style={styles.description}>
                 Tap your Keycard to read the pairing slot status.
@@ -230,6 +252,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 24,
     paddingHorizontal: 24,
+  },
+  absenceTitle: {
+    color: theme.colors.onSurface,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   description: {
     color: theme.colors.onSurfaceMuted,

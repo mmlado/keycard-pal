@@ -75,6 +75,17 @@ describe('SecretsMenuScreen', () => {
     });
   });
 
+  // The pairing secret screen reads the card as soon as it opens, so its row
+  // carries the NFC mark. PIN and PUK ask for input first and do not.
+  describe('NFC indicator', () => {
+    it('marks only the pairing secret entry', () => {
+      renderScreen();
+      expect(screen.queryByTestId('menu-nfc-indicator-0')).toBeNull();
+      expect(screen.queryByTestId('menu-nfc-indicator-1')).toBeNull();
+      expect(screen.getByTestId('menu-nfc-indicator-2')).toBeTruthy();
+    });
+  });
+
   describe('navigation', () => {
     it('navigates to ChangeSecret with pin secretType', () => {
       renderScreen();

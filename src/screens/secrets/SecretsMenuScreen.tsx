@@ -32,6 +32,8 @@ export default function SecretsMenuScreen({
     {
       label: 'Change Pairing Secret',
       icon: Icons.pairingSecret,
+      // Unlike PIN and PUK, this one reads the card as soon as it opens.
+      requiresNfc: true,
       generationBoundRoute: 'ChangePairingSecret',
       onPress: () =>
         navigation.navigate('ChangeSecret', { secretType: 'pairing' }),

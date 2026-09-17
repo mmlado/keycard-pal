@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react-native';
 
 import { usePairingSlots } from '../src/hooks/keycard/usePairingSlots';
 
+import { filler, v4Select } from './selectResponse.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -83,6 +85,7 @@ describe('usePairingSlots', () => {
   describe('initial state', () => {
     it('starts idle with empty status and null slotInfo', () => {
       const { result } = renderHook(() => usePairingSlots());
+      expect(result.current.noPairingSlots).toBe(false);
       expect(result.current.phase).toBe('idle');
       expect(result.current.status).toBe('');
       expect(result.current.slotInfo).toBeNull();
@@ -161,7 +164,7 @@ describe('usePairingSlots', () => {
 
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe(
-        'No application info in SELECT response',
+        'Could not read this Keycard. Try again.',
       );
     });
 
@@ -180,6 +183,75 @@ describe('usePairingSlots', () => {
       expect(result.current.status).toBe(
         'This Keycard is not initialized. Initialize it first.',
       );
+    });
+  });
+
+  // A 4.0 card has no pairing at all: no slots, no free slot count, and
+  // nothing stored locally for it. That is an answer, not a failure.
+  describe('a card without pairing slots', () => {
+    const CERTIFICATE = [...filler(33, 0x02), ...filler(65, 0x09)];
+
+    async function tapCardWithoutSlots() {
+      (mockCmdSet as any).applicationInfo = v4Select(0x0400, {
+        certificate: CERTIFICATE,
+      });
+      const hook = renderHook(() => usePairingSlots());
+      await act(async () => {
+        hook.result.current.checkSlots();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return hook;
+    }
+
+    it('ends the read as done, with no slot list', async () => {
+      const { result } = await tapCardWithoutSlots();
+      expect(result.current.phase).toBe('done');
+      expect(result.current.noPairingSlots).toBe(true);
+      expect(result.current.slotInfo).toBeNull();
+    });
+
+    it('looks up no local pairing for it', async () => {
+      await tapCardWithoutSlots();
+      expect(mockLoadPairing).not.toHaveBeenCalled();
+    });
+
+    // Without its certificate such a card has no card key. It still must not
+    // be mistaken for a card that is merely not initialized.
+    it('says so even when the card carries no certificate', async () => {
+      (mockCmdSet as any).applicationInfo = v4Select(0x0400, {
+        certificate: null,
+      });
+      const { result } = renderHook(() => usePairingSlots());
+      await act(async () => {
+        result.current.checkSlots();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(result.current.noPairingSlots).toBe(true);
+    });
+
+    it('forgets it when another card is about to be read', async () => {
+      const { result } = await tapCardWithoutSlots();
+      await act(async () => {
+        result.current.checkSlots();
+      });
+      expect(result.current.noPairingSlots).toBe(false);
+    });
+
+    it('forgets it on reset, but not when only NFC is reset', async () => {
+      const { result } = await tapCardWithoutSlots();
+      await act(async () => {
+        result.current.resetNFCOnly();
+      });
+      expect(result.current.noPairingSlots).toBe(true);
+      await act(async () => {
+        result.current.reset();
+      });
+      expect(result.current.noPairingSlots).toBe(false);
     });
   });
 

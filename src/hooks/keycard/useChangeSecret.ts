@@ -47,6 +47,11 @@ export function useChangeSecret(
         },
         {
           requiresMasterKey: false,
+          // Only the pairing secret went away with newer cards. The screen
+          // identifies the card first; this catches a different card being
+          // tapped the second time.
+          requiresRoute:
+            secretType === 'pairing' ? 'ChangePairingSecret' : undefined,
           // Mirrors ChangeSecretScreen's per-secret done toast.
           successMessage: SECRET_CHANGED_MESSAGE[secretType],
         },

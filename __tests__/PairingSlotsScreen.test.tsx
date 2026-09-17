@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
+import { routeAbsence } from '../src/navigation/generationBoundRoutes';
 import PairingSlotsScreen from '../src/screens/PairingSlotsScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 
@@ -142,12 +143,14 @@ function makeCheckHook(
     ourSlotIndex: number | null;
     cardKey: string;
   } | null = null,
+  noPairingSlots = false,
 ) {
   return {
     phase,
     cardPresence: phase === 'nfc' ? 'lost' : 'waiting',
     status: phase === 'nfc' ? 'Selecting applet...' : '',
     slotInfo,
+    noPairingSlots,
     checkSlots: mockCheckSlots,
     cancel: mockCancel,
     reset: jest.fn(),
@@ -298,6 +301,21 @@ describe('PairingSlotsScreen', () => {
       expect(mockExecute).toHaveBeenCalled();
     });
 
+    // The slots were read from one card and the unpair tap can land on
+    // another, so the operation itself says which cards it exists on.
+    it('binds the unpair tap to cards that have pairing slots', async () => {
+      renderScreen('done', slotInfo);
+      fireEvent.press(screen.getByText('Slot 3'));
+      await act(async () => {
+        fireEvent.press(screen.getByText('Unpair'));
+      });
+      expect(mockExecute).toHaveBeenCalledWith(expect.any(Function), {
+        requiresPin: true,
+        requiresMasterKey: false,
+        requiresRoute: 'PairingSlots',
+      });
+    });
+
     it('returns to slot list when user cancels confirmation', () => {
       renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 3'));
@@ -341,6 +359,57 @@ describe('PairingSlotsScreen', () => {
       });
       expect(mockExecute).toHaveBeenCalled();
       expect(mockDeletePairing).not.toHaveBeenCalled();
+    });
+  });
+
+  // This screen taps as part of its own flow, so it finds out about the card
+  // on the one tap it already has and explains, rather than drawing slots.
+  describe('a card without pairing slots', () => {
+    const absence = routeAbsence('PairingSlots');
+
+    function renderWithoutSlots() {
+      mockUsePairingSlots.mockReturnValue(makeCheckHook('done', null, true));
+      mockUseKeycardOperation.mockReturnValue(makeUnpairHook('idle'));
+      return render(
+        <PairingSlotsScreen navigation={navigation} route={undefined as any} />,
+      );
+    }
+
+    it('explains that the card has none', () => {
+      renderWithoutSlots();
+      expect(screen.getByText(absence.title)).toBeTruthy();
+      expect(screen.getByText(absence.detail)).toBeTruthy();
+    });
+
+    it('draws no slots and no free slot count', () => {
+      renderWithoutSlots();
+      expect(screen.queryByText('Slots free')).toBeNull();
+      expect(screen.queryByText('Slot 1')).toBeNull();
+    });
+
+    it('does not ask for another tap', () => {
+      renderWithoutSlots();
+      expect(
+        screen.queryByText('Tap your Keycard to read the pairing slot status.'),
+      ).toBeNull();
+    });
+
+    // slotInfo stays empty for good on such a card. Without this the focus
+    // effect would open the reader again every time the read finished.
+    it('does not start another read on focus', () => {
+      mockUsePairingSlots.mockReturnValue(makeCheckHook('idle', null, true));
+      mockUseKeycardOperation.mockReturnValue(makeUnpairHook('idle'));
+      render(
+        <PairingSlotsScreen navigation={navigation} route={undefined as any} />,
+      );
+      expect(mockCheckSlots).not.toHaveBeenCalled();
+    });
+
+    it('goes back from its one button', () => {
+      navigation.goBack.mockClear();
+      renderWithoutSlots();
+      fireEvent.press(screen.getByText('Go back'));
+      expect(navigation.goBack).toHaveBeenCalledTimes(1);
     });
   });
 
