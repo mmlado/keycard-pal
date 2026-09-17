@@ -26,6 +26,8 @@ import { useIdentifyCard } from '../hooks/keycard/useIdentifyCard';
 import { useKeycardScreen } from '../hooks/useKeycardScreen';
 import { usePreferences } from '../hooks/usePreferences';
 
+import { resetLastTappedGeneration } from '../utils/lastTappedGeneration';
+
 export const dashboardEntry: DashboardAction = {
   label: 'Settings',
   icon: Icons.settings,
@@ -47,6 +49,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   useEffect(() => {
     if (identifyPhase === 'done' && generation !== null) {
       setPreference('generationsInUse', [generation]);
+      // This tap was the user setting the selection, not a card turning up
+      // outside it, so it leaves no question behind for the dashboard.
+      resetLastTappedGeneration();
     }
   }, [identifyPhase, generation, setPreference]);
 

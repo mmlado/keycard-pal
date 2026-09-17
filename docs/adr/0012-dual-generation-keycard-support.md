@@ -76,7 +76,10 @@ that adds a generation is not, and most users will not own the new card when it
 ships. So a new generation arrives unticked for anyone who has saved a selection,
 and ticked for anyone who never touched it. The reminder keeps the tapped
 generation in memory only, as a pending question rather than a fact the app acts
-on, which is as far as "never remembered" bends. A button in Settings reads a
+on, which is as far as "never remembered" bends. Editing the selection forgets
+it: the user has then answered the question themselves, and unticking the
+generation of the card last used must not raise a reminder with no tap behind
+it. A button in Settings reads a
 card and ticks only its generation, for the user who would rather tap than read
 version numbers.
 

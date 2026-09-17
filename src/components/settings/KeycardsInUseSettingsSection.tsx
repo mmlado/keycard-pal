@@ -7,6 +7,7 @@ import theme from '@/theme';
 import { usePreferences } from '@/hooks/usePreferences';
 
 import { Generation, GENERATIONS } from '@/utils/cardGeneration';
+import { resetLastTappedGeneration } from '@/utils/lastTappedGeneration';
 
 export const KEYCARDS_IN_USE_EXPLAINER =
   'Tick the Keycards you use. Menu entries and extra taps that only other ' +
@@ -43,6 +44,9 @@ export default function KeycardsInUseSettingsSection({
         );
     if (next.length > 0) {
       setPreference('generationsInUse', next);
+      // The user has just said which cards they use. A reminder about the
+      // card they last tapped would now come from this edit, not from a tap.
+      resetLastTappedGeneration();
     }
   };
 

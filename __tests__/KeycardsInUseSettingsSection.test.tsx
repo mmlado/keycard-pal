@@ -4,6 +4,11 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import KeycardsInUseSettingsSection, {
   KEYCARDS_IN_USE_EXPLAINER,
 } from '../src/components/settings/KeycardsInUseSettingsSection';
+import {
+  getLastTappedGeneration,
+  noteTappedGeneration,
+  resetLastTappedGeneration,
+} from '../src/utils/lastTappedGeneration';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -47,6 +52,7 @@ function box(generation: '3.1' | '4.0') {
 beforeEach(() => {
   mockInUse = ['3.1', '4.0'];
   mockSetPreference.mockClear();
+  resetLastTappedGeneration();
 });
 
 // ---------------------------------------------------------------------------
@@ -108,6 +114,24 @@ describe('KeycardsInUseSettingsSection', () => {
     mockInUse = ['3.1'];
     renderSection();
     expect(box('4.0').props.accessibilityState.disabled).toBe(false);
+  });
+
+  // The dashboard reminder has to follow a tap. Unticking the generation of
+  // the card last used would otherwise raise it from this edit alone, and ask
+  // the user to undo the choice they just made.
+  it('forgets the last tapped card when the selection is edited', () => {
+    noteTappedGeneration('4.0');
+    renderSection();
+    fireEvent.press(box('4.0'));
+    expect(getLastTappedGeneration()).toBeNull();
+  });
+
+  it('keeps the last tapped card when a locked box is pressed', () => {
+    mockInUse = ['3.1'];
+    noteTappedGeneration('4.0');
+    renderSection();
+    fireEvent.press(box('3.1'));
+    expect(getLastTappedGeneration()).toBe('4.0');
   });
 
   describe('set from my Keycard', () => {

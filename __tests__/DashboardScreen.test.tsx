@@ -3,6 +3,10 @@ import { AppState, Platform, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardScreen from '../src/screens/DashboardScreen';
+import {
+  noteTappedGeneration,
+  resetLastTappedGeneration,
+} from '../src/utils/lastTappedGeneration';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -31,10 +35,15 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 let mockLayout: 'tiles' | 'list' = 'tiles';
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: mockLayout },
+    preferences: {
+      dashboardLayout: mockLayout,
+      generationsInUse: mockGenerationsInUse,
+      generationRemindersDismissed: [],
+    },
     setPreference: jest.fn(),
   }),
 }));
@@ -118,6 +127,8 @@ describe('DashboardScreen', () => {
     mockDashboardActions.length = 0;
     focusCallback = null;
     mockLayout = 'tiles';
+    mockGenerationsInUse = ['3.1', '4.0'];
+    resetLastTappedGeneration();
     // mockImplementation alone leaves call history from earlier tests in place.
     (AppState.addEventListener as jest.Mock).mockClear();
     setAppState('active');
@@ -209,6 +220,24 @@ describe('DashboardScreen', () => {
       await renderScreen();
       expect(screen.getByText('Hero detail')).toBeTruthy();
       expect(screen.queryByText('Standard detail')).toBeNull();
+    });
+  });
+
+  // The dashboard is the only place the reminder is mounted, and almost every
+  // card flow ends here. Without it a wrong selection has no way to correct
+  // itself from a tap.
+  describe('unselected Keycard reminder', () => {
+    it('shows after a tap of a card the user left unticked', async () => {
+      mockGenerationsInUse = ['4.0'];
+      noteTappedGeneration('3.1');
+      await renderScreen();
+      expect(screen.getByTestId('unselected-keycard-reminder')).toBeTruthy();
+    });
+
+    it('stays away while the tapped card is one the user ticked', async () => {
+      noteTappedGeneration('3.1');
+      await renderScreen();
+      expect(screen.queryByTestId('unselected-keycard-reminder')).toBeNull();
     });
   });
 

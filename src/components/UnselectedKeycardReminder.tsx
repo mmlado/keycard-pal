@@ -9,6 +9,7 @@ import { usePreferences } from '@/hooks/usePreferences';
 import { GENERATIONS, generationLabel } from '@/utils/cardGeneration';
 import {
   getLastTappedGeneration,
+  resetLastTappedGeneration,
   subscribeLastTappedGeneration,
 } from '@/utils/lastTappedGeneration';
 
@@ -47,7 +48,8 @@ export default function UnselectedKeycardReminder() {
       <View style={styles.header}>
         <Text style={styles.message}>
           You tapped a Keycard with applet {label}, which is turned off in
-          Settings. Some menu entries for it are hidden.
+          Settings. Keycard Pal is set up for your other Keycards, so its menus
+          and taps may not fit this one.
         </Text>
         <Pressable
           style={styles.close}
@@ -72,7 +74,10 @@ export default function UnselectedKeycardReminder() {
 
       <Pressable
         style={styles.action}
-        onPress={() => setPreference('generationsInUse', inTableOrder(inUse))}
+        onPress={() => {
+          setPreference('generationsInUse', inTableOrder(inUse));
+          resetLastTappedGeneration();
+        }}
         android_ripple={{ color: theme.colors.ripple }}
         accessibilityRole="button"
         testID="unselected-keycard-reminder-use"

@@ -14,8 +14,9 @@ export type Entry = {
 type ListProps = {
   entries: Entry[];
   /**
-   * Added to each row's testID. A grouped screen renders several lists, and
-   * without this their ids would restart at 0 and collide.
+   * Added to the testIDs of each row's icon and NFC indicator. A grouped
+   * screen renders several lists, and without this their ids would restart at
+   * 0 and collide. A row itself carries no testID; reach it by its label.
    */
   indexOffset?: number;
 };

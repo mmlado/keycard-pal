@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import UnselectedKeycardReminder from '../src/components/UnselectedKeycardReminder';
 import {
+  getLastTappedGeneration,
   noteTappedGeneration,
   resetLastTappedGeneration,
 } from '../src/utils/lastTappedGeneration';
@@ -70,6 +71,16 @@ describe('UnselectedKeycardReminder', () => {
     expect(screen.getByTestId(REMINDER)).toBeTruthy();
   });
 
+  // With only 3.x ticked nothing is hidden for a 4.x card: what changes is
+  // that a tap is skipped. So the wording may not claim hidden entries.
+  it('does not claim that entries are hidden', () => {
+    mockInUse = ['3.1'];
+    noteTappedGeneration('4.0');
+    render(<UnselectedKeycardReminder />);
+    expect(screen.queryByText(/hidden/i)).toBeNull();
+    expect(screen.getByText(/may not fit this one/)).toBeTruthy();
+  });
+
   it('keeps internal vocabulary out of the wording', () => {
     noteTappedGeneration('3.1');
     const { toJSON } = render(<UnselectedKeycardReminder />);
@@ -84,6 +95,7 @@ describe('UnselectedKeycardReminder', () => {
       '3.1',
       '4.0',
     ]);
+    expect(getLastTappedGeneration()).toBeNull();
   });
 
   // A friend's card should not keep asking. The user can still tick it in

@@ -52,12 +52,21 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
+// One object for the life of the file. The real provider hands out a stable
+// setPreference, and a fresh one per render would re-run the screen's effect on
+// every render, hiding whether it is keyed on the tap finishing.
 const mockSetPreference = jest.fn();
+const mockPreferencesValue = {
+  preferences: {},
+  setPreference: (...args: unknown[]) => mockSetPreference(...args),
+};
 jest.mock('../src/hooks/usePreferences', () => ({
-  usePreferences: () => ({
-    preferences: {},
-    setPreference: (...args: unknown[]) => mockSetPreference(...args),
-  }),
+  usePreferences: () => mockPreferencesValue,
+}));
+
+const mockResetLastTapped = jest.fn();
+jest.mock('../src/utils/lastTappedGeneration', () => ({
+  resetLastTappedGeneration: () => mockResetLastTapped(),
 }));
 
 const mockIdentifyStart = jest.fn();
@@ -149,6 +158,7 @@ describe('SettingsScreen', () => {
     navigation.navigate.mockClear();
     navigation.goBack.mockClear();
     mockSetPreference.mockClear();
+    mockResetLastTapped.mockClear();
     mockIdentifyStart.mockClear();
     mockIdentifyCancel.mockClear();
     MockNFCBottomSheet.mockClear();
@@ -209,6 +219,26 @@ describe('SettingsScreen', () => {
       expect(mockSetPreference).toHaveBeenCalledWith('generationsInUse', [
         '3.1',
       ]);
+    });
+
+    // A plain re-render at 'done' must not write again: the selection may
+    // have been changed by hand since, and this would silently undo that.
+    it('does not narrow again on a re-render with nothing new', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      const view = renderScreen();
+      mockSetPreference.mockClear();
+      view.rerender(
+        <SettingsScreen navigation={navigation} route={{} as any} />,
+      );
+      expect(mockSetPreference).not.toHaveBeenCalled();
+    });
+
+    // The tap was the user setting the selection, so it must not come back
+    // as a dashboard reminder about that same card.
+    it('leaves no reminder behind for the dashboard', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      renderScreen();
+      expect(mockResetLastTapped).toHaveBeenCalledTimes(1);
     });
 
     it('changes nothing until a card has been read', () => {

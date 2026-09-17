@@ -64,9 +64,11 @@ export function useIdentifyCard(): UseIdentifyCard {
   } = useNFCOperation<Generation>(handleConnected, {
     // Reading the SELECT response changes nothing on the card.
     retryOnTagLoss: true,
-    // Apple's sheet lingers after the tap, over the screen that asks for
-    // input next. "Success" there would read as the whole operation done.
-    successMessage: 'Keycard read. Continue on your phone.',
+    // Apple's sheet lingers after the tap, over whatever the screen shows
+    // next. "Success" would read as the whole operation done, and anything
+    // about what comes next would be wrong for some caller: Settings has no
+    // next step, and neither has a card that turns out to lack the feature.
+    successMessage: 'Keycard read.',
   });
 
   return {

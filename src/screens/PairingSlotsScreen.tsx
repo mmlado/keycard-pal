@@ -180,14 +180,18 @@ export default function PairingSlotsScreen({
       {showContent && (
         <View style={styles.content}>
           {noPairingSlots && (
-            <View style={styles.centeredContent}>
-              <Text style={styles.absenceTitle}>{absence.title}</Text>
-              <Text style={styles.description}>{absence.detail}</Text>
-              <PrimaryButton
-                label="Go back"
-                onPress={() => navigation.goBack()}
-              />
-            </View>
+            <>
+              <View style={styles.centeredContent}>
+                <Text style={styles.absenceTitle}>{absence.title}</Text>
+                <Text style={styles.description}>{absence.detail}</Text>
+              </View>
+              <View style={styles.footer}>
+                <PrimaryButton
+                  label="Go back"
+                  onPress={() => navigation.goBack()}
+                />
+              </View>
+            </>
           )}
 
           {!slotInfo && !noPairingSlots && checkPhase !== 'error' && (
@@ -251,6 +255,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     gap: 24,
+    paddingHorizontal: 24,
+  },
+  footer: {
     paddingHorizontal: 24,
   },
   absenceTitle: {

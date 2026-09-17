@@ -183,13 +183,12 @@ describe('useIdentifyCard', () => {
     expect(result.current.generation).toBe('3.1');
   });
 
-  // Apple's sheet lingers over the screen that asks for input next, and
-  // "Success" there would read as the whole change being done.
-  it('words the iOS sheet as a read, not as a finished operation', async () => {
+  // Apple's sheet lingers over whatever comes next. "Success" would read as
+  // the whole change being done, and "continue" would be wrong in Settings
+  // and on a card that lacks the feature, where nothing follows.
+  it('words the iOS sheet as a read, and promises no next step', async () => {
     await tap(v3Select(0x0302));
-    expect(mockStopNFCWithMessage).toHaveBeenCalledWith(
-      'Keycard read. Continue on your phone.',
-    );
+    expect(mockStopNFCWithMessage).toHaveBeenCalledWith('Keycard read.');
   });
 
   // After an error the reader is disarmed, so the sheet's Try again has to
