@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import PinPad from '../src/components/PinPad';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -16,7 +18,7 @@ jest.mock('react-native-paper', () => {
 let mockScramble = false;
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { pinPadScramble: mockScramble },
+    preferences: mockTestPreferences({ pinPadScramble: mockScramble }),
     setPreference: jest.fn(),
   }),
 }));

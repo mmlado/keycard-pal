@@ -4,15 +4,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Snackbar } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '../assets/icons';
-import { dashboardActions } from '../navigation/dashboardActions';
-import { DashboardScreenProps } from '../navigation/types';
-import theme from '../theme';
+import { Icons } from '@/assets/icons';
+import { dashboardActions } from '@/navigation/dashboardActions';
+import { DashboardScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import EntryList from '../components/EntryList';
-import PrimaryButton from '../components/PrimaryButton';
-import UnselectedKeycardReminder from '../components/UnselectedKeycardReminder';
-import WalletConnectDashboardCard from '../components/walletConnect/DashboardCard.online';
+import EntryList from '@/components/EntryList';
+import PrimaryButton from '@/components/PrimaryButton';
+import UnselectedKeycardReminder from '@/components/UnselectedKeycardReminder';
+import WalletConnectDashboardCard from '@/components/walletConnect/DashboardCard.online';
 
 /**
  * How long the confirmation toast stays up on iOS.

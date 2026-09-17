@@ -8,6 +8,8 @@ import ChangeSecretScreen, {
 } from '../src/screens/secrets/ChangeSecretScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -38,10 +40,10 @@ let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: {
+    preferences: mockTestPreferences({
       pinPadScramble: false,
       generationsInUse: mockGenerationsInUse,
-    },
+    }),
     setPreference: jest.fn(),
   }),
 }));

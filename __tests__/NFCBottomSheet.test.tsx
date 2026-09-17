@@ -246,6 +246,22 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(screen.getByText(BUY_KEYCARD_LINK)).toBeTruthy();
     });
 
+    // Settings keeps the user in place on cancel and already carries the
+    // purchase link itself, so its sheet leaves this one out.
+    it.each(['nfc', 'error'] as const)(
+      'leaves the link out in phase %s when the host screen asks',
+      phase => {
+        render(
+          <NFCBottomSheet
+            nfc={makeNfc(phase, { cardPresence: 'waiting' })}
+            onCancel={onCancel}
+            hideNoCardExit
+          />,
+        );
+        expect(screen.queryByText(BUY_KEYCARD_LINK)).toBeNull();
+      },
+    );
+
     it('cancels the session, then opens the browser when there is a network', async () => {
       renderSheet(makeNfc('nfc'));
       await pressBuyKeycardLink();

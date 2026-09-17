@@ -4,6 +4,8 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import EntryList, { EntryListItem } from '../src/components/EntryList';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -15,10 +17,10 @@ let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: {
+    preferences: mockTestPreferences({
       dashboardLayout: mockLayout,
       generationsInUse: mockGenerationsInUse,
-    },
+    }),
     setPreference: jest.fn(),
   }),
 }));

@@ -9,19 +9,19 @@ import { Snackbar, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { routeAbsence } from '../navigation/generationBoundRoutes';
-import type { PairingSlotsScreenProps } from '../navigation/types';
-import theme from '../theme';
+import { routeAbsence } from '@/navigation/generationBoundRoutes';
+import type { PairingSlotsScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import ConfirmPrompt from '../components/ConfirmPropmpt';
-import Menu from '../components/Menu';
-import NFCBottomSheet, { NFCOperation } from '../components/NFCBottomSheet';
-import PrimaryButton from '../components/PrimaryButton';
+import ConfirmPrompt from '@/components/ConfirmPropmpt';
+import Menu from '@/components/Menu';
+import NFCBottomSheet, { NFCOperation } from '@/components/NFCBottomSheet';
+import PrimaryButton from '@/components/PrimaryButton';
 
-import { useKeycardOperation } from '../hooks/keycard/useKeycardOperation';
-import { usePairingSlots } from '../hooks/keycard/usePairingSlots';
+import { useKeycardOperation } from '@/hooks/keycard/useKeycardOperation';
+import { usePairingSlots } from '@/hooks/keycard/usePairingSlots';
 
-import { deletePairing } from '../storage/pairingStorage';
+import { deletePairing } from '@/storage/pairingStorage';
 
 export default function PairingSlotsScreen({
   navigation,

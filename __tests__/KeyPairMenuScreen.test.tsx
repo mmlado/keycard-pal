@@ -5,6 +5,8 @@ import KeyPairMenuScreen, {
   dashboardEntry,
 } from '../src/screens/keypair/KeyPairMenuScreen';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -23,7 +25,7 @@ jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 // These assertions describe the list layout's rows, so pin the preference.
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: 'list' },
+    preferences: mockTestPreferences({ dashboardLayout: 'list' }),
     setPreference: jest.fn(),
   }),
 }));

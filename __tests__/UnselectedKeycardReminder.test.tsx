@@ -8,6 +8,8 @@ import {
   resetLastTappedGeneration,
 } from '../src/utils/lastTappedGeneration';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -20,10 +22,10 @@ const mockSetPreference = jest.fn();
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: {
+    preferences: mockTestPreferences({
       generationsInUse: mockInUse,
       generationRemindersDismissed: mockDismissed,
-    },
+    }),
     setPreference: (...args: unknown[]) => mockSetPreference(...args),
   }),
 }));

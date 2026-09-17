@@ -56,9 +56,21 @@ type Props = {
   onCancel: () => void;
   /** Show success variant when phase is 'done' (e.g. for screens that navigate away after a delay) */
   showOnDone?: boolean;
+  /**
+   * Leaves out the "Don't have a Keycard?" link. For a host screen that keeps
+   * the user in place on cancel and already carries the purchase link itself
+   * (Settings): there the link is a duplicate, and following it would push the
+   * shop's screen while this sheet is still sliding out over it.
+   */
+  hideNoCardExit?: boolean;
 };
 
-export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
+export default function NFCBottomSheet({
+  nfc,
+  onCancel,
+  showOnDone,
+  hideNoCardExit,
+}: Props) {
   const {
     phase,
     status,
@@ -94,7 +106,8 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
   // shows only the recovery actions. The shop link is for the session that
   // never saw a card.
   const onBuyKeycard =
-    cardPresence === undefined || cardPresence === 'waiting'
+    !hideNoCardExit &&
+    (cardPresence === undefined || cardPresence === 'waiting')
       ? handleBuyKeycard
       : undefined;
 

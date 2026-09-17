@@ -4,6 +4,8 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import InitCardScreen, { dashboardEntry } from '../src/screens/InitCardScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -31,7 +33,7 @@ jest.mock('@react-navigation/native', () => ({
 // PinPad reads the scramble preference from context.
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { pinPadScramble: false },
+    preferences: mockTestPreferences({ pinPadScramble: false }),
     setPreference: jest.fn(),
   }),
 }));

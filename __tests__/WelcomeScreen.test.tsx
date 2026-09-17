@@ -9,6 +9,8 @@ import {
   KEYCARD_PURCHASE_URL,
 } from '../src/constants/keycard';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -42,7 +44,7 @@ jest.mock('../src/assets/icons', () => {
 const mockSetPreference = jest.fn().mockResolvedValue(undefined);
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { welcomeSeen: false },
+    preferences: mockTestPreferences({ welcomeSeen: false }),
     setPreference: (...args: any[]) => mockSetPreference(...args),
   }),
 }));

@@ -4,6 +4,8 @@ import {
   savePreference,
 } from '../src/storage/preferencesStorage';
 
+import { testPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -138,6 +140,26 @@ describe('loadPreferences', () => {
     const preferences = await loadPreferences();
     expect(preferences).toEqual(DEFAULT_PREFERENCES);
     expect(preferences).not.toBe(DEFAULT_PREFERENCES);
+  });
+});
+
+// Screen tests build their mocked preferences from this helper. If it drifts
+// from the real defaults, those tests describe an app that does not exist.
+describe('testPreferences', () => {
+  it('matches the real defaults', () => {
+    expect(testPreferences()).toEqual(DEFAULT_PREFERENCES);
+  });
+
+  it('lays overrides over the defaults', () => {
+    expect(testPreferences({ dashboardLayout: 'list' })).toEqual({
+      ...DEFAULT_PREFERENCES,
+      dashboardLayout: 'list',
+    });
+  });
+
+  it('hands out fresh lists each time', () => {
+    testPreferences().generationsInUse.pop();
+    expect(testPreferences().generationsInUse).toEqual(['3.1', '4.0']);
   });
 });
 

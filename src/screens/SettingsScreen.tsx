@@ -8,25 +8,25 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '../assets/icons';
-import type { DashboardAction, SettingsScreenProps } from '../navigation/types';
-import theme from '../theme';
+import { Icons } from '@/assets/icons';
+import type { DashboardAction, SettingsScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import NFCBottomSheet from '../components/NFCBottomSheet';
-import DashboardLayoutSettingsSection from '../components/settings/DashboardLayoutSettingsSection';
-import EnsSettingsSection from '../components/settings/ens/EnsSettingsSection.online';
-import KeycardSettingsSection from '../components/settings/KeycardSettingsSection';
-import KeycardsInUseSettingsSection from '../components/settings/KeycardsInUseSettingsSection';
-import PinPadSettingsSection from '../components/settings/PinPadSettingsSection';
-import TenderlySettingsSection from '../components/settings/tenderly/TenderlySettingsSection.online';
-import TokenImagesSettingsSection from '../components/settings/TokenImagesSettingsSection.online';
-import WalletConnectSettingsSection from '../components/settings/WalletConnectSettingsSection.online';
+import NFCBottomSheet from '@/components/NFCBottomSheet';
+import DashboardLayoutSettingsSection from '@/components/settings/DashboardLayoutSettingsSection';
+import EnsSettingsSection from '@/components/settings/ens/EnsSettingsSection.online';
+import KeycardSettingsSection from '@/components/settings/KeycardSettingsSection';
+import KeycardsInUseSettingsSection from '@/components/settings/KeycardsInUseSettingsSection';
+import PinPadSettingsSection from '@/components/settings/PinPadSettingsSection';
+import TenderlySettingsSection from '@/components/settings/tenderly/TenderlySettingsSection.online';
+import TokenImagesSettingsSection from '@/components/settings/TokenImagesSettingsSection.online';
+import WalletConnectSettingsSection from '@/components/settings/WalletConnectSettingsSection.online';
 
-import { useIdentifyCard } from '../hooks/keycard/useIdentifyCard';
-import { useKeycardScreen } from '../hooks/useKeycardScreen';
-import { usePreferences } from '../hooks/usePreferences';
+import { useIdentifyCard } from '@/hooks/keycard/useIdentifyCard';
+import { useKeycardScreen } from '@/hooks/useKeycardScreen';
+import { usePreferences } from '@/hooks/usePreferences';
 
-import { resetLastTappedGeneration } from '../utils/lastTappedGeneration';
+import { resetLastTappedGeneration } from '@/utils/lastTappedGeneration';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Settings',
@@ -92,7 +92,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         </View>
       </ScrollView>
 
-      <NFCBottomSheet nfc={identify} onCancel={onCancel} />
+      {/* No shop link on this sheet: "Buy a Keycard" is the first row of this
+          very screen, and the user stays here when the tap is cancelled. */}
+      <NFCBottomSheet nfc={identify} onCancel={onCancel} hideNoCardExit />
     </KeyboardAvoidingView>
   );
 }

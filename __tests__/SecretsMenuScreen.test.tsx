@@ -5,6 +5,8 @@ import SecretsMenuScreen, {
   dashboardEntry,
 } from '../src/screens/secrets/SecretsMenuScreen';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -25,10 +27,10 @@ let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: {
+    preferences: mockTestPreferences({
       dashboardLayout: 'list',
       generationsInUse: mockGenerationsInUse,
-    },
+    }),
     setPreference: jest.fn(),
   }),
 }));

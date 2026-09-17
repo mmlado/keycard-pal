@@ -5,6 +5,8 @@ import KeycardMenuScreen, {
   dashboardEntry,
 } from '../src/screens/KeycardMenuScreen';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -21,10 +23,10 @@ let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: {
+    preferences: mockTestPreferences({
       dashboardLayout: 'list',
       generationsInUse: mockGenerationsInUse,
-    },
+    }),
     setPreference: jest.fn(),
   }),
 }));

@@ -9,6 +9,8 @@ import {
   KEYCARD_PURCHASE_URL,
 } from '../src/constants/keycard';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks — every other section is a stub so this test only proves the screen
 // mounts the Keycard purchase section in both build flavors.
@@ -57,7 +59,7 @@ jest.mock('@react-navigation/native', () => ({
 // every render, hiding whether it is keyed on the tap finishing.
 const mockSetPreference = jest.fn();
 const mockPreferencesValue = {
-  preferences: {},
+  preferences: mockTestPreferences(),
   setPreference: (...args: unknown[]) => mockSetPreference(...args),
 };
 jest.mock('../src/hooks/usePreferences', () => ({
@@ -204,6 +206,14 @@ describe('SettingsScreen', () => {
       mockIdentify = { phase: 'nfc', generation: null };
       renderScreen();
       expect(screen.getByText('Reading card')).toBeTruthy();
+    });
+
+    // "Buy a Keycard" is the first row of this very screen, and the user stays
+    // here on cancel, so the sheet does not repeat the shop link.
+    it('keeps the shop link off its NFC sheet', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(lastSheetProps().hideNoCardExit).toBe(true);
     });
 
     it('gives the NFC sheet the read', () => {
