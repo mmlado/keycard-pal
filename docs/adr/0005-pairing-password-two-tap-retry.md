@@ -13,7 +13,7 @@ The alternative — retrying `autoPair` in the same NFC session immediately afte
 
 Custom pairing password entry follows the same two-tap pattern as `genuine_warning`:
 
-1. First tap: detect the cryptogram mismatch, return `null` from `handleCardConnected`, set `phase = 'pairing_password'`.
+1. First tap: detect the cryptogram mismatch, set `phase = 'pairing_password'`, and end the tap by throwing (it used to return `null`; a tap that returns closes Apple's NFC sheet with the operation's success message, so since 2026-09-18 every interrupted tap throws).
 2. Show a full-screen `PairingPasswordEntry` modal — same structure as PIN entry.
 3. User submits password → stored in a ref → `startNFC()` called.
 4. Second tap: `autoPair` called with the custom password string (SDK derives the pairing secret via PBKDF2-HMAC-SHA256 internally).
