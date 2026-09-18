@@ -222,6 +222,41 @@ describe('useNFCOperation', () => {
     });
   });
 
+  // After an error the reader is off, so tapping the card does nothing. The
+  // NFC sheet only offers "Try again" when it is given this; without it the
+  // sheet says "Tap your card to try again" and nothing is listening.
+  describe('retry', () => {
+    it('opens the reader again after an error and runs the operation', async () => {
+      const operation = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Invalid MAC'))
+        .mockResolvedValue('ok');
+      const { result } = renderHook(() =>
+        useNFCOperation(useCallback(() => operation(), [])),
+      );
+      await act(async () => {
+        result.current.start();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+      mockStartNFC.mockClear();
+
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(result.current.result).toBe('ok');
+    });
+  });
+
   describe('cancellation mid-operation', () => {
     it('does not set result when cancelled while the operation is in flight', async () => {
       let resolveOp: ((v: string) => void) | null = null;
