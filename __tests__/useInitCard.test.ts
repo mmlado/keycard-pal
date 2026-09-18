@@ -117,6 +117,29 @@ describe('useInitCard', () => {
     });
   });
 
+  // The screen hands this hook to the NFC sheet as it is, so the sheet's
+  // "Try again" exists only if the hook carries a retry.
+  describe('retry', () => {
+    it('opens the reader again after an error', async () => {
+      mockSelect.mockResolvedValueOnce({ sw: 0x6a82 });
+      const { result } = renderHook(() => useInitCard());
+      await act(async () => {
+        result.current.start('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+      mockStartNFC.mockClear();
+
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('cancel', () => {
     it('returns to idle, clears status, and stops NFC', async () => {
       const { result } = renderHook(() => useInitCard());

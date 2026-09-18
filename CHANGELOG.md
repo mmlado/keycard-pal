@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Initializing a Keycard, or changing its PIN, PUK or pairing secret, no longer leaves the app on the finished screen under the success sheet instead of returning to the dashboard
+- A Keycard that slips off the phone before the app has read it is now waited for in every operation, instead of ending card initialization or a factory reset with a connection-lost error
+- The error sheet of card initialization and factory reset now has a working Try again button; it used to say "Tap your card to try again" while nothing was listening
 
 ## [1.10.0] - 2026-09-15
 
