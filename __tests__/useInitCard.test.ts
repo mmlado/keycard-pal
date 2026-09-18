@@ -392,6 +392,8 @@ describe('useInitCard', () => {
         expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
         expect(mockInit.mock.calls[0][0]).toBe('123456');
         expect(result.current.phase).toBe('done');
+        // The screen only leaves once there is a result to show for it.
+        expect(result.current.result).toMatch(/^[0-9]{12}$/);
       });
 
       // init() opens the channel and sends INIT inside it, so an accepted INIT
