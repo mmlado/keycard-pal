@@ -36,8 +36,8 @@ jest.mock('react-native-keycard', () => ({
         return { remove: jest.fn() };
       },
       startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: () => mockStopNFC(),
-      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
+      stopNFC: (message?: string, isError?: boolean) =>
+        isError ? mockStopNFCWithError(message) : mockStopNFC(),
       isNFCEnabled: () => Promise.resolve(true),
       openNFCSettings: () => Promise.resolve(true),
       setNFCMessage: () => Promise.resolve(true),

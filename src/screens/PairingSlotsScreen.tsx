@@ -59,8 +59,7 @@ export default function PairingSlotsScreen({
   // Auto-start NFC check when the screen is focused and we have no data yet.
   useFocusEffect(
     useCallback(() => {
-      // A card without pairing slots leaves slotInfo empty for good, so it
-      // has to stop this from asking for another tap every time.
+      // A card without pairing slots leaves slotInfo empty for good; do not ask again.
       if (checkPhase === 'idle' && !slotInfo && !noPairingSlots) {
         checkSlots();
       }
@@ -70,8 +69,7 @@ export default function PairingSlotsScreen({
   useEffect(() => {
     if (unpairPhase === 'done') {
       resetUnpair();
-      // Keep slotInfo — it was already updated in the unpair callback via
-      // readSlotInfoFromCmdSet, so no second NFC tap is needed.
+      // slotInfo was already refreshed inside the unpair tap.
       resetCheckNFCOnly();
     }
   }, [unpairPhase, resetUnpair, resetCheckNFCOnly]);
@@ -93,8 +91,7 @@ export default function PairingSlotsScreen({
             // Card-side unpair already succeeded; local cleanup is best-effort.
           }
         }
-        // Re-read slot info in the same NFC connection so the screen updates
-        // immediately without requiring a second tap on either platform.
+        // Re-read in the same connection, so no second tap is needed.
         await readSlotInfoFromCmdSet(cmdSet);
         setUnpairNotice(`Slot ${slotIndex + 1} was unpaired`);
       },
@@ -111,10 +108,7 @@ export default function PairingSlotsScreen({
     setPendingSlotIndex(null);
   }, []);
 
-  // The PIN pad no longer covers the navigator header, so the real back button
-  // and the iOS swipe-back gesture can leave this screen mid-session. Tear both
-  // sessions down on the way out; navigation is already happening, so this
-  // deliberately does not call handleCancel's goBack.
+  // Back can leave mid-session: tear both sessions down. Navigation is already under way.
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       cancelUnpair();
@@ -138,8 +132,7 @@ export default function PairingSlotsScreen({
         phase: checkPhase,
         status: checkStatus,
         cardPresence: checkCardPresence,
-        // After an error the reader is disarmed (stopNFCWithError), so the
-        // sheet needs an explicit restart — re-tapping emits nothing.
+        // After an error the reader is stopped, so a re-tap emits nothing.
         retry: checkSlots,
       };
 

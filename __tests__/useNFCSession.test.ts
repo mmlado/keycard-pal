@@ -55,9 +55,12 @@ jest.mock('react-native-keycard', () => ({
         return { remove: jest.fn() };
       },
       startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: () => mockStopNFC(),
-      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
-      stopNFCWithMessage: (msg: string) => mockStopNFCWithMessage(msg),
+      stopNFC: (message?: string, isError?: boolean) =>
+        isError
+          ? mockStopNFCWithError(message)
+          : message
+          ? mockStopNFCWithMessage(message)
+          : mockStopNFC(),
       isNFCEnabled: () => mockIsNFCEnabled(),
       openNFCSettings: () => mockOpenNFCSettings(),
       setNFCMessage: (msg: string) => mockSetNFCMessage(msg),
@@ -556,11 +559,12 @@ describe('useNFCSession', () => {
         expect(mockStopNFCWithMessage).not.toHaveBeenCalled();
       });
 
-      it('does not word the sheet on Android, which has none', async () => {
+      it('passes the message on Android too, where the bridge ignores it', async () => {
         Platform.OS = 'android';
         await runToDone({ successMessage: 'Factory reset done' });
-        expect(mockStopNFC).toHaveBeenCalled();
-        expect(mockStopNFCWithMessage).not.toHaveBeenCalled();
+        expect(mockStopNFCWithMessage).toHaveBeenCalledWith(
+          'Factory reset done',
+        );
       });
     });
 
