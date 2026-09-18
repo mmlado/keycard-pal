@@ -3,11 +3,13 @@ import { Commandset } from 'keycard-sdk/dist/commandset';
 import useNFCSession, {
   CardPresence,
   NFCSessionPhase,
+  SelectedCard,
   UseNFCSessionOptions,
 } from './useNFCSession';
 
 export type { CardPresence };
 export type { NFCSessionPhase };
+export type { SelectedCard };
 export type { UseNFCSessionOptions };
 
 export interface UseNFCOperation<T> {
@@ -27,6 +29,7 @@ export function useNFCOperation<T>(
   onConnected: (
     cmdSet: Commandset,
     setStatus: (status: string) => void,
+    card: SelectedCard,
   ) => Promise<T>,
   options: UseNFCSessionOptions = {},
 ): UseNFCOperation<T> {
@@ -34,9 +37,13 @@ export function useNFCOperation<T>(
   const runIdRef = useRef(0);
 
   const handleCardConnected = useCallback(
-    async (cmdSet: Commandset, setStatus: (status: string) => void) => {
+    async (
+      cmdSet: Commandset,
+      setStatus: (status: string) => void,
+      card: SelectedCard,
+    ) => {
       const runId = ++runIdRef.current;
-      const value = await onConnected(cmdSet, setStatus);
+      const value = await onConnected(cmdSet, setStatus, card);
       if (runId === runIdRef.current) {
         setResult(value);
       }

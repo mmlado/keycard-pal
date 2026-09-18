@@ -10,6 +10,7 @@ import {
   isBelowMinimumVersion,
   MIN_SUPPORTED_APPLET_VERSION,
 } from '@/utils/cardGeneration';
+import { isUnknownCaError, TRUSTED_CA_PUBLIC_KEYS } from '@/utils/cardTrust';
 import { isTagLostError } from '@/utils/keycardErrors';
 import { noteTappedGeneration } from '@/utils/lastTappedGeneration';
 
@@ -47,6 +48,26 @@ export interface UseNFCSessionOptions {
   /** Wording for Apple's NFC sheet on the success path, in place of the
    *  bridge's generic "Success". iOS-only; ignored elsewhere. */
   successMessage?: string;
+  /** Identity public keys of cards the user approved although their
+   *  certificate chains to no trusted CA (ADR-0013). Asked for on every tap,
+   *  so an approval given a moment ago is already in force on the next one.
+   *  Without it nothing is whitelisted, which is right for a SELECT-only read:
+   *  it needs to know the card, not to trust it. */
+  whitelistedCardKeys?: () => Uint8Array[] | Promise<Uint8Array[]>;
+}
+
+/** What SELECT told the session about the card, beyond the command set. */
+export interface SelectedCard {
+  /**
+   * True when the card carries a certificate that chains to no trusted CA and
+   * the card is not whitelisted. keycard-sdk refuses such a card from inside
+   * `select()`, but only after filling in `applicationInfo`, so the card is
+   * still known: its version, its card key, and that it answered at all. The
+   * caller decides what that is worth. A read of the SELECT response can go
+   * ahead; anything that opens a secure channel has to ask the user first,
+   * and cannot open one anyway until the card is whitelisted.
+   */
+  untrustedCertificate: boolean;
 }
 
 export interface UseNFCSessionOperation {
@@ -65,6 +86,7 @@ export default function useNFCSession(
   onCardConnected: (
     cmdSet: Commandset,
     setStatus: (status: string) => void,
+    card: SelectedCard,
   ) => Promise<void>,
   onCardDisconnected: () => Promise<void>,
   options: UseNFCSessionOptions = {},
@@ -77,6 +99,8 @@ export default function useNFCSession(
   onNFCAvailableRef.current = options.onNFCAvailable;
   const retryOnTagLossRef = useRef(options.retryOnTagLoss ?? false);
   retryOnTagLossRef.current = options.retryOnTagLoss ?? false;
+  const whitelistedCardKeysRef = useRef(options.whitelistedCardKeys);
+  whitelistedCardKeysRef.current = options.whitelistedCardKeys;
   const successMessageRef = useRef(options.successMessage);
   successMessageRef.current = options.successMessage;
   const retryUnsafeRef = useRef(false);
@@ -209,16 +233,35 @@ export default function useNFCSession(
     try {
       reportStatus('Selecting applet...');
       const channel = new RNKeycard.NFCCardChannel();
-      const cmdSet = new Keycard.Commandset(channel);
-
-      const selectResp = await cmdSet.select();
-      console.log(
-        `[Keycard] SELECT SW: 0x${selectResp.sw.toString(16).toUpperCase()}`,
+      // The CA keys are stated rather than left to the SDK's default: on a
+      // card with a certificate they decide whether a channel opens at all.
+      const whitelist = (await whitelistedCardKeysRef.current?.()) ?? [];
+      const cmdSet = new Keycard.Commandset(
+        channel,
+        TRUSTED_CA_PUBLIC_KEYS,
+        whitelist,
       );
-      if (selectResp.sw !== 0x9000) {
-        throw new Error(
-          `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
+
+      // On a card with a certificate the SDK judges it inside select() and
+      // throws for an unknown CA. It has filled in applicationInfo by then,
+      // which only happens on a 0x9000 SELECT, so the card is still readable.
+      let untrustedCertificate = false;
+      try {
+        const selectResp = await cmdSet.select();
+        console.log(
+          `[Keycard] SELECT SW: 0x${selectResp.sw.toString(16).toUpperCase()}`,
         );
+        if (selectResp.sw !== 0x9000) {
+          throw new Error(
+            `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
+          );
+        }
+      } catch (e) {
+        if (!isUnknownCaError(e) || !cmdSet.applicationInfo) {
+          throw e;
+        }
+        console.log('[Keycard] SELECT OK, certificate from an unknown CA');
+        untrustedCertificate = true;
       }
       // Forward progress: only a successful SELECT resets the loss bound. A card
       // that connects and instantly drops must not reset it (R11).
@@ -244,7 +287,7 @@ export default function useNFCSession(
         noteTappedGeneration(generation);
       }
 
-      await onCardConnected(cmdSet, reportStatus);
+      await onCardConnected(cmdSet, reportStatus, { untrustedCertificate });
       outcome = 'done';
       setPhase('done');
       stopWithSuccess();

@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import useNFCSession, {
   CARD_MOVED_STATUS,
 } from '../src/hooks/keycard/useNFCSession';
+import { KEYCARD_CA_PUBLIC_KEY } from '../src/constants/keycard';
 import {
   getLastTappedGeneration,
   resetLastTappedGeneration,
@@ -63,11 +64,18 @@ jest.mock('react-native-keycard', () => ({
 
 const mockSelect = jest.fn();
 
+// What each Commandset was built with: the CA keys and the whitelist decide
+// whether the SDK opens a channel with a certificate card at all.
+const mockCommandsetArgs: unknown[][] = [];
+
 jest.mock('keycard-sdk', () => ({
   __esModule: true,
   default: {
     Commandset: class {
       select = mockSelect;
+      constructor(...args: unknown[]) {
+        mockCommandsetArgs.push(args);
+      }
     },
   },
 }));
@@ -102,6 +110,7 @@ describe('useNFCSession', () => {
     mockSelect.mockClear();
     mockOnCardConnected = jest.fn().mockResolvedValue(undefined);
     mockOnCardDisconnected = jest.fn().mockResolvedValue(undefined);
+    mockCommandsetArgs.length = 0;
     capturedOnConnected = null;
     capturedOnDisconnected = null;
     capturedOnCancelled = null;
@@ -119,6 +128,7 @@ describe('useNFCSession', () => {
     onNFCAvailable?: () => void;
     retryOnTagLoss?: boolean;
     successMessage?: string;
+    whitelistedCardKeys?: () => Uint8Array[] | Promise<Uint8Array[]>;
   }) {
     return renderHook(() =>
       useNFCSession(
@@ -748,6 +758,122 @@ describe('useNFCSession', () => {
         await tapCard();
         expect(getLastTappedGeneration()).toBeNull();
       });
+    });
+  });
+
+  // Cards with a certificate (ADR-0013). The SDK judges the certificate inside
+  // select() and throws for an unknown CA, but only after it has filled in
+  // applicationInfo, so the card is still readable.
+  describe('certificate trust', () => {
+    const UNKNOWN_CA =
+      'Card certificate verification failed: unknown CA public key and card not whitelisted';
+
+    async function tap(options?: Parameters<typeof makeHook>[0]) {
+      const hook = makeHook(options);
+      await act(async () => {
+        hook.result.current.startNFC();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return hook;
+    }
+
+    function selectThrowing(message: string, applicationInfo?: object) {
+      mockSelect.mockImplementation(function (this: {
+        applicationInfo?: object;
+      }) {
+        if (applicationInfo) {
+          this.applicationInfo = applicationInfo;
+        }
+        return Promise.reject(new Error(message));
+      });
+    }
+
+    it('states the CA key instead of relying on the SDK default', async () => {
+      await tap();
+      const [, caKeys] = mockCommandsetArgs[0];
+      expect(caKeys).toEqual([KEYCARD_CA_PUBLIC_KEY]);
+    });
+
+    it('whitelists nothing unless the caller says so', async () => {
+      await tap();
+      expect(mockCommandsetArgs[0][2]).toEqual([]);
+    });
+
+    // Asked on every tap, so an approval given a moment ago is already in
+    // force on the tap that follows it.
+    it('asks for the whitelist on every tap, and waits for it', async () => {
+      const approved = new Uint8Array(33).fill(2);
+      const whitelistedCardKeys = jest.fn().mockResolvedValue([approved]);
+      const { result } = await tap({ whitelistedCardKeys });
+      expect(mockCommandsetArgs[0][2]).toEqual([approved]);
+
+      await act(async () => {
+        result.current.startNFC();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(whitelistedCardKeys).toHaveBeenCalledTimes(2);
+    });
+
+    it('tells the operation that a trusted card is trusted', async () => {
+      mockSelect.mockResolvedValue({ sw: 0x9000 });
+      await tap();
+      expect(mockOnCardConnected.mock.calls[0][2]).toEqual({
+        untrustedCertificate: false,
+      });
+    });
+
+    it('hands over a card from an unknown CA, marked as such', async () => {
+      selectThrowing(UNKNOWN_CA, { appVersion: 0x0400 });
+      const { result } = await tap();
+      expect(mockOnCardConnected).toHaveBeenCalledTimes(1);
+      expect(mockOnCardConnected.mock.calls[0][2]).toEqual({
+        untrustedCertificate: true,
+      });
+      expect(result.current.phase).toBe('done');
+      expect(mockStopNFCWithError).not.toHaveBeenCalled();
+    });
+
+    // The floor and the reminder both read applicationInfo, which such a card
+    // has, so they behave exactly as they do for any other card.
+    it('still notes the generation of such a card', async () => {
+      selectThrowing(UNKNOWN_CA, { appVersion: 0x0400 });
+      resetLastTappedGeneration();
+      await tap();
+      expect(getLastTappedGeneration()).toBe('4.0');
+    });
+
+    // Without applicationInfo there is no card to describe, so the refusal
+    // stands as the error it is.
+    it('fails when the refusal came with nothing about the card', async () => {
+      selectThrowing(UNKNOWN_CA);
+      const { result } = await tap();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(UNKNOWN_CA);
+      expect(mockOnCardConnected).not.toHaveBeenCalled();
+    });
+
+    // Any other throw from select() is a failure, certificate or not. In
+    // particular a card that cannot prove its key must never be waved through.
+    it.each([
+      'Card authentication failed: invalid signature',
+      'Something else entirely',
+    ])('does not wave through %p', async message => {
+      selectThrowing(message, { appVersion: 0x0400 });
+      const { result } = await tap();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(message);
+      expect(mockOnCardConnected).not.toHaveBeenCalled();
+    });
+
+    it('still fails a SELECT the card answered with an error status', async () => {
+      mockSelect.mockResolvedValue({ sw: 0x6985 });
+      const { result } = await tap();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe('SELECT failed: 0x6985');
     });
   });
 

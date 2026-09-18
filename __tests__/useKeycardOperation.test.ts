@@ -83,6 +83,13 @@ jest.mock('../src/storage/pairingStorage', () => ({
   savePairing: jest.fn(),
 }));
 
+const mockLoadApprovedCardKeys = jest.fn();
+const mockApproveCardKey = jest.fn();
+jest.mock('../src/storage/approvedCardsStorage', () => ({
+  loadApprovedCardKeys: () => mockLoadApprovedCardKeys(),
+  approveCardKey: (cardKey: string) => mockApproveCardKey(cardKey),
+}));
+
 const mockCheckGenuine = checkGenuine as jest.MockedFunction<
   typeof checkGenuine
 >;
@@ -142,6 +149,8 @@ describe('useKeycardOperation', () => {
     );
     mockCheckGenuine.mockClear();
     mockLoadPairing.mockClear();
+    mockLoadApprovedCardKeys.mockReset().mockResolvedValue([]);
+    mockApproveCardKey.mockReset().mockResolvedValue(undefined);
   });
 
   describe('initial state', () => {
@@ -707,6 +716,273 @@ describe('useKeycardOperation', () => {
       expect(result.current.status).not.toBe(
         routeAbsence('PairingSlots').sheetError,
       );
+    });
+  });
+
+  // Cards that carry a certificate (ADR-0013): no pairing, no IDENTIFY CARD,
+  // and nothing but SELECT answered outside the secure channel.
+  describe('certificate cards', () => {
+    const UNKNOWN_CA =
+      'Card certificate verification failed: unknown CA public key and card not whitelisted';
+    const IDENTITY_KEY = filler(33, 0x02);
+    const CARD_KEY = '02'.repeat(33);
+    const CERTIFICATE = [...IDENTITY_KEY, ...filler(65, 0x09)];
+    const KEY_UID = filler(32, 0x5e);
+
+    function card(options: { status?: number } = {}) {
+      return v4Select(0x0400, {
+        certificate: CERTIFICATE,
+        keyUID: KEY_UID,
+        ...options,
+      });
+    }
+
+    function useCard(overrides: Record<string, unknown> = {}) {
+      const cmdSet = {
+        ...makeMockCmdSet(),
+        applicationInfo: card(),
+        ...overrides,
+      };
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+      return cmdSet;
+    }
+
+    /** The whitelist the session built the most recent Commandset with. */
+    function lastWhitelist(): Uint8Array[] {
+      const Keycard = require('keycard-sdk').default;
+      const calls = Keycard.Commandset.mock.calls;
+      return calls[calls.length - 1][2];
+    }
+
+    async function start(op = jest.fn().mockResolvedValue('result')) {
+      const hook = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        hook.result.current.execute(op, {});
+      });
+      await act(async () => {
+        hook.result.current.submitPin('123456');
+      });
+      return { ...hook, op };
+    }
+
+    async function tap() {
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+    }
+
+    beforeEach(() => {
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockClear();
+    });
+
+    describe('signed by the Keycard CA', () => {
+      it('runs the operation without pairing or IDENTIFY CARD', async () => {
+        const cmdSet = useCard();
+        const { result, op } = await start();
+        await tap();
+        expect(result.current.phase).toBe('done');
+        expect(op).toHaveBeenCalledTimes(1);
+        expect(mockLoadPairing).not.toHaveBeenCalled();
+        expect(cmdSet.autoPair).not.toHaveBeenCalled();
+        expect(mockCheckGenuine).not.toHaveBeenCalled();
+        expect(cmdSet.identifyCard).not.toHaveBeenCalled();
+      });
+
+      // Such a card answers nothing but SELECT outside the channel, so a name
+      // read sent first would come back 0x6985 and fail the whole operation.
+      it('opens the channel before it reads the name or verifies the PIN', async () => {
+        const cmdSet = useCard();
+        await start();
+        await tap();
+        const order = (fn: jest.Mock) => fn.mock.invocationCallOrder[0];
+        expect(order(cmdSet.autoOpenSecureChannel)).toBeLessThan(
+          order(cmdSet.getData),
+        );
+        expect(order(cmdSet.getData)).toBeLessThan(order(cmdSet.verifyPIN));
+      });
+
+      it('shows the name it read inside the channel', async () => {
+        useCard();
+        const { result } = await start();
+        await tap();
+        expect(result.current.cardName).toBe('Main card');
+      });
+
+      it('remembers no approval, because none was needed', async () => {
+        useCard();
+        await start();
+        await tap();
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('signed by an unknown CA', () => {
+      function useUntrustedCard() {
+        return useCard({
+          select: jest.fn().mockRejectedValue(new Error(UNKNOWN_CA)),
+        });
+      }
+
+      it('asks the user before anything more is sent', async () => {
+        const cmdSet = useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        expect(result.current.phase).toBe('genuine_warning');
+        expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+        expect(cmdSet.getData).not.toHaveBeenCalled();
+        expect(cmdSet.verifyPIN).not.toHaveBeenCalled();
+        expect(op).not.toHaveBeenCalled();
+      });
+
+      it('does not whitelist the card before the user approves', async () => {
+        useUntrustedCard();
+        await start();
+        await tap();
+        expect(lastWhitelist()).toEqual([]);
+      });
+
+      it('whitelists the card for the tap after approval', async () => {
+        useUntrustedCard();
+        const { result } = await start();
+        await tap();
+
+        useCard();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+        await tap();
+        expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
+      });
+
+      // Anyone can present a copied certificate. Only the card that holds its
+      // private key can sign the handshake, so that is when the approval
+      // becomes worth keeping, and not a moment earlier.
+      it('remembers the approval only once the handshake has succeeded', async () => {
+        useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+
+        useCard();
+        await tap();
+        expect(mockApproveCardKey).toHaveBeenCalledWith(CARD_KEY);
+        expect(op).toHaveBeenCalledTimes(1);
+        expect(result.current.phase).toBe('done');
+      });
+
+      it('remembers nothing when the handshake fails', async () => {
+        useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+
+        useCard({
+          autoOpenSecureChannel: jest
+            .fn()
+            .mockRejectedValue(
+              new Error('Card authentication failed: invalid signature'),
+            ),
+        });
+        await tap();
+        expect(result.current.phase).toBe('error');
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+        expect(op).not.toHaveBeenCalled();
+      });
+
+      // The write is not awaited and may fail. The approval then still holds
+      // from memory for this session, and the operation is not disturbed.
+      it('runs the operation even when the approval cannot be saved', async () => {
+        mockApproveCardKey.mockRejectedValue(new Error('storage full'));
+        useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+        useCard();
+        await tap();
+        expect(op).toHaveBeenCalledTimes(1);
+        expect(result.current.phase).toBe('done');
+      });
+
+      it('forgets the pending question when the user cancels', async () => {
+        useUntrustedCard();
+        const { result } = await start();
+        await tap();
+        await act(async () => {
+          result.current.cancel();
+        });
+        expect(result.current.phase).toBe('idle');
+
+        // A later approval of a card WITHOUT a certificate must not be filed
+        // as a certificate approval because of this one.
+        useCard();
+        const next = await start();
+        await tap();
+        expect(next.result.current.phase).toBe('done');
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+      });
+    });
+
+    it('whitelists the cards approved on an earlier run of the app', async () => {
+      mockLoadApprovedCardKeys.mockResolvedValue([CARD_KEY]);
+      useCard();
+      await start();
+      await tap();
+      expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
+    });
+
+    // A blank card with a certificate has a card key from its first SELECT,
+    // so the missing key is not what gives it away: its status is.
+    it('says so when the card is not initialized', async () => {
+      const cmdSet = useCard({ applicationInfo: card({ status: 0x00 }) });
+      const { result } = await start();
+      await tap();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard is not initialized. Initialize it first.',
+      );
+      expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+    });
+  });
+
+  // The 3.x wire order is what every card in the field depends on, and the
+  // certificate branch was cut out of the same function.
+  describe('cards without a certificate', () => {
+    it('still reads the name before it pairs and opens the channel', async () => {
+      const cmdSet = makeMockCmdSet();
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+      mockLoadPairing.mockResolvedValue(null);
+      mockCheckGenuine.mockResolvedValue(true);
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {});
+      });
+      await act(async () => {
+        result.current.submitPin('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+
+      const order = (fn: jest.Mock) => fn.mock.invocationCallOrder[0];
+      expect(order(cmdSet.getData)).toBeLessThan(order(cmdSet.autoPair));
+      expect(order(cmdSet.autoPair)).toBeLessThan(
+        order(cmdSet.autoOpenSecureChannel),
+      );
+      expect(order(cmdSet.autoOpenSecureChannel)).toBeLessThan(
+        order(cmdSet.verifyPIN),
+      );
+      expect(mockApproveCardKey).not.toHaveBeenCalled();
     });
   });
 
