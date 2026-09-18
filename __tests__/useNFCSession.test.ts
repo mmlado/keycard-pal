@@ -6,6 +6,10 @@ import useNFCSession, {
 } from '../src/hooks/keycard/useNFCSession';
 import { KEYCARD_CA_PUBLIC_KEY } from '../src/constants/keycard';
 import {
+  CARD_NOT_GENUINE_STATUS,
+  NO_CERTIFICATE_STATUS,
+} from '../src/utils/keycardErrors';
+import {
   getLastTappedGeneration,
   resetLastTappedGeneration,
 } from '../src/utils/lastTappedGeneration';
@@ -859,21 +863,25 @@ describe('useNFCSession', () => {
     // Any other throw from select() is a failure, certificate or not. In
     // particular a card that cannot prove its key must never be waved through.
     it.each([
-      'Card authentication failed: invalid signature',
-      'Something else entirely',
-    ])('does not wave through %p', async message => {
+      [
+        'Card authentication failed: invalid signature',
+        CARD_NOT_GENUINE_STATUS,
+      ],
+      ['Something else entirely', 'Something else entirely'],
+    ])('does not wave through %p', async (message, shown) => {
       selectThrowing(message, { appVersion: 0x0400 });
       const { result } = await tap();
       expect(result.current.phase).toBe('error');
-      expect(result.current.status).toBe(message);
+      expect(result.current.status).toBe(shown);
       expect(mockOnCardConnected).not.toHaveBeenCalled();
     });
 
-    it('still fails a SELECT the card answered with an error status', async () => {
+    it('says so when the card has no certificate and refuses SELECT', async () => {
       mockSelect.mockResolvedValue({ sw: 0x6985 });
       const { result } = await tap();
       expect(result.current.phase).toBe('error');
-      expect(result.current.status).toBe('SELECT failed: 0x6985');
+      expect(result.current.status).toBe(NO_CERTIFICATE_STATUS);
+      expect(mockStopNFCWithError).toHaveBeenCalledWith(NO_CERTIFICATE_STATUS);
     });
   });
 

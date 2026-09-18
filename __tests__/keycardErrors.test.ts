@@ -3,7 +3,14 @@ import {
   WrongPINException,
 } from 'keycard-sdk/dist/apdu-exception';
 
-import { isTagLostError } from '../src/utils/keycardErrors';
+import {
+  CARD_NOT_GENUINE_STATUS,
+  cardErrorMessage,
+  CONNECTION_NOT_PROTECTED_STATUS,
+  isTagLostError,
+  NO_CERTIFICATE_STATUS,
+  selectFailureMessage,
+} from '../src/utils/keycardErrors';
 
 describe('isTagLostError', () => {
   describe('tag-lost messages (true)', () => {
@@ -63,5 +70,63 @@ describe('isTagLostError', () => {
         expect(isTagLostError(value)).toBe(false);
       },
     );
+  });
+});
+
+describe('cardErrorMessage', () => {
+  // keycard-sdk 4.0.0's own words. If one of these has to change, check the
+  // installed SDK first.
+  const SDK_LITERALS = [
+    'Card authentication failed: invalid signature',
+    'OPEN SECURE CHANNEL failed',
+    'Invalid handshake response: too short',
+  ];
+
+  it.each(SDK_LITERALS)('the installed SDK still says %p', literal => {
+    const source = require('fs').readFileSync(
+      require.resolve('keycard-sdk/dist/secure-channel-v2.js'),
+      'utf8',
+    );
+    expect(source).toContain(literal);
+  });
+
+  it.each(SDK_LITERALS)('%p is never taken for a lost tag', literal => {
+    expect(isTagLostError(new APDUException(literal))).toBe(false);
+  });
+
+  it('puts a card that failed the handshake signature in plain words', () => {
+    expect(
+      cardErrorMessage(
+        new APDUException('Card authentication failed: invalid signature'),
+      ),
+    ).toBe(CARD_NOT_GENUINE_STATUS);
+  });
+
+  it('puts a refused handshake in plain words, status word or not', () => {
+    expect(
+      cardErrorMessage(new APDUException('OPEN SECURE CHANNEL failed', 0x6982)),
+    ).toBe(CONNECTION_NOT_PROTECTED_STATUS);
+    expect(
+      cardErrorMessage(
+        new APDUException('Invalid handshake response: too short'),
+      ),
+    ).toBe(CONNECTION_NOT_PROTECTED_STATUS);
+  });
+
+  it('leaves every other message as it is', () => {
+    expect(cardErrorMessage(new Error('Card is locked.'))).toBe(
+      'Card is locked.',
+    );
+    expect(cardErrorMessage('plain string')).toBe('plain string');
+  });
+});
+
+describe('selectFailureMessage', () => {
+  it('explains the refusal of a card with no certificate', () => {
+    expect(selectFailureMessage(0x6985)).toBe(NO_CERTIFICATE_STATUS);
+  });
+
+  it('keeps the status word for anything else', () => {
+    expect(selectFailureMessage(0x6a82)).toBe('SELECT failed: 0x6A82');
   });
 });

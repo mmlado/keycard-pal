@@ -5,6 +5,7 @@ import { cardHasRoute } from '@/navigation/generationBoundRoutes';
 import { loadPairing } from '@/storage/pairingStorage';
 import { cardGeneration } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
+import { selectFailureMessage } from '@/utils/keycardErrors';
 import { UNREADABLE_CARD_STATUS } from './useIdentifyCard';
 import {
   useNFCOperation,
@@ -113,9 +114,7 @@ export function usePairingSlots(): UsePairingSlots {
     async (cmdSet: Commandset) => {
       const selectResp = await cmdSet.select();
       if (selectResp.sw !== 0x9000) {
-        throw new Error(
-          `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
-        );
+        throw new Error(selectFailureMessage(selectResp.sw));
       }
       await readSlotInfo(cmdSet);
     },

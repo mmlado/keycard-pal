@@ -11,7 +11,11 @@ import {
   MIN_SUPPORTED_APPLET_VERSION,
 } from '@/utils/cardGeneration';
 import { isUnknownCaError, TRUSTED_CA_PUBLIC_KEYS } from '@/utils/cardTrust';
-import { isTagLostError } from '@/utils/keycardErrors';
+import {
+  cardErrorMessage,
+  isTagLostError,
+  selectFailureMessage,
+} from '@/utils/keycardErrors';
 import { noteTappedGeneration } from '@/utils/lastTappedGeneration';
 
 export type NFCSessionPhase = 'idle' | 'nfc' | 'done' | 'error';
@@ -256,9 +260,7 @@ export default function useNFCSession(
           `[Keycard] SELECT SW: 0x${selectResp.sw.toString(16).toUpperCase()}`,
         );
         if (selectResp.sw !== 0x9000) {
-          throw new Error(
-            `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
-          );
+          throw new Error(selectFailureMessage(selectResp.sw));
         }
       } catch (e) {
         if (!isUnknownCaError(e) || !cmdSet.applicationInfo) {
@@ -322,8 +324,8 @@ export default function useNFCSession(
       }
       outcome = 'error';
       realErrorRef.current = true;
-      const msg = e instanceof Error ? e.message : String(e);
-      console.log(`[Keycard] Error: ${msg}`, e);
+      const msg = cardErrorMessage(e);
+      console.log('[Keycard] Error:', e);
       setStatus(msg);
       setPhase('error');
       RNKeycard.Core.stopNFCWithError(msg).catch(() => {});
