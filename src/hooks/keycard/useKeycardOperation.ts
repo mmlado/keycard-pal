@@ -86,6 +86,12 @@ export interface UseKeycardOperation<T> {
   openNFCSettings: (() => void) | undefined;
 }
 
+// An interrupted tap is thrown, never returned: a tap that returns closes
+// Apple's NFC sheet with the operation's success wording.
+export const PAIRING_PASSWORD_NEEDED_STATUS =
+  'This Keycard needs its pairing password.';
+export const NOT_GENUINE_STATUS = 'This Keycard may not be genuine.';
+
 export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [waitingForPin, setWaitingForPin] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -369,7 +375,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         if (retryUnsafeRef) retryUnsafeRef.current = true;
         const paired = await runAutoPair(cmdSet, cardKey);
         if (retryUnsafeRef) retryUnsafeRef.current = false;
-        if (!paired) return null;
+        if (!paired) throw new Error(PAIRING_PASSWORD_NEEDED_STATUS);
       }
       return await openChannelAndExecute(
         cmdSet,
@@ -446,7 +452,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
           pendingGenuineCardKeyRef.current = cardKey;
           pendingCertificateRef.current = true;
           setShowGenuineWarning(true);
-          return null;
+          throw new Error(NOT_GENUINE_STATUS);
         }
         return await openChannelAndExecute(
           cmdSet,
@@ -466,7 +472,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         !!existingPairing,
         setStatus,
       );
-      if (!shouldProceed) return null;
+      if (!shouldProceed) throw new Error(NOT_GENUINE_STATUS);
 
       return await doPairAndExecute(
         cmdSet,

@@ -564,6 +564,36 @@ describe('useNFCSession', () => {
       });
     });
 
+    // The success sheet draws the status under its check mark.
+    describe('status once the operation is done', () => {
+      async function runToDone(options?: { successMessage?: string }) {
+        const { result } = makeHook(options);
+        mockOnCardConnected.mockImplementation(
+          async (_cmdSet: unknown, setStatus: (s: string) => void) => {
+            setStatus('Initializing...');
+          },
+        );
+        await act(async () => {
+          result.current.startNFC();
+        });
+        await act(async () => {
+          await capturedOnConnected?.();
+        });
+        expect(result.current.phase).toBe('done');
+        return result;
+      }
+
+      it('is the operation message, not the last progress text', async () => {
+        const result = await runToDone({ successMessage: 'Card initialized' });
+        expect(result.current.status).toBe('Card initialized');
+      });
+
+      it('is empty when the operation has no message', async () => {
+        const result = await runToDone();
+        expect(result.current.status).toBe('');
+      });
+    });
+
     it('ignores card connected when phase is done', async () => {
       const { result } = makeHook();
       mockOnCardConnected.mockResolvedValue(undefined);

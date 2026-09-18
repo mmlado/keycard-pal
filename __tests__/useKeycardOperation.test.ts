@@ -3,6 +3,8 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { AppState } from 'react-native';
 import {
+  NOT_GENUINE_STATUS,
+  PAIRING_PASSWORD_NEEDED_STATUS,
   useKeycardOp,
   useKeycardOperation,
 } from '../src/hooks/keycard/useKeycardOperation';
@@ -26,6 +28,7 @@ let capturedAppStateListener: ((state: string) => void) | null = null;
 const mockStartNFC = jest.fn();
 const mockStopNFC = jest.fn();
 const mockStopNFCWithError = jest.fn();
+const mockStopNFCWithMessage = jest.fn();
 const mockIsNFCEnabled = jest.fn();
 
 jest.mock('react-native-keycard', () => ({
@@ -51,6 +54,7 @@ jest.mock('react-native-keycard', () => ({
       startNFC: (msg: string) => mockStartNFC(msg),
       stopNFC: () => mockStopNFC(),
       stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
+      stopNFCWithMessage: (msg: string) => mockStopNFCWithMessage(msg),
       isNFCEnabled: () => mockIsNFCEnabled(),
       openNFCSettings: () => Promise.resolve(true),
       setNFCMessage: () => Promise.resolve(true),
@@ -131,10 +135,12 @@ describe('useKeycardOperation', () => {
     mockStartNFC.mockResolvedValue(undefined);
     mockStopNFC.mockResolvedValue(undefined);
     mockStopNFCWithError.mockResolvedValue(undefined);
+    mockStopNFCWithMessage.mockResolvedValue(undefined);
     mockIsNFCEnabled.mockResolvedValue(true);
     mockStartNFC.mockClear();
     mockStopNFC.mockClear();
     mockStopNFCWithError.mockClear();
+    mockStopNFCWithMessage.mockClear();
     mockIsNFCEnabled.mockClear();
     capturedOnConnected = null;
     capturedOnDisconnected = null;
@@ -426,6 +432,23 @@ describe('useKeycardOperation', () => {
       });
       await triggerCardConnect(result.current);
       expect(result.current.phase).toBe('genuine_warning');
+    });
+
+    // A tap that returns closes Apple's NFC sheet with the success wording.
+    it('never closes the reader with the success wording', async () => {
+      mockCheckGenuine.mockResolvedValue(false);
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), {
+          requiresPin: false,
+          successMessage: 'PIN changed',
+        });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('genuine_warning');
+      expect(mockStopNFCWithMessage).not.toHaveBeenCalled();
+      expect(mockStopNFC).not.toHaveBeenCalled();
+      expect(mockStopNFCWithError).toHaveBeenCalledWith(NOT_GENUINE_STATUS);
     });
 
     it('genuine check is skipped when pairing already exists', async () => {
@@ -836,6 +859,15 @@ describe('useKeycardOperation', () => {
         expect(op).not.toHaveBeenCalled();
       });
 
+      it('ends that tap with the warning, never as a success', async () => {
+        useUntrustedCard();
+        await start();
+        await tap();
+        expect(mockStopNFC).not.toHaveBeenCalled();
+        expect(mockStopNFCWithMessage).not.toHaveBeenCalled();
+        expect(mockStopNFCWithError).toHaveBeenCalledWith(NOT_GENUINE_STATUS);
+      });
+
       it('does not whitelist the card before the user approves', async () => {
         useUntrustedCard();
         await start();
@@ -1210,6 +1242,32 @@ describe('useKeycardOperation', () => {
       await triggerCardConnect(result.current);
       expect(result.current.phase).toBe('pairing_password');
       expect(result.current.pairingPasswordError).toBeNull();
+    });
+
+    it('never closes the reader with the success wording', async () => {
+      const { APDUException } = require('keycard-sdk/dist/apdu-exception');
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        autoPair: jest
+          .fn()
+          .mockRejectedValue(new APDUException('Invalid card cryptogram')),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {
+          requiresPin: false,
+          successMessage: 'PIN changed',
+        });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('pairing_password');
+      expect(mockStopNFCWithMessage).not.toHaveBeenCalled();
+      expect(mockStopNFC).not.toHaveBeenCalled();
+      expect(mockStopNFCWithError).toHaveBeenCalledWith(
+        PAIRING_PASSWORD_NEEDED_STATUS,
+      );
     });
 
     it('transitions to nfc and calls startNFC after submitPairingPassword', async () => {
