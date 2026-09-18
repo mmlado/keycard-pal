@@ -276,6 +276,110 @@ describe('back guard', () => {
   });
 });
 
+// React Navigation asks the screen that is about to go first: reset() fires its
+// beforeRemove listeners, and a listener that calls preventDefault cancels the
+// navigation. A bare jest.fn() for reset never does that, which is how a screen
+// whose own back guard vetoed its own "done" went unnoticed.
+describe('done navigation against a screen with its own back guard', () => {
+  function makeNavigationThatAsksFirst() {
+    const listeners: ((e: { preventDefault: () => void }) => void)[] = [];
+    const left = jest.fn();
+    const navigation = {
+      goBack: jest.fn(),
+      setOptions: jest.fn(),
+      addListener: jest.fn((_type: string, listener: (e: any) => void) => {
+        listeners.push(listener);
+        return jest.fn();
+      }),
+      reset: jest.fn((state: unknown) => {
+        let prevented = false;
+        const e = {
+          preventDefault: () => {
+            prevented = true;
+          },
+        };
+        listeners.forEach(listener => listener(e));
+        if (!prevented) {
+          left(state);
+        }
+      }),
+    };
+    return { navigation, left };
+  }
+
+  /** A step machine like InitCardScreen's: back steps the form, never leaves. */
+  function stepGuard() {
+    return jest.fn((e: { preventDefault: () => void }) => e.preventDefault());
+  }
+
+  // Mounted mid-operation and then finished, the way a real screen gets there:
+  // the back guard is long registered by the time the operation is done.
+  it('leaves when the operation is done, whatever step the form is on', () => {
+    const { navigation, left } = makeNavigationThatAsksFirst();
+    const onBeforeRemove = stepGuard();
+    const options = {
+      navigation,
+      title: 'T',
+      done: { toast: 'Card initialized', requireResult: true },
+      onBeforeRemove,
+    };
+    const { rerender } = renderScreenHook({
+      ...options,
+      keycard: makeKeycard('nfc'),
+    });
+    expect(left).not.toHaveBeenCalled();
+
+    rerender({ ...options, keycard: makeKeycard('done', '123456123456') });
+
+    expect(left).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
+    });
+    // The form is not stepped back either: nothing is left to go back to.
+    expect(onBeforeRemove).not.toHaveBeenCalled();
+  });
+
+  it('still lets the screen veto a real back press before the operation', () => {
+    const { navigation } = makeNavigationThatAsksFirst();
+    const onBeforeRemove = stepGuard();
+    renderScreenHook({
+      keycard: makeKeycard('idle'),
+      navigation,
+      title: 'T',
+      done: { toast: 'Card initialized' },
+      onBeforeRemove,
+    });
+
+    const e = { preventDefault: jest.fn() };
+    capturedBeforeRemove(navigation as any)(e);
+    expect(onBeforeRemove).toHaveBeenCalledWith(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+  });
+
+  it('leaves once the operation finishes, after earlier back presses were vetoed', () => {
+    const { navigation, left } = makeNavigationThatAsksFirst();
+    const onBeforeRemove = stepGuard();
+    const { rerender } = renderScreenHook({
+      keycard: makeKeycard('idle'),
+      navigation,
+      title: 'T',
+      done: { toast: 'PIN changed' },
+      onBeforeRemove,
+    });
+    capturedBeforeRemove(navigation as any)({ preventDefault: jest.fn() });
+    expect(left).not.toHaveBeenCalled();
+
+    rerender({
+      keycard: makeKeycard('done'),
+      navigation,
+      title: 'T',
+      done: { toast: 'PIN changed' },
+      onBeforeRemove,
+    });
+    expect(left).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('activeKeycard override', () => {
   it('guard, title, and cancel key on activeKeycard; done keys on keycard', () => {
     const navigation = makeNavigation();

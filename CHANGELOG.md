@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Initializing a Keycard, or changing its PIN, PUK or pairing secret, no longer leaves the app on the finished screen under the success sheet instead of returning to the dashboard
+
 ## [1.10.0] - 2026-09-15
 
 ### Added

@@ -71,6 +71,12 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
   optionsRef.current = options;
   const activeRef = useRef(active);
   activeRef.current = active;
+  // Raised just before this hook leaves the screen because the operation is
+  // done. React Navigation asks the screen being removed first (beforeRemove),
+  // and a screen's own back guard cannot tell that from a back press: it would
+  // veto the navigation and step its entry form back instead, leaving the user
+  // on a finished screen under a success sheet that has no Cancel.
+  const leavingRef = useRef(false);
 
   useEffect(() => {
     const done = optionsRef.current.done;
@@ -82,6 +88,7 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
     }
     const toast =
       typeof done.toast === 'function' ? done.toast(result) : done.toast;
+    leavingRef.current = true;
     navigation.reset({
       index: 0,
       routes: [{ name: 'Dashboard', params: { toast } }],
@@ -118,6 +125,9 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', e => {
+      if (leavingRef.current) {
+        return;
+      }
       if (keycardBusy()) {
         activeRef.current.cancel();
         return;
