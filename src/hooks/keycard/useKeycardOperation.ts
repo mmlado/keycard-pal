@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Keycard from 'keycard-sdk';
 import {
   APDUException,
@@ -13,18 +13,14 @@ import {
   routeAbsence,
   type GenerationBoundRoute,
 } from '@/navigation/generationBoundRoutes';
-import {
-  approveCardKey,
-  loadApprovedCardKeys,
-} from '@/storage/approvedCardsStorage';
 import { loadPairing, savePairing } from '@/storage/pairingStorage';
 import { cardGeneration, secureChannelVersion } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
 import { pubKeyFingerprint } from '@/utils/cryptoAccount';
 import { checkGenuine } from '@/utils/genuineCheck';
-import { fromHex } from '@/utils/hex';
 import { isTagLostError } from '@/utils/keycardErrors';
 import { displayKeycardName, parseKeycardName } from '@/utils/keycardName';
+import { useCertificateApprovals } from './useCertificateApprovals';
 import {
   useNFCOperation,
   type CardPresence,
@@ -109,25 +105,14 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [showGenuineWarning, setShowGenuineWarning] = useState(false);
   const approvedNonGenuineCardKeysRef = useRef<Set<string>>(new Set());
   const pendingGenuineCardKeyRef = useRef<string | null>(null);
-  // Cards with a certificate (ADR-0013): approved by the user, but not yet
-  // remembered. An approval is only worth keeping once the handshake has shown
-  // the card holds the certificate's private key, so it waits here until then,
-  // and is whitelisted from here to get the card through SELECT meanwhile.
-  const unprovenCertificateApprovalsRef = useRef<Set<string>>(new Set());
+  // Cards with a certificate (ADR-0013). Their approval is whitelisted at once
+  // and kept only after the handshake; see useCertificateApprovals.
   const pendingCertificateRef = useRef(false);
-
-  // Warm the approval store before any tap, so reading it during one is a
-  // lookup in memory and adds nothing to the time the card is on the antenna.
-  useEffect(() => {
-    loadApprovedCardKeys().catch(() => {});
-  }, []);
-
-  const whitelistedCardKeys = useCallback(async () => {
-    const remembered = await loadApprovedCardKeys();
-    return [
-      ...new Set([...remembered, ...unprovenCertificateApprovalsRef.current]),
-    ].map(fromHex);
-  }, []);
+  const {
+    whitelistedCardKeys,
+    approve: approveCertificate,
+    handshakeSucceeded,
+  } = useCertificateApprovals();
 
   const pinRef = useRef('');
   /** True once this PIN has been accepted by the card in this session, which
@@ -280,15 +265,9 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       console.log('[Keycard] Secure channel open');
 
       // The handshake verified the card's signature with the key from its
-      // certificate, so the card holds that key and the approval is about a
-      // real card. Only now is it remembered. Not awaited: the write has no
-      // business holding the card on the antenna, and until it lands the
-      // approval is still in force from memory.
-      if (unprovenCertificateApprovalsRef.current.has(cardKey)) {
-        approveCardKey(cardKey)
-          .then(() => unprovenCertificateApprovalsRef.current.delete(cardKey))
-          .catch(e => console.warn('[Keycard] approval not saved', e));
-      }
+      // certificate, so an approval waiting on this card is now about a real
+      // card and can be kept.
+      handshakeSucceeded(cardKey);
 
       const name = knownName ?? (await readCardName(cmdSet, setStatus));
 
@@ -357,7 +336,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         operationRunningRef.current = false;
       }
     },
-    [readCardName, verifyPin],
+    [handshakeSucceeded, readCardName, verifyPin],
   );
 
   // Cards without a certificate: pair (or reuse the stored pairing), then hand
@@ -607,7 +586,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       // and remembered only once that tap's handshake has succeeded. One
       // without is carried by the pairing the next tap creates.
       if (pendingCertificateRef.current) {
-        unprovenCertificateApprovalsRef.current.add(cardKey);
+        approveCertificate(cardKey);
       } else {
         approvedNonGenuineCardKeysRef.current.add(cardKey);
       }
@@ -616,7 +595,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     }
     setShowGenuineWarning(false);
     startNFC();
-  }, [startNFC]);
+  }, [approveCertificate, startNFC]);
 
   // Re-starts NFC. If PIN hasn't been entered yet (e.g. NFC was off before PIN entry),
   // show the PIN pad instead of starting NFC directly.
