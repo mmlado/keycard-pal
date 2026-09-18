@@ -117,7 +117,7 @@ a second type that would need the field too.
   layout.
 - A card info screen showing the applet version was wanted but is not part of
   this work: what it should show was not settled, so it is tracked separately
-  in #305, along with deleting the unreachable `KeycardLogScreen`.
+  in #310, along with deleting the unreachable `KeycardLogScreen`.
 - The words "generation" and "secure channel" stay out of the UI, and the
   user's word for the trust verdict is "genuine", as in shell. Applet versions
   are shown, though, where shell shows none: as a hand-written label per
