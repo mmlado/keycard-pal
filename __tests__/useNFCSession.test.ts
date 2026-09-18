@@ -908,6 +908,93 @@ describe('useNFCSession', () => {
       expect(mockStopNFCWithError).toHaveBeenCalled();
     });
 
+    // Until SELECT has answered, nothing but SELECT has been sent, and SELECT
+    // changes nothing on the card. A write has nothing to replay yet, so its
+    // card can be waited for like any other. Calling that "mid-operation"
+    // stranded the user on an error while the card reconnected underneath it
+    // (seen on a phone, 2026-09-18).
+    describe('a card that leaves before SELECT has answered', () => {
+      it('is waited for, even in an operation that may not be replayed', async () => {
+        mockSelect.mockRejectedValueOnce(new Error(ANDROID_TAG_LOST));
+        const { result } = makeHook();
+        await act(async () => {
+          result.current.startNFC();
+        });
+        await act(async () => {
+          await capturedOnConnected?.();
+        });
+
+        expect(result.current.phase).toBe('nfc');
+        expect(result.current.cardPresence).toBe('lost');
+        expect(result.current.status).toBe(CARD_MOVED_STATUS);
+        expect(mockStopNFCWithError).not.toHaveBeenCalled();
+        expect(mockOnCardConnected).not.toHaveBeenCalled();
+      });
+
+      it('runs the operation once, on the tap that gets through', async () => {
+        mockSelect.mockRejectedValueOnce(new Error(IOS_TAG_LOST));
+        const { result } = makeHook();
+        await act(async () => {
+          result.current.startNFC();
+        });
+        await act(async () => {
+          await capturedOnConnected?.();
+        });
+        await act(async () => {
+          await capturedOnConnected?.();
+        });
+
+        expect(mockOnCardConnected).toHaveBeenCalledTimes(1);
+        expect(result.current.phase).toBe('done');
+      });
+
+      // The wait is still bounded: a card that never settles ends in an error
+      // the user can act on, not in a sheet that waits forever.
+      it('still gives up after three losses in a row', async () => {
+        mockSelect.mockRejectedValue(new Error(ANDROID_TAG_LOST));
+        const { result } = makeHook();
+        await act(async () => {
+          result.current.startNFC();
+        });
+        for (let i = 0; i < 3; i++) {
+          await act(async () => {
+            await capturedOnConnected?.();
+          });
+        }
+
+        expect(result.current.phase).toBe('error');
+        expect(result.current.status).toBe(
+          'Could not keep a stable connection. Try again.',
+        );
+        expect(mockOnCardConnected).not.toHaveBeenCalled();
+      });
+
+      // Once SELECT has answered the operation has started, and the rule for
+      // writes is unchanged: no silent replay.
+      it('does not cover a loss after SELECT in such an operation', async () => {
+        const { result } = makeHook();
+        await startAndFail(result, ANDROID_TAG_LOST);
+        expect(result.current.phase).toBe('error');
+        expect(result.current.status).toBe(
+          'Connection lost mid-operation. Check the card state before retrying.',
+        );
+      });
+
+      // A failure that is not the card leaving is still a failure at once.
+      it('does not cover a SELECT that failed for another reason', async () => {
+        mockSelect.mockRejectedValueOnce(new Error('Invalid MAC'));
+        const { result } = makeHook();
+        await act(async () => {
+          result.current.startNFC();
+        });
+        await act(async () => {
+          await capturedOnConnected?.();
+        });
+        expect(result.current.phase).toBe('error');
+        expect(result.current.status).toBe('Invalid MAC');
+      });
+    });
+
     it('retryOnTagLoss but inside an unsafe window: error, no silent replay', async () => {
       const { result } = makeHook({ retryOnTagLoss: true });
       mockOnCardConnected.mockImplementation(async () => {

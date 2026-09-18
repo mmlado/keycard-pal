@@ -63,6 +63,30 @@ an unbounded wait on a dead session would be an invisible hang.
 - Failure mode of both gates is "show today's error", so a missed call site
   degrades to current behaviour, never to silent replay.
 
+## Update, 2026-09-18: a loss before SELECT answers is always waited for
+
+The opt-in above decides whether an operation may be **replayed**. Until SELECT
+has answered there is nothing to replay: only SELECT has been sent, and SELECT
+changes nothing on the card. So a card that leaves the field before then is
+waited for whatever the operation is, a write included, inside the same bounds
+(three consecutive losses, or the 6 s watchdog).
+
+This came from a phone, not from theory. A card dropped 0.6 s after connecting,
+before SELECT had answered, during initialization. Init is a write, so the
+session called it "Connection lost mid-operation" and stopped, while the card
+reconnected 150 ms later and then every few seconds underneath an error nobody
+could leave: the bridge stops forwarding card events after `stopNFCWithError`,
+so the sheet's "Tap your card to try again" had nothing behind it.
+
+That second half is fixed separately. `useNFCOperation` now returns `retry`, so
+every hook built on it (init, factory reset) gives the sheet a real "Try again".
+Running such an operation again after a lost connection is safe because each
+checks the card's state when it connects: init refuses a card that is already
+set up, and factory reset refuses one that is already empty.
+
+Once SELECT has answered, nothing here changes. A loss in a write is still the
+ambiguity error, never a silent replay.
+
 ## Revisit
 
 Per-operation opt-in for the held-back idempotent writes, once the reconnect

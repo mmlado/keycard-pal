@@ -199,6 +199,10 @@ export default function useNFCSession(
     // still stale inside the finally below (R8), so it cannot say whether this
     // run ended in an error.
     let outcome: 'waiting' | 'done' | 'error' = 'waiting';
+    // Until SELECT has answered, nothing but SELECT has been sent, and SELECT
+    // changes nothing on the card. So a card that slips off the antenna before
+    // then can always be waited for, whatever the operation is.
+    let selected = false;
     try {
       reportStatus('Selecting applet...');
       const channel = new RNKeycard.NFCCardChannel();
@@ -213,6 +217,7 @@ export default function useNFCSession(
           `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
         );
       }
+      selected = true;
       // Forward progress: only a successful SELECT resets the loss bound. A card
       // that connects and instantly drops must not reset it (R11).
       tagLossCountRef.current = 0;
@@ -223,9 +228,15 @@ export default function useNFCSession(
       stopWithSuccess();
     } catch (e: any) {
       if (isTagLostError(e)) {
-        if (retryOnTagLossRef.current && !retryUnsafeRef.current) {
+        if (
+          !selected ||
+          (retryOnTagLossRef.current && !retryUnsafeRef.current)
+        ) {
           // Session stays up: no setPhase, no stopNFCWithError. The next tap
-          // re-runs the operation from SELECT.
+          // re-runs the operation from SELECT. A write gets here too when the
+          // card left before SELECT answered: there is nothing of it to replay
+          // yet, and calling that "mid-operation" strands the user on an error
+          // while the card reconnects underneath it.
           onTagLost();
           return;
         }
