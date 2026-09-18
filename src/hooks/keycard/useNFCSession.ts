@@ -128,6 +128,8 @@ export default function useNFCSession(
    *  stopNFCWithMessage is a no-op delegate and the round trip buys nothing. */
   const stopWithSuccess = useCallback(() => {
     const message = successMessageRef.current;
+    // The last progress text ("Initializing...") must not sit under the check mark.
+    setStatus(message ?? '');
     if (message && Platform.OS === 'ios') {
       RNKeycard.Core.stopNFCWithMessage(message).catch(() => {});
       return;
