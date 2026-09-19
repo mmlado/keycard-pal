@@ -3,7 +3,7 @@ import MaterialDesignIcons, {
   type MaterialDesignIconsIconName,
 } from '@react-native-vector-icons/material-design-icons';
 
-import theme from '../../theme';
+import theme from '@/theme';
 
 import KeycardPalIcon from './keycard-pal.svg';
 import LayoutListIcon from './layout-list.svg';
@@ -39,8 +39,7 @@ function mdi(name: MaterialDesignIconsIconName, defaultColor: string) {
 
 const onSurface = theme.colors.onSurface;
 
-// Keys are semantic (what the icon stands for in the app), not glyph names,
-// so a glyph can be swapped without touching every call site.
+// Keys say what the icon stands for, so a glyph can be swapped without touching call sites.
 export const Icons = {
   scan: ScanIcon,
   keycardPal: KeycardPalIcon,
@@ -60,8 +59,7 @@ export const Icons = {
     failure: mdi('close-circle-outline', theme.colors.error),
   },
 
-  // Dashboard tiles. Addresses gets its own glyph rather than the static
-  // qr.svg, whose hardcoded white fill ignores the tint a tile applies.
+  // Dashboard tiles. qr.svg has a hardcoded fill, so Addresses gets its own glyph.
   connectWallet: mdi('link-variant', onSurface),
   addresses: mdi('qrcode', onSurface),
   keycard: mdi('credit-card-chip-outline', onSurface),
@@ -76,8 +74,7 @@ export const Icons = {
   pairingSlots: mdi('cellphone-link', onSurface),
   factoryReset: mdi('restore', onSurface),
 
-  // Key pair menu. The phrase icons mark length; the label says whether a
-  // passphrase is added, so the 12- and 24-word pairs share their glyph.
+  // Key pair menu. The phrase icons mark length only.
   phraseShort: mdi('text-short', onSurface),
   phraseLong: mdi('text-long', onSurface),
   keyGenerate: mdi('key-plus', onSurface),
@@ -92,16 +89,18 @@ export const Icons = {
   puk: mdi('lock-reset', onSurface),
   pairingSecret: mdi('handshake-outline', onSurface),
 
-  // Coins: the currency mark rather than the brand logo, so every place a coin
-  // is named (Addresses, wallet export, donation rows) reads as one set.
+  // Coins use the currency mark, not the brand logo.
   ethereum: mdi('currency-eth', onSurface),
   bitcoin: mdi('currency-btc', onSurface),
 
   // Export target that spans both chains and so has no single currency mark
   wallet: mdi('wallet-outline', onSurface),
 
-  // Layout picker: two squares side by side vs two stacked rows.
-  // Custom SVGs because MDI has the stacked pair but no two-squares glyph.
+  // Settings: a choice of several, where every other row is a single switch.
+  checkboxOn: mdi('checkbox-marked', onSurface),
+  checkboxOff: mdi('checkbox-blank-outline', onSurface),
+
+  // Layout picker. Custom SVGs: MDI has no two-squares glyph.
   layoutTiles: LayoutTilesIcon,
   layoutList: LayoutListIcon,
 };

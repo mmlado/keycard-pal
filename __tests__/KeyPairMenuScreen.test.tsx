@@ -5,6 +5,8 @@ import KeyPairMenuScreen, {
   dashboardEntry,
 } from '../src/screens/keypair/KeyPairMenuScreen';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -23,7 +25,7 @@ jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 // These assertions describe the list layout's rows, so pin the preference.
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: 'list' },
+    preferences: mockTestPreferences({ dashboardLayout: 'list' }),
     setPreference: jest.fn(),
   }),
 }));
@@ -48,8 +50,7 @@ describe('KeyPairMenuScreen', () => {
     navigation.navigate.mockClear();
   });
 
-  // The two formats offer the same three actions, so the heading distinguishes
-  // them and the labels stay short enough to scan.
+  // The heading names the format, so labels stay short.
   describe('grouping', () => {
     it('heads each group with its seed format', () => {
       renderScreen();
@@ -95,8 +96,7 @@ describe('KeyPairMenuScreen', () => {
       expect(screen.getByText('Verify shares')).toBeTruthy();
     });
 
-    // Row ids continue across groups rather than restarting, so the second
-    // group's rows do not collide with the first group's.
+    // Row ids continue across groups.
     it('shows a leading icon on every row across both groups', () => {
       renderScreen();
       for (const index of [0, 1, 2, 3, 4, 5]) {

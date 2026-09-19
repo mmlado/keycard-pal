@@ -1,8 +1,13 @@
 import { useCallback, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
-import { loadPairing } from '../../storage/pairingStorage';
-import { toHex } from '../../utils/hex';
+import { cardHasRoute } from '@/navigation/generationBoundRoutes';
+
+import { loadPairing } from '@/storage/pairingStorage';
+import { cardGeneration } from '@/utils/cardGeneration';
+import { getCardKey } from '@/utils/cardIdentity';
+import { selectFailureMessage } from '@/utils/keycardErrors';
+import { UNREADABLE_CARD_STATUS } from './useIdentifyCard';
 import {
   useNFCOperation,
   type CardPresence,
@@ -15,13 +20,15 @@ export interface SlotInfo {
   totalSlots: number;
   freeSlots: number;
   ourSlotIndex: number | null;
-  cardUid: string;
+  cardKey: string;
 }
 
 export interface UsePairingSlots {
   phase: NFCSessionPhase;
   cardPresence: CardPresence;
   slotInfo: SlotInfo | null;
+  /** A tap showed a card without pairing slots. The read still ends in 'done'. */
+  noPairingSlots: boolean;
   status: string;
   checkSlots: () => void;
   cancel: () => void;
@@ -32,19 +39,29 @@ export interface UsePairingSlots {
 
 export function usePairingSlots(): UsePairingSlots {
   const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
+  const [noPairingSlots, setNoPairingSlots] = useState(false);
 
   const readSlotInfo = useCallback(async (cmdSet: Commandset) => {
     const appInfo = cmdSet.applicationInfo;
     if (!appInfo) {
-      throw new Error('No application info in SELECT response');
+      throw new Error(UNREADABLE_CARD_STATUS);
     }
-    const uid = toHex(appInfo.instanceUID);
-    const existingPairing = await loadPairing(uid);
+    // Before the card key, so such a card is not mistaken for an uninitialized one.
+    if (!cardHasRoute('PairingSlots', cardGeneration(appInfo))) {
+      setNoPairingSlots(true);
+      setSlotInfo(null);
+      return;
+    }
+    const cardKey = getCardKey(appInfo);
+    if (cardKey === null) {
+      throw new Error('This Keycard is not initialized. Initialize it first.');
+    }
+    const existingPairing = await loadPairing(cardKey);
     setSlotInfo({
       totalSlots: TOTAL_SLOTS,
       freeSlots: appInfo.freePairingSlots,
       ourSlotIndex: existingPairing?.pairingIndex ?? null,
-      cardUid: uid,
+      cardKey,
     });
   }, []);
 
@@ -69,6 +86,7 @@ export function usePairingSlots(): UsePairingSlots {
 
   const checkSlots = useCallback(() => {
     setSlotInfo(null);
+    setNoPairingSlots(false);
     start();
   }, [start]);
 
@@ -78,6 +96,7 @@ export function usePairingSlots(): UsePairingSlots {
 
   const reset = useCallback(() => {
     setSlotInfo(null);
+    setNoPairingSlots(false);
     nfcReset();
   }, [nfcReset]);
 
@@ -86,15 +105,12 @@ export function usePairingSlots(): UsePairingSlots {
     nfcReset();
   }, [nfcReset]);
 
-  // Re-reads slot info from an already-connected cmdSet (e.g. after unpair).
-  // Calls SELECT to get fresh applicationInfo before reading.
+  // Re-reads after unpair, in the same connection. SELECT refreshes applicationInfo.
   const readSlotInfoFromCmdSet = useCallback(
     async (cmdSet: Commandset) => {
       const selectResp = await cmdSet.select();
       if (selectResp.sw !== 0x9000) {
-        throw new Error(
-          `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
-        );
+        throw new Error(selectFailureMessage(selectResp.sw));
       }
       await readSlotInfo(cmdSet);
     },
@@ -105,6 +121,7 @@ export function usePairingSlots(): UsePairingSlots {
     phase,
     cardPresence,
     slotInfo,
+    noPairingSlots,
     status,
     checkSlots,
     cancel,

@@ -5,6 +5,8 @@ import KeycardMenuScreen, {
   dashboardEntry,
 } from '../src/screens/KeycardMenuScreen';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -17,9 +19,14 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // These assertions describe the list layout's rows, so pin the preference.
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
+
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: 'list' },
+    preferences: mockTestPreferences({
+      dashboardLayout: 'list',
+      generationsInUse: mockGenerationsInUse,
+    }),
     setPreference: jest.fn(),
   }),
 }));
@@ -34,6 +41,7 @@ function renderScreen() {
 describe('KeycardMenuScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
+    mockGenerationsInUse = ['3.1', '4.0'];
   });
 
   it('renders the requested submenu items', () => {
@@ -83,6 +91,22 @@ describe('KeycardMenuScreen', () => {
       fireEvent.press(screen.getByText(label));
       expect(navigation.navigate).toHaveBeenCalledWith(destination);
     }
+  });
+
+  // The entry stays for anyone who ticked a card that has pairing slots.
+  describe('pairing slots entry', () => {
+    it('is hidden when only 4.x cards are ticked', () => {
+      mockGenerationsInUse = ['4.0'];
+      renderScreen();
+      expect(screen.queryByText('Manage pairing slots')).toBeNull();
+      expect(screen.getByText('Factory reset')).toBeTruthy();
+    });
+
+    it('stays when 3.x cards are ticked', () => {
+      mockGenerationsInUse = ['3.1'];
+      renderScreen();
+      expect(screen.getByText('Manage pairing slots')).toBeTruthy();
+    });
   });
 
   describe('dashboardEntry', () => {

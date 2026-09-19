@@ -1,13 +1,16 @@
 import { useCallback, useRef, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
+
 import useNFCSession, {
   CardPresence,
   NFCSessionPhase,
+  SelectedCard,
   UseNFCSessionOptions,
 } from './useNFCSession';
 
 export type { CardPresence };
 export type { NFCSessionPhase };
+export type { SelectedCard };
 export type { UseNFCSessionOptions };
 
 export interface UseNFCOperation<T> {
@@ -16,13 +19,7 @@ export interface UseNFCOperation<T> {
   cardPresence: CardPresence;
   result: T | null;
   start: () => void;
-  /**
-   * Opens the reader again after an error, for the NFC sheet's "Try again".
-   * After an error the reader is off, so tapping the card alone does nothing.
-   * Same as `start`: a caller keeps its inputs in refs until the operation has
-   * succeeded, and checks the card's state when it connects, so running again
-   * after a lost connection corrects itself.
-   */
+  /** Same as `start`, for the sheet's "Try again": after an error the reader is off. */
   retry: () => void;
   cancel: () => void;
   reset: () => void;
@@ -35,6 +32,7 @@ export function useNFCOperation<T>(
   onConnected: (
     cmdSet: Commandset,
     setStatus: (status: string) => void,
+    card: SelectedCard,
   ) => Promise<T>,
   options: UseNFCSessionOptions = {},
 ): UseNFCOperation<T> {
@@ -42,9 +40,13 @@ export function useNFCOperation<T>(
   const runIdRef = useRef(0);
 
   const handleCardConnected = useCallback(
-    async (cmdSet: Commandset, setStatus: (status: string) => void) => {
+    async (
+      cmdSet: Commandset,
+      setStatus: (status: string) => void,
+      card: SelectedCard,
+    ) => {
       const runId = ++runIdRef.current;
-      const value = await onConnected(cmdSet, setStatus);
+      const value = await onConnected(cmdSet, setStatus, card);
       if (runId === runIdRef.current) {
         setResult(value);
       }

@@ -9,18 +9,19 @@ import { Snackbar, Text } from 'react-native-paper';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PairingSlotsScreenProps } from '../navigation/types';
-import theme from '../theme';
+import { routeAbsence } from '@/navigation/generationBoundRoutes';
+import type { PairingSlotsScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import ConfirmPrompt from '../components/ConfirmPropmpt';
-import Menu from '../components/Menu';
-import NFCBottomSheet, { NFCOperation } from '../components/NFCBottomSheet';
-import PrimaryButton from '../components/PrimaryButton';
+import ConfirmPrompt from '@/components/ConfirmPropmpt';
+import Menu from '@/components/Menu';
+import NFCBottomSheet, { NFCOperation } from '@/components/NFCBottomSheet';
+import PrimaryButton from '@/components/PrimaryButton';
 
-import { useKeycardOperation } from '../hooks/keycard/useKeycardOperation';
-import { usePairingSlots } from '../hooks/keycard/usePairingSlots';
+import { useKeycardOperation } from '@/hooks/keycard/useKeycardOperation';
+import { usePairingSlots } from '@/hooks/keycard/usePairingSlots';
 
-import { deletePairing } from '../storage/pairingStorage';
+import { deletePairing } from '@/storage/pairingStorage';
 
 export default function PairingSlotsScreen({
   navigation,
@@ -33,6 +34,7 @@ export default function PairingSlotsScreen({
     phase: checkPhase,
     cardPresence: checkCardPresence,
     slotInfo,
+    noPairingSlots,
     status: checkStatus,
     checkSlots,
     cancel: cancelCheck,
@@ -57,17 +59,17 @@ export default function PairingSlotsScreen({
   // Auto-start NFC check when the screen is focused and we have no data yet.
   useFocusEffect(
     useCallback(() => {
-      if (checkPhase === 'idle' && !slotInfo) {
+      // A card without pairing slots leaves slotInfo empty for good; do not ask again.
+      if (checkPhase === 'idle' && !slotInfo && !noPairingSlots) {
         checkSlots();
       }
-    }, [checkPhase, slotInfo, checkSlots]),
+    }, [checkPhase, slotInfo, noPairingSlots, checkSlots]),
   );
 
   useEffect(() => {
     if (unpairPhase === 'done') {
       resetUnpair();
-      // Keep slotInfo — it was already updated in the unpair callback via
-      // readSlotInfoFromCmdSet, so no second NFC tap is needed.
+      // slotInfo was already refreshed inside the unpair tap.
       resetCheckNFCOnly();
     }
   }, [unpairPhase, resetUnpair, resetCheckNFCOnly]);
@@ -84,17 +86,21 @@ export default function PairingSlotsScreen({
         await cmdSet.unpair(slotIndex);
         if (slotInfo?.ourSlotIndex === slotIndex) {
           try {
-            await deletePairing(slotInfo.cardUid);
+            await deletePairing(slotInfo.cardKey);
           } catch {
             // Card-side unpair already succeeded; local cleanup is best-effort.
           }
         }
-        // Re-read slot info in the same NFC connection so the screen updates
-        // immediately without requiring a second tap on either platform.
+        // Re-read in the same connection, so no second tap is needed.
         await readSlotInfoFromCmdSet(cmdSet);
         setUnpairNotice(`Slot ${slotIndex + 1} was unpaired`);
       },
-      { requiresPin: true, requiresMasterKey: false },
+      // The slots were read from one card; the unpair tap can land on another.
+      {
+        requiresPin: true,
+        requiresMasterKey: false,
+        requiresRoute: 'PairingSlots',
+      },
     );
   }, [pendingSlotIndex, executeUnpair, slotInfo, readSlotInfoFromCmdSet]);
 
@@ -102,10 +108,7 @@ export default function PairingSlotsScreen({
     setPendingSlotIndex(null);
   }, []);
 
-  // The PIN pad no longer covers the navigator header, so the real back button
-  // and the iOS swipe-back gesture can leave this screen mid-session. Tear both
-  // sessions down on the way out; navigation is already happening, so this
-  // deliberately does not call handleCancel's goBack.
+  // Back can leave mid-session: tear both sessions down. Navigation is already under way.
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', () => {
       cancelUnpair();
@@ -129,8 +132,7 @@ export default function PairingSlotsScreen({
         phase: checkPhase,
         status: checkStatus,
         cardPresence: checkCardPresence,
-        // After an error the reader is disarmed (stopNFCWithError), so the
-        // sheet needs an explicit restart — re-tapping emits nothing.
+        // After an error the reader is stopped, so a re-tap emits nothing.
         retry: checkSlots,
       };
 
@@ -153,6 +155,8 @@ export default function PairingSlotsScreen({
     !isUnpairing &&
     (checkPhase === 'idle' || checkPhase === 'done' || checkPhase === 'error');
 
+  const absence = routeAbsence('PairingSlots');
+
   const menuEntries = slotInfo?.totalSlots
     ? Array.from({ length: slotInfo.totalSlots }, (_, i) => {
         const isOurSlot = i === slotInfo.ourSlotIndex;
@@ -168,7 +172,22 @@ export default function PairingSlotsScreen({
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
       {showContent && (
         <View style={styles.content}>
-          {!slotInfo && checkPhase !== 'error' && (
+          {noPairingSlots && (
+            <>
+              <View style={styles.centeredContent}>
+                <Text style={styles.absenceTitle}>{absence.title}</Text>
+                <Text style={styles.description}>{absence.detail}</Text>
+              </View>
+              <View style={styles.footer}>
+                <PrimaryButton
+                  label="Go back"
+                  onPress={() => navigation.goBack()}
+                />
+              </View>
+            </>
+          )}
+
+          {!slotInfo && !noPairingSlots && checkPhase !== 'error' && (
             <View style={styles.centeredContent}>
               <Text style={styles.description}>
                 Tap your Keycard to read the pairing slot status.
@@ -230,6 +249,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 24,
     paddingHorizontal: 24,
+  },
+  footer: {
+    paddingHorizontal: 24,
+  },
+  absenceTitle: {
+    color: theme.colors.onSurface,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   description: {
     color: theme.colors.onSurfaceMuted,

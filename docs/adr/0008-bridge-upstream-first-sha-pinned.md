@@ -42,6 +42,27 @@ Two delivery hazards are documented from direct experience in this repo:
 - Upstream review turnaround (about a month on PR #3) is on the critical path
   only for deleting the fork pin, not for shipping Pal.
 
+## Update, 2026-09-18: the same rule now covers `keycard-sdk`
+
+`keycard-sdk` 4.0.0 does not await the Secure Channel V2 handshake inside
+`Commandset.init()`. It builds the INIT command while the channel is still
+opening, so the new PIN and PUK leave the phone unencrypted and an applet 4.0
+card refuses them with `0x6985`. Reproduced on a real card. The fix is one
+`await`, submitted upstream as choppu/keycard-sdk#40 with a regression test.
+
+An app-side workaround (rebuilding INIT over a channel Pal opens itself) was
+written and rejected: it copies SDK logic into the app, and someone has to find
+and delete it later. The decision above applies instead. `keycard-sdk` is
+consumed as a commit-SHA git dependency on the fork while the PR is open.
+`__tests__/keycardSdkContract.test.ts` reads the installed `dist/` and goes red
+if the pin is ever moved to a build without the fix, which is what a routine
+version bump would otherwise do silently.
+
+One constraint is specific to this package: the bridge takes `keycard-sdk` as a
+peer dependency, and two installed copies break every `instanceof` check between
+them. After changing the pin, `npm ls keycard-sdk` must still show a single,
+deduped copy.
+
 ## Revisit
 
 If upstream starts cutting timely npm releases with the required changes,

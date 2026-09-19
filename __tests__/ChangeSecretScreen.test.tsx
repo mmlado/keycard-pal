@@ -2,8 +2,13 @@ import React, { act } from 'react';
 import { TextInput } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import ChangeSecretScreen from '../src/screens/secrets/ChangeSecretScreen';
+import { routeAbsence } from '../src/navigation/generationBoundRoutes';
+import ChangeSecretScreen, {
+  IDENTIFY_EXPLAINER,
+} from '../src/screens/secrets/ChangeSecretScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
+
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -18,6 +23,8 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
 jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
 const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
@@ -27,10 +34,15 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-// PinPad reads the scramble preference from context.
+// PinPad and the screen both read preferences.
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
+
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { pinPadScramble: false },
+    preferences: mockTestPreferences({
+      pinPadScramble: false,
+      generationsInUse: mockGenerationsInUse,
+    }),
     setPreference: jest.fn(),
   }),
 }));
@@ -42,6 +54,27 @@ const mockUseChangeSecret = jest.fn();
 
 jest.mock('../src/hooks/keycard/useChangeSecret', () => ({
   useChangeSecret: () => mockUseChangeSecret(),
+}));
+
+// The identify tap is its own hook; the test drives what it found.
+const mockIdentifyStart = jest.fn();
+const mockIdentifyCancel = jest.fn();
+let mockIdentify: {
+  phase: 'idle' | 'nfc' | 'done' | 'error';
+  generation: '3.1' | '4.0' | null;
+};
+
+jest.mock('../src/hooks/keycard/useIdentifyCard', () => ({
+  useIdentifyCard: () => ({
+    phase: mockIdentify.phase,
+    status: '',
+    cardPresence: 'waiting',
+    generation: mockIdentify.generation,
+    start: mockIdentifyStart,
+    retry: mockIdentifyStart,
+    cancel: mockIdentifyCancel,
+    openNFCSettings: undefined,
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -118,6 +151,13 @@ describe('ChangeSecretScreen', () => {
     navigation.goBack.mockClear();
     navigation.reset.mockClear();
     navigation.setOptions.mockClear();
+    navigation.addListener.mockClear();
+    mockIdentifyStart.mockClear();
+    mockIdentifyCancel.mockClear();
+    mockUseChangeSecret.mockClear();
+    mockGenerationsInUse = ['3.1', '4.0'];
+    // A card with a pairing secret, already identified: the default state below.
+    mockIdentify = { phase: 'done', generation: '3.1' };
   });
 
   // -------------------------------------------------------------------------
@@ -283,6 +323,200 @@ describe('ChangeSecretScreen', () => {
         routes: [
           { name: 'Dashboard', params: { toast: 'Pairing secret changed' } },
         ],
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Identify tap (pairing secret only)
+  // -------------------------------------------------------------------------
+
+  // The pairing secret reads the card first, then asks.
+  describe('identify tap', () => {
+    function lastSheetProps() {
+      const calls = MockNFCBottomSheet.mock.calls;
+      return calls[calls.length - 1][0];
+    }
+
+    describe('PIN and PUK are untouched', () => {
+      it.each(['pin', 'puk'] as const)(
+        'never starts an identify tap for %s',
+        async secretType => {
+          mockIdentify = { phase: 'idle', generation: null };
+          await renderScreen(secretType);
+          expect(mockIdentifyStart).not.toHaveBeenCalled();
+          expect(screen.getByText(/digits/)).toBeTruthy();
+          expect(screen.queryByText(IDENTIFY_EXPLAINER)).toBeNull();
+          expect(lastSheetProps().showOnDone).toBe(true);
+          // The sheet follows the change, never the idle identify hook.
+          expect(lastSheetProps().nfc).toBe(
+            mockUseChangeSecret.mock.results[0].value,
+          );
+        },
+      );
+    });
+
+    describe('while the card is unknown', () => {
+      beforeEach(() => {
+        mockIdentify = { phase: 'idle', generation: null };
+      });
+
+      it('starts the tap once when the screen opens', async () => {
+        const view = await renderScreen('pairing');
+        expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
+
+        // Dismissing Apple's sheet returns to idle; that must not reopen it.
+        view.rerender(
+          <ChangeSecretScreen
+            navigation={navigation}
+            route={routeFor('pairing')}
+          />,
+        );
+        expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
+      });
+
+      it('asks for nothing yet', async () => {
+        await renderScreen('pairing');
+        expect(screen.getByText(IDENTIFY_EXPLAINER)).toBeTruthy();
+        expect(screen.UNSAFE_queryByType(TextInput)).toBeNull();
+        expect(screen.queryByText(/digits/)).toBeNull();
+      });
+
+      it('titles the screen without naming a step', async () => {
+        await renderScreen('pairing');
+        expect(navigation.setOptions).toHaveBeenCalledWith({
+          title: 'Change pairing secret',
+        });
+      });
+
+      it('gives the sheet the identify tap, and hides it once read', async () => {
+        mockIdentify = { phase: 'nfc', generation: null };
+        await renderScreen('pairing');
+        expect(lastSheetProps().nfc.phase).toBe('nfc');
+        expect(lastSheetProps().nfc.retry).toBe(mockIdentifyStart);
+        expect(lastSheetProps().showOnDone).toBe(false);
+      });
+
+      it('offers the tap again after the system sheet was dismissed', async () => {
+        await renderScreen('pairing');
+        mockIdentifyStart.mockClear();
+        fireEvent.press(screen.getByText('Read Keycard'));
+        expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
+      });
+
+      it('disables that button while a tap is under way', async () => {
+        mockIdentify = { phase: 'nfc', generation: null };
+        await renderScreen('pairing');
+        mockIdentifyStart.mockClear();
+        fireEvent.press(screen.getByTestId('identify-card-button'));
+        expect(mockIdentifyStart).not.toHaveBeenCalled();
+      });
+
+      it('cancels the identify tap, not the change, from the sheet', async () => {
+        mockIdentify = { phase: 'nfc', generation: null };
+        await renderScreen('pairing');
+        lastSheetProps().onCancel();
+        expect(mockIdentifyCancel).toHaveBeenCalledTimes(1);
+        expect(mockCancel).not.toHaveBeenCalled();
+        expect(navigation.goBack).toHaveBeenCalledTimes(1);
+      });
+
+      it('cancels the identify tap when leaving mid-tap', async () => {
+        mockIdentify = { phase: 'nfc', generation: null };
+        await renderScreen('pairing');
+        lastBeforeRemoveHandler()?.({ preventDefault: jest.fn() });
+        expect(mockIdentifyCancel).toHaveBeenCalledTimes(1);
+        expect(mockCancel).not.toHaveBeenCalled();
+      });
+    });
+
+    // Every ticked card has a pairing secret, so the first tap is skipped.
+    describe('when every card in use has a pairing secret', () => {
+      beforeEach(() => {
+        mockGenerationsInUse = ['3.1'];
+        mockIdentify = { phase: 'idle', generation: null };
+      });
+
+      it('skips the identify tap and asks for the secret at once', async () => {
+        await renderScreen('pairing');
+        expect(mockIdentifyStart).not.toHaveBeenCalled();
+        expect(screen.UNSAFE_getByType(TextInput)).toBeTruthy();
+        expect(screen.queryByText(IDENTIFY_EXPLAINER)).toBeNull();
+        expect(navigation.setOptions).toHaveBeenCalledWith({
+          title: 'Enter new pairing secret',
+        });
+      });
+
+      it('drives the sheet from the change itself', async () => {
+        await renderScreen('pairing', 'nfc');
+        expect(lastSheetProps().showOnDone).toBe(true);
+        lastSheetProps().onCancel();
+        expect(mockCancel).toHaveBeenCalledTimes(1);
+        expect(mockIdentifyCancel).not.toHaveBeenCalled();
+      });
+    });
+
+    it('keeps the identify tap when a ticked card has no pairing secret', async () => {
+      mockGenerationsInUse = ['3.1', '4.0'];
+      mockIdentify = { phase: 'idle', generation: null };
+      await renderScreen('pairing');
+      expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
+    });
+
+    describe('on a card that has a pairing secret', () => {
+      // Only the change itself may end the screen.
+      it('does not leave the screen when the identify tap is done', async () => {
+        await renderScreen('pairing');
+        expect(navigation.reset).not.toHaveBeenCalled();
+        expect(screen.UNSAFE_getByType(TextInput)).toBeTruthy();
+      });
+
+      it('hands the sheet and the back guard over to the change', async () => {
+        await renderScreen('pairing', 'nfc');
+        expect(lastSheetProps().showOnDone).toBe(true);
+        lastBeforeRemoveHandler()?.({ preventDefault: jest.fn() });
+        expect(mockCancel).toHaveBeenCalledTimes(1);
+        expect(mockIdentifyCancel).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('on a card that has none', () => {
+      const absence = routeAbsence('ChangePairingSecret');
+
+      beforeEach(() => {
+        mockIdentify = { phase: 'done', generation: '4.0' };
+      });
+
+      it('explains it instead of asking for a secret or a PIN', async () => {
+        await renderScreen('pairing');
+        expect(screen.getByText(absence.title)).toBeTruthy();
+        expect(screen.getByText(absence.detail)).toBeTruthy();
+        expect(screen.UNSAFE_queryByType(TextInput)).toBeNull();
+        expect(screen.queryByText(/digits/)).toBeNull();
+        expect(mockStart).not.toHaveBeenCalled();
+      });
+
+      it('draws no NFC sheet, since no tap can follow', async () => {
+        await renderScreen('pairing');
+        expect(MockNFCBottomSheet).not.toHaveBeenCalled();
+      });
+
+      it('goes back from its one button', async () => {
+        await renderScreen('pairing');
+        fireEvent.press(screen.getByText('Go back'));
+        expect(navigation.goBack).toHaveBeenCalledTimes(1);
+      });
+
+      it('keeps the plain title', async () => {
+        await renderScreen('pairing');
+        expect(navigation.setOptions).toHaveBeenCalledWith({
+          title: 'Change pairing secret',
+        });
+      });
+
+      it('does not leave for the Dashboard', async () => {
+        await renderScreen('pairing');
+        expect(navigation.reset).not.toHaveBeenCalled();
       });
     });
   });

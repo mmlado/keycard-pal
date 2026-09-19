@@ -5,6 +5,8 @@ import SecretsMenuScreen, {
   dashboardEntry,
 } from '../src/screens/secrets/SecretsMenuScreen';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -21,9 +23,14 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // These assertions describe the list layout's rows, so pin the preference.
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
+
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: 'list' },
+    preferences: mockTestPreferences({
+      dashboardLayout: 'list',
+      generationsInUse: mockGenerationsInUse,
+    }),
     setPreference: jest.fn(),
   }),
 }));
@@ -46,6 +53,7 @@ function renderScreen() {
 describe('SecretsMenuScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
+    mockGenerationsInUse = ['3.1', '4.0'];
   });
 
   describe('layout', () => {
@@ -72,6 +80,16 @@ describe('SecretsMenuScreen', () => {
     });
   });
 
+  // The pairing secret row taps at once, so it carries the NFC mark.
+  describe('NFC indicator', () => {
+    it('marks only the pairing secret entry', () => {
+      renderScreen();
+      expect(screen.queryByTestId('menu-nfc-indicator-0')).toBeNull();
+      expect(screen.queryByTestId('menu-nfc-indicator-1')).toBeNull();
+      expect(screen.getByTestId('menu-nfc-indicator-2')).toBeTruthy();
+    });
+  });
+
   describe('navigation', () => {
     it('navigates to ChangeSecret with pin secretType', () => {
       renderScreen();
@@ -95,6 +113,23 @@ describe('SecretsMenuScreen', () => {
       expect(navigation.navigate).toHaveBeenCalledWith('ChangeSecret', {
         secretType: 'pairing',
       });
+    });
+  });
+
+  // The pairing secret went away with applet 4.0. PIN and PUK did not.
+  describe('pairing secret entry', () => {
+    it('is hidden when only 4.x cards are ticked', () => {
+      mockGenerationsInUse = ['4.0'];
+      renderScreen();
+      expect(screen.queryByText('Change Pairing Secret')).toBeNull();
+      expect(screen.getByText('Change PIN')).toBeTruthy();
+      expect(screen.getByText('Change PUK')).toBeTruthy();
+    });
+
+    it('stays when 3.x cards are ticked', () => {
+      mockGenerationsInUse = ['3.1'];
+      renderScreen();
+      expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
     });
   });
 

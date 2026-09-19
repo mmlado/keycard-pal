@@ -50,6 +50,17 @@ The literals belong to upstream and must never be paraphrased on either side.
 - The predicate keeps inert `code`/`name` arms as forward compatibility only;
   nothing may assume they fire.
 
+## Update, 2026-09-18: other upstream literals follow the same rule
+
+keycard-sdk 4.0.0 leaves the tag-loss literals as they were, so the closed list
+stands. The app now reads three more of the SDK's messages, none of them tag
+loss: the unknown-CA refusal (`isUnknownCaError`, ADR-0013), and the two
+handshake failures that `cardErrorMessage` puts in plain words (an invalid
+handshake signature, a refused OPEN SECURE CHANNEL). They are upstream's in the
+same way, and `cardTrust.test.ts` and `keycardErrors.test.ts` hold each one
+equal to the installed SDK's source, so a rename upstream is a red build. A
+missed match degrades to the raw message, never to a wrong classification.
+
 ## Revisit
 
 If the bridge ever ships typed error classes end to end (and the stale-`lib/`

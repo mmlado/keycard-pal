@@ -87,6 +87,14 @@ set up, and factory reset refuses one that is already empty.
 Once SELECT has answered, nothing here changes. A loss in a write is still the
 ambiguity error, never a silent replay.
 
+## Update, 2026-09-18: cards without pairing
+
+A card with a certificate (applet 4.0) has no pairing, so the `autoPair` window
+does not exist there. The `verifyPIN` window is unchanged and now lives in the
+part both card kinds share (`openChannelAndExecute`). A retry still replays from
+SELECT, which on such a card means a new handshake with new session keys and a
+counter starting over, so nothing of the interrupted channel is reused.
+
 ## Revisit
 
 Per-operation opt-in for the held-back idempotent writes, once the reconnect

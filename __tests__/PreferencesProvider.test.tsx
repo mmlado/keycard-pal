@@ -25,6 +25,8 @@ jest.mock('../src/storage/preferencesStorage', () => ({
 
 const STORED: Preferences = {
   dashboardLayout: 'list',
+  generationsInUse: ['3.1', '4.0'],
+  generationRemindersDismissed: [],
   pinPadScramble: true,
   tokenImagesEnabled: false,
   welcomeSeen: true,
@@ -60,11 +62,7 @@ function deferredSave() {
   return { resolve: () => resolve(), reject: (e: Error) => reject(e) };
 }
 
-/**
- * A write that has already failed by the time the provider gets to issue it,
- * which is how a newer write's failure can reach the provider before an older
- * write's success.
- */
+/** A write that has failed before the provider issues it. */
 function failedSave() {
   const failure = Promise.reject(new Error('storage full'));
   // Handled here too, so the rejection is never loose while it waits its turn.
@@ -85,8 +83,7 @@ beforeEach(() => {
 
 describe('PreferencesProvider', () => {
   describe('startup', () => {
-    // Children must not paint with a default the stored value then replaces;
-    // that flicker is what the single startup read exists to remove.
+    // Children never paint a default first.
     it('shows the loading screen and holds children until the read resolves', async () => {
       let resolveLoad!: (value: Preferences) => void;
       mockLoad.mockReturnValue(
@@ -109,8 +106,7 @@ describe('PreferencesProvider', () => {
       expect(screen.getByText('layout:list')).toBeTruthy();
     });
 
-    // The loading screen fades over the first screen rather than popping
-    // away, so it stays mounted above the children until the fade ends.
+    // The loading screen stays mounted until its fade ends.
     it('keeps the loading screen above the children until it has faded', async () => {
       render(
         <PreferencesProvider>
@@ -203,8 +199,7 @@ describe('PreferencesProvider', () => {
       expect(mockSave).not.toHaveBeenCalled();
     });
 
-    // The value shows before the write lands, so a failed write has to put
-    // it back rather than leave the UI disagreeing with storage.
+    // A failed write puts the shown value back.
     it('rolls back when the write fails', async () => {
       const pending = deferredSave();
       const { result } = await renderPreferences();
@@ -236,8 +231,7 @@ describe('PreferencesProvider', () => {
       await act(async () => {
         result.current.setPreference('dashboardLayout', 'tiles');
       });
-      // Not awaited: the second write is queued behind the first, so its
-      // promise cannot settle until the first one has.
+      // Not awaited: the second write is queued behind the first.
       await act(async () => {
         result.current.setPreference('dashboardLayout', 'list');
       });
@@ -266,10 +260,7 @@ describe('PreferencesProvider', () => {
       expect(result.current.preferences.dashboardLayout).toBe('tiles');
     });
 
-    // A rollback targets what storage holds, not the value that was on
-    // screen: after two failed writes the value it replaced is itself an
-    // optimistic value that never reached storage, and restoring it would
-    // show something the user never chose and the card never stored.
+    // A rollback goes to what storage holds, never to an optimistic value.
     it('rolls back to the stored value when consecutive writes fail', async () => {
       const first = deferredSave();
       const second = deferredSave();
@@ -294,8 +285,7 @@ describe('PreferencesProvider', () => {
       );
     });
 
-    // Two writes to one key never race: the second is issued only once the
-    // first has settled, so they cannot reach storage out of order.
+    // Writes to one key are issued one after the other.
     it('holds a write to a key until the write before it settles', async () => {
       const first = deferredSave();
       const { result } = await renderPreferences();
@@ -315,10 +305,7 @@ describe('PreferencesProvider', () => {
       expect(mockSave).toHaveBeenLastCalledWith('tokenImagesEnabled', false);
     });
 
-    // The ordering is what makes the rollback land in the right place. Run
-    // unordered, the newer write's failure is handled while the older write
-    // is still in flight, so the screen goes back to the value from before
-    // either of them while storage keeps what the older write put there.
+    // Unordered, a rollback could go past a value storage kept.
     it('rolls a failed write back to what the write before it stored', async () => {
       const first = deferredSave();
       failedSave();
@@ -338,8 +325,7 @@ describe('PreferencesProvider', () => {
       expect(result.current.preferences.dashboardLayout).toBe('tiles');
     });
 
-    // A write that succeeded is what storage holds, so a later failure goes
-    // back to it rather than to whatever preceded the successful one.
+    // A later failure rolls back to the last successful write.
     it('rolls back to a value an earlier write stored successfully', async () => {
       const { result } = await renderPreferences();
       await act(async () => {
@@ -357,8 +343,7 @@ describe('PreferencesProvider', () => {
       expect(result.current.preferences.tokenImagesEnabled).toBe(true);
     });
 
-    // Consecutive writes to different preferences must compose: the second
-    // starts from the state the first left, not from the render it saw.
+    // Writes to different preferences compose.
     it('composes writes to different preferences', async () => {
       const { result } = await renderPreferences();
       await act(async () => {

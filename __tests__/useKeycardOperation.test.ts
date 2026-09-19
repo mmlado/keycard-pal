@@ -11,6 +11,9 @@ import {
 import type { UseKeycardOperation } from '../src/hooks/keycard/useKeycardOperation';
 import { checkGenuine } from '../src/utils/genuineCheck';
 import { loadPairing } from '../src/storage/pairingStorage';
+import { routeAbsence } from '../src/navigation/generationBoundRoutes';
+
+import { filler, v3Select, v4Select } from './selectResponse.testUtils';
 
 // ---------------------------------------------------------------------------
 // RNKeycard mock — captures event callbacks so tests can trigger them
@@ -49,9 +52,12 @@ jest.mock('react-native-keycard', () => ({
         return { remove: jest.fn() };
       },
       startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: () => mockStopNFC(),
-      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
-      stopNFCWithMessage: (msg: string) => mockStopNFCWithMessage(msg),
+      stopNFC: (message?: string, isError?: boolean) =>
+        isError
+          ? mockStopNFCWithError(message)
+          : message
+          ? mockStopNFCWithMessage(message)
+          : mockStopNFC(),
       isNFCEnabled: () => mockIsNFCEnabled(),
       openNFCSettings: () => Promise.resolve(true),
       setNFCMessage: () => Promise.resolve(true),
@@ -82,6 +88,13 @@ jest.mock('../src/utils/genuineCheck', () => ({
 jest.mock('../src/storage/pairingStorage', () => ({
   loadPairing: jest.fn(),
   savePairing: jest.fn(),
+}));
+
+const mockLoadApprovedCardKeys = jest.fn();
+const mockApproveCardKey = jest.fn();
+jest.mock('../src/storage/approvedCardsStorage', () => ({
+  loadApprovedCardKeys: () => mockLoadApprovedCardKeys(),
+  approveCardKey: (cardKey: string) => mockApproveCardKey(cardKey),
 }));
 
 const mockCheckGenuine = checkGenuine as jest.MockedFunction<
@@ -145,6 +158,8 @@ describe('useKeycardOperation', () => {
     );
     mockCheckGenuine.mockClear();
     mockLoadPairing.mockClear();
+    mockLoadApprovedCardKeys.mockReset().mockResolvedValue([]);
+    mockApproveCardKey.mockReset().mockResolvedValue(undefined);
   });
 
   describe('initial state', () => {
@@ -485,6 +500,19 @@ describe('useKeycardOperation', () => {
       expect(mockCheckGenuine).not.toHaveBeenCalled();
     });
 
+    it('approving with no card waiting only opens the reader again', async () => {
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      mockStartNFC.mockClear();
+      await act(async () => {
+        result.current.proceedWithNonGenuine();
+      });
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+      expect(result.current.phase).toBe('nfc');
+    });
+
     it('cancel in genuine_warning returns to idle', async () => {
       mockCheckGenuine.mockResolvedValue(false);
       const { result } = renderHook(() => useKeycardOperation<string>());
@@ -582,6 +610,415 @@ describe('useKeycardOperation', () => {
         'No application info in SELECT response',
       );
     });
+
+    // A blank 3.x card has no card key to look a pairing up by.
+    it('enters error phase when the card is not initialized', async () => {
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        applicationInfo: { initializedCard: false },
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard is not initialized. Initialize it first.',
+      );
+    });
+  });
+
+  // The second tap can land on another card, so the check comes before anything is spent or sent.
+  describe('requiresRoute', () => {
+    const CERTIFICATE = [...filler(33, 0x02), ...filler(65, 0x09)];
+
+    function useCard(applicationInfo: unknown) {
+      const cmdSet = { ...makeMockCmdSet(), applicationInfo };
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+      return cmdSet;
+    }
+
+    async function tapWithPin(
+      options: Parameters<UseKeycardOperation<string>['execute']>[1],
+    ) {
+      const op = jest.fn().mockResolvedValue('result');
+      const hook = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        hook.result.current.execute(op, options);
+      });
+      await act(async () => {
+        hook.result.current.submitPin('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return { ...hook, op };
+    }
+
+    it('refuses a card that lacks the operation, in plain words', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        routeAbsence('ChangePairingSecret').sheetError,
+      );
+    });
+
+    it('sends that card nothing beyond SELECT', async () => {
+      const cmdSet = useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { op } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      expect(cmdSet.getData).not.toHaveBeenCalled();
+      expect(mockCheckGenuine).not.toHaveBeenCalled();
+      expect(cmdSet.autoPair).not.toHaveBeenCalled();
+      expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+      expect(cmdSet.verifyPIN).not.toHaveBeenCalled();
+      expect(op).not.toHaveBeenCalled();
+    });
+
+    // The right card is one tap away, so the typed PIN is kept.
+    it('lets the user tap the right card without typing the PIN again', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result, op } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      mockStartNFC.mockClear();
+
+      useCard(v3Select(0x0302));
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs on a card that has the operation', async () => {
+      const cmdSet = useCard(v3Select(0x0302));
+      const { result, op } = await tapWithPin({
+        requiresRoute: 'ChangePairingSecret',
+        requiresMasterKey: false,
+      });
+      expect(cmdSet.verifyPIN).toHaveBeenCalledWith('123456');
+      expect(op).toHaveBeenCalledTimes(1);
+      expect(result.current.phase).toBe('done');
+    });
+
+    // An operation every card has must not be held to this check.
+    it('is not applied to an operation that names no route', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result } = await tapWithPin({ requiresMasterKey: false });
+      expect(result.current.status).not.toBe(
+        routeAbsence('ChangePairingSecret').sheetError,
+      );
+    });
+
+    // The option is per execute; it must not leak into the next run.
+    it('does not carry over to the next operation', async () => {
+      useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
+      const { result } = await tapWithPin({
+        requiresRoute: 'PairingSlots',
+        requiresMasterKey: false,
+      });
+      expect(result.current.status).toBe(
+        routeAbsence('PairingSlots').sheetError,
+      );
+
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('next'), {
+          requiresPin: false,
+          requiresMasterKey: false,
+        });
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.status).not.toBe(
+        routeAbsence('PairingSlots').sheetError,
+      );
+    });
+  });
+
+  // Cards with a certificate (ADR-0013).
+  describe('certificate cards', () => {
+    const UNKNOWN_CA =
+      'Card certificate verification failed: unknown CA public key and card not whitelisted';
+    const IDENTITY_KEY = filler(33, 0x02);
+    const CARD_KEY = '02'.repeat(33);
+    const CERTIFICATE = [...IDENTITY_KEY, ...filler(65, 0x09)];
+    const KEY_UID = filler(32, 0x5e);
+
+    function card(options: { status?: number } = {}) {
+      return v4Select(0x0400, {
+        certificate: CERTIFICATE,
+        keyUID: KEY_UID,
+        ...options,
+      });
+    }
+
+    function useCard(overrides: Record<string, unknown> = {}) {
+      const cmdSet = {
+        ...makeMockCmdSet(),
+        applicationInfo: card(),
+        ...overrides,
+      };
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+      return cmdSet;
+    }
+
+    /** The whitelist the session built the most recent Commandset with. */
+    function lastWhitelist(): Uint8Array[] {
+      const Keycard = require('keycard-sdk').default;
+      const calls = Keycard.Commandset.mock.calls;
+      return calls[calls.length - 1][2];
+    }
+
+    async function start(op = jest.fn().mockResolvedValue('result')) {
+      const hook = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        hook.result.current.execute(op, {});
+      });
+      await act(async () => {
+        hook.result.current.submitPin('123456');
+      });
+      return { ...hook, op };
+    }
+
+    async function tap() {
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+    }
+
+    beforeEach(() => {
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockClear();
+    });
+
+    describe('signed by the Keycard CA', () => {
+      it('runs the operation without pairing or IDENTIFY CARD', async () => {
+        const cmdSet = useCard();
+        const { result, op } = await start();
+        await tap();
+        expect(result.current.phase).toBe('done');
+        expect(op).toHaveBeenCalledTimes(1);
+        expect(mockLoadPairing).not.toHaveBeenCalled();
+        expect(cmdSet.autoPair).not.toHaveBeenCalled();
+        expect(mockCheckGenuine).not.toHaveBeenCalled();
+        expect(cmdSet.identifyCard).not.toHaveBeenCalled();
+      });
+
+      // Outside the channel a name read would come back 0x6985.
+      it('opens the channel before it reads the name or verifies the PIN', async () => {
+        const cmdSet = useCard();
+        await start();
+        await tap();
+        const order = (fn: jest.Mock) => fn.mock.invocationCallOrder[0];
+        expect(order(cmdSet.autoOpenSecureChannel)).toBeLessThan(
+          order(cmdSet.getData),
+        );
+        expect(order(cmdSet.getData)).toBeLessThan(order(cmdSet.verifyPIN));
+      });
+
+      it('shows the name it read inside the channel', async () => {
+        useCard();
+        const { result } = await start();
+        await tap();
+        expect(result.current.cardName).toBe('Main card');
+      });
+
+      it('remembers no approval, because none was needed', async () => {
+        useCard();
+        await start();
+        await tap();
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('signed by an unknown CA', () => {
+      function useUntrustedCard() {
+        return useCard({
+          select: jest.fn().mockRejectedValue(new Error(UNKNOWN_CA)),
+        });
+      }
+
+      it('asks the user before anything more is sent', async () => {
+        const cmdSet = useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        expect(result.current.phase).toBe('genuine_warning');
+        expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+        expect(cmdSet.getData).not.toHaveBeenCalled();
+        expect(cmdSet.verifyPIN).not.toHaveBeenCalled();
+        expect(op).not.toHaveBeenCalled();
+      });
+
+      it('ends that tap with the warning, never as a success', async () => {
+        useUntrustedCard();
+        await start();
+        await tap();
+        expect(mockStopNFC).not.toHaveBeenCalled();
+        expect(mockStopNFCWithMessage).not.toHaveBeenCalled();
+        expect(mockStopNFCWithError).toHaveBeenCalledWith(NOT_GENUINE_STATUS);
+      });
+
+      it('does not whitelist the card before the user approves', async () => {
+        useUntrustedCard();
+        await start();
+        await tap();
+        expect(lastWhitelist()).toEqual([]);
+      });
+
+      it('whitelists the card for the tap after approval', async () => {
+        useUntrustedCard();
+        const { result } = await start();
+        await tap();
+
+        useCard();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+        await tap();
+        expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
+      });
+
+      // Only the handshake proves the card holds its key, so the approval is kept then.
+      it('remembers the approval only once the handshake has succeeded', async () => {
+        useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+
+        useCard();
+        await tap();
+        expect(mockApproveCardKey).toHaveBeenCalledWith(CARD_KEY);
+        expect(op).toHaveBeenCalledTimes(1);
+        expect(result.current.phase).toBe('done');
+      });
+
+      it('remembers nothing when the handshake fails', async () => {
+        useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+
+        useCard({
+          autoOpenSecureChannel: jest
+            .fn()
+            .mockRejectedValue(
+              new Error('Card authentication failed: invalid signature'),
+            ),
+        });
+        await tap();
+        expect(result.current.phase).toBe('error');
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+        expect(op).not.toHaveBeenCalled();
+      });
+
+      // The write may fail; the approval still holds from memory.
+      it('runs the operation even when the approval cannot be saved', async () => {
+        mockApproveCardKey.mockRejectedValue(new Error('storage full'));
+        useUntrustedCard();
+        const { result, op } = await start();
+        await tap();
+        await act(async () => {
+          result.current.proceedWithNonGenuine();
+        });
+        useCard();
+        await tap();
+        expect(op).toHaveBeenCalledTimes(1);
+        expect(result.current.phase).toBe('done');
+      });
+
+      it('forgets the pending question when the user cancels', async () => {
+        useUntrustedCard();
+        const { result } = await start();
+        await tap();
+        await act(async () => {
+          result.current.cancel();
+        });
+        expect(result.current.phase).toBe('idle');
+
+        // A later approval of a card without a certificate must not be filed as one with.
+        useCard();
+        const next = await start();
+        await tap();
+        expect(next.result.current.phase).toBe('done');
+        expect(mockApproveCardKey).not.toHaveBeenCalled();
+      });
+    });
+
+    it('whitelists the cards approved on an earlier run of the app', async () => {
+      mockLoadApprovedCardKeys.mockResolvedValue([CARD_KEY]);
+      useCard();
+      await start();
+      await tap();
+      expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
+    });
+
+    // A blank card with a certificate has a card key; its status gives it away.
+    it('says so when the card is not initialized', async () => {
+      const cmdSet = useCard({ applicationInfo: card({ status: 0x00 }) });
+      const { result } = await start();
+      await tap();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard is not initialized. Initialize it first.',
+      );
+      expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+    });
+  });
+
+  // The 3.x wire order must not change.
+  describe('cards without a certificate', () => {
+    it('still reads the name before it pairs and opens the channel', async () => {
+      const cmdSet = makeMockCmdSet();
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+      mockLoadPairing.mockResolvedValue(null);
+      mockCheckGenuine.mockResolvedValue(true);
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn().mockResolvedValue('result'), {});
+      });
+      await act(async () => {
+        result.current.submitPin('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+
+      const order = (fn: jest.Mock) => fn.mock.invocationCallOrder[0];
+      expect(order(cmdSet.getData)).toBeLessThan(order(cmdSet.autoPair));
+      expect(order(cmdSet.autoPair)).toBeLessThan(
+        order(cmdSet.autoOpenSecureChannel),
+      );
+      expect(order(cmdSet.autoOpenSecureChannel)).toBeLessThan(
+        order(cmdSet.verifyPIN),
+      );
+      expect(mockApproveCardKey).not.toHaveBeenCalled();
+    });
   });
 
   describe('empty PIN guard', () => {
@@ -676,9 +1113,7 @@ describe('useKeycardOperation', () => {
     });
 
     it('does NOT swallow a tag loss during the fingerprint export', async () => {
-      // Observed on-device: the card left the field during the export; the
-      // old swallow sent the operation onto a dead channel, which froze in
-      // Processing until the 120 s transceive timeout.
+      // Seen on a device: swallowing this sent the operation onto a dead channel.
       const cmdSet = makeUnnamedCmdSet({
         exportKey: jest
           .fn()
@@ -701,8 +1136,7 @@ describe('useKeycardOperation', () => {
       });
       await triggerCardConnect();
 
-      // The op never ran on the dead channel; the session entered the
-      // reconnect wait instead.
+      // The op never ran; the session waits for a re-tap.
       expect(operation).not.toHaveBeenCalled();
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
@@ -1063,9 +1497,7 @@ describe('useKeycardOperation', () => {
     });
   });
 
-  // T3/R9: the autoPair window is non-idempotent — PAIR step 2 commits a slot
-  // on the card before the response is read — so a tag loss inside it must
-  // never be silently replayed, even when the operation opted into retry.
+  // PAIR commits a slot before the response is read, so a loss there is never replayed.
   describe('tag loss', () => {
     const TAG_LOST = 'CardIO Error: Error: Tag was lost.';
 
@@ -1118,11 +1550,7 @@ describe('useKeycardOperation', () => {
       expect(mockStopNFCWithError).not.toHaveBeenCalled();
     });
 
-    // R14 amended by the 2026-08-22 device probe: verifyPIN is a
-    // non-idempotent window. The card may decrement its 3-attempt counter
-    // before the response is lost, so an unconfirmed PIN is never silently
-    // resubmitted — the loss is an error, the cached PIN is forgotten, and
-    // retry re-prompts so every attempt is user-authorised.
+    // An unconfirmed PIN is never resubmitted: the loss is an error and retry re-prompts.
     it('during verifyPIN: error, cached PIN forgotten, retry re-prompts', async () => {
       mockLoadPairing.mockResolvedValue({ pairingIndex: 1 } as any);
       const Keycard = require('keycard-sdk').default;
@@ -1156,16 +1584,12 @@ describe('useKeycardOperation', () => {
       await act(async () => {
         result.current.retry();
       });
-      // The unconfirmed PIN was discarded, so retry shows the PIN pad again
-      // instead of restarting the reader with a cached value.
+      // The PIN was discarded, so retry shows the PIN pad.
       expect(result.current.phase).toBe('pin_entry');
       expect(mockStartNFC).not.toHaveBeenCalled();
     });
 
-    // Reported from device: pairing failed, Try again, then the card was
-    // removed during PIN validation and it failed hard rather than showing the
-    // reconnect nudge. These two pin down whether that is the designed
-    // verifyPIN window or a retryUnsafeRef left raised by the earlier failure.
+    // From a device report: is this the verifyPIN window, or a retryUnsafeRef left raised?
     it('after an autoPair failure and retry: a verifyPIN loss still fails hard', async () => {
       mockLoadPairing.mockResolvedValue(null);
       mockCheckGenuine.mockResolvedValue(true);
@@ -1207,9 +1631,7 @@ describe('useKeycardOperation', () => {
       );
     });
 
-    // The load-bearing one: if the earlier hard failure left retryUnsafeRef
-    // raised, this later loss — which IS safe to replay — would wrongly fail
-    // hard too. It must reach the reconnect wait.
+    // A flag left raised by the earlier failure would wrongly fail this safe loss.
     it('an earlier autoPair failure does not poison a later retryable loss', async () => {
       mockLoadPairing.mockResolvedValue(null);
       mockCheckGenuine.mockResolvedValue(true);
@@ -1246,18 +1668,14 @@ describe('useKeycardOperation', () => {
       await act(async () => {
         await capturedOnConnected?.();
       });
-      // Pairing and PIN both succeeded this run; the loss landed in the
-      // operation itself, which opted into retry.
+      // The loss landed in the operation, which opted into retry.
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
       expect(mockStopNFCWithError).not.toHaveBeenCalled();
     });
 
     it('after a verified PIN: a loss during a RE-verify keeps the reconnect wait', async () => {
-      // On every reconnect the handshake re-runs, so verifyPIN runs again. A
-      // known-correct PIN resets the card's attempt counter rather than
-      // decrementing it, so those re-verifies are safe to replay — guarding
-      // them made every card slip during the handshake a hard error.
+      // A PIN that already verified is safe to replay: a correct verify resets the counter.
       mockLoadPairing.mockResolvedValue({ pairingIndex: 1 } as any);
       const Keycard = require('keycard-sdk').default;
       const verifyPIN = jest
@@ -1317,9 +1735,7 @@ describe('useKeycardOperation', () => {
       await act(async () => {
         await capturedOnConnected?.();
       });
-      // verifyPIN succeeded (window closed), the loss hit the op itself: the
-      // PIN is proven correct this session, so replaying it cannot walk the
-      // counter — the reconnect wait stays.
+      // The PIN is proven this session, so the reconnect wait stays.
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
 

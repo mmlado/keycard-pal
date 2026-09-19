@@ -141,8 +141,7 @@ describe('exportKeysForTarget', () => {
     expect(cmdSet.exportExtendedKey).not.toHaveBeenCalled();
   });
 
-  // Resume after a mid-export tag loss: keys already fetched are reused, the
-  // session-level reads are skipped, and the cache is bound to one card UID.
+  // Resume after a tag loss: fetched keys are reused, bound to the key UID.
   describe('resume cache', () => {
     const PLAN = [
       { derivationPath: "m/84'/0'/0'", parentPath: "m/84'/0'" },
@@ -150,8 +149,11 @@ describe('exportKeysForTarget', () => {
     ];
     const PARENTS = { "m/84'/0'": 2, "m/44'/60'": 3 };
 
-    function withUid(cmdSet: any, uid: number[]) {
-      cmdSet.applicationInfo = { instanceUID: new Uint8Array(uid) };
+    function withKeyUid(cmdSet: any, keyUid: number[], instanceUid = [0x01]) {
+      cmdSet.applicationInfo = {
+        instanceUID: new Uint8Array(instanceUid),
+        keyUID: new Uint8Array(keyUid),
+      };
       return cmdSet;
     }
 
@@ -159,7 +161,7 @@ describe('exportKeysForTarget', () => {
       const cache = makeExportResumeCache();
 
       // First tap: key 1 exports, key 2 is cut short by tag loss.
-      const first = withUid(makeCmdSet(PARENTS), [0xaa, 0xbb]);
+      const first = withKeyUid(makeCmdSet(PARENTS), [0xaa, 0xbb]);
       first.exportExtendedKey
         .mockImplementationOnce((_p1: number, path: string) =>
           Promise.resolve({
@@ -176,7 +178,7 @@ describe('exportKeysForTarget', () => {
       expect(first.exportExtendedKey).toHaveBeenCalledTimes(2);
 
       // Re-tap, same card: master read skipped, only key 2 exported.
-      const second = withUid(makeCmdSet(PARENTS), [0xaa, 0xbb]);
+      const second = withKeyUid(makeCmdSet(PARENTS), [0xaa, 0xbb]);
       const result = await exportKeysForTarget(second, PLAN, () => {}, cache);
       expect(second.exportKey).not.toHaveBeenCalledWith(0, true, 'm', false);
       expect(second.exportExtendedKey).toHaveBeenCalledTimes(1);
@@ -192,15 +194,14 @@ describe('exportKeysForTarget', () => {
       ]);
     });
 
-    it('discards the cache when the re-tap is a different card', async () => {
+    it('discards the cache when the re-tap holds a different seed', async () => {
       const cache = makeExportResumeCache();
-      const first = withUid(makeCmdSet(PARENTS), [0xaa, 0xbb]);
+      const first = withKeyUid(makeCmdSet(PARENTS), [0xaa, 0xbb]);
       await exportKeysForTarget(first, PLAN, () => {}, cache);
 
-      const other = withUid(makeCmdSet(PARENTS), [0xcc, 0xdd]);
+      const other = withKeyUid(makeCmdSet(PARENTS), [0xcc, 0xdd]);
       await exportKeysForTarget(other, PLAN, () => {}, cache);
-      // Everything re-fetched: cached keys from card A must never merge into
-      // card B's export.
+      // Keys of seed A never merge into seed B's export.
       expect(other.exportKey).toHaveBeenCalledWith(0, true, 'm', false);
       expect(other.exportExtendedKey).toHaveBeenCalledTimes(2);
     });
@@ -208,7 +209,7 @@ describe('exportKeysForTarget', () => {
     it('does not trust the cache when the card has no applicationInfo', async () => {
       const cache = makeExportResumeCache();
       await exportKeysForTarget(
-        withUid(makeCmdSet(PARENTS), [0xaa]),
+        withKeyUid(makeCmdSet(PARENTS), [0xaa]),
         PLAN,
         () => {},
         cache,
@@ -218,6 +219,45 @@ describe('exportKeysForTarget', () => {
       await exportKeysForTarget(anonymous, PLAN, () => {}, cache);
       expect(anonymous.exportKey).toHaveBeenCalledWith(0, true, 'm', false);
       expect(anonymous.exportExtendedKey).toHaveBeenCalledTimes(2);
+    });
+
+    // A factory reset with a new seed keeps the instance UID; the key UID changes.
+    it('discards the cache when the same card now holds a different seed', async () => {
+      const cache = makeExportResumeCache();
+      const before = withKeyUid(makeCmdSet(PARENTS), [0xaa], [0x07]);
+      await exportKeysForTarget(before, PLAN, () => {}, cache);
+
+      const afterReset = withKeyUid(makeCmdSet(PARENTS), [0xbb], [0x07]);
+      await exportKeysForTarget(afterReset, PLAN, () => {}, cache);
+      expect(afterReset.exportKey).toHaveBeenCalledWith(0, true, 'm', false);
+      expect(afterReset.exportExtendedKey).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the cache across two cards holding the same seed', async () => {
+      const cache = makeExportResumeCache();
+      const cardA = withKeyUid(makeCmdSet(PARENTS), [0xaa], [0x01]);
+      await exportKeysForTarget(cardA, PLAN, () => {}, cache);
+
+      // Same seed exports identical keys, so resuming on a second card is safe.
+      const cardB = withKeyUid(makeCmdSet(PARENTS), [0xaa], [0x02]);
+      await exportKeysForTarget(cardB, PLAN, () => {}, cache);
+      expect(cardB.exportKey).not.toHaveBeenCalledWith(0, true, 'm', false);
+      expect(cardB.exportExtendedKey).not.toHaveBeenCalled();
+    });
+
+    it('does not trust the cache when no key is loaded', async () => {
+      const cache = makeExportResumeCache();
+      await exportKeysForTarget(
+        withKeyUid(makeCmdSet(PARENTS), []),
+        PLAN,
+        () => {},
+        cache,
+      );
+
+      const noKey = withKeyUid(makeCmdSet(PARENTS), []);
+      await exportKeysForTarget(noKey, PLAN, () => {}, cache);
+      expect(noKey.exportKey).toHaveBeenCalledWith(0, true, 'm', false);
+      expect(noKey.exportExtendedKey).toHaveBeenCalledTimes(2);
     });
   });
 });

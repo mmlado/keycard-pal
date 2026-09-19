@@ -8,24 +8,31 @@ import { Commandset } from 'keycard-sdk/dist/commandset';
 import RNKeycard from 'react-native-keycard';
 
 import { PAIRING_PASSWORD } from '@/constants/keycard';
+import {
+  cardHasRoute,
+  routeAbsence,
+  type GenerationBoundRoute,
+} from '@/navigation/generationBoundRoutes';
+
 import { loadPairing, savePairing } from '@/storage/pairingStorage';
+import { cardGeneration, secureChannelVersion } from '@/utils/cardGeneration';
+import { getCardKey } from '@/utils/cardIdentity';
 import { pubKeyFingerprint } from '@/utils/cryptoAccount';
 import { checkGenuine } from '@/utils/genuineCheck';
-import { toHex } from '@/utils/hex';
 import { isTagLostError } from '@/utils/keycardErrors';
 import { displayKeycardName, parseKeycardName } from '@/utils/keycardName';
+import { useCertificateApprovals } from './useCertificateApprovals';
 import {
   useNFCOperation,
   type CardPresence,
   type NFCSessionPhase,
+  type SelectedCard,
 } from './useNFCOperation';
 
 export type { CardPresence };
 
 /**
- * The full phase vocabulary of a coordinated Keycard operation: the 4-state
- * session machine plus the coordinator's interactive interrupts. There is one
- * vocabulary — never re-declare or rename these states downstream.
+ * The one phase vocabulary of a Keycard operation. Never re-declare or rename it downstream.
  */
 export type KeycardPhase =
   | NFCSessionPhase
@@ -41,14 +48,13 @@ export type KeycardOperationFn<T> = (
 export interface ExecuteOptions {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
-  /** Wait for a re-tap instead of failing when the card leaves the field
-   *  mid-operation. Default false — only read-only operations may opt in;
-   *  a replayed write can burn pairing slots or overwrite card state (R9). */
+  /**
+   * The route this operation belongs to, when newer cards lack it. Checked right after SELECT.
+   */
+  requiresRoute?: GenerationBoundRoute;
+  /** Wait for a re-tap when the card leaves mid-operation. Read-only operations only. */
   retryOnTagLoss?: boolean;
-  /** Wording for Apple's NFC sheet when the operation succeeds, in place of the
-   *  generic "Success". Mirror the screen's done-toast: the sheet is read first
-   *  and the toast repeats it once the sheet clears, so two different strings
-   *  for one outcome read as two different outcomes. iOS-only. */
+  /** Shown on success. Keep it equal to the screen's done-toast. */
   successMessage?: string;
 }
 
@@ -71,8 +77,7 @@ export interface UseKeycardOperation<T> {
   openNFCSettings: (() => void) | undefined;
 }
 
-// An interrupted tap is thrown, never returned: a tap that returns closes
-// Apple's NFC sheet with the operation's success wording.
+// An interrupted tap throws: one that returns ends in the success wording.
 export const PAIRING_PASSWORD_NEEDED_STATUS =
   'This Keycard needs its pairing password.';
 export const NOT_GENUINE_STATUS = 'This Keycard may not be genuine.';
@@ -83,8 +88,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [cardName, setCardName] = useState<string | null>(null);
   const [cardFingerprint, setCardFingerprint] = useState<number | null>(null);
 
-  // Custom pairing password flow (ADR-0005): first tap detects the cryptogram
-  // mismatch and interrupts, second tap pairs with the entered password.
+  // Custom pairing password (ADR-0005): the first tap interrupts, the second pairs.
   const [waitingForPairingPassword, setWaitingForPairingPassword] =
     useState(false);
   const [pairingPasswordError, setPairingPasswordError] = useState<
@@ -92,24 +96,29 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   >(null);
   const customPairingPasswordRef = useRef<string | null>(null);
 
-  // Genuine check: non-genuine cards need explicit per-UID approval.
+  // Genuine check: non-genuine cards need explicit per-card approval.
   const [showGenuineWarning, setShowGenuineWarning] = useState(false);
-  const approvedNonGenuineUidsRef = useRef<Set<string>>(new Set());
-  const pendingGenuineUidRef = useRef<string | null>(null);
+  const approvedNonGenuineCardKeysRef = useRef<Set<string>>(new Set());
+  const pendingGenuineCardKeyRef = useRef<string | null>(null);
+  // Cards with a certificate (ADR-0013); see useCertificateApprovals.
+  const pendingCertificateRef = useRef(false);
+  const {
+    whitelistedCardKeys,
+    approve: approveCertificate,
+    handshakeSucceeded,
+  } = useCertificateApprovals();
 
   const pinRef = useRef('');
-  /** True once this PIN has been accepted by the card in this session, which
-   *  makes replaying it safe: a correct verify resets the attempt counter. */
+  /** The card accepted this PIN in this session, so replaying it is safe. */
   const pinVerifiedRef = useRef(false);
   const operationRef = useRef<KeycardOperationFn<T> | null>(null);
   const requiresPinRef = useRef(true);
   const requiresMasterKeyRef = useRef(true);
+  const requiresRouteRef = useRef<GenerationBoundRoute | undefined>(undefined);
   const operationRunningRef = useRef(false);
   const retryOnTagLossRef = useRef(false);
   const successMessageRef = useRef<string | undefined>(undefined);
-  // The session's retryUnsafeRef only exists after the useNFCOperation call
-  // below, but doPairAndExecute (defined first) must raise it around autoPair.
-  // Held here and assigned each render; always set before any card contact.
+  // The session's retryUnsafeRef, assigned each render because it only exists further down.
   const retryUnsafeHolderRef = useRef<{ current: boolean } | null>(null);
 
   const verifyPin = useCallback(
@@ -139,10 +148,9 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     [],
   );
 
-  // Runs autoPair. Returns true on success (pairing saved), false if
-  // interrupted for pairing password entry.
+  // False when interrupted for the pairing password.
   const runAutoPair = useCallback(
-    async (cmdSet: Commandset, uid: string): Promise<boolean> => {
+    async (cmdSet: Commandset, cardKey: string): Promise<boolean> => {
       const password = customPairingPasswordRef.current;
       try {
         await cmdSet.autoPair(password ?? PAIRING_PASSWORD);
@@ -168,33 +176,36 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         }
         throw e;
       }
-      const pairing = cmdSet.getPairing();
+      // Nullable since SDK 4; a V1 autoPair that returned always leaves one.
+      const pairing = cmdSet.getPairing()!;
       console.log(
         `[Keycard] autoPair OK (index: ${pairing.pairingIndex}), saving to storage`,
       );
-      await savePairing(uid, pairing);
+      await savePairing(cardKey, pairing);
       return true;
     },
     [],
   );
 
-  // Returns true if the operation should proceed, false if interrupted for
-  // the non-genuine warning.
+  // False when interrupted for the non-genuine warning.
   const checkOrSkipGenuine = useCallback(
     async (
       cmdSet: Commandset,
-      uid: string,
+      cardKey: string,
       hasExistingPairing: boolean,
       setStatus: (s: string) => void,
     ): Promise<boolean> => {
-      if (hasExistingPairing || approvedNonGenuineUidsRef.current.has(uid)) {
+      if (
+        hasExistingPairing ||
+        approvedNonGenuineCardKeysRef.current.has(cardKey)
+      ) {
         return true;
       }
       setStatus('Verifying card...');
       const isGenuine = await checkGenuine(cmdSet);
       if (!isGenuine) {
         console.log('[Keycard] Genuine check failed, showing warning');
-        pendingGenuineUidRef.current = uid;
+        pendingGenuineCardKeyRef.current = cardKey;
         setShowGenuineWarning(true);
         return false;
       }
@@ -204,54 +215,49 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     [],
   );
 
-  const doPairAndExecute = useCallback(
+  const readCardName = useCallback(
     async (
       cmdSet: Commandset,
-      uid: string,
-      existingPairing: InstanceType<typeof Keycard.Pairing> | null,
       setStatus: (s: string) => void,
-      name: string,
+    ): Promise<string> => {
+      const dataResp = await cmdSet.getData(0x00);
+      if (dataResp.sw !== 0x9000) {
+        throw new Error(
+          `GET DATA failed: 0x${dataResp.sw.toString(16).toUpperCase()}`,
+        );
+      }
+      const name = parseKeycardName(dataResp.data);
+      setCardName(name);
+      setStatus(`Connected to ${displayKeycardName(name)}`);
+      return name;
+    },
+    [],
+  );
+
+  /**
+   * Everything from the secure channel on, shared by every card. `knownName` is null when the
+   * name could not be read before the channel (cards with a certificate).
+   */
+  const openChannelAndExecute = useCallback(
+    async (
+      cmdSet: Commandset,
+      cardKey: string,
+      setStatus: (s: string) => void,
+      knownName: string | null,
       hasMasterKey: boolean,
     ): Promise<T | null> => {
-      if (existingPairing) {
-        console.log(
-          `[Keycard] Pairing found in storage (index: ${existingPairing.pairingIndex})`,
-        );
-        cmdSet.setPairing(existingPairing);
-      } else {
-        console.log('[Keycard] No pairing found — running autoPair');
-        setStatus('Pairing with card...');
-        // Non-idempotent window (R9): PAIR step 2 commits a slot on the card
-        // before the response is read, so a tag loss in here must never be
-        // silently replayed — even for an operation that opted into retry.
-        // Cleared only on success, NOT in a finally: a finally would run while
-        // the exception unwinds, before the session's catch classifies it, and
-        // the window would never apply to the very throw it exists for. On the
-        // throw path the session clears the flag in the next startNFC/reset.
-        const retryUnsafeRef = retryUnsafeHolderRef.current;
-        if (retryUnsafeRef) retryUnsafeRef.current = true;
-        const paired = await runAutoPair(cmdSet, uid);
-        if (retryUnsafeRef) retryUnsafeRef.current = false;
-        if (!paired) throw new Error(PAIRING_PASSWORD_NEEDED_STATUS);
-      }
       setStatus('Opening secure channel...');
       await cmdSet.autoOpenSecureChannel();
       console.log('[Keycard] Secure channel open');
 
+      // The handshake proved the card holds its key, so a pending approval can be kept.
+      handshakeSucceeded(cardKey);
+
+      const name = knownName ?? (await readCardName(cmdSet, setStatus));
+
       if (requiresPinRef.current) {
-        // An UNCONFIRMED PIN is a non-idempotent window, same class as
-        // autoPair: the card decrements its 3-attempt counter before the
-        // response is read, so a tag loss here may have consumed an attempt
-        // with nothing to show for it. Never silently resubmit one — forget
-        // it so the next attempt is one the user explicitly authorised
-        // (device probe, 2026-08-22: a cached PIN replayed 0.43 s after
-        // reconnect, with no prompt).
-        //
-        // Once the PIN has verified successfully in this session it is known
-        // correct, and a correct verify RESETS the counter rather than
-        // decrementing it — so replaying it on a reconnect cannot cost an
-        // attempt. Guarding those re-verifies too made every card slip during
-        // the handshake a hard error, which is what this narrower rule fixes.
+        // An unconfirmed PIN costs an attempt before the response is read, so a tag loss here is
+        // never replayed. A PIN that already verified is safe: a correct verify resets the counter.
         const retryUnsafeRef = pinVerifiedRef.current
           ? null
           : retryUnsafeHolderRef.current;
@@ -268,10 +274,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         if (retryUnsafeRef) retryUnsafeRef.current = false;
       }
 
-      // Unnamed card: derive the master fingerprint for display, mirroring
-      // keycard-shell's `name[0] ? name : fingerprint` fallback. Display only —
-      // never written back to the card. Failure is non-fatal: the operation
-      // continues and the card stays shown as "Unnamed card".
+      // Unnamed card: show the master fingerprint instead. Display only, failure is not fatal.
       if (name === '' && hasMasterKey) {
         try {
           const masterResp = await cmdSet.exportKey(0, true, 'm', false);
@@ -283,9 +286,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
           setStatus(`Connected to ${displayKeycardName(name, fingerprint)}`);
         } catch (e) {
           if (isTagLostError(e)) {
-            // The card is gone, not merely unnamed — swallowing this would
-            // send the operation onto a dead channel (observed on-device as a
-            // freeze in Processing). Let the session classify it.
+            // The card is gone, not unnamed. Let the session classify it.
             throw e;
           }
           console.warn('[Keycard] master fingerprint export failed', e);
@@ -303,16 +304,53 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         operationRunningRef.current = false;
       }
     },
-    [runAutoPair, verifyPin],
+    [handshakeSucceeded, readCardName, verifyPin],
+  );
+
+  // Cards without a certificate: pair or reuse the pairing, then the shared part.
+  const doPairAndExecute = useCallback(
+    async (
+      cmdSet: Commandset,
+      cardKey: string,
+      existingPairing: InstanceType<typeof Keycard.Pairing> | null,
+      setStatus: (s: string) => void,
+      name: string,
+      hasMasterKey: boolean,
+    ): Promise<T | null> => {
+      if (existingPairing) {
+        console.log(
+          `[Keycard] Pairing found in storage (index: ${existingPairing.pairingIndex})`,
+        );
+        cmdSet.setPairing(existingPairing);
+      } else {
+        console.log('[Keycard] No pairing found — running autoPair');
+        setStatus('Pairing with card...');
+        // PAIR commits a slot before the response is read, so a tag loss here is never replayed.
+        // Cleared on success only: a finally would run before the session classifies the throw.
+        const retryUnsafeRef = retryUnsafeHolderRef.current;
+        if (retryUnsafeRef) retryUnsafeRef.current = true;
+        const paired = await runAutoPair(cmdSet, cardKey);
+        if (retryUnsafeRef) retryUnsafeRef.current = false;
+        if (!paired) throw new Error(PAIRING_PASSWORD_NEEDED_STATUS);
+      }
+      return await openChannelAndExecute(
+        cmdSet,
+        cardKey,
+        setStatus,
+        name,
+        hasMasterKey,
+      );
+    },
+    [runAutoPair, openChannelAndExecute],
   );
 
   const handleCardConnected = useCallback(
     async (
       cmdSet: Commandset,
       setStatus: (status: string) => void,
+      card: SelectedCard,
     ): Promise<T | null> => {
-      // Guard: PIN was required but user returned from NFC Settings before entering it.
-      // SELECT already ran (harmless); stop here to avoid sending verifyPIN('').
+      // No PIN yet (back from NFC settings): never send verifyPIN('').
       if (requiresPinRef.current && !pinRef.current) {
         throw new Error('Enter your PIN first — tap Retry to continue.');
       }
@@ -322,12 +360,29 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         throw new Error('No application info in SELECT response');
       }
 
-      const uid = toHex(appInfo.instanceUID);
+      // First of all: a card without this operation is sent nothing beyond SELECT.
+      const requiredRoute = requiresRouteRef.current;
+      if (
+        requiredRoute &&
+        !cardHasRoute(requiredRoute, cardGeneration(appInfo))
+      ) {
+        throw new Error(routeAbsence(requiredRoute).sheetError);
+      }
+
+      // A blank card without a certificate has no card key; one with a certificate says so in its status.
+      const cardKey = getCardKey(appInfo);
+      if (cardKey === null || !appInfo.initializedCard) {
+        throw new Error(
+          'This Keycard is not initialized. Initialize it first.',
+        );
+      }
+      const hasCertificate = secureChannelVersion(appInfo) === 'v2';
       console.log(
-        `[Keycard] SELECT OK — UID: ${uid}, initialized: ${appInfo.initializedCard}, ` +
-          `freePairingSlots: ${
-            appInfo.freePairingSlots
-          }, hasMasterKey: ${appInfo.hasMasterKey()}`,
+        `[Keycard] SELECT OK — card key: ${cardKey}, ` +
+          (hasCertificate
+            ? `certificate trusted: ${!card.untrustedCertificate}`
+            : `freePairingSlots: ${appInfo.freePairingSlots}`) +
+          `, hasMasterKey: ${appInfo.hasMasterKey()}`,
       );
 
       if (requiresMasterKeyRef.current && !appInfo.hasMasterKey()) {
@@ -336,20 +391,32 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         );
       }
 
-      const dataResp = await cmdSet.getData(0x00);
-      if (dataResp.sw !== 0x9000) {
-        throw new Error(
-          `GET DATA failed: 0x${dataResp.sw.toString(16).toUpperCase()}`,
+      // A card with a certificate (ADR-0013): no pairing, no IDENTIFY CARD, and nothing but
+      // SELECT outside the channel, so even the name waits for it.
+      if (hasCertificate) {
+        if (card.untrustedCertificate) {
+          // Asked before anything more is sent.
+          console.log('[Keycard] Certificate not trusted, showing warning');
+          pendingGenuineCardKeyRef.current = cardKey;
+          pendingCertificateRef.current = true;
+          setShowGenuineWarning(true);
+          throw new Error(NOT_GENUINE_STATUS);
+        }
+        return await openChannelAndExecute(
+          cmdSet,
+          cardKey,
+          setStatus,
+          null,
+          appInfo.hasMasterKey(),
         );
       }
-      const name = parseKeycardName(dataResp.data);
-      setCardName(name);
-      setStatus(`Connected to ${displayKeycardName(name)}`);
 
-      const existingPairing = await loadPairing(uid);
+      const name = await readCardName(cmdSet, setStatus);
+
+      const existingPairing = await loadPairing(cardKey);
       const shouldProceed = await checkOrSkipGenuine(
         cmdSet,
-        uid,
+        cardKey,
         !!existingPairing,
         setStatus,
       );
@@ -357,20 +424,17 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
 
       return await doPairAndExecute(
         cmdSet,
-        uid,
+        cardKey,
         existingPairing,
         setStatus,
         name,
         appInfo.hasMasterKey(),
       );
     },
-    [checkOrSkipGenuine, doPairAndExecute],
+    [checkOrSkipGenuine, doPairAndExecute, openChannelAndExecute, readCardName],
   );
 
-  // When NFC becomes available again (user returned from NFC Settings), react
-  // with the same decision retry() makes: PIN pad first if a PIN is still
-  // missing, otherwise restart the reader. Wired through a ref because retry
-  // is defined below (it needs startNFC from this call).
+  // NFC came back on: do what retry() does. Through a ref because retry is defined below.
   const retryRef = useRef<() => void>(() => {});
   const {
     phase: nfcPhase,
@@ -384,12 +448,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     retryUnsafeRef,
   } = useNFCOperation<T | null>(handleCardConnected, {
     onNFCAvailable: () => retryRef.current(),
-    // Read at render: execute() writes the ref and then triggers a re-render
-    // (setWaitingForPin or the session's setPhase), so the session sees the new
-    // value long before any APDU can fail.
+    whitelistedCardKeys,
+    // Read at render: execute() writes the ref, then re-renders, long before an APDU can fail.
     retryOnTagLoss: retryOnTagLossRef.current,
-    // Same read-at-render contract, and it only has to be current by the time
-    // the operation resolves — far later than the first render.
+    // Same read-at-render contract.
     successMessage: successMessageRef.current,
   });
   retryUnsafeHolderRef.current = retryUnsafeRef;
@@ -410,6 +472,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       operationRef.current = op;
       requiresPinRef.current = options.requiresPin ?? true;
       requiresMasterKeyRef.current = options.requiresMasterKey ?? true;
+      requiresRouteRef.current = options.requiresRoute;
       retryOnTagLossRef.current = options.retryOnTagLoss ?? false;
       successMessageRef.current = options.successMessage;
       operationRunningRef.current = false;
@@ -422,8 +485,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         return;
       }
 
-      // Check NFC before showing the PIN pad so users don't enter their PIN
-      // only to be told NFC is disabled immediately after.
+      // Check NFC first, so nobody types a PIN only to learn NFC is off.
       RNKeycard.Core.isNFCEnabled()
         .then(enabled => {
           if (enabled) {
@@ -442,8 +504,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const submitPin = useCallback(
     (pin: string) => {
       pinRef.current = pin;
-      // A newly entered PIN is unconfirmed again, even if a previous one in
-      // this session verified: it is protected until the card accepts it.
+      // A newly entered PIN is unconfirmed again.
       pinVerifiedRef.current = false;
       setPinError(null);
       setWaitingForPin(false);
@@ -465,17 +526,22 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
 
   // Approves the pending non-genuine card and starts the second tap.
   const proceedWithNonGenuine = useCallback(() => {
-    const uid = pendingGenuineUidRef.current;
-    if (uid) {
-      approvedNonGenuineUidsRef.current.add(uid);
-      pendingGenuineUidRef.current = null;
+    const cardKey = pendingGenuineCardKeyRef.current;
+    if (cardKey) {
+      // With a certificate: whitelisted now, remembered after the handshake. Without: carried by the pairing.
+      if (pendingCertificateRef.current) {
+        approveCertificate(cardKey);
+      } else {
+        approvedNonGenuineCardKeysRef.current.add(cardKey);
+      }
+      pendingGenuineCardKeyRef.current = null;
+      pendingCertificateRef.current = false;
     }
     setShowGenuineWarning(false);
     startNFC();
-  }, [startNFC]);
+  }, [approveCertificate, startNFC]);
 
-  // Re-starts NFC. If PIN hasn't been entered yet (e.g. NFC was off before PIN entry),
-  // show the PIN pad instead of starting NFC directly.
+  // Restarts NFC, or shows the PIN pad first when no PIN was entered yet.
   const retry = useCallback(() => {
     if (!operationRef.current) return;
     if (requiresPinRef.current && !pinRef.current) {
@@ -496,7 +562,8 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     operationRef.current = null;
     operationRunningRef.current = false;
     setShowGenuineWarning(false);
-    pendingGenuineUidRef.current = null;
+    pendingGenuineCardKeyRef.current = null;
+    pendingCertificateRef.current = false;
     setWaitingForPairingPassword(false);
     setPairingPasswordError(null);
     customPairingPasswordRef.current = null;

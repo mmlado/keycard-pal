@@ -4,6 +4,8 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import EntryList, { EntryListItem } from '../src/components/EntryList';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -11,10 +13,14 @@ import EntryList, { EntryListItem } from '../src/components/EntryList';
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 let mockLayout: 'tiles' | 'list' = 'tiles';
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: mockLayout },
+    preferences: mockTestPreferences({
+      dashboardLayout: mockLayout,
+      generationsInUse: mockGenerationsInUse,
+    }),
     setPreference: jest.fn(),
   }),
 }));
@@ -30,8 +36,14 @@ function entry(label: string, onPress = jest.fn()): EntryListItem {
   return { label, icon: Icon, onPress };
 }
 
+/** An entry only cards older than 4.0 have. */
+function legacyEntry(label: string): EntryListItem {
+  return { ...entry(label), generationBoundRoute: 'PairingSlots' };
+}
+
 beforeEach(() => {
   mockLayout = 'tiles';
+  mockGenerationsInUse = ['3.1', '4.0'];
 });
 
 // ---------------------------------------------------------------------------
@@ -75,8 +87,7 @@ describe('EntryList', () => {
     });
   });
 
-  // Groups let a screen carry a heading per set, in either layout. Ids have to
-  // stay unique across groups or a query would match more than one element.
+  // Ids stay unique across groups.
   describe('sections', () => {
     const sections = [
       { title: 'BIP39', entries: [entry('Generate'), entry('Import')] },
@@ -125,6 +136,71 @@ describe('EntryList', () => {
       render(<EntryList sections={sections} />);
       expect(screen.getByText('Generate')).toBeTruthy();
       expect(screen.getByText('Recover')).toBeTruthy();
+    });
+  });
+
+  // A hidden entry must look as if it was never passed in.
+  describe('generation-bound entries', () => {
+    it('shows them while every card is ticked', () => {
+      render(<EntryList entries={[entry('One'), legacyEntry('Legacy')]} />);
+      expect(screen.getByText('Legacy')).toBeTruthy();
+    });
+
+    it('shows them when only cards that have them are ticked', () => {
+      mockGenerationsInUse = ['3.1'];
+      render(<EntryList entries={[entry('One'), legacyEntry('Legacy')]} />);
+      expect(screen.getByText('Legacy')).toBeTruthy();
+    });
+
+    it('hides them when no ticked card has them', () => {
+      mockGenerationsInUse = ['4.0'];
+      render(<EntryList entries={[entry('One'), legacyEntry('Legacy')]} />);
+      expect(screen.queryByText('Legacy')).toBeNull();
+      expect(screen.getByText('One')).toBeTruthy();
+    });
+
+    it('renumbers the rows that follow a hidden one', () => {
+      mockLayout = 'list';
+      mockGenerationsInUse = ['4.0'];
+      render(
+        <EntryList
+          entries={[entry('One'), legacyEntry('Legacy'), entry('Three')]}
+        />,
+      );
+      expect(screen.getByTestId('menu-icon-0')).toBeTruthy();
+      expect(screen.getByTestId('menu-icon-1')).toBeTruthy();
+      expect(screen.queryByTestId('menu-icon-2')).toBeNull();
+    });
+
+    // Hiding one of three leaves an even count: two plain tiles.
+    it('lays the tiles out for the count that is left', () => {
+      mockGenerationsInUse = ['4.0'];
+      render(
+        <EntryList
+          entries={[
+            { ...entry('One'), detail: 'Only a hero shows this' },
+            legacyEntry('Legacy'),
+            entry('Three'),
+          ]}
+        />,
+      );
+      expect(screen.queryByText('Only a hero shows this')).toBeNull();
+    });
+
+    it('drops a group that is left empty, heading included', () => {
+      mockGenerationsInUse = ['4.0'];
+      render(
+        <EntryList
+          sections={[
+            { title: 'Current', entries: [entry('One'), entry('Two')] },
+            { title: 'Pairing', entries: [legacyEntry('Legacy')] },
+          ]}
+        />,
+      );
+      expect(screen.queryByText('Pairing')).toBeNull();
+      expect(screen.getByText('Current')).toBeTruthy();
+      // One group left, so the grid takes the ungrouped id.
+      expect(screen.getByTestId('tile-grid')).toBeTruthy();
     });
   });
 

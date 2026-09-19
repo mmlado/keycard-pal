@@ -2,12 +2,12 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { Icons } from '../../assets/icons';
-import theme from '../../theme';
-import { displayKeycardName } from '../../utils/keycardName';
+import { Icons } from '@/assets/icons';
+import theme from '@/theme';
 
-import AffiliateDisclosure from '../AffiliateDisclosure';
+import AffiliateDisclosure from '@/components/AffiliateDisclosure';
 
+import { displayKeycardName } from '@/utils/keycardName';
 import type { NFCVariant } from './index';
 
 type Props = {
@@ -16,15 +16,10 @@ type Props = {
   cardName?: string | null;
   cardFingerprint?: number | null;
   onCancel: () => void;
-  /** Restarts the operation (re-arms the NFC reader). After an error the
-   *  bridge has stopped listening — stopNFCWithError sets the channel's
-   *  listening=false — so a re-tap emits nothing and only an explicit
-   *  restart can recover. */
+  /** Restarts the operation. After an error the bridge stops listening, so a re-tap emits nothing. */
   retry?: () => void;
   openNFCSettings?: () => void;
-  /** Quiet exit for someone who reached the tap prompt without owning a
-   *  card. Shown only while the app is asking for a card (scanning, error);
-   *  a card that is connected or merely moved needs no shop link. */
+  /** Exit for someone without a card. Shown only while the app is asking for one. */
   onBuyKeycard?: () => void;
 };
 
@@ -87,9 +82,7 @@ export default function NFCSheet({
     onBuyKeycard !== undefined &&
     (variant === 'scanning' || variant === 'error');
 
-  // 'disconnected' deliberately keeps the default icon, not the failure one:
-  // a card that moved is a recoverable event, and presenting it as a failure
-  // is exactly what this variant exists to stop.
+  // A card that moved is recoverable, so 'disconnected' keeps the default icon.
   const NfcIcon =
     variant === 'success'
       ? Icons.nfc.success

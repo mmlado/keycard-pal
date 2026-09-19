@@ -4,17 +4,26 @@ import RNKeycard from 'react-native-keycard';
 import Keycard from 'keycard-sdk';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
-import { isTagLostError } from '@/utils/keycardErrors';
+import {
+  cardGeneration,
+  formatAppletVersion,
+  isBelowMinimumVersion,
+  MIN_SUPPORTED_APPLET_VERSION,
+} from '@/utils/cardGeneration';
+import { isUnknownCaError, TRUSTED_CA_PUBLIC_KEYS } from '@/utils/cardTrust';
+import {
+  cardErrorMessage,
+  isTagLostError,
+  selectFailureMessage,
+} from '@/utils/keycardErrors';
+import { noteTappedGeneration } from '@/utils/lastTappedGeneration';
 
 export type NFCSessionPhase = 'idle' | 'nfc' | 'done' | 'error';
 
-/** Whether a card is on the antenna right now. Deliberately separate from
- *  NFCSessionPhase: 31 call sites test `phase ===` against the 4-state machine,
- *  so presence must never widen that union. */
+/** Whether a card is on the antenna. Kept apart from NFCSessionPhase on purpose. */
 export type CardPresence = 'waiting' | 'connected' | 'lost';
 
-/** Single status string for both loss paths (event and classified error) so they
- *  cannot flicker against each other. */
+/** One status for both loss paths, so they cannot flicker against each other. */
 export const CARD_MOVED_STATUS =
   'Connection lost — hold your Keycard against the phone again';
 
@@ -28,18 +37,25 @@ const TAG_LOSS_WATCHDOG_MS = 6000;
 const IOS_TIMEOUT_RESTART_DELAY_MS = 500;
 const MAX_IOS_TIMEOUT_RESTARTS = 2;
 
+// A stop that never lands leaves Apple's sheet up until the 60 s cap.
+const logStopFailure = (e: unknown) =>
+  console.log('[Keycard] stopNFC failed:', e);
+
 export interface UseNFCSessionOptions {
-  /** Called instead of restarting the NFC reader when NFC becomes available
-   *  after being disabled (e.g. the coordinator shows the PIN pad first).
-   *  Without it, the default restarts the reader directly. */
+  /** Runs instead of restarting the reader when NFC comes back on. */
   onNFCAvailable?: () => void;
-  /** Keep the session alive and wait for a re-tap when an APDU fails because
-   *  the card left the field. Default false: a replayed operation can burn
-   *  pairing slots or overwrite card state, so only read-only operations opt in. */
+  /** Wait for a re-tap when the card leaves mid-APDU. Only read-only operations opt in. */
   retryOnTagLoss?: boolean;
-  /** Wording for Apple's NFC sheet on the success path, in place of the
-   *  bridge's generic "Success". iOS-only; ignored elsewhere. */
+  /** Shown under the success mark, and on Apple's NFC sheet. */
   successMessage?: string;
+  /** Card keys the user approved despite an untrusted certificate (ADR-0013). Read on every tap. */
+  whitelistedCardKeys?: () => Uint8Array[] | Promise<Uint8Array[]>;
+}
+
+/** What SELECT told the session about the card, beyond the command set. */
+export interface SelectedCard {
+  /** The certificate chains to no trusted CA and the card is not whitelisted. The card is still readable. */
+  untrustedCertificate: boolean;
 }
 
 export interface UseNFCSessionOperation {
@@ -49,8 +65,7 @@ export interface UseNFCSessionOperation {
   startNFC: () => void;
   reset: () => void;
   openNFCSettings: (() => void) | undefined;
-  /** Raised around a non-idempotent APDU sequence (e.g. autoPair) so a tag loss
-   *  inside it is never silently replayed, even for a retry-safe operation. */
+  /** Raised around a non-idempotent APDU sequence, so a tag loss inside it is never replayed. */
   retryUnsafeRef: { current: boolean };
 }
 
@@ -58,6 +73,7 @@ export default function useNFCSession(
   onCardConnected: (
     cmdSet: Commandset,
     setStatus: (status: string) => void,
+    card: SelectedCard,
   ) => Promise<void>,
   onCardDisconnected: () => Promise<void>,
   options: UseNFCSessionOptions = {},
@@ -70,6 +86,8 @@ export default function useNFCSession(
   onNFCAvailableRef.current = options.onNFCAvailable;
   const retryOnTagLossRef = useRef(options.retryOnTagLoss ?? false);
   retryOnTagLossRef.current = options.retryOnTagLoss ?? false;
+  const whitelistedCardKeysRef = useRef(options.whitelistedCardKeys);
+  whitelistedCardKeysRef.current = options.whitelistedCardKeys;
   const successMessageRef = useRef(options.successMessage);
   successMessageRef.current = options.successMessage;
   const retryUnsafeRef = useRef(false);
@@ -101,16 +119,7 @@ export default function useNFCSession(
     }
   }, []);
 
-  /** Sets the status AND mirrors it into Apple's system NFC sheet, which is the
-   *  only NFC UI on iOS — Pal's own sheet is Android-only by design, so without
-   *  this the whole progress narrative, including the reconnect nudge, is
-   *  invisible there. Android's setNFCMessage is a documented no-op, so the
-   *  platform check saves a pointless bridge round trip rather than guarding
-   *  against anything.
-   *
-   *  Deliberately NOT used on the error paths: those call stopNFCWithError(msg),
-   *  which already puts the message on the sheet as it tears the session down.
-   *  Setting the same text again immediately before that would be redundant. */
+  // Apple's NFC sheet is the only NFC UI on iOS, so progress is mirrored into it.
   const reportStatus = useCallback((next: string) => {
     setStatus(next);
     if (Platform.OS === 'ios') {
@@ -118,37 +127,24 @@ export default function useNFCSession(
     }
   }, []);
 
-  /** Ends the session on the success path, wording Apple's sheet with the
-   *  operation's own message instead of the bridge's generic "Success". The
-   *  sheet stays up ~3.4 s after invalidation (device probe 2026-09-01), so it
-   *  is the first place the user reads the outcome — and on iOS the only NFC UI
-   *  there is.
-   *
-   *  Android has no system sheet, so it takes the plain stop: its
-   *  stopNFCWithMessage is a no-op delegate and the round trip buys nothing. */
   const stopWithSuccess = useCallback(() => {
     const message = successMessageRef.current;
     // The last progress text ("Initializing...") must not sit under the check mark.
     setStatus(message ?? '');
-    if (message && Platform.OS === 'ios') {
-      RNKeycard.Core.stopNFCWithMessage(message).catch(() => {});
-      return;
-    }
-    RNKeycard.Core.stopNFC().catch(() => {});
+    // The message words Apple's sheet; Android ignores it.
+    RNKeycard.Core.stopNFC(message).catch(logStopFailure);
   }, []);
 
-  // Terminal path for both reconnect bounds (R11). Marks the error as real so a
-  // trailing disconnect event cannot clobber the status text.
+  // Marked as a real error so a trailing disconnect event cannot overwrite the status.
   const failUnstableConnection = useCallback(() => {
     clearWatchdog();
     realErrorRef.current = true;
     setStatus(STABILITY_ERROR_STATUS);
     setPhase('error');
-    RNKeycard.Core.stopNFCWithError(STABILITY_ERROR_STATUS).catch(() => {});
+    RNKeycard.Core.stopNFC(STABILITY_ERROR_STATUS, true).catch(logStopFailure);
   }, [clearWatchdog]);
 
-  // A classified tag loss while waiting is allowed: bump the bound, nudge the
-  // user, keep the session alive. Either bound firing ends the wait (R11).
+  // A tag loss while waiting keeps the session alive, within both bounds.
   const onTagLost = useCallback(() => {
     tagLossCountRef.current += 1;
     if (tagLossCountRef.current >= MAX_CONSECUTIVE_TAG_LOSSES) {
@@ -174,13 +170,7 @@ export default function useNFCSession(
       return;
     }
     if (inFlightRef.current) {
-      // A tap landed while the previous run is still unwinding: the disconnect
-      // event arrives within ~50 ms of the card leaving, but the APDU it was
-      // in the middle of stays blocked in transceive until the bridge's
-      // timeout. Dropping the tap here strands the user — the tag is already
-      // on the antenna, so no new discovery fires and only a physical
-      // remove-and-tap produces another event. Remember it and replay when
-      // this run finishes.
+      // The previous run is still unwinding. Remember the tap and replay it, or the user is stranded.
       console.log('[Keycard] Card connected (queued — previous run in flight)');
       pendingConnectRef.current = true;
       return;
@@ -191,40 +181,64 @@ export default function useNFCSession(
       setPhase('nfc');
     }
     console.log('[Keycard] Card connected');
-    // Cleared unconditionally (R7): a loss where the disconnect event arrived
-    // after the classified error must not swallow the next real error.
+    // Always cleared, so a late disconnect event cannot swallow the next real error.
     disconnectedRef.current = false;
     clearWatchdog();
     setCardPresence('connected');
     inFlightRef.current = true;
-    // Tracked locally, not from phaseRef: phaseRef is render-assigned and is
-    // still stale inside the finally below (R8), so it cannot say whether this
-    // run ended in an error.
+    // phaseRef is render-assigned and stale inside the finally below.
     let outcome: 'waiting' | 'done' | 'error' = 'waiting';
-    // Until SELECT has answered, nothing but SELECT has been sent, and SELECT
-    // changes nothing on the card. So a card that slips off the antenna before
-    // then can always be waited for, whatever the operation is.
+    // Before SELECT answers nothing can be replayed, so a loss is always waited for.
     let selected = false;
     try {
       reportStatus('Selecting applet...');
       const channel = new RNKeycard.NFCCardChannel();
-      const cmdSet = new Keycard.Commandset(channel);
-
-      const selectResp = await cmdSet.select();
-      console.log(
-        `[Keycard] SELECT SW: 0x${selectResp.sw.toString(16).toUpperCase()}`,
+      // On a card with a certificate the CA keys decide whether a channel opens at all.
+      const whitelist = (await whitelistedCardKeysRef.current?.()) ?? [];
+      const cmdSet = new Keycard.Commandset(
+        channel,
+        TRUSTED_CA_PUBLIC_KEYS,
+        whitelist,
       );
-      if (selectResp.sw !== 0x9000) {
-        throw new Error(
-          `SELECT failed: 0x${selectResp.sw.toString(16).toUpperCase()}`,
+
+      // The SDK throws for an unknown CA, after filling in applicationInfo.
+      let untrustedCertificate = false;
+      try {
+        const selectResp = await cmdSet.select();
+        console.log(
+          `[Keycard] SELECT SW: 0x${selectResp.sw.toString(16).toUpperCase()}`,
         );
+        if (selectResp.sw !== 0x9000) {
+          throw new Error(selectFailureMessage(selectResp.sw));
+        }
+      } catch (e) {
+        if (!isUnknownCaError(e) || !cmdSet.applicationInfo) {
+          throw e;
+        }
+        console.log('[Keycard] SELECT OK, certificate from an unknown CA');
+        untrustedCertificate = true;
       }
       selected = true;
-      // Forward progress: only a successful SELECT resets the loss bound. A card
-      // that connects and instantly drops must not reset it (R11).
+      // Only a successful SELECT resets the loss bound.
       tagLossCountRef.current = 0;
 
-      await onCardConnected(cmdSet, reportStatus);
+      // The floor. An uninitialized 3.x card reports no version and passes.
+      const appInfo = cmdSet.applicationInfo;
+      if (appInfo && isBelowMinimumVersion(appInfo)) {
+        const found = formatAppletVersion(appInfo.appVersion);
+        const needed = formatAppletVersion(MIN_SUPPORTED_APPLET_VERSION);
+        throw new Error(
+          `This Keycard runs applet ${found}. Keycard Pal needs applet ${needed} or newer.`,
+        );
+      }
+
+      // For the dashboard reminder only. Never acted on here.
+      const generation = appInfo ? cardGeneration(appInfo) : null;
+      if (generation !== null) {
+        noteTappedGeneration(generation);
+      }
+
+      await onCardConnected(cmdSet, reportStatus, { untrustedCertificate });
       outcome = 'done';
       setPhase('done');
       stopWithSuccess();
@@ -234,39 +248,33 @@ export default function useNFCSession(
           !selected ||
           (retryOnTagLossRef.current && !retryUnsafeRef.current)
         ) {
-          // Session stays up: no setPhase, no stopNFCWithError. The next tap
-          // re-runs the operation from SELECT. A write gets here too when the
-          // card left before SELECT answered: there is nothing of it to replay
-          // yet, and calling that "mid-operation" strands the user on an error
-          // while the card reconnects underneath it.
+          // Session stays up. The next tap re-runs from SELECT.
           onTagLost();
           return;
         }
-        // Replay is not safe for this operation (or we are inside a
-        // non-idempotent window): surface the ambiguity instead of retrying.
+        // Replay is not safe here: surface the ambiguity.
         outcome = 'error';
         realErrorRef.current = true;
         console.log('[Keycard] Tag lost mid-operation (no retry)');
         setStatus(AMBIGUOUS_LOSS_STATUS);
         setPhase('error');
-        RNKeycard.Core.stopNFCWithError(AMBIGUOUS_LOSS_STATUS).catch(() => {});
+        RNKeycard.Core.stopNFC(AMBIGUOUS_LOSS_STATUS, true).catch(
+          logStopFailure,
+        );
         return;
       }
       outcome = 'error';
       realErrorRef.current = true;
-      const msg = e instanceof Error ? e.message : String(e);
-      console.log(`[Keycard] Error: ${msg}`, e);
+      const msg = cardErrorMessage(e);
+      console.log('[Keycard] Error:', e);
       setStatus(msg);
       setPhase('error');
-      RNKeycard.Core.stopNFCWithError(msg).catch(() => {});
+      RNKeycard.Core.stopNFC(msg, true).catch(logStopFailure);
     } finally {
       inFlightRef.current = false;
       if (pendingConnectRef.current) {
         pendingConnectRef.current = false;
-        // Replay only while the session is still waiting for a card. A run
-        // that finished or failed must never be restarted behind the user's
-        // back — after an error the reader is stopped anyway, and Try again
-        // is the way back.
+        // Never restart a run that finished or failed.
         if (outcome === 'waiting') {
           console.log('[Keycard] Replaying queued card connect');
           handleCardConnectedRef.current?.().catch(() => {});
@@ -281,13 +289,10 @@ export default function useNFCSession(
     stopWithSuccess,
   ]);
 
-  // Lets the finally above re-enter the latest handler without making the
-  // callback depend on itself.
+  // Lets the finally above re-enter the latest handler.
   handleCardConnectedRef.current = handleCardConnected;
 
-  // Presence reporting only. The `!realErrorRef.current` guard is load-bearing:
-  // phaseRef is render-assigned and still reads 'nfc' in the tick after a real
-  // error's setPhase('error'), so the ref is the only same-tick signal (R8).
+  // Presence only. phaseRef still reads 'nfc' in the tick after a real error, hence realErrorRef.
   const handleCardDisconnected = useCallback(() => {
     console.log('[Keycard] Card disconnected');
     onCardDisconnected();
@@ -323,10 +328,7 @@ export default function useNFCSession(
     });
     const timeoutSub = RNKeycard.Core.onNFCTimeout(() => {
       console.log('[Keycard] NFC timed out');
-      // iOS: Apple caps the session at 60 s. Mirror status-legacy's auto-restart
-      // (nfc/events.cljs:12-15) but bounded — legacy has a persistent sheet to
-      // fall back on, Pal renders nothing at phase 'nfc' on iOS (R11). Each
-      // restart re-presents the system sheet, hence the cap.
+      // Apple caps a session at 60 s. Reopen it, a bounded number of times.
       if (
         Platform.OS === 'ios' &&
         phaseRef.current === 'nfc' &&
@@ -338,15 +340,13 @@ export default function useNFCSession(
         iosRestartTimerRef.current = setTimeout(() => {
           iosRestartTimerRef.current = null;
           if (phaseRef.current !== 'nfc') return;
-          // Re-check: an RN timer can fire on foreground resume long after the
-          // 500 ms it was scheduled for.
+          // A timer can fire long after it was due, on foreground resume.
           if (AppState.currentState !== 'active') {
             setStatus('Timed out — tap again');
             setPhase('error');
             return;
           }
-          // doStartNFC, not startNFC: the operation state must survive; only
-          // the CoreNFC session is being reopened.
+          // Only the CoreNFC session is reopened; the operation state survives.
           doStartNFC();
         }, IOS_TIMEOUT_RESTART_DELAY_MS);
         return;
@@ -364,7 +364,7 @@ export default function useNFCSession(
       timeoutSub.remove();
       clearWatchdog();
       clearIosRestartTimer();
-      RNKeycard.Core.stopNFC().catch(() => {});
+      RNKeycard.Core.stopNFC().catch(logStopFailure);
     };
   }, [
     handleCardConnected,
@@ -374,8 +374,7 @@ export default function useNFCSession(
     clearIosRestartTimer,
   ]);
 
-  // When the user returns from the NFC settings screen with NFC now enabled,
-  // invoke the onNFCAvailable option (e.g. show PIN pad) or restart NFC directly.
+  // Back from NFC settings with NFC on: run onNFCAvailable, or restart the reader.
   useEffect(() => {
     if (!nfcDisabled) return;
     const sub = AppState.addEventListener('change', nextState => {
@@ -410,9 +409,7 @@ export default function useNFCSession(
     clearIosRestartTimer();
     setCardPresence('waiting');
 
-    // Open the NFC sheet immediately so there is no empty-screen gap while the
-    // async isNFCEnabled() check runs. If NFC is off, we transition to 'error'
-    // inside the already-visible sheet.
+    // Open the sheet at once; an NFC-off error lands inside it.
     setStatus('Tap your Keycard');
     setPhase('nfc');
 
@@ -443,7 +440,7 @@ export default function useNFCSession(
     iosTimeoutRestartsRef.current = 0;
     clearWatchdog();
     clearIosRestartTimer();
-    RNKeycard.Core.stopNFC().catch(() => {});
+    RNKeycard.Core.stopNFC().catch(logStopFailure);
     setPhase('idle');
     setStatus('');
     setCardPresence('waiting');

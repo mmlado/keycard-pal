@@ -56,9 +56,16 @@ type Props = {
   onCancel: () => void;
   /** Show success variant when phase is 'done' (e.g. for screens that navigate away after a delay) */
   showOnDone?: boolean;
+  /** Leaves out the "Don't have a Keycard?" link, for a screen that already carries it (Settings). */
+  hideNoCardExit?: boolean;
 };
 
-export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
+export default function NFCBottomSheet({
+  nfc,
+  onCancel,
+  showOnDone,
+  hideNoCardExit,
+}: Props) {
   const {
     phase,
     status,
@@ -76,25 +83,20 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(400)).current;
   const [modalVisible, setModalVisible] = useState(false);
-  // Replaces the Modal's animationType="slide". Kept mounted through the
-  // outgoing animation so the pad does not vanish the instant the phase flips.
+  // Kept mounted through the outgoing animation, so the pad does not vanish at once.
   const pinSlide = useRef(new Animated.Value(PIN_SLIDE_DISTANCE)).current;
   const [pinMounted, setPinMounted] = useState(false);
 
-  // Someone without a card has no use for the tap prompt: end the session
-  // the same way Cancel does (which may also leave the host screen) before
-  // opening the shop, so the sheet never sits over the browser or QR screen.
+  // End the session as Cancel does before opening the shop, so the sheet never sits over it.
   const { buyKeycard } = useBuyKeycard();
   const handleBuyKeycard = useCallback(() => {
     onCancel();
     buyKeycard();
   }, [onCancel, buyKeycard]);
-  // A card that has been on the antenna this session (connected, or moved and
-  // recoverable) proves the user owns one, so an error with the card present
-  // shows only the recovery actions. The shop link is for the session that
-  // never saw a card.
+  // A card that was on the antenna proves ownership, so the shop link is left out then.
   const onBuyKeycard =
-    cardPresence === undefined || cardPresence === 'waiting'
+    !hideNoCardExit &&
+    (cardPresence === undefined || cardPresence === 'waiting')
       ? handleBuyKeycard
       : undefined;
 
@@ -102,9 +104,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
   const showGenuineWarning = phase === 'genuine_warning';
   const showPairingPassword = phase === 'pairing_password';
   const showIOSError = Platform.OS === 'ios' && phase === 'error';
-  // The connected/disconnected presence variants are Android-only by design:
-  // iOS shows Apple's system NFC sheet, which owns that feedback (mirrors
-  // status-legacy's platform/android? gate around its connection sheet).
+  // Presence variants are Android-only: on iOS Apple's sheet owns that feedback.
   const showSheet =
     Platform.OS === 'android' &&
     (phase === 'nfc' ||
@@ -172,8 +172,7 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
     slideAnim,
   ]);
 
-  // Phase always wins over presence: an error must render as an error even if
-  // the card is technically still on the antenna.
+  // Phase wins over presence: an error renders as an error.
   const variant: NFCVariant =
     phase === 'genuine_warning'
       ? 'genuine_warning'
@@ -289,10 +288,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginBottom: 24,
   },
-  /** Covers the screen's content but not the navigator header. Yoga anchors an
-   *  absolute child to the parent's padding box, so the host screen's own
-   *  bottom-inset padding is covered rather than inherited: the overlay pads
-   *  for the system navigation bar itself (see the paddingBottom above; #282). */
+  /** Yoga anchors an absolute child to the padding box, so the overlay pads for the navigation bar itself (#282). */
   pinOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: theme.colors.background,

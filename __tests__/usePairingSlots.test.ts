@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react-native';
 
 import { usePairingSlots } from '../src/hooks/keycard/usePairingSlots';
 
+import { filler, v4Select } from './selectResponse.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -24,8 +26,8 @@ jest.mock('react-native-keycard', () => ({
       onNFCUserCancelled: () => ({ remove: jest.fn() }),
       onNFCTimeout: () => ({ remove: jest.fn() }),
       startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: () => mockStopNFC(),
-      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
+      stopNFC: (message?: string, isError?: boolean) =>
+        isError ? mockStopNFCWithError(message) : mockStopNFC(),
       isNFCEnabled: () => Promise.resolve(true),
       openNFCSettings: () => Promise.resolve(true),
       setNFCMessage: () => Promise.resolve(true),
@@ -83,6 +85,7 @@ describe('usePairingSlots', () => {
   describe('initial state', () => {
     it('starts idle with empty status and null slotInfo', () => {
       const { result } = renderHook(() => usePairingSlots());
+      expect(result.current.noPairingSlots).toBe(false);
       expect(result.current.phase).toBe('idle');
       expect(result.current.status).toBe('');
       expect(result.current.slotInfo).toBeNull();
@@ -115,7 +118,7 @@ describe('usePairingSlots', () => {
         totalSlots: 10,
         freeSlots: 7,
         ourSlotIndex: 3,
-        cardUid: 'abcd',
+        cardKey: 'abcd',
       });
       expect(mockLoadPairing).toHaveBeenCalledWith('abcd');
     });
@@ -161,8 +164,92 @@ describe('usePairingSlots', () => {
 
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe(
-        'No application info in SELECT response',
+        'Could not read this Keycard. Try again.',
       );
+    });
+
+    it('transitions to error when the card is not initialized', async () => {
+      (mockCmdSet as any).applicationInfo = { initializedCard: false };
+      const { result } = renderHook(() => usePairingSlots());
+
+      await act(async () => {
+        result.current.checkSlots();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'This Keycard is not initialized. Initialize it first.',
+      );
+    });
+  });
+
+  // A 4.0 card has no pairing: an answer, not a failure.
+  describe('a card without pairing slots', () => {
+    const CERTIFICATE = [...filler(33, 0x02), ...filler(65, 0x09)];
+
+    async function tapCardWithoutSlots() {
+      (mockCmdSet as any).applicationInfo = v4Select(0x0400, {
+        certificate: CERTIFICATE,
+      });
+      const hook = renderHook(() => usePairingSlots());
+      await act(async () => {
+        hook.result.current.checkSlots();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return hook;
+    }
+
+    it('ends the read as done, with no slot list', async () => {
+      const { result } = await tapCardWithoutSlots();
+      expect(result.current.phase).toBe('done');
+      expect(result.current.noPairingSlots).toBe(true);
+      expect(result.current.slotInfo).toBeNull();
+    });
+
+    it('looks up no local pairing for it', async () => {
+      await tapCardWithoutSlots();
+      expect(mockLoadPairing).not.toHaveBeenCalled();
+    });
+
+    // Without a card key it still must not read as uninitialized.
+    it('says so even when the card carries no certificate', async () => {
+      (mockCmdSet as any).applicationInfo = v4Select(0x0400, {
+        certificate: null,
+      });
+      const { result } = renderHook(() => usePairingSlots());
+      await act(async () => {
+        result.current.checkSlots();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(result.current.noPairingSlots).toBe(true);
+    });
+
+    it('forgets it when another card is about to be read', async () => {
+      const { result } = await tapCardWithoutSlots();
+      await act(async () => {
+        result.current.checkSlots();
+      });
+      expect(result.current.noPairingSlots).toBe(false);
+    });
+
+    it('forgets it on reset, but not when only NFC is reset', async () => {
+      const { result } = await tapCardWithoutSlots();
+      await act(async () => {
+        result.current.resetNFCOnly();
+      });
+      expect(result.current.noPairingSlots).toBe(true);
+      await act(async () => {
+        result.current.reset();
+      });
+      expect(result.current.noPairingSlots).toBe(false);
     });
   });
 
@@ -229,7 +316,7 @@ describe('usePairingSlots', () => {
         totalSlots: 10,
         freeSlots: 5,
         ourSlotIndex: 2,
-        cardUid: 'abcd',
+        cardKey: 'abcd',
       });
     });
   });
@@ -256,8 +343,7 @@ describe('usePairingSlots', () => {
     });
   });
 
-  // T11: the slot read is a read-only SELECT-response read, so it opts into
-  // tag-loss retry — a loss keeps the session up and reports presence.
+  // The slot read opts into tag-loss retry.
   describe('cardPresence', () => {
     it('starts as waiting', () => {
       const { result } = renderHook(() => usePairingSlots());
@@ -291,8 +377,7 @@ describe('usePairingSlots', () => {
       });
       expect(result.current.phase).toBe('done');
 
-      // readSlotInfoFromCmdSet runs outside the session (live cmdSet after an
-      // unpair): a tag loss there rejects to the caller, not the session.
+      // Outside the session a tag loss rejects to the caller.
       mockSelect.mockRejectedValueOnce(
         new Error('CardIO Error: Error: Tag was lost.'),
       );

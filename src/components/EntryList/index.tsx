@@ -8,12 +8,18 @@ import {
 } from 'react-native';
 
 import { IconComponent } from '@/assets/icons';
+import {
+  GenerationBoundRoute,
+  isRouteHidden,
+} from '@/navigation/generationBoundRoutes';
 import theme from '@/theme';
 
 import { MenuList } from '@/components/Menu';
 import TileGrid, { gridMetrics } from '@/components/TileGrid';
 
 import { usePreferences } from '@/hooks/usePreferences';
+
+import { Generation } from '@/utils/cardGeneration';
 
 export type EntryListItem = {
   label: string;
@@ -22,6 +28,8 @@ export type EntryListItem = {
   icon: IconComponent;
   /** Marks a row that starts an NFC flow, per the app's NFC icon rule. */
   requiresNfc?: boolean;
+  /** Set on an entry only some cards have; dropped when no ticked generation has it. */
+  generationBoundRoute?: GenerationBoundRoute;
   onPress: () => void;
 };
 
@@ -39,24 +47,39 @@ type Props = {
   footer?: React.ReactNode;
 };
 
-/**
- * Renders a screen's destinations in whichever layout the user picked. Every
- * navigation menu goes through this rather than choosing a component itself,
- * so the setting cannot apply to some screens and not others.
- *
- * This owns the scroll container for both layouts, because a grouped screen
- * renders several lists or grids and they have to scroll as one.
- */
+/** Runs first: testIDs, the hero tile and the grouped flag are all derived from what is left. */
+function visibleGroups(
+  groups: EntryListSection[],
+  generationsInUse: Generation[],
+): EntryListSection[] {
+  return groups
+    .map(group => ({
+      ...group,
+      entries: group.entries.filter(
+        entry =>
+          !entry.generationBoundRoute ||
+          !isRouteHidden(entry.generationBoundRoute, generationsInUse),
+      ),
+    }))
+    .filter(
+      (group, index) =>
+        group.entries.length > 0 || groups[index].entries.length === 0,
+    );
+}
+
+/** Every navigation menu renders through this, so the layout setting applies everywhere. Owns the scroll container. */
 export default function EntryList({ entries, sections, footer }: Props) {
   const { preferences } = usePreferences();
   const { width } = useWindowDimensions();
 
-  const groups: EntryListSection[] = sections ?? [{ entries: entries ?? [] }];
+  const groups = visibleGroups(
+    sections ?? [{ entries: entries ?? [] }],
+    preferences.generationsInUse,
+  );
   const list = preferences.dashboardLayout === 'list';
   const grouped = groups.length > 1;
 
-  // A tile group's heading has to line up with the tiles, whose margin varies
-  // by screen width; a list group's card is already inset by the padding.
+  // A tile group's heading lines up with the tiles, whose margin varies by width.
   const titleInset = list ? undefined : gridMetrics(width).margin;
 
   let offset = 0;

@@ -4,6 +4,8 @@ import {
   savePreference,
 } from '../src/storage/preferencesStorage';
 
+import { testPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -25,6 +27,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const KEYS = {
   dashboardLayout: 'preference_dashboard_layout',
+  generationsInUse: 'preference_generations_in_use',
+  generationRemindersDismissed: 'preference_generation_reminders_dismissed',
   pinPadScramble: 'preference_pinpad_scramble',
   tokenImagesEnabled: 'preference_token_images_enabled',
   welcomeSeen: 'preference_welcome_seen',
@@ -51,8 +55,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('loadPreferences', () => {
-  // One read for every preference is the point: nothing else reads storage
-  // after startup, so the whole set has to come from this call.
+  // One read for every preference.
   it('reads every key in one round trip', async () => {
     await loadPreferences();
     expect(mockGetMany).toHaveBeenCalledTimes(1);
@@ -67,6 +70,8 @@ describe('loadPreferences', () => {
   it('decodes every stored value', async () => {
     stored({
       [KEYS.dashboardLayout]: 'list',
+      [KEYS.generationsInUse]: '4.0',
+      [KEYS.generationRemindersDismissed]: '3.1',
       [KEYS.pinPadScramble]: '1',
       [KEYS.tokenImagesEnabled]: '1',
       [KEYS.welcomeSeen]: '1',
@@ -74,6 +79,8 @@ describe('loadPreferences', () => {
     });
     expect(await loadPreferences()).toEqual({
       dashboardLayout: 'list',
+      generationsInUse: ['4.0'],
+      generationRemindersDismissed: ['3.1'],
       pinPadScramble: true,
       tokenImagesEnabled: true,
       welcomeSeen: true,
@@ -94,13 +101,60 @@ describe('loadPreferences', () => {
     expect((await loadPreferences()).dashboardLayout).toBe('tiles');
   });
 
-  // Startup gates on this read, so a storage failure must resolve, not
-  // reject, or the app never gets past the loading screen.
+  // An unrecognised selection leaves nothing out.
+  it.each(['5.0', '3.0', 'any', 'undefined', ''])(
+    'reads an unrecognised selection %p as every generation',
+    async value => {
+      stored({ [KEYS.generationsInUse]: value });
+      expect((await loadPreferences()).generationsInUse).toEqual([
+        '3.1',
+        '4.0',
+      ]);
+    },
+  );
+
+  // A saved selection is kept, so a generation added later arrives unticked.
+  it('keeps a saved selection narrower than the table', async () => {
+    stored({ [KEYS.generationsInUse]: '3.1' });
+    expect((await loadPreferences()).generationsInUse).toEqual(['3.1']);
+  });
+
+  it('reads no dismissed reminders when nothing usable is stored', async () => {
+    stored({ [KEYS.generationRemindersDismissed]: 'garbage' });
+    expect((await loadPreferences()).generationRemindersDismissed).toEqual([]);
+  });
+
+  it('hands out its own copy of the default selection', async () => {
+    const first = await loadPreferences();
+    first.generationsInUse.pop();
+    expect((await loadPreferences()).generationsInUse).toEqual(['3.1', '4.0']);
+  });
+
+  // Startup waits on this read, so a failure must resolve.
   it('returns the defaults when storage throws', async () => {
     mockGetMany.mockRejectedValue(new Error('storage failure'));
     const preferences = await loadPreferences();
     expect(preferences).toEqual(DEFAULT_PREFERENCES);
     expect(preferences).not.toBe(DEFAULT_PREFERENCES);
+  });
+});
+
+// Screen tests build on this helper; it must equal the real defaults.
+describe('testPreferences', () => {
+  it('matches the real defaults', () => {
+    expect(testPreferences()).toEqual(DEFAULT_PREFERENCES);
+  });
+
+  it('lays overrides over the defaults', () => {
+    expect(testPreferences({ dashboardLayout: 'list' })).toEqual({
+      ...DEFAULT_PREFERENCES,
+      dashboardLayout: 'list',
+    });
+  });
+
+  it('hands out fresh lists each time', () => {
+    testPreferences().generationsInUse.pop();
+    expect(testPreferences().generationsInUse).toEqual(['3.1', '4.0']);
   });
 });
 
@@ -126,8 +180,18 @@ describe('savePreference', () => {
     expect(mockSetItem).toHaveBeenCalledWith(KEYS.dashboardLayout, 'tiles');
   });
 
-  // The provider decides what a failed write means for the UI, so the
-  // failure has to reach it.
+  it('stores a list of generations comma-separated', async () => {
+    await savePreference('generationsInUse', ['3.1', '4.0']);
+    expect(mockSetItem).toHaveBeenCalledWith(KEYS.generationsInUse, '3.1,4.0');
+
+    await savePreference('generationRemindersDismissed', ['4.0']);
+    expect(mockSetItem).toHaveBeenCalledWith(
+      KEYS.generationRemindersDismissed,
+      '4.0',
+    );
+  });
+
+  // The failure has to reach the provider.
   it('rejects when storage does', async () => {
     mockSetItem.mockRejectedValue(new Error('storage full'));
     await expect(savePreference('pinPadScramble', true)).rejects.toThrow(

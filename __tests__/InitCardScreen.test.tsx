@@ -4,6 +4,8 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import InitCardScreen, { dashboardEntry } from '../src/screens/InitCardScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -22,8 +24,7 @@ const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
 >;
 
-// useFocusEffect is used only to register the hardware-back handler.
-// In tests there's no focus management so we make it a no-op.
+// useFocusEffect only registers the hardware-back handler; a no-op here.
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
@@ -31,7 +32,7 @@ jest.mock('@react-navigation/native', () => ({
 // PinPad reads the scramble preference from context.
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { pinPadScramble: false },
+    preferences: mockTestPreferences({ pinPadScramble: false }),
     setPreference: jest.fn(),
   }),
 }));

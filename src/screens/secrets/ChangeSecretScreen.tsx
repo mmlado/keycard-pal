@@ -1,20 +1,26 @@
-import React, { useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type {
-  ChangeSecretScreenProps,
-  SecretType,
-} from '../../navigation/types';
+import { Icons } from '@/assets/icons';
+import {
+  cardHasRoute,
+  everyCardInUseHasRoute,
+  routeAbsence,
+} from '@/navigation/generationBoundRoutes';
+import type { ChangeSecretScreenProps, SecretType } from '@/navigation/types';
+import theme from '@/theme';
 
-import { useChangeSecret } from '../../hooks/keycard/useChangeSecret';
-import { useConfirmedEntry } from '../../hooks/useConfirmedEntry';
-import { useKeycardScreen } from '../../hooks/useKeycardScreen';
+import NFCBottomSheet from '@/components/NFCBottomSheet';
+import PinPad from '@/components/PinPad';
+import PrimaryButton from '@/components/PrimaryButton';
+import TextEntry from '@/components/TextEntry';
 
-import theme from '../../theme';
-import NFCBottomSheet from '../../components/NFCBottomSheet';
-import PinPad from '../../components/PinPad';
-import TextEntry from '../../components/TextEntry';
+import { useChangeSecret } from '@/hooks/keycard/useChangeSecret';
+import { useIdentifyCard } from '@/hooks/keycard/useIdentifyCard';
+import { useConfirmedEntry } from '@/hooks/useConfirmedEntry';
+import { useKeycardScreen } from '@/hooks/useKeycardScreen';
+import { usePreferences } from '@/hooks/usePreferences';
 
 type SecretConfig = {
   inputType: 'numeric' | 'text';
@@ -47,6 +53,13 @@ const SECRET_CONFIG: Record<SecretType, SecretConfig> = {
   },
 };
 
+/** Header while the card is still being identified, or turned out not to have one. */
+const PAIRING_SECRET_TITLE = 'Change pairing secret';
+
+export const IDENTIFY_EXPLAINER =
+  'Hold your Keycard against the phone. Keycard Pal checks whether this ' +
+  'card has a pairing secret before asking you for a new one.';
+
 export default function ChangeSecretScreen({
   route,
   navigation,
@@ -57,6 +70,35 @@ export default function ChangeSecretScreen({
 
   const keycard = useChangeSecret(secretType);
   const { phase } = keycard;
+
+  // The pairing secret is identify-then-operate (ADR-0012). The first tap is skipped when every
+  // ticked card has one; `requiresRoute` still guards the operating tap.
+  const { preferences } = usePreferences();
+  const needsIdentify =
+    secretType === 'pairing' &&
+    !everyCardInUseHasRoute(
+      'ChangePairingSecret',
+      preferences.generationsInUse,
+    );
+  const identify = useIdentifyCard();
+  const { generation, phase: identifyPhase, start: startIdentify } = identify;
+
+  const identifying = needsIdentify && generation === null;
+  const unavailable =
+    needsIdentify &&
+    generation !== null &&
+    !cardHasRoute('ChangePairingSecret', generation);
+  const absence = routeAbsence('ChangePairingSecret');
+
+  // Once per mount, not on focus: dismissing Apple's sheet returns to 'idle' and would reopen it.
+  const identifyStartedRef = useRef(false);
+  useEffect(() => {
+    if (!needsIdentify || identifyStartedRef.current) {
+      return;
+    }
+    identifyStartedRef.current = true;
+    startIdentify();
+  }, [needsIdentify, startIdentify]);
 
   const entry = useConfirmedEntry(newSecret => keycard.start(newSecret), {
     length: config.length,
@@ -70,10 +112,17 @@ export default function ChangeSecretScreen({
     return true;
   }, [entry, navigation]);
 
+  const stepTitle =
+    entry.step === 'entry' ? config.entryTitle : config.confirmTitle;
+
+  // `keycard` stays the change, so only the second tap ends the screen.
+  const activeKeycard = identifying ? identify : keycard;
+
   const { onCancel } = useKeycardScreen({
     keycard,
+    activeKeycard,
     navigation,
-    title: entry.step === 'entry' ? config.entryTitle : config.confirmTitle,
+    title: identifying || unavailable ? PAIRING_SECRET_TITLE : stepTitle,
     pinEntryTitle: 'Enter current PIN',
     done: { toast: config.toast },
     onHardwareBack: onScreenBack,
@@ -85,9 +134,44 @@ export default function ChangeSecretScreen({
     },
   });
 
+  if (unavailable) {
+    return (
+      <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={styles.message}>
+          <Text style={styles.messageTitle}>{absence.title}</Text>
+          <Text style={styles.messageDetail}>{absence.detail}</Text>
+        </View>
+        <View style={styles.footer}>
+          <PrimaryButton label="Go back" onPress={() => navigation.goBack()} />
+        </View>
+      </View>
+    );
+  }
+
+  const showInput = phase === 'idle' && !identifying;
+
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
-      {phase === 'idle' && config.inputType === 'numeric' && (
+      {identifying && (
+        <>
+          <View style={styles.message}>
+            <Text style={styles.messageDetail}>{IDENTIFY_EXPLAINER}</Text>
+          </View>
+          <View style={styles.footer}>
+            {/* Always drawn, so it neither flashes before the tap starts nor
+                leaves a blank screen behind Apple's sheet. */}
+            <PrimaryButton
+              label="Read Keycard"
+              icon={Icons.nfcActivate}
+              onPress={startIdentify}
+              disabled={identifyPhase !== 'idle'}
+              testID="identify-card-button"
+            />
+          </View>
+        </>
+      )}
+
+      {showInput && config.inputType === 'numeric' && (
         <PinPad
           key={entry.step}
           length={entry.length}
@@ -99,7 +183,7 @@ export default function ChangeSecretScreen({
         />
       )}
 
-      {phase === 'idle' && config.inputType === 'text' && (
+      {showInput && config.inputType === 'text' && (
         <TextEntry
           resetKey={entry.step}
           onSubmit={
@@ -110,7 +194,13 @@ export default function ChangeSecretScreen({
         />
       )}
 
-      <NFCBottomSheet nfc={keycard} onCancel={onCancel} showOnDone />
+      {/* The identify tap ends in 'done' too, and that is not an outcome to
+          celebrate: the sheet just steps aside for the input. */}
+      <NFCBottomSheet
+        nfc={activeKeycard}
+        onCancel={onCancel}
+        showOnDone={!identifying}
+      />
     </View>
   );
 }
@@ -119,5 +209,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  message: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+  },
+  messageTitle: {
+    color: theme.colors.onSurface,
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  messageDetail: {
+    color: theme.colors.onSurfaceMuted,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  footer: {
+    paddingHorizontal: 24,
   },
 });

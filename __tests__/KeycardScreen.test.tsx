@@ -88,8 +88,7 @@ jest.mock('../src/hooks/useWalletConnectSession.online', () => ({
 
 const navigation = {
   goBack: jest.fn(),
-  // The screen tears its NFC session down on beforeRemove, now that the real
-  // back button can leave it mid-session.
+  // The session is torn down on beforeRemove.
   addListener: jest.fn(() => jest.fn()),
   reset: jest.fn(),
   setOptions: jest.fn(),
@@ -470,10 +469,7 @@ describe('KeycardScreen', () => {
       return calls[calls.length - 1][0].onCancel as () => Promise<void>;
     }
 
-    // The PIN pad no longer covers the navigator header, so the real back
-    // button and the iOS swipe-back gesture can leave the screen mid-session.
-    // The reader has to be torn down without also re-running the reset that
-    // handleCancel does, since navigation is already happening.
+    // Back can leave mid-session: the reader is torn down without handleCancel's reset.
     it('cancels the session when the screen is removed', async () => {
       await renderScreen('nfc');
       const beforeRemove = navigation.addListener.mock.calls.find(
@@ -541,8 +537,7 @@ describe('KeycardScreen', () => {
       const signOp = mockExecute.mock.calls[0][0];
       const result = await signOp({ signWithPath }, { setStatus: jest.fn() });
 
-      // signRoute carries a raw 32-byte digest, so the signing digest is the
-      // payload bytes themselves (raw-digest passthrough).
+      // A raw 32-byte digest is signed as it is.
       expect(signWithPath).toHaveBeenCalledWith(
         new Uint8Array(Buffer.from(signRoute.params.signData, 'hex')),
         signRoute.params.derivationPath,
@@ -599,7 +594,7 @@ describe('KeycardScreen', () => {
         getExportTarget('ethereum').keys,
         setStatus,
         // The flow's resume cache (reconnect resume, see keycardExport.ts).
-        expect.objectContaining({ cardUid: null }),
+        expect.objectContaining({ keyUid: null }),
       );
     });
   });

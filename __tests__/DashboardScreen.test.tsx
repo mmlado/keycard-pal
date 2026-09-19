@@ -3,6 +3,12 @@ import { AppState, Platform, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardScreen from '../src/screens/DashboardScreen';
+import {
+  noteTappedGeneration,
+  resetLastTappedGeneration,
+} from '../src/utils/lastTappedGeneration';
+
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -31,10 +37,15 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 let mockLayout: 'tiles' | 'list' = 'tiles';
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { dashboardLayout: mockLayout },
+    preferences: mockTestPreferences({
+      dashboardLayout: mockLayout,
+      generationsInUse: mockGenerationsInUse,
+      generationRemindersDismissed: [],
+    }),
     setPreference: jest.fn(),
   }),
 }));
@@ -58,8 +69,7 @@ type MockAction = {
 
 const mockDashboardActions: MockAction[] = [];
 
-// Forwards its props so the rendered icon carries a findable testID, the same
-// way the shared icon mock behaves.
+// Forwards props, so the icon carries its testID.
 const Icon = (props: any) => <View {...props} />;
 
 function action(
@@ -90,8 +100,7 @@ const navigation = {
   setParams: jest.fn(),
 } as any;
 
-// AppState.currentState is a jest.fn() in the RN preset, not a string, so any
-// test that depends on foreground state has to set it explicitly.
+// AppState.currentState is a jest.fn() in the preset, so set it explicitly.
 function setAppState(state: 'active' | 'inactive' | 'background') {
   (AppState as any).currentState = state;
 }
@@ -118,6 +127,8 @@ describe('DashboardScreen', () => {
     mockDashboardActions.length = 0;
     focusCallback = null;
     mockLayout = 'tiles';
+    mockGenerationsInUse = ['3.1', '4.0'];
+    resetLastTappedGeneration();
     // mockImplementation alone leaves call history from earlier tests in place.
     (AppState.addEventListener as jest.Mock).mockClear();
     setAppState('active');
@@ -176,8 +187,7 @@ describe('DashboardScreen', () => {
     });
   });
 
-  // An odd number of entries would leave a dangling half-row, so the first one
-  // is promoted to a full-width hero tile.
+  // An odd count promotes the first entry to a hero tile.
   describe('tile grid', () => {
     it('renders the first entry as a hero tile when the count is odd', async () => {
       mockDashboardActions.push(
@@ -209,6 +219,22 @@ describe('DashboardScreen', () => {
       await renderScreen();
       expect(screen.getByText('Hero detail')).toBeTruthy();
       expect(screen.queryByText('Standard detail')).toBeNull();
+    });
+  });
+
+  // The reminder is mounted only here.
+  describe('unselected Keycard reminder', () => {
+    it('shows after a tap of a card the user left unticked', async () => {
+      mockGenerationsInUse = ['4.0'];
+      noteTappedGeneration('3.1');
+      await renderScreen();
+      expect(screen.getByTestId('unselected-keycard-reminder')).toBeTruthy();
+    });
+
+    it('stays away while the tapped card is one the user ticked', async () => {
+      noteTappedGeneration('3.1');
+      await renderScreen();
+      expect(screen.queryByTestId('unselected-keycard-reminder')).toBeNull();
     });
   });
 
@@ -273,9 +299,7 @@ describe('DashboardScreen', () => {
     });
   });
 
-  // Apple's CoreNFC sheet covers the Snackbar's band for ~3.4 s after a Keycard
-  // operation ends. The toast is shown at once and simply outlasts the sheet,
-  // so it is revealed as the sheet slides away rather than appearing after it.
+  // The toast outlasts Apple's NFC sheet, which covers it for about 3.4 s.
   describe('toast vs the iOS NFC sheet', () => {
     const origOS = Platform.OS;
 
@@ -301,9 +325,7 @@ describe('DashboardScreen', () => {
       expect(lastSnackDuration).toBe(3000);
     });
 
-    // Regression: an earlier fix held the toast back until AppState returned to
-    // 'active'. iOS posts that only after the sheet's dismissal animation ends,
-    // so the toast appeared into an already-empty screen after a visible gap.
+    // Regression: waiting for AppState 'active' showed the toast late, into an empty screen.
     it('shows immediately rather than waiting for the app to become active', async () => {
       Platform.OS = 'ios';
       setAppState('inactive');

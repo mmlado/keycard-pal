@@ -9,10 +9,9 @@ import {
   KEYCARD_PURCHASE_URL,
 } from '../src/constants/keycard';
 
-// ---------------------------------------------------------------------------
-// Mocks — every other section is a stub so this test only proves the screen
-// mounts the Keycard purchase section in both build flavors.
-// ---------------------------------------------------------------------------
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
+// Mocks: every other section is a stub.
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -28,6 +27,63 @@ jest.mock('../src/assets/icons', () => {
   const Icon = (props: any) => <View {...props} />;
   return { Icons: { openInBrowser: Icon, qr: Icon } };
 });
+
+// A stub that keeps the two props the screen's tap goes through.
+jest.mock('../src/components/settings/KeycardsInUseSettingsSection', () => {
+  const { Text } = require('react-native');
+  return ({
+    onSetFromCard,
+    readingCard,
+  }: {
+    onSetFromCard: () => void;
+    readingCard: boolean;
+  }) => (
+    <Text onPress={onSetFromCard}>
+      {readingCard ? 'Reading card' : 'Set from my Keycard'}
+    </Text>
+  );
+});
+
+jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
+
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: jest.fn(),
+}));
+
+// One stable object, like the real provider, or the screen's effect would re-run every render.
+const mockSetPreference = jest.fn();
+const mockPreferencesValue = {
+  preferences: mockTestPreferences(),
+  setPreference: (...args: unknown[]) => mockSetPreference(...args),
+};
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => mockPreferencesValue,
+}));
+
+const mockResetLastTapped = jest.fn();
+jest.mock('../src/utils/lastTappedGeneration', () => ({
+  resetLastTappedGeneration: () => mockResetLastTapped(),
+}));
+
+const mockIdentifyStart = jest.fn();
+const mockIdentifyCancel = jest.fn();
+let mockIdentify: {
+  phase: 'idle' | 'nfc' | 'done' | 'error';
+  generation: '3.1' | '4.0' | null;
+};
+
+jest.mock('../src/hooks/keycard/useIdentifyCard', () => ({
+  useIdentifyCard: () => ({
+    phase: mockIdentify.phase,
+    status: '',
+    cardPresence: 'waiting',
+    generation: mockIdentify.generation,
+    start: mockIdentifyStart,
+    retry: mockIdentifyStart,
+    cancel: mockIdentifyCancel,
+    openNFCSettings: undefined,
+  }),
+}));
 
 jest.mock('../src/components/settings/DashboardLayoutSettingsSection', () => {
   const { Text } = require('react-native');
@@ -67,7 +123,19 @@ jest.mock('../src/navigation/navigationRef', () => ({
   },
 }));
 
-const navigation = { setOptions: jest.fn() } as any;
+const navigation = {
+  setOptions: jest.fn(),
+  navigate: jest.fn(),
+  goBack: jest.fn(),
+  addListener: jest.fn(() => jest.fn()),
+} as any;
+
+const MockNFCBottomSheet = jest.requireMock('../src/components/NFCBottomSheet');
+
+function lastSheetProps() {
+  const calls = MockNFCBottomSheet.mock.calls;
+  return calls[calls.length - 1][0];
+}
 
 function renderScreen() {
   return render(<SettingsScreen navigation={navigation} route={{} as any} />);
@@ -83,6 +151,14 @@ describe('SettingsScreen', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     navigation.setOptions.mockClear();
+    navigation.navigate.mockClear();
+    navigation.goBack.mockClear();
+    mockSetPreference.mockClear();
+    mockResetLastTapped.mockClear();
+    mockIdentifyStart.mockClear();
+    mockIdentifyCancel.mockClear();
+    MockNFCBottomSheet.mockClear();
+    mockIdentify = { phase: 'idle', generation: null };
     mockConnected = true;
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     (Linking.openURL as jest.Mock).mockClear();
@@ -97,19 +173,108 @@ describe('SettingsScreen', () => {
     expect(navigation.setOptions).toHaveBeenCalledWith({ title: 'Settings' });
   });
 
-  // The purchase link is the one section that always stays at the top; every
-  // other section is added below it.
+  // The purchase link always stays first.
   it('keeps Buy a Keycard above the layout section', () => {
     const { toJSON } = renderScreen();
     const rendered = JSON.stringify(toJSON());
-    // Both have to be present, or a missing section would make indexOf return
-    // -1 and the ordering assertion would pass for the wrong reason.
+    // Both must be present, or indexOf -1 would pass the ordering check.
     expect(rendered).toContain('Buy a Keycard');
     expect(rendered).toContain('Layout');
     expect(rendered.indexOf('Buy a Keycard')).toBeLessThan(
       rendered.indexOf('Layout'),
     );
     expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
+  });
+
+  // For the user who would rather tap a card than read applet versions.
+  describe('set from my Keycard', () => {
+    it('starts a read of the card from the section', () => {
+      renderScreen();
+      fireEvent.press(screen.getByText('Set from my Keycard'));
+      expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('tells the section while a card is being read', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(screen.getByText('Reading card')).toBeTruthy();
+    });
+
+    // The shop link is already this screen's first row.
+    it('keeps the shop link off its NFC sheet', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(lastSheetProps().hideNoCardExit).toBe(true);
+    });
+
+    it('gives the NFC sheet the read', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(lastSheetProps().nfc.phase).toBe('nfc');
+      expect(lastSheetProps().nfc.retry).toBe(mockIdentifyStart);
+    });
+
+    it('ticks only the generation of the card that was read', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      renderScreen();
+      expect(mockSetPreference).toHaveBeenCalledWith('generationsInUse', [
+        '3.1',
+      ]);
+    });
+
+    // A re-render at 'done' must not write again.
+    it('does not narrow again on a re-render with nothing new', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      const view = renderScreen();
+      mockSetPreference.mockClear();
+      view.rerender(
+        <SettingsScreen navigation={navigation} route={{} as any} />,
+      );
+      expect(mockSetPreference).not.toHaveBeenCalled();
+    });
+
+    // This tap must not come back as a dashboard reminder.
+    it('leaves no reminder behind for the dashboard', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      renderScreen();
+      expect(mockResetLastTapped).toHaveBeenCalledTimes(1);
+    });
+
+    it('changes nothing until a card has been read', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      expect(mockSetPreference).not.toHaveBeenCalled();
+    });
+
+    // A second card of the same generation narrows the selection again.
+    it('narrows again when another card of the same generation is read', () => {
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      const view = renderScreen();
+      mockSetPreference.mockClear();
+
+      mockIdentify = { phase: 'nfc', generation: '3.1' };
+      view.rerender(
+        <SettingsScreen navigation={navigation} route={{} as any} />,
+      );
+      expect(mockSetPreference).not.toHaveBeenCalled();
+
+      mockIdentify = { phase: 'done', generation: '3.1' };
+      view.rerender(
+        <SettingsScreen navigation={navigation} route={{} as any} />,
+      );
+      expect(mockSetPreference).toHaveBeenCalledWith('generationsInUse', [
+        '3.1',
+      ]);
+    });
+
+    // Cancelling or finishing a read keeps the user in Settings.
+    it('stays in Settings when the read is cancelled', () => {
+      mockIdentify = { phase: 'nfc', generation: null };
+      renderScreen();
+      lastSheetProps().onCancel();
+      expect(mockIdentifyCancel).toHaveBeenCalledTimes(1);
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
   });
 
   it('renders on Android with the height keyboard behaviour', () => {

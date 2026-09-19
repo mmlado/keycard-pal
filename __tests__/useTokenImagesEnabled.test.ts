@@ -2,11 +2,13 @@ import { renderHook } from '@testing-library/react-native';
 
 import useTokenImagesEnabled from '../src/hooks/useTokenImagesEnabled.online';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 let mockEnabled = false;
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { tokenImagesEnabled: mockEnabled },
+    preferences: mockTestPreferences({ tokenImagesEnabled: mockEnabled }),
     setPreference: jest.fn(),
   }),
 }));

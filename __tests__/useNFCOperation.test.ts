@@ -36,8 +36,8 @@ jest.mock('react-native-keycard', () => ({
         return { remove: jest.fn() };
       },
       startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: () => mockStopNFC(),
-      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
+      stopNFC: (message?: string, isError?: boolean) =>
+        isError ? mockStopNFCWithError(message) : mockStopNFC(),
       isNFCEnabled: () => Promise.resolve(true),
       openNFCSettings: () => Promise.resolve(true),
       setNFCMessage: () => Promise.resolve(true),
@@ -222,9 +222,7 @@ describe('useNFCOperation', () => {
     });
   });
 
-  // After an error the reader is off, so tapping the card does nothing. The
-  // NFC sheet only offers "Try again" when it is given this; without it the
-  // sheet says "Tap your card to try again" and nothing is listening.
+  // After an error the reader is off; the sheet offers "Try again" only when given this.
   describe('retry', () => {
     it('opens the reader again after an error and runs the operation', async () => {
       const operation = jest
@@ -278,8 +276,7 @@ describe('useNFCOperation', () => {
       act(() => {
         connectPromise = capturedOnConnected?.();
       });
-      // Let SELECT resolve so the operation is actually entered (and its runId
-      // captured) before the cancel arrives.
+      // Let SELECT resolve, so the operation is entered before the cancel arrives.
       await act(async () => {});
       expect(resolveOp).not.toBeNull();
       await act(async () => {
@@ -293,8 +290,7 @@ describe('useNFCOperation', () => {
     });
   });
 
-  // T3: retryOnTagLoss defaults to false — a tag loss must not silently
-  // replay an operation that never opted in.
+  // retryOnTagLoss defaults to false.
   describe('retryOnTagLoss option', () => {
     const TAG_LOST = 'CardIO Error: Error: Tag was lost.';
 

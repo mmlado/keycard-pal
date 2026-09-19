@@ -3,20 +3,24 @@ import { Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardLayoutSettingsSection from '../src/components/settings/DashboardLayoutSettingsSection';
+import KeycardsInUseSettingsSection from '../src/components/settings/KeycardsInUseSettingsSection';
 import PinPadSettingsSection from '../src/components/settings/PinPadSettingsSection';
 import TokenImagesSettingsSection from '../src/components/settings/TokenImagesSettingsSection.online';
 import { usePreferences } from '../src/hooks/usePreferences';
 import useTokenImagesEnabled from '../src/hooks/useTokenImagesEnabled.online';
 import { PreferencesProvider } from '../src/providers/preferences/Provider';
+import SecretsMenuScreen from '../src/screens/secrets/SecretsMenuScreen';
+import UnselectedKeycardReminder from '../src/components/UnselectedKeycardReminder';
+import {
+  noteTappedGeneration,
+  resetLastTappedGeneration,
+} from '../src/utils/lastTappedGeneration';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-// Nothing between the settings rows and the bytes is mocked: the real
-// provider and the real storage module run against an in-memory
-// AsyncStorage, so this proves a toggle both lands in storage and reaches
-// every other consumer. (The package's own Jest mock is ESM-only.)
+// The real provider and storage module, over an in-memory AsyncStorage.
 jest.mock('@react-native-async-storage/async-storage', () => {
   const store = new Map<string, string>();
   return {
@@ -57,6 +61,38 @@ function Probe() {
       {`layout:${preferences.dashboardLayout} scramble:${preferences.pinPadScramble} images:${images}`}
     </Text>
   );
+}
+
+/** Its own line, so the existing assertions keep reading one string. */
+function GenerationProbe() {
+  const { preferences } = usePreferences();
+  return (
+    <Text>
+      {`in-use:${preferences.generationsInUse.join('+')} dismissed:${
+        preferences.generationRemindersDismissed.join('+') || 'none'
+      }`}
+    </Text>
+  );
+}
+
+/** The Settings checkboxes beside the menu and the reminder they act on. */
+async function renderKeycardsInUse() {
+  const view = render(
+    <PreferencesProvider>
+      <KeycardsInUseSettingsSection
+        onSetFromCard={jest.fn()}
+        readingCard={false}
+      />
+      <UnselectedKeycardReminder />
+      <SecretsMenuScreen
+        navigation={{ navigate: jest.fn() } as any}
+        route={{ key: 'SecretsMenu', name: 'SecretsMenu' } as any}
+      />
+      <GenerationProbe />
+    </PreferencesProvider>,
+  );
+  await act(async () => {});
+  return view;
 }
 
 async function renderSettings() {
@@ -170,8 +206,99 @@ describe('changing a setting', () => {
     expect(await AsyncStorage.getItem('preference_pinpad_scramble')).toBe('0');
   });
 
-  // What a restart sees: a fresh provider reads back exactly what the
-  // settings wrote.
+  describe('Keycards in use', () => {
+    beforeEach(() => {
+      resetLastTappedGeneration();
+    });
+
+    it('starts with every Keycard ticked and nothing left out', async () => {
+      await renderKeycardsInUse();
+      expect(screen.getByText('in-use:3.1+4.0 dismissed:none')).toBeTruthy();
+      expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
+    });
+
+    // A menu elsewhere drops the entry as soon as the user says so.
+    it('unticking 3.x stores it and hides the pairing secret entry', async () => {
+      await renderKeycardsInUse();
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await flush();
+
+      expect(screen.getByText('in-use:4.0 dismissed:none')).toBeTruthy();
+      expect(screen.queryByText('Change Pairing Secret')).toBeNull();
+      expect(screen.getByText('Change PIN')).toBeTruthy();
+      expect(await AsyncStorage.getItem('preference_generations_in_use')).toBe(
+        '4.0',
+      );
+    });
+
+    it('the reminder ticks the tapped generation back on', async () => {
+      await renderKeycardsInUse();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await flush();
+
+      await act(async () => {
+        noteTappedGeneration('3.1');
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('unselected-keycard-reminder-use'));
+      });
+      await flush();
+
+      expect(screen.getByText('in-use:3.1+4.0 dismissed:none')).toBeTruthy();
+      expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
+      expect(screen.queryByTestId('unselected-keycard-reminder')).toBeNull();
+      expect(await AsyncStorage.getItem('preference_generations_in_use')).toBe(
+        '3.1,4.0',
+      );
+    });
+
+    it('closing the reminder is remembered and changes no selection', async () => {
+      await renderKeycardsInUse();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await act(async () => {
+        noteTappedGeneration('3.1');
+      });
+      await act(async () => {
+        fireEvent.press(
+          screen.getByTestId('unselected-keycard-reminder-close'),
+        );
+      });
+      await flush();
+
+      expect(screen.getByText('in-use:4.0 dismissed:3.1')).toBeTruthy();
+      expect(screen.queryByTestId('unselected-keycard-reminder')).toBeNull();
+      expect(
+        await AsyncStorage.getItem('preference_generation_reminders_dismissed'),
+      ).toBe('3.1');
+    });
+
+    it('survives a remount, so the next launch reads the same selection', async () => {
+      const first = await renderKeycardsInUse();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('keycards-in-use-3.1'));
+      });
+      await flush();
+      first.unmount();
+
+      render(
+        <PreferencesProvider>
+          <GenerationProbe />
+        </PreferencesProvider>,
+      );
+      await flush();
+
+      expect(screen.getByText('in-use:4.0 dismissed:none')).toBeTruthy();
+    });
+  });
+
+  // A fresh provider reads back what the settings wrote.
   it('survives a remount, so the next launch reads the same values', async () => {
     const first = await renderSettings();
     await act(async () => {

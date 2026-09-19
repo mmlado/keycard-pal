@@ -9,6 +9,8 @@ import {
   KEYCARD_PURCHASE_URL,
 } from '../src/constants/keycard';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -42,14 +44,12 @@ jest.mock('../src/assets/icons', () => {
 const mockSetPreference = jest.fn().mockResolvedValue(undefined);
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
-    preferences: { welcomeSeen: false },
+    preferences: mockTestPreferences({ welcomeSeen: false }),
     setPreference: (...args: any[]) => mockSetPreference(...args),
   }),
 }));
 
-// The buy button goes through useBuyKeycard: live network state decides
-// between browser and QR code, and the offline build's stub always reports
-// disconnected.
+// useBuyKeycard picks browser or QR code from the network state.
 let mockConnected = true;
 jest.mock('../src/utils/connectivity.online', () => ({
   getNetworkConnected: () => mockConnected,
@@ -81,8 +81,7 @@ describe('WelcomeScreen', () => {
     mockNavigate.mockClear();
     mockReplace.mockClear();
     mockConnected = true;
-    // The RN jest preset already mocks Linking.openURL, so spyOn returns that
-    // shared mock; clear it to keep call history per-test.
+    // The preset's Linking.openURL mock is shared: clear it per test.
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     (Linking.openURL as jest.Mock).mockClear();
   });

@@ -5,6 +5,8 @@ module.exports = {
     customExportConditions: ['require', 'node', 'node-addons'],
   },
   testPathIgnorePatterns: ['/node_modules/', '/android/', '/ios/', 'testUtils\\.ts$'],
+  // Test helpers are not product code.
+  coveragePathIgnorePatterns: ['/node_modules/', '/__tests__/'],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation|@noble/(secp256k1|hashes|curves)|@scure/(bip32|bip39|base)|keycard-sdk)/)',
   ],

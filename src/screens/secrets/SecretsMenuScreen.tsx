@@ -1,13 +1,10 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Icons } from '../../assets/icons';
-import {
-  DashboardAction,
-  SecretsMenuScreenProps,
-} from '../../navigation/types';
-import theme from '../../theme';
+import { Icons } from '@/assets/icons';
+import { DashboardAction, SecretsMenuScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import EntryList from '../../components/EntryList';
+import EntryList, { EntryListItem } from '@/components/EntryList';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Secrets',
@@ -18,7 +15,7 @@ export const dashboardEntry: DashboardAction = {
 export default function SecretsMenuScreen({
   navigation,
 }: SecretsMenuScreenProps) {
-  const entries = [
+  const entries: EntryListItem[] = [
     {
       label: 'Change PIN',
       icon: Icons.pin,
@@ -32,6 +29,9 @@ export default function SecretsMenuScreen({
     {
       label: 'Change Pairing Secret',
       icon: Icons.pairingSecret,
+      // Unlike PIN and PUK, this one reads the card as soon as it opens.
+      requiresNfc: true,
+      generationBoundRoute: 'ChangePairingSecret',
       onPress: () =>
         navigation.navigate('ChangeSecret', { secretType: 'pairing' }),
     },
