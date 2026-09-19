@@ -258,7 +258,9 @@ export default function useNFCSession(
         console.log('[Keycard] Tag lost mid-operation (no retry)');
         setStatus(AMBIGUOUS_LOSS_STATUS);
         setPhase('error');
-        RNKeycard.Core.stopNFC(AMBIGUOUS_LOSS_STATUS, true).catch(logStopFailure);
+        RNKeycard.Core.stopNFC(AMBIGUOUS_LOSS_STATUS, true).catch(
+          logStopFailure,
+        );
         return;
       }
       outcome = 'error';
