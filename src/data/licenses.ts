@@ -1,5 +1,7 @@
 import { APP_NAME } from '@/constants/app';
 
+import { onlineLicenses } from './onlineLicenses.online';
+
 export type LicenseEntry = {
   package: string;
   licenseType: string;
@@ -406,8 +408,7 @@ export const LICENSE_TEXTS: Record<string, string> = {
 // Keycard Pal own license + all 3rd-party packages
 // ---------------------------------------------------------------------------
 
-export const licenses: LicenseEntry[] = [
-  { package: APP_NAME, licenseType: 'MIT' },
+const bundled: LicenseEntry[] = [
   { package: '@ethereumjs/rlp', licenseType: 'MPL-2.0' },
   { package: '@keystonehq/bc-ur-registry', licenseType: 'Apache-2.0' },
   { package: '@keystonehq/bc-ur-registry-eth', licenseType: 'ISC' },
@@ -438,4 +439,11 @@ export const licenses: LicenseEntry[] = [
   { package: 'react-native-svg', licenseType: 'MIT' },
   { package: 'react-native-vector-icons', licenseType: 'MIT' },
   { package: 'viem', licenseType: 'MIT' },
+];
+
+export const licenses: LicenseEntry[] = [
+  { package: APP_NAME, licenseType: 'MIT' },
+  ...[...bundled, ...onlineLicenses].sort((a, b) =>
+    a.package < b.package ? -1 : 1,
+  ),
 ];
