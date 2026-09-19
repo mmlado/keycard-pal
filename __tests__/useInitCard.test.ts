@@ -378,6 +378,27 @@ describe('useInitCard', () => {
       });
     });
 
+    it('keeps no approval for a card that reports no card key', async () => {
+      mockCmdSet.applicationInfo = v4Select(0x0400, {
+        status: 0x00,
+        certificate: null,
+      });
+      const { result } = await startAndTap();
+      expect(result.current.phase).toBe('done');
+      expect(mockApproveCardKey).not.toHaveBeenCalled();
+    });
+
+    it('approving with no card waiting only opens the reader again', async () => {
+      const { result } = renderHook(() => useInitCard());
+      mockStartNFC.mockClear();
+      await act(async () => {
+        result.current.proceedWithNonGenuine();
+      });
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+      await tapAgain();
+      expect(lastWhitelist()).toEqual([]);
+    });
+
     describe('signed by an unknown CA', () => {
       beforeEach(() => {
         mockSelect.mockRejectedValue(new Error(UNKNOWN_CA));

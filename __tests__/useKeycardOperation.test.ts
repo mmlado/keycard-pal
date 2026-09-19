@@ -500,6 +500,19 @@ describe('useKeycardOperation', () => {
       expect(mockCheckGenuine).not.toHaveBeenCalled();
     });
 
+    it('approving with no card waiting only opens the reader again', async () => {
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: false });
+      });
+      mockStartNFC.mockClear();
+      await act(async () => {
+        result.current.proceedWithNonGenuine();
+      });
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+      expect(result.current.phase).toBe('nfc');
+    });
+
     it('cancel in genuine_warning returns to idle', async () => {
       mockCheckGenuine.mockResolvedValue(false);
       const { result } = renderHook(() => useKeycardOperation<string>());

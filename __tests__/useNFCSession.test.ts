@@ -596,6 +596,24 @@ describe('useNFCSession', () => {
       });
     });
 
+    // On iOS a stop that never lands leaves Apple's sheet up, which reads as a hung card.
+    it('logs a stop that fails instead of swallowing it', async () => {
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const failure = new Error('stop refused');
+      mockStopNFC.mockRejectedValueOnce(failure);
+      const { result } = makeHook();
+      mockOnCardConnected.mockResolvedValue(undefined);
+      await act(async () => {
+        result.current.startNFC();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(log).toHaveBeenCalledWith('[Keycard] stopNFC failed:', failure);
+      log.mockRestore();
+    });
+
     it('ignores card connected when phase is done', async () => {
       const { result } = makeHook();
       mockOnCardConnected.mockResolvedValue(undefined);
