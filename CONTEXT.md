@@ -113,12 +113,20 @@ _Avoid_: Card profile, saved wallet
 - Address-match and default-name features (fingerprint default) must work **session-local** — derived during the active tap, not read from a persisted store.
 
 **Applet version**:
-The raw version number reported by the Keycard in its SELECT response, such as `0x0400`. A fact about the card, readable before any secure channel, pairing or PIN. Never shown to the user.
+The version number reported by the Keycard in its SELECT response, such as `0x0400`, shown to the user as major.minor (4.0). A fact about the card, readable before any secure channel, pairing or PIN. An uninitialized 3.x card reports none.
 _Avoid_: Card version, firmware version
 
 **Generation**:
 An ordered, named point at which the feature surface Pal cares about changes, expressed as a minimum **Applet version**. Two exist today: 3.1+ and 4.0+. A new applet release earns a generation only when it changes what the app can or cannot do, so releases and generations are not the same list.
 _Avoid_: Card version, applet family, feature boundary
+
+**Keycards in use**:
+The set of **Generations** the user has ticked in Settings as the cards they hold, every generation by default. A preference about the user's cards, never a fact about the tapped one. It leaves out menu entries that no ticked generation has, and the identify tap where every ticked generation has the operation, and does nothing else: it never refuses a card. A generation added by a later app version arrives unticked for a user who has saved a selection. Shown to the user by each generation's label, "Applet 3.x".
+_Avoid_: Minimum generation, minimum version, supported versions, card filter
+
+**Unselected Keycard reminder**:
+The dashboard card shown after a tap of a card whose **Generation** is not among the **Keycards in use**. It offers to tick that generation, or to stay quiet about it for good. The tapped generation is held in memory only, as a pending question.
+_Avoid_: Update prompt, new generation prompt
 
 **Secure channel version**:
 Which channel protocol a card speaks, V1 or V2. Derived from the **Applet version** today, but a separate attribute on purpose: a later applet could keep V2 while introducing a new **Generation**.
@@ -134,8 +142,8 @@ _Avoid_: Card public key, device key
 
 ## Generation relationships
 
-- A **Generation** is the unit the minimum-version floor, the Settings picker, and the version-bound menu entries are all expressed in. None of them are expressed in **Applet version** directly.
-- The floor refuses a card below the lowest **Generation**; the Settings picker only hides menu entries and never refuses a card.
+- A **Generation** is the unit the minimum-version floor, the **Keycards in use** selection, and the version-bound menu entries are all expressed in. None of them are expressed in **Applet version** directly.
+- The floor refuses a card below the lowest **Generation**; **Keycards in use** only leaves out menu entries and identify taps, and never refuses a card.
 - **Card key** is used for trust decisions. The key UID, not the **Card key**, identifies the key material on a card, so anything about derived keys is keyed on the key UID.
 - A card's **Generation** is knowable from the first SELECT of a tap, before any PIN, which is what lets an operation a card does not support fail before asking for anything.
 
