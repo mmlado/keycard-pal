@@ -2,8 +2,9 @@
 // Usage: node scripts/check-offline-apk.js --apk <path>
 //
 // Fails if an offline APK carries native code that only the full flavor should
-// link: WalletConnect's Android module and what it drags in (JNA and the
-// Yttrium uniffi bindings) plus NetInfo (#270). React Native autolinking is not
+// link: WalletConnect's Android module plus NetInfo (#270). JNA and the Yttrium
+// uniffi bindings came with newer WalletConnect releases than the pinned one
+// (ADR-0014); their markers stay as a tripwire. React Native autolinking is not
 // flavor-aware, so react-native.config.js keeps those packages out of it and
 // the full flavor links them by hand; this is the artifact-level check that
 // the arrangement still holds. Reads the APK's own zip directory, so it needs
