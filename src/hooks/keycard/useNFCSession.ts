@@ -37,6 +37,10 @@ const TAG_LOSS_WATCHDOG_MS = 6000;
 const IOS_TIMEOUT_RESTART_DELAY_MS = 500;
 const MAX_IOS_TIMEOUT_RESTARTS = 2;
 
+// A stop that never lands leaves Apple's sheet up until the 60 s cap.
+const logStopFailure = (e: unknown) =>
+  console.log('[Keycard] stopNFC failed:', e);
+
 export interface UseNFCSessionOptions {
   /** Runs instead of restarting the reader when NFC comes back on. */
   onNFCAvailable?: () => void;
@@ -128,7 +132,7 @@ export default function useNFCSession(
     // The last progress text ("Initializing...") must not sit under the check mark.
     setStatus(message ?? '');
     // The message words Apple's sheet; Android ignores it.
-    RNKeycard.Core.stopNFC(message).catch(() => {});
+    RNKeycard.Core.stopNFC(message).catch(logStopFailure);
   }, []);
 
   // Marked as a real error so a trailing disconnect event cannot overwrite the status.
@@ -137,7 +141,7 @@ export default function useNFCSession(
     realErrorRef.current = true;
     setStatus(STABILITY_ERROR_STATUS);
     setPhase('error');
-    RNKeycard.Core.stopNFC(STABILITY_ERROR_STATUS, true).catch(() => {});
+    RNKeycard.Core.stopNFC(STABILITY_ERROR_STATUS, true).catch(logStopFailure);
   }, [clearWatchdog]);
 
   // A tag loss while waiting keeps the session alive, within both bounds.
@@ -254,7 +258,7 @@ export default function useNFCSession(
         console.log('[Keycard] Tag lost mid-operation (no retry)');
         setStatus(AMBIGUOUS_LOSS_STATUS);
         setPhase('error');
-        RNKeycard.Core.stopNFC(AMBIGUOUS_LOSS_STATUS, true).catch(() => {});
+        RNKeycard.Core.stopNFC(AMBIGUOUS_LOSS_STATUS, true).catch(logStopFailure);
         return;
       }
       outcome = 'error';
@@ -263,7 +267,7 @@ export default function useNFCSession(
       console.log('[Keycard] Error:', e);
       setStatus(msg);
       setPhase('error');
-      RNKeycard.Core.stopNFC(msg, true).catch(() => {});
+      RNKeycard.Core.stopNFC(msg, true).catch(logStopFailure);
     } finally {
       inFlightRef.current = false;
       if (pendingConnectRef.current) {
@@ -358,7 +362,7 @@ export default function useNFCSession(
       timeoutSub.remove();
       clearWatchdog();
       clearIosRestartTimer();
-      RNKeycard.Core.stopNFC().catch(() => {});
+      RNKeycard.Core.stopNFC().catch(logStopFailure);
     };
   }, [
     handleCardConnected,
@@ -434,7 +438,7 @@ export default function useNFCSession(
     iosTimeoutRestartsRef.current = 0;
     clearWatchdog();
     clearIosRestartTimer();
-    RNKeycard.Core.stopNFC().catch(() => {});
+    RNKeycard.Core.stopNFC().catch(logStopFailure);
     setPhase('idle');
     setStatus('');
     setCardPresence('waiting');
