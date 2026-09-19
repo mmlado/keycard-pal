@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Support for Keycards with applet 4.0, alongside 3.x cards; a new "Keycards in use" setting leaves out the menu entries and extra taps that only one kind of card needs
+
+### Changed
+
+- A Keycard with an applet older than 3.1 is now refused with a message that names both versions
+
 ### Fixed
 
 - The success sheet now shows the outcome ("Card initialized") under its check mark instead of the last progress text ("Initializing...")
