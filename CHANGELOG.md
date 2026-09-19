@@ -13,9 +13,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - A Keycard with an applet older than 3.1 is now refused with a message that names both versions
+- WalletConnect moved back to its last Apache-2.0 releases (`@reown/walletkit` 1.2.10); newer ones ship under a non-free license
 
 ### Fixed
 
+- The About screen's license list now names the WalletConnect, NetInfo and text-encoding packages of the online build
 - The success sheet now shows the outcome ("Card initialized") under its check mark instead of the last progress text ("Initializing...")
 - Initializing a Keycard, or changing its PIN, PUK or pairing secret, no longer leaves the app on the finished screen under the success sheet instead of returning to the dashboard
 - A Keycard that slips off the phone before the app has read it is now waited for in every operation, instead of ending card initialization or a factory reset with a connection-lost error
