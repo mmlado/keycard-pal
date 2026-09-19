@@ -55,6 +55,13 @@ describe('installed react-native-keycard carries the tag-loss contract', () => {
     ).toContain('override fun stopNFC(message: String?, isError: Boolean?');
   });
 
+  // A TurboModule call must carry every argument, so a bare native stopNFC(msg) throws.
+  it('built lib always sends both arguments to the native stopNFC', () => {
+    expect(read('lib/module/index.js')).toContain(
+      'Keycard.stopNFC(message, isError)',
+    );
+  });
+
   it('built lib wraps APDUResponse construction inside the try', () => {
     // Metro bundles lib/module, and lib/ is what went stale before.
     const lib = read('lib/module/CardChannel.js');
