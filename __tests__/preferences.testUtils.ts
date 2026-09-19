@@ -1,18 +1,9 @@
 import type { Preferences } from '../src/storage/preferencesStorage';
 
 /**
- * A complete `Preferences` record for tests that mock `usePreferences`. Not a
- * test suite: jest.config.js ignores *testUtils.ts.
- *
- * A mock that lists only the preferences its own test cares about breaks the
- * day the component under it starts reading another one, and it breaks at
- * runtime with a TypeError about `undefined`, far from the cause. Spreading
- * these defaults under the overrides keeps such a mock whole. It is typed, so
- * adding a preference fails the type check here until it has a default, and
- * preferencesStorage.test.ts holds it equal to the real DEFAULT_PREFERENCES.
- *
- * The storage module is imported for its type only, which is erased, so using
- * this never pulls AsyncStorage into a screen test.
+ * A complete `Preferences` record for tests that mock `usePreferences`, so a partial mock cannot
+ * break when a component reads another preference. Typed, and held equal to DEFAULT_PREFERENCES
+ * by preferencesStorage.test.ts. Not a suite: jest ignores *testUtils.ts.
  */
 const DEFAULTS: Preferences = {
   dashboardLayout: 'tiles',

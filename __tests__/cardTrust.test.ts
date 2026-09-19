@@ -1,12 +1,12 @@
 import { KEYCARD_CA_PUBLIC_KEY } from '../src/constants/keycard';
+
 import {
   isUnknownCaError,
   TRUSTED_CA_PUBLIC_KEYS,
 } from '../src/utils/cardTrust';
 
 describe('TRUSTED_CA_PUBLIC_KEYS', () => {
-  // One CA, the same one keycard-shell ships. A development card signed by
-  // anything else is meant to fail the check and go through the override.
+  // One CA, the one keycard-shell ships.
   it('is exactly the Keycard CA', () => {
     expect(TRUSTED_CA_PUBLIC_KEYS).toEqual([KEYCARD_CA_PUBLIC_KEY]);
   });
@@ -18,9 +18,7 @@ describe('TRUSTED_CA_PUBLIC_KEYS', () => {
 });
 
 describe('isUnknownCaError', () => {
-  // The literal keycard-sdk 4.0.0 throws from setCardCertificate, inside
-  // select(). It belongs to upstream: if this test has to change, check the
-  // installed SDK first, because a mismatch leaves no way to approve a card.
+  // Upstream's literal. If this changes, check the installed SDK first.
   const SDK_MESSAGE =
     'Card certificate verification failed: unknown CA public key and card not whitelisted';
 
@@ -40,8 +38,7 @@ describe('isUnknownCaError', () => {
     expect(source).toContain(SDK_MESSAGE);
   });
 
-  // The handshake failing is a different thing entirely: the card could not
-  // prove it holds the key. That must never offer an "approve anyway".
+  // A failed handshake must never offer "approve anyway".
   it.each([
     'Card authentication failed: invalid signature',
     'OPEN SECURE CHANNEL failed',

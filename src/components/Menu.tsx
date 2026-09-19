@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { IconComponent, Icons } from '../assets/icons';
-import theme from '../theme';
+import { IconComponent, Icons } from '@/assets/icons';
+import theme from '@/theme';
 
 export type Entry = {
   label: string;
@@ -13,11 +13,7 @@ export type Entry = {
 
 type ListProps = {
   entries: Entry[];
-  /**
-   * Added to the testIDs of each row's icon and NFC indicator. A grouped
-   * screen renders several lists, and without this their ids would restart at
-   * 0 and collide. A row itself carries no testID; reach it by its label.
-   */
+  /** Offsets the icon and NFC testIDs, so several lists on one screen do not collide. */
   indexOffset?: number;
 };
 
@@ -79,10 +75,7 @@ export function MenuList({ entries, indexOffset = 0 }: ListProps) {
   );
 }
 
-/**
- * A self-scrolling single list. Menu screens go through EntryList instead;
- * this remains for screens that are not navigation menus (PairingSlotsScreen).
- */
+/** A self-scrolling list, for screens that are not navigation menus. Menus use EntryList. */
 export default function Menu({ entries }: { entries: Entry[] }) {
   return (
     <ScrollView

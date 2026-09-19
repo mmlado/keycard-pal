@@ -20,10 +20,7 @@ import {
 // Mocks
 // ---------------------------------------------------------------------------
 
-// Nothing between the settings rows and the bytes is mocked: the real
-// provider and the real storage module run against an in-memory
-// AsyncStorage, so this proves a toggle both lands in storage and reaches
-// every other consumer. (The package's own Jest mock is ESM-only.)
+// The real provider and storage module, over an in-memory AsyncStorage.
 jest.mock('@react-native-async-storage/async-storage', () => {
   const store = new Map<string, string>();
   return {
@@ -78,10 +75,7 @@ function GenerationProbe() {
   );
 }
 
-/**
- * The Settings checkboxes beside the two things they act on: a menu that
- * leaves entries out, and the dashboard reminder.
- */
+/** The Settings checkboxes beside the menu and the reminder they act on. */
 async function renderKeycardsInUse() {
   const view = render(
     <PreferencesProvider>
@@ -223,8 +217,7 @@ describe('changing a setting', () => {
       expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
     });
 
-    // The whole point of the preference: a menu elsewhere in the tree drops
-    // what none of the user's cards has, the moment they say so.
+    // A menu elsewhere drops the entry as soon as the user says so.
     it('unticking 3.x stores it and hides the pairing secret entry', async () => {
       await renderKeycardsInUse();
 
@@ -305,8 +298,7 @@ describe('changing a setting', () => {
     });
   });
 
-  // What a restart sees: a fresh provider reads back exactly what the
-  // settings wrote.
+  // A fresh provider reads back what the settings wrote.
   it('survives a remount, so the next launch reads the same values', async () => {
     const first = await renderSettings();
     await act(async () => {

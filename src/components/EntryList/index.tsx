@@ -28,10 +28,7 @@ export type EntryListItem = {
   icon: IconComponent;
   /** Marks a row that starts an NFC flow, per the app's NFC icon rule. */
   requiresNfc?: boolean;
-  /**
-   * Set on an entry only some cards have. The entry is then dropped when none
-   * of the cards the user ticked in Settings is one of them.
-   */
+  /** Set on an entry only some cards have; dropped when no ticked generation has it. */
   generationBoundRoute?: GenerationBoundRoute;
   onPress: () => void;
 };
@@ -50,13 +47,7 @@ type Props = {
   footer?: React.ReactNode;
 };
 
-/**
- * Drops the entries none of the user's cards has, and any group that
- * leaves empty. This runs before anything else is derived from the groups:
- * testIDs are positional, the tile grid promotes its first entry on an odd
- * count, and the grouped flag counts groups, so a hidden entry has to look as
- * if it was never passed in.
- */
+/** Runs first: testIDs, the hero tile and the grouped flag are all derived from what is left. */
 function visibleGroups(
   groups: EntryListSection[],
   generationsInUse: Generation[],
@@ -76,14 +67,7 @@ function visibleGroups(
     );
 }
 
-/**
- * Renders a screen's destinations in whichever layout the user picked. Every
- * navigation menu goes through this rather than choosing a component itself,
- * so the setting cannot apply to some screens and not others.
- *
- * This owns the scroll container for both layouts, because a grouped screen
- * renders several lists or grids and they have to scroll as one.
- */
+/** Every navigation menu renders through this, so the layout setting applies everywhere. Owns the scroll container. */
 export default function EntryList({ entries, sections, footer }: Props) {
   const { preferences } = usePreferences();
   const { width } = useWindowDimensions();
@@ -95,8 +79,7 @@ export default function EntryList({ entries, sections, footer }: Props) {
   const list = preferences.dashboardLayout === 'list';
   const grouped = groups.length > 1;
 
-  // A tile group's heading has to line up with the tiles, whose margin varies
-  // by screen width; a list group's card is already inset by the padding.
+  // A tile group's heading lines up with the tiles, whose margin varies by width.
   const titleInset = list ? undefined : gridMetrics(width).margin;
 
   let offset = 0;

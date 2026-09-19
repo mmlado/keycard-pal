@@ -15,8 +15,7 @@ import {
 describe('isTagLostError', () => {
   describe('tag-lost messages (true)', () => {
     it.each([
-      // Real Android wire shape: PromiseImpl sets name to the Java class, so the
-      // CardIOError wrapper stringifies the class name into the message.
+      // The real Android shape: the Java class name ends up in the message.
       'CardIO Error: android.nfc.TagLostException: Tag was lost.',
       'CardIO Error: Error: Tag was lost.',
       'Tag was lost.',
@@ -74,8 +73,7 @@ describe('isTagLostError', () => {
 });
 
 describe('cardErrorMessage', () => {
-  // keycard-sdk 4.0.0's own words. If one of these has to change, check the
-  // installed SDK first.
+  // Upstream's literals. If one changes, check the installed SDK first.
   const SDK_LITERALS = [
     'Card authentication failed: invalid signature',
     'OPEN SECURE CHANNEL failed',

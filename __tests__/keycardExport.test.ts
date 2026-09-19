@@ -141,9 +141,7 @@ describe('exportKeysForTarget', () => {
     expect(cmdSet.exportExtendedKey).not.toHaveBeenCalled();
   });
 
-  // Resume after a mid-export tag loss: keys already fetched are reused, the
-  // session-level reads are skipped, and the cache is bound to one seed (the
-  // key UID), not to one card.
+  // Resume after a tag loss: fetched keys are reused, bound to the key UID.
   describe('resume cache', () => {
     const PLAN = [
       { derivationPath: "m/84'/0'/0'", parentPath: "m/84'/0'" },
@@ -203,8 +201,7 @@ describe('exportKeysForTarget', () => {
 
       const other = withKeyUid(makeCmdSet(PARENTS), [0xcc, 0xdd]);
       await exportKeysForTarget(other, PLAN, () => {}, cache);
-      // Everything re-fetched: cached keys from seed A must never merge into
-      // seed B's export.
+      // Keys of seed A never merge into seed B's export.
       expect(other.exportKey).toHaveBeenCalledWith(0, true, 'm', false);
       expect(other.exportExtendedKey).toHaveBeenCalledTimes(2);
     });
@@ -224,9 +221,7 @@ describe('exportKeysForTarget', () => {
       expect(anonymous.exportExtendedKey).toHaveBeenCalledTimes(2);
     });
 
-    // The bug the key UID fixes: a factory reset that loads a different seed
-    // keeps the instance UID, so a card-keyed cache would hand back the old
-    // seed's keys.
+    // A factory reset with a new seed keeps the instance UID; the key UID changes.
     it('discards the cache when the same card now holds a different seed', async () => {
       const cache = makeExportResumeCache();
       const before = withKeyUid(makeCmdSet(PARENTS), [0xaa], [0x07]);

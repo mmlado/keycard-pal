@@ -87,8 +87,7 @@ describe('EntryList', () => {
     });
   });
 
-  // Groups let a screen carry a heading per set, in either layout. Ids have to
-  // stay unique across groups or a query would match more than one element.
+  // Ids stay unique across groups.
   describe('sections', () => {
     const sections = [
       { title: 'BIP39', entries: [entry('Generate'), entry('Import')] },
@@ -140,10 +139,7 @@ describe('EntryList', () => {
     });
   });
 
-  // The cards the user ticked are a preference, not the tapped card, so this
-  // only decides what is drawn. A hidden entry has to look as if it was never
-  // passed in, because ids, the hero tile and the grouped flag all come from
-  // what is left.
+  // A hidden entry must look as if it was never passed in.
   describe('generation-bound entries', () => {
     it('shows them while every card is ticked', () => {
       render(<EntryList entries={[entry('One'), legacyEntry('Legacy')]} />);
@@ -176,8 +172,7 @@ describe('EntryList', () => {
       expect(screen.queryByTestId('menu-icon-2')).toBeNull();
     });
 
-    // Three entries promote the first to a hero tile; hiding one leaves an
-    // even count, so the grid must lay out as two plain tiles.
+    // Hiding one of three leaves an even count: two plain tiles.
     it('lays the tiles out for the count that is left', () => {
       mockGenerationsInUse = ['4.0'];
       render(

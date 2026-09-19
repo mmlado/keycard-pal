@@ -34,8 +34,7 @@ describe('loadApprovedCardKeys', () => {
     expect(await loadApprovedCardKeys()).toEqual([KEY_A, KEY_B]);
   });
 
-  // The coordinator reads this during a tap. After the first read it has to
-  // be a lookup in memory, so it adds nothing to the time on the antenna.
+  // Read during a tap, so after the first read it must come from memory.
   it('goes to storage once, then answers from memory', async () => {
     mockGetItem.mockResolvedValue(JSON.stringify([KEY_A]));
     await loadApprovedCardKeys();
@@ -43,8 +42,7 @@ describe('loadApprovedCardKeys', () => {
     expect(mockGetItem).toHaveBeenCalledTimes(1);
   });
 
-  // Unreadable storage must approve nothing: the user is asked again, which
-  // is the safe direction for a trust decision.
+  // Unreadable storage approves nothing.
   it.each([
     [
       'storage that throws',
@@ -85,8 +83,7 @@ describe('approveCardKey', () => {
     expect(mockSetItem).not.toHaveBeenCalled();
   });
 
-  // A failed write must not leave the memory copy claiming the approval was
-  // kept: the next launch would not have it, and the two would disagree.
+  // A failed write must not stay approved in memory.
   it('rejects, and remembers nothing, when storage fails', async () => {
     mockSetItem.mockRejectedValue(new Error('storage full'));
     await expect(approveCardKey(KEY_A)).rejects.toThrow('storage full');

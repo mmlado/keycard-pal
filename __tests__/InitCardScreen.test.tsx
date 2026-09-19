@@ -24,8 +24,7 @@ const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
 >;
 
-// useFocusEffect is used only to register the hardware-back handler.
-// In tests there's no focus management so we make it a no-op.
+// useFocusEffect only registers the hardware-back handler; a no-op here.
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));

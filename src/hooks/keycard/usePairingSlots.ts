@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { cardHasRoute } from '@/navigation/generationBoundRoutes';
+
 import { loadPairing } from '@/storage/pairingStorage';
 import { cardGeneration } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
@@ -26,10 +27,7 @@ export interface UsePairingSlots {
   phase: NFCSessionPhase;
   cardPresence: CardPresence;
   slotInfo: SlotInfo | null;
-  /**
-   * True once a tap has shown a card that has no pairing slots at all. The
-   * read still ends in 'done': nothing failed, there is just nothing to list.
-   */
+  /** A tap showed a card without pairing slots. The read still ends in 'done'. */
   noPairingSlots: boolean;
   status: string;
   checkSlots: () => void;
@@ -48,8 +46,7 @@ export function usePairingSlots(): UsePairingSlots {
     if (!appInfo) {
       throw new Error(UNREADABLE_CARD_STATUS);
     }
-    // Before the card key: a card without pairing reports no free slot count
-    // and must not be mistaken for one that is merely not initialized.
+    // Before the card key, so such a card is not mistaken for an uninitialized one.
     if (!cardHasRoute('PairingSlots', cardGeneration(appInfo))) {
       setNoPairingSlots(true);
       setSlotInfo(null);
@@ -108,8 +105,7 @@ export function usePairingSlots(): UsePairingSlots {
     nfcReset();
   }, [nfcReset]);
 
-  // Re-reads slot info from an already-connected cmdSet (e.g. after unpair).
-  // Calls SELECT to get fresh applicationInfo before reading.
+  // Re-reads after unpair, in the same connection. SELECT refreshes applicationInfo.
   const readSlotInfoFromCmdSet = useCallback(
     async (cmdSet: Commandset) => {
       const selectResp = await cmdSet.select();

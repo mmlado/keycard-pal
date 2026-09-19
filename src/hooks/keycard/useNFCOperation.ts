@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
+
 import useNFCSession, {
   CardPresence,
   NFCSessionPhase,
@@ -18,13 +19,7 @@ export interface UseNFCOperation<T> {
   cardPresence: CardPresence;
   result: T | null;
   start: () => void;
-  /**
-   * Opens the reader again after an error, for the NFC sheet's "Try again".
-   * After an error the reader is off, so tapping the card alone does nothing.
-   * Same as `start`: a caller keeps its inputs in refs until the operation has
-   * succeeded, and checks the card's state when it connects, so running again
-   * after a lost connection corrects itself.
-   */
+  /** Same as `start`, for the sheet's "Try again": after an error the reader is off. */
   retry: () => void;
   cancel: () => void;
   reset: () => void;

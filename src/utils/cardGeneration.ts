@@ -1,21 +1,10 @@
 /* eslint-disable no-bitwise */
 import type { ApplicationInfo } from 'keycard-sdk/dist/application-info';
 
-/**
- * A point at which the feature surface Keycard Pal cares about changes, named
- * after the lowest applet version it starts at. Releases and generations are
- * not the same list: a release only earns a generation when it changes what
- * the app can do.
- */
+/** A point where what the app can do with a card changes. Not every applet release is one. */
 export type Generation = '3.1' | '4.0';
 
-/**
- * Every generation, oldest first. The first one is the floor.
- *
- * `label` is how the generation is named to the user. It is written by hand
- * rather than derived from the version: a generation can start mid-major, where
- * a computed "4.x" would name two of them.
- */
+/** Oldest first; the first is the floor. `label` is hand-written: a generation can start mid-major. */
 export const GENERATIONS: readonly {
   generation: Generation;
   minAppletVersion: number;
@@ -25,11 +14,7 @@ export const GENERATIONS: readonly {
   { generation: '4.0', minAppletVersion: 0x0400, label: '4.x' },
 ];
 
-/**
- * The oldest applet Keycard Pal drives. Below it there is no IDENTIFY CARD, so
- * a card would otherwise work in a degraded, never-verified way; it is refused
- * instead, as keycard-shell does.
- */
+/** Below this there is no IDENTIFY CARD, so the card is refused, as keycard-shell does. */
 export const MIN_SUPPORTED_APPLET_VERSION = GENERATIONS[0].minAppletVersion;
 
 /** An applet version as major.minor, e.g. 0x0301 as "3.1". */
@@ -37,24 +22,12 @@ export function formatAppletVersion(version: number): string {
   return `${version >> 8}.${version & 0xff}`;
 }
 
-/**
- * The applet version from a SELECT response, or null when the card reported
- * none. An uninitialized 3.x card answers SELECT with a bare secure channel
- * key and no version, so the SDK leaves the field unset even though its type
- * says number.
- */
+/** Null when the card reported none: a blank 3.x card answers SELECT without a version. */
 export function appletVersion(appInfo: ApplicationInfo): number | null {
   return typeof appInfo.appVersion === 'number' ? appInfo.appVersion : null;
 }
 
-/**
- * The tapped card's generation, resolved from this tap's SELECT and never
- * stored. Null for a card below the floor.
- *
- * A card with no version is an uninitialized 3.x card (a 4.0 card reports its
- * version even when blank), so it takes the 3.x path and is not refused until
- * it has been initialized and reports one, matching keycard-shell.
- */
+/** Derived per tap, never stored. Null below the floor. No version means a blank 3.x card. */
 export function cardGeneration(appInfo: ApplicationInfo): Generation | null {
   const version = appletVersion(appInfo);
   if (version === null) {
@@ -97,25 +70,15 @@ export const ALL_GENERATIONS: readonly Generation[] = GENERATIONS.map(
   entry => entry.generation,
 );
 
-/**
- * A stored list of generations, as the known ones among its comma-separated
- * parts, in table order and without repeats. Anything else in it is dropped:
- * a name this version does not know cannot be shown or acted on.
- */
+/** The known generations in a stored comma list, in table order, without repeats. */
 export function parseGenerations(stored: unknown): Generation[] {
   const parts = typeof stored === 'string' ? stored.split(',') : [];
   return ALL_GENERATIONS.filter(generation => parts.includes(generation));
 }
 
 /**
- * The generations the user ticked as the cards they hold, from storage.
- *
- * Nothing usable stored means all of them. That is the fresh install, and it
- * is also the only safe reading of a value nobody recognises: leaving entries
- * out on the strength of a corrupt preference could hide what the user then
- * has no way to reach. A saved selection is kept as it is, so a generation
- * added by a later version arrives unticked: most users will not own the new
- * card when it ships, and tapping one is what asks them.
+ * Nothing usable stored means all: a corrupt value must not hide anything. A saved selection is
+ * kept as it is, so a generation added later arrives unticked.
  */
 export function parseGenerationsInUse(stored: unknown): Generation[] {
   const known = parseGenerations(stored);
@@ -126,22 +89,13 @@ export function serializeGenerations(generations: Generation[]): string {
   return generations.join(',');
 }
 
-/**
- * Which secure channel protocol a card speaks. Derived from the applet version
- * today, but deliberately a separate attribute from the generation: a later
- * applet could keep V2 while starting a new generation, so anything that
- * depends on the channel asks this, never the generation.
- */
+/** A separate axis from the generation on purpose: a later applet could keep V2. */
 export type SecureChannelVersion = 'v1' | 'v2';
 
-/** The first applet to speak V2, by the same rule the SDK uses to pick its
- *  channel, so Pal and the SDK always agree on which one was opened. */
+/** The same threshold the SDK uses to pick its channel. */
 const SECURE_CHANNEL_V2_MIN_APPLET_VERSION = 0x0400;
 
-/**
- * The secure channel the tapped card speaks. A card that reports no version is
- * an uninitialized 3.x card, which speaks V1.
- */
+/** A card that reports no version is a blank 3.x card, which speaks V1. */
 export function secureChannelVersion(
   appInfo: ApplicationInfo,
 ): SecureChannelVersion {

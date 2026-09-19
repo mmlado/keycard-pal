@@ -128,8 +128,7 @@ const mockNavigate = jest.fn();
 
 const navigation = {
   goBack: jest.fn(),
-  // The screen tears its NFC session down on beforeRemove, now that the real
-  // back button can leave it mid-session.
+  // Both sessions are torn down on beforeRemove.
   addListener: jest.fn(() => jest.fn()),
   setOptions: jest.fn(),
   navigate: mockNavigate,
@@ -301,8 +300,7 @@ describe('PairingSlotsScreen', () => {
       expect(mockExecute).toHaveBeenCalled();
     });
 
-    // The slots were read from one card and the unpair tap can land on
-    // another, so the operation itself says which cards it exists on.
+    // The unpair tap can land on another card.
     it('binds the unpair tap to cards that have pairing slots', async () => {
       renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 3'));
@@ -362,8 +360,7 @@ describe('PairingSlotsScreen', () => {
     });
   });
 
-  // This screen taps as part of its own flow, so it finds out about the card
-  // on the one tap it already has and explains, rather than drawing slots.
+  // The one tap it already has explains a card without slots.
   describe('a card without pairing slots', () => {
     const absence = routeAbsence('PairingSlots');
 
@@ -394,8 +391,7 @@ describe('PairingSlotsScreen', () => {
       ).toBeNull();
     });
 
-    // slotInfo stays empty for good on such a card. Without this the focus
-    // effect would open the reader again every time the read finished.
+    // slotInfo stays empty on such a card; the focus effect must not reopen the reader.
     it('does not start another read on focus', () => {
       mockUsePairingSlots.mockReturnValue(makeCheckHook('idle', null, true));
       mockUseKeycardOperation.mockReturnValue(makeUnpairHook('idle'));
@@ -431,9 +427,7 @@ describe('PairingSlotsScreen', () => {
       expect(mockUnpairCancel).not.toHaveBeenCalled();
     });
 
-    // The PIN pad no longer covers the navigator header, so the real back
-    // button and the iOS swipe-back gesture can leave the screen mid-session.
-    // Both readers have to be torn down on the way out.
+    // Back can leave mid-session: both readers are torn down.
     it('cancels both sessions when the screen is removed', () => {
       renderScreen('nfc');
       const beforeRemove = navigation.addListener.mock.calls.find(
@@ -524,8 +518,7 @@ describe('PairingSlotsScreen', () => {
     });
   });
 
-  // T11: the screen hand-builds its NFCOperation object, so cardPresence must
-  // be threaded through explicitly or the sheet never sees a loss.
+  // The screen hand-builds its NFCOperation, so cardPresence is threaded explicitly.
   describe('cardPresence threading', () => {
     it('passes the check hook presence into the sheet object', () => {
       renderScreen('nfc');

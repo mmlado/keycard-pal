@@ -1,11 +1,7 @@
 /* eslint-disable no-bitwise */
 import { ApplicationInfo } from 'keycard-sdk/dist/application-info';
 
-/**
- * SELECT responses built as the bytes a card sends and parsed by the real SDK,
- * so tests exercise what an actual card returns rather than a hand-made
- * ApplicationInfo. Not a test suite: jest.config.js ignores *testUtils.ts.
- */
+/** SELECT responses as card bytes, parsed by the real SDK. Not a suite: jest ignores *testUtils.ts. */
 
 function berLength(length: number): number[] {
   if (length < 0x80) {
@@ -29,8 +25,7 @@ function versionBytes(version: number): number[] {
   return [version >> 8, version & 0xff];
 }
 
-/** An initialized 3.x card: instance UID, secure channel key, version, free
- *  pairing slots, key UID, capabilities. */
+/** An initialized 3.x card. */
 export function v3Select(
   version: number,
   options: { instanceUID?: number[]; keyUID?: number[] } = {},
@@ -46,10 +41,7 @@ export function v3Select(
   return new ApplicationInfo(new Uint8Array(tlv(0xa4, body)));
 }
 
-/** A 4.0 card: version, status, key UID, capabilities, certificate. No
- *  instance UID, no secure channel key, no pairing slots. Pass
- *  `certificate: null` for a card that carries none, as a self-flashed
- *  development card may. */
+/** A 4.0 card: no instance UID, channel key or pairing slots. `certificate: null` leaves it out. */
 export function v4Select(
   version: number,
   options: {

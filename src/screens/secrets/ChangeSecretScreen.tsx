@@ -71,14 +71,8 @@ export default function ChangeSecretScreen({
   const keycard = useChangeSecret(secretType);
   const { phase } = keycard;
 
-  // Newer cards have no pairing secret, and the menu cannot know the card. So
-  // this one secret is identify-then-operate (ADR-0012): a first tap that only
-  // reads the card, then the input, then the tap that changes it. Nothing is
-  // asked of the user for a change the card cannot make.
-  //
-  // A user who ticked only cards that have a pairing secret skips the first
-  // tap. If they tap another card anyway, `requiresRoute` on the operation
-  // still stops it right after SELECT.
+  // The pairing secret is identify-then-operate (ADR-0012). The first tap is skipped when every
+  // ticked card has one; `requiresRoute` still guards the operating tap.
   const { preferences } = usePreferences();
   const needsIdentify =
     secretType === 'pairing' &&
@@ -96,9 +90,7 @@ export default function ChangeSecretScreen({
     !cardHasRoute('ChangePairingSecret', generation);
   const absence = routeAbsence('ChangePairingSecret');
 
-  // Once per mount, and not on focus: dismissing Apple's NFC sheet returns the
-  // session to 'idle', and restarting on that would put the sheet straight
-  // back up. The button below is the way forward from there.
+  // Once per mount, not on focus: dismissing Apple's sheet returns to 'idle' and would reopen it.
   const identifyStartedRef = useRef(false);
   useEffect(() => {
     if (!needsIdentify || identifyStartedRef.current) {
@@ -123,9 +115,7 @@ export default function ChangeSecretScreen({
   const stepTitle =
     entry.step === 'entry' ? config.entryTitle : config.confirmTitle;
 
-  // `keycard` stays the change itself, so only the second tap can end the
-  // screen with the toast. The identify tap borrows the guard, the title and
-  // the sheet while it runs.
+  // `keycard` stays the change, so only the second tap ends the screen.
   const activeKeycard = identifying ? identify : keycard;
 
   const { onCancel } = useKeycardScreen({

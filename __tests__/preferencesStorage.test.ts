@@ -55,8 +55,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('loadPreferences', () => {
-  // One read for every preference is the point: nothing else reads storage
-  // after startup, so the whole set has to come from this call.
+  // One read for every preference.
   it('reads every key in one round trip', async () => {
     await loadPreferences();
     expect(mockGetMany).toHaveBeenCalledTimes(1);
@@ -102,8 +101,7 @@ describe('loadPreferences', () => {
     expect((await loadPreferences()).dashboardLayout).toBe('tiles');
   });
 
-  // A selection nobody recognises must leave nothing out: it could otherwise
-  // hide entries the user then has no way to reach.
+  // An unrecognised selection leaves nothing out.
   it.each(['5.0', '3.0', 'any', 'undefined', ''])(
     'reads an unrecognised selection %p as every generation',
     async value => {
@@ -115,8 +113,7 @@ describe('loadPreferences', () => {
     },
   );
 
-  // A saved selection is kept as it is, so a generation a later version adds
-  // arrives unticked: most users will not own the new card when it ships.
+  // A saved selection is kept, so a generation added later arrives unticked.
   it('keeps a saved selection narrower than the table', async () => {
     stored({ [KEYS.generationsInUse]: '3.1' });
     expect((await loadPreferences()).generationsInUse).toEqual(['3.1']);
@@ -133,8 +130,7 @@ describe('loadPreferences', () => {
     expect((await loadPreferences()).generationsInUse).toEqual(['3.1', '4.0']);
   });
 
-  // Startup gates on this read, so a storage failure must resolve, not
-  // reject, or the app never gets past the loading screen.
+  // Startup waits on this read, so a failure must resolve.
   it('returns the defaults when storage throws', async () => {
     mockGetMany.mockRejectedValue(new Error('storage failure'));
     const preferences = await loadPreferences();
@@ -143,8 +139,7 @@ describe('loadPreferences', () => {
   });
 });
 
-// Screen tests build their mocked preferences from this helper. If it drifts
-// from the real defaults, those tests describe an app that does not exist.
+// Screen tests build on this helper; it must equal the real defaults.
 describe('testPreferences', () => {
   it('matches the real defaults', () => {
     expect(testPreferences()).toEqual(DEFAULT_PREFERENCES);
@@ -196,8 +191,7 @@ describe('savePreference', () => {
     );
   });
 
-  // The provider decides what a failed write means for the UI, so the
-  // failure has to reach it.
+  // The failure has to reach the provider.
   it('rejects when storage does', async () => {
     mockSetItem.mockRejectedValue(new Error('storage full'));
     await expect(savePreference('pinPadScramble', true)).rejects.toThrow(

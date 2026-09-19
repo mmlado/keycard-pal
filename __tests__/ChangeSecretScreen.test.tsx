@@ -34,8 +34,7 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-// PinPad reads the scramble preference from context, and the screen reads
-// which cards the user ticked to decide whether the identify tap is needed.
+// PinPad and the screen both read preferences.
 let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
 
 jest.mock('../src/hooks/usePreferences', () => ({
@@ -57,8 +56,7 @@ jest.mock('../src/hooks/keycard/useChangeSecret', () => ({
   useChangeSecret: () => mockUseChangeSecret(),
 }));
 
-// The identify tap is a hook of its own with its own session; the screen only
-// reads what it found, so the test drives that directly.
+// The identify tap is its own hook; the test drives what it found.
 const mockIdentifyStart = jest.fn();
 const mockIdentifyCancel = jest.fn();
 let mockIdentify: {
@@ -158,8 +156,7 @@ describe('ChangeSecretScreen', () => {
     mockIdentifyCancel.mockClear();
     mockUseChangeSecret.mockClear();
     mockGenerationsInUse = ['3.1', '4.0'];
-    // A card that has a pairing secret, already identified: the state every
-    // test below starts from unless it is about the identify tap itself.
+    // A card with a pairing secret, already identified: the default state below.
     mockIdentify = { phase: 'done', generation: '3.1' };
   });
 
@@ -334,8 +331,7 @@ describe('ChangeSecretScreen', () => {
   // Identify tap (pairing secret only)
   // -------------------------------------------------------------------------
 
-  // Newer cards have no pairing secret and the menu cannot know the card, so
-  // this one secret reads the card first and only then asks for anything.
+  // The pairing secret reads the card first, then asks.
   describe('identify tap', () => {
     function lastSheetProps() {
       const calls = MockNFCBottomSheet.mock.calls;
@@ -352,8 +348,7 @@ describe('ChangeSecretScreen', () => {
           expect(screen.getByText(/digits/)).toBeTruthy();
           expect(screen.queryByText(IDENTIFY_EXPLAINER)).toBeNull();
           expect(lastSheetProps().showOnDone).toBe(true);
-          // The sheet is driven by the change itself, never by the idle
-          // identify hook that PIN and PUK also mount.
+          // The sheet follows the change, never the idle identify hook.
           expect(lastSheetProps().nfc).toBe(
             mockUseChangeSecret.mock.results[0].value,
           );
@@ -370,8 +365,7 @@ describe('ChangeSecretScreen', () => {
         const view = await renderScreen('pairing');
         expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
 
-        // Dismissing Apple's sheet returns the session to idle. Starting
-        // again on that would put the sheet straight back up.
+        // Dismissing Apple's sheet returns to idle; that must not reopen it.
         view.rerender(
           <ChangeSecretScreen
             navigation={navigation}
@@ -436,8 +430,7 @@ describe('ChangeSecretScreen', () => {
       });
     });
 
-    // A user who ticked only cards that have a pairing secret has told the app
-    // what the first tap would find out. The operation still checks the card.
+    // Every ticked card has a pairing secret, so the first tap is skipped.
     describe('when every card in use has a pairing secret', () => {
       beforeEach(() => {
         mockGenerationsInUse = ['3.1'];
@@ -471,8 +464,7 @@ describe('ChangeSecretScreen', () => {
     });
 
     describe('on a card that has a pairing secret', () => {
-      // The identify tap ends in 'done' as well. Only the change itself may
-      // end the screen, or the user would be sent home before typing a thing.
+      // Only the change itself may end the screen.
       it('does not leave the screen when the identify tap is done', async () => {
         await renderScreen('pairing');
         expect(navigation.reset).not.toHaveBeenCalled();

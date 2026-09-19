@@ -120,8 +120,7 @@ describe('useFactoryReset', () => {
     });
   });
 
-  // The screen hands this hook to the NFC sheet as it is, so the sheet's
-  // "Try again" exists only if the hook carries a retry.
+  // The sheet's "Try again" needs the hook to carry a retry.
   describe('retry', () => {
     it('opens the reader again after an error', async () => {
       mockSelect.mockResolvedValueOnce({ sw: 0x6a82 });

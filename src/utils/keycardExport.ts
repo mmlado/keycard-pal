@@ -23,15 +23,9 @@ export type ExportKeysResult<E extends ExportPlanEntry = ExportPlanEntry> = {
 };
 
 /**
- * Checkpoint for resuming a multi-key export after a mid-operation tag loss:
- * the session handshake (SELECT, pairing, secure channel, PIN) must re-run on
- * every tap, but exported keys are deterministic reads, so keys fetched before
- * the loss are reused and only the remainder is fetched. Bound to one seed, not
- * one card: the re-tap may be a DIFFERENT card, or the same card after a factory
- * reset with a new seed, and merging keys from two seeds would corrupt the
- * export, so the cache self-invalidates when the key UID changes. Two cards
- * holding the same seed export identical keys, so resuming across them is safe.
- * Create one per prepared flow (screen visit), never share or persist it.
+ * Keys already exported, for resuming after a tag loss. Bound to the key UID, not the card: the
+ * re-tap may be another card or a new seed, and keys of two seeds must never mix. One per
+ * prepared flow; never shared or persisted.
  */
 export type ExportResumeCache = {
   keyUid: string | null;
@@ -53,14 +47,7 @@ function fingerprintFromExportResponse(data: Uint8Array): number {
   return pubKeyFingerprint(Keycard.BIP32KeyPair.fromTLV(data).publicKey);
 }
 
-/**
- * The generic card-session executor for wallet exports: reads the master
- * fingerprint once, then exports every planned key with its parent
- * fingerprint (parents are fetched once per distinct path). Which keys to
- * export and what UR to build from them is declared by an ExportTarget
- * (see exportTargets.ts). With a cache, a re-run after a tag loss skips
- * everything already fetched from the same card.
- */
+/** Reads the master fingerprint once and each parent once, then every planned key. A cache skips what was already fetched. */
 export async function exportKeysForTarget<E extends ExportPlanEntry>(
   cmdSet: Commandset,
   entries: readonly E[],
@@ -95,9 +82,7 @@ export async function exportKeysForTarget<E extends ExportPlanEntry>(
 
   const keys: ExportedKey<E>[] = [];
   for (const [index, entry] of entries.entries()) {
-    // Entries within one target are unique by derivation path, and the cached
-    // entry object is the same table constant, so the base-typed cache read is
-    // safe to narrow back to E.
+    // Paths are unique within a target and the entry is the same constant, so narrowing to E is safe.
     const cached = cache?.keys.get(entry.derivationPath);
     if (cached) {
       keys.push(cached as ExportedKey<E>);

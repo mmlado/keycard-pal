@@ -38,25 +38,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const insets = useSafeAreaInsets();
   const { setPreference } = usePreferences();
 
-  // "Set from my Keycard": the SELECT-only identify tap, for the user who
-  // would rather tap a card than read applet versions.
+  // "Set from my Keycard": a SELECT-only tap.
   const identify = useIdentifyCard();
   const { phase: identifyPhase, generation, start: startIdentify } = identify;
 
-  // Keyed on the tap finishing, not on the generation alone: reading a second
-  // card of the same generation has to narrow the selection again, and the
-  // generation would not have changed.
+  // Keyed on the tap finishing: a second card of the same generation narrows the selection again.
   useEffect(() => {
     if (identifyPhase === 'done' && generation !== null) {
       setPreference('generationsInUse', [generation]);
-      // This tap was the user setting the selection, not a card turning up
-      // outside it, so it leaves no question behind for the dashboard.
+      // The reminder must follow a tap outside the selection, never this one.
       resetLastTappedGeneration();
     }
   }, [identifyPhase, generation, setPreference]);
 
-  // Owns the header title and the back guard. There is no `done` here, so a
-  // finished tap leaves the user in Settings, looking at what it ticked.
+  // No `done` navigation here: the user stays in Settings.
   const { onCancel } = useKeycardScreen({
     keycard: identify,
     navigation,

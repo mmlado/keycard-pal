@@ -128,8 +128,7 @@ describe('parseGenerations', () => {
     expect(parseGenerations('4.0,3.1,4.0')).toEqual(['3.1', '4.0']);
   });
 
-  // A name from a newer or older version of the app can be neither shown nor
-  // acted on, so it is dropped rather than kept around.
+  // An unknown name is dropped.
   it('drops what it does not know', () => {
     expect(parseGenerations('3.1,9.9')).toEqual(['3.1']);
     expect(parseGenerations('any')).toEqual([]);
@@ -146,9 +145,7 @@ describe('parseGenerationsInUse', () => {
     expect(parseGenerationsInUse('4.0')).toEqual(['4.0']);
   });
 
-  // The fresh install, and the only safe reading of a value nobody
-  // recognises: leaving entries out on the strength of a corrupt preference
-  // could hide what the user then has no way to reach.
+  // Nothing usable stored means all: a corrupt value must hide nothing.
   it.each([null, undefined, '', 'any', '9.9', 4])(
     'reads %p as every generation',
     value => {

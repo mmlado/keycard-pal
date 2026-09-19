@@ -135,8 +135,7 @@ describe('useInitCard', () => {
     });
   });
 
-  // The screen hands this hook to the NFC sheet as it is, so the sheet's
-  // "Try again" exists only if the hook carries a retry.
+  // The sheet's "Try again" needs the hook to carry a retry.
   describe('retry', () => {
     it('opens the reader again after an error', async () => {
       mockSelect.mockResolvedValueOnce({ sw: 0x6a82 });
@@ -296,8 +295,7 @@ describe('useInitCard', () => {
       );
     });
   });
-  // A card with a certificate (applet 4.0) takes INIT only inside the secure
-  // channel, has no pairing secret, and is judged before anything is written.
+  // A card with a certificate: INIT inside the channel, no pairing secret, judged first.
   describe('cards with a certificate', () => {
     const UNKNOWN_CA =
       'Card certificate verification failed: unknown CA public key and card not whitelisted';
@@ -337,8 +335,7 @@ describe('useInitCard', () => {
     });
 
     describe('signed by the Keycard CA', () => {
-      // The SDK opens the channel as part of init() on such a card. The 4.0
-      // applet takes the PIN and the PUK and nothing else: it has no pairing.
+      // PIN and PUK only: such a card has no pairing.
       it('initializes through the SDK, with no pairing secret', async () => {
         const { result } = await startAndTap();
         expect(mockInit).toHaveBeenCalledWith(
@@ -361,8 +358,7 @@ describe('useInitCard', () => {
         expect(mockInit.mock.calls[0][3]).toBe('654321');
       });
 
-      // The SDK hands back the card's answer instead of throwing, and on this
-      // path a refusal would otherwise read as "Card initialized".
+      // init() returns the card's answer, so a refusal must not read as success.
       it('fails when the card refuses INIT', async () => {
         mockInit.mockResolvedValue({
           sw: 0x6985,
@@ -387,16 +383,14 @@ describe('useInitCard', () => {
         mockSelect.mockRejectedValue(new Error(UNKNOWN_CA));
       });
 
-      // A PIN, a PUK or a duress PIN is never written to a card the user has
-      // not accepted. keycard-shell skips this check on a blank card.
+      // Nothing is written to a card the user has not accepted.
       it('asks before anything is written', async () => {
         const { result } = await startAndTap();
         expect(result.current.phase).toBe('genuine_warning');
         expect(mockInit).not.toHaveBeenCalled();
       });
 
-      // Apple's sheet shows how the session ended. A tap that returned would
-      // close it with "Card initialized" over a card nothing was written to.
+      // A tap that returned would close Apple's sheet with "Card initialized".
       it('closes the tap as unverified, not as initialized', async () => {
         await startAndTap();
         expect(mockStopNFCWithError).toHaveBeenCalledWith(
@@ -422,8 +416,7 @@ describe('useInitCard', () => {
         expect(result.current.result).toMatch(/^[0-9]{12}$/);
       });
 
-      // init() opens the channel and sends INIT inside it, so an accepted INIT
-      // is the proof that the card holds its certificate's key.
+      // An accepted INIT proves the handshake succeeded.
       it('remembers the approval only once the card has accepted INIT', async () => {
         const { result } = await startAndTap();
         mockSelect.mockResolvedValue({ sw: 0x9000 });

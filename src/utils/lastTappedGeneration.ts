@@ -1,19 +1,9 @@
 import type { Generation } from './cardGeneration';
 
 /**
- * The generation of the card most recently tapped, held in memory for as long
- * as the app runs and never written anywhere.
- *
- * It exists for one reader: the dashboard reminder that a card outside the
- * user's selection was tapped. Nothing else may consult it. The reminder has to
- * follow a tap and nothing else, so whoever edits the selection forgets the
- * last tap: otherwise unticking the generation of the card last used would
- * raise the reminder from a Settings change alone. A card's generation
- * is otherwise resolved from its own tap and forgotten (ADR-0012), and this is
- * a pending question to the user, not a fact the app acts on.
- *
- * An external store rather than context, because the writer is the NFC session
- * hook, which runs outside any provider in most of its tests.
+ * The last tapped card's generation, in memory only, for one reader: the dashboard reminder.
+ * Nothing else may consult it. Every edit of the selection forgets it, so the reminder follows a
+ * tap and never a Settings change. An external store because the writer runs outside providers.
  */
 let lastTapped: Generation | null = null;
 const listeners = new Set<() => void>();
@@ -39,10 +29,7 @@ export function subscribeLastTappedGeneration(
   };
 }
 
-/**
- * Forgets the last tap. Called when the user edits the selection themselves,
- * which answers whatever question the last tap had raised.
- */
+/** Called by every writer of the selection. */
 export function resetLastTappedGeneration(): void {
   if (lastTapped === null) {
     return;

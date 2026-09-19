@@ -44,8 +44,7 @@ jest.mock('react-native-keycard', () => ({
   },
 }));
 
-// Everything a real operation would send after SELECT. The identify tap must
-// never reach any of it.
+// Everything an operation sends after SELECT; the identify tap must reach none of it.
 const mockSelect = jest.fn();
 const mockAfterSelect = {
   getData: jest.fn(),
@@ -131,8 +130,7 @@ describe('useIdentifyCard', () => {
       expect(result.current.generation).toBe('4.0');
     });
 
-    // A blank 3.x card answers SELECT with no version at all. It is still a
-    // 3.x card, and saying so lets the flow that follows explain the rest.
+    // A blank 3.x card reports no version and is still a 3.x card.
     it('reads an uninitialized 3.x card as 3.x', async () => {
       const { result } = await tap(blankV3Select());
       expect(result.current.generation).toBe('3.1');
@@ -155,8 +153,7 @@ describe('useIdentifyCard', () => {
     });
   });
 
-  // The whole point of the first tap: SELECT and nothing else, so it is short
-  // and cannot move a retry counter or use up a pairing slot.
+  // SELECT and nothing else.
   it.each([
     ['a 3.x', () => v3Select(0x0302)],
     ['a 4.0', () => v4Select(0x0400)],
@@ -168,8 +165,7 @@ describe('useIdentifyCard', () => {
     }
   });
 
-  // Reading the SELECT response changes nothing on the card, so a card that
-  // slips off the antenna just gets tapped again.
+  // A read changes nothing, so a lost card is simply tapped again.
   it('waits for a re-tap when the card leaves the field', async () => {
     mockSelect.mockRejectedValueOnce(
       new Error('CardIO Error: Error: Tag was lost.'),
@@ -186,16 +182,13 @@ describe('useIdentifyCard', () => {
     expect(result.current.generation).toBe('3.1');
   });
 
-  // Apple's sheet lingers over whatever comes next. "Success" would read as
-  // the whole change being done, and "continue" would be wrong in Settings
-  // and on a card that lacks the feature, where nothing follows.
+  // Apple's sheet lingers, so the wording must not read as the whole change done.
   it('words the iOS sheet as a read, and promises no next step', async () => {
     await tap(v3Select(0x0302));
     expect(mockStopNFCWithMessage).toHaveBeenCalledWith('Keycard read.');
   });
 
-  // After an error the reader is disarmed, so the sheet's Try again has to
-  // open it again: re-tapping alone emits nothing.
+  // After an error the reader is off, so Try again must reopen it.
   it('restarts the reader through retry after an error', async () => {
     const { result } = await tap(null);
     expect(result.current.phase).toBe('error');

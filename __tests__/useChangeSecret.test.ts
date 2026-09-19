@@ -64,8 +64,7 @@ describe('useChangeSecret', () => {
     });
   });
 
-  // Newer cards have no pairing secret. The screen identifies the card first;
-  // this is what stops a different card being tapped the second time.
+  // Stops a different card being tapped the second time.
   it('binds only the pairing secret to cards that have one', async () => {
     const pairing = renderHook(() => useChangeSecret('pairing'));
     await act(async () => {

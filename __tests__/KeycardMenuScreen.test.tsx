@@ -93,8 +93,7 @@ describe('KeycardMenuScreen', () => {
     }
   });
 
-  // Pairing slots went away with applet 4.0. The entry stays for everyone who
-  // ticked a card that has them, because the menu cannot know the card.
+  // The entry stays for anyone who ticked a card that has pairing slots.
   describe('pairing slots entry', () => {
     it('is hidden when only 4.x cards are ticked', () => {
       mockGenerationsInUse = ['4.0'];

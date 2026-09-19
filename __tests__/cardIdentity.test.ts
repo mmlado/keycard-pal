@@ -13,17 +13,14 @@ const INSTANCE_UID = [
   0xad, 0xae, 0xaf,
 ];
 
-// A certificate is the 33-byte card identity public key followed by the CA's
-// signature over it (64 bytes plus a recovery id).
+// 33-byte identity key, then the CA's signature (64 bytes and a recovery id).
 const IDENTITY_KEY = filler(33, 0x02);
 const CERTIFICATE = [...IDENTITY_KEY, ...filler(65, 0x09)];
 
 const SEED_KEY_UID = filler(32, 0x5e);
 
 describe('getCardKey', () => {
-  // Pairings are stored under the instance UID hex. If the card key ever
-  // produced a different string on a 3.x card, every existing pairing would
-  // silently stop being found and the card would pair again.
+  // Pairings are stored under the instance UID hex; a different string would orphan them.
   it('is exactly the instance UID hex on a 3.x card', () => {
     const appInfo = v3Select(0x0302, { instanceUID: INSTANCE_UID });
     expect(getCardKey(appInfo)).toBe(toHex(new Uint8Array(INSTANCE_UID)));

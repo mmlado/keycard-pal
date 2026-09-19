@@ -2,12 +2,12 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { Icons } from '../../assets/icons';
-import theme from '../../theme';
-import { displayKeycardName } from '../../utils/keycardName';
+import { Icons } from '@/assets/icons';
+import theme from '@/theme';
 
-import AffiliateDisclosure from '../AffiliateDisclosure';
+import AffiliateDisclosure from '@/components/AffiliateDisclosure';
 
+import { displayKeycardName } from '@/utils/keycardName';
 import type { NFCVariant } from './index';
 
 type Props = {

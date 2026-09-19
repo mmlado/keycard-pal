@@ -186,8 +186,7 @@ describe('usePairingSlots', () => {
     });
   });
 
-  // A 4.0 card has no pairing at all: no slots, no free slot count, and
-  // nothing stored locally for it. That is an answer, not a failure.
+  // A 4.0 card has no pairing: an answer, not a failure.
   describe('a card without pairing slots', () => {
     const CERTIFICATE = [...filler(33, 0x02), ...filler(65, 0x09)];
 
@@ -217,8 +216,7 @@ describe('usePairingSlots', () => {
       expect(mockLoadPairing).not.toHaveBeenCalled();
     });
 
-    // Without its certificate such a card has no card key. It still must not
-    // be mistaken for a card that is merely not initialized.
+    // Without a card key it still must not read as uninitialized.
     it('says so even when the card carries no certificate', async () => {
       (mockCmdSet as any).applicationInfo = v4Select(0x0400, {
         certificate: null,
@@ -345,8 +343,7 @@ describe('usePairingSlots', () => {
     });
   });
 
-  // T11: the slot read is a read-only SELECT-response read, so it opts into
-  // tag-loss retry — a loss keeps the session up and reports presence.
+  // The slot read opts into tag-loss retry.
   describe('cardPresence', () => {
     it('starts as waiting', () => {
       const { result } = renderHook(() => usePairingSlots());
@@ -380,8 +377,7 @@ describe('usePairingSlots', () => {
       });
       expect(result.current.phase).toBe('done');
 
-      // readSlotInfoFromCmdSet runs outside the session (live cmdSet after an
-      // unpair): a tag loss there rejects to the caller, not the session.
+      // Outside the session a tag loss rejects to the caller.
       mockSelect.mockRejectedValueOnce(
         new Error('CardIO Error: Error: Tag was lost.'),
       );

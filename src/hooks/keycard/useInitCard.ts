@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { PAIRING_PASSWORD } from '@/constants/keycard';
+
 import { secureChannelVersion } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
 import { useCertificateApprovals } from './useCertificateApprovals';
@@ -22,12 +23,7 @@ export type UseInitCardOperation = Omit<
   proceedWithNonGenuine: () => void;
 };
 
-/**
- * Ends the tap that found a card it may not set up yet. Thrown rather than
- * returned, so the session closes as an error: a tap that returns closes with
- * this hook's success wording, and Apple's sheet would announce "Card
- * initialized" over a card nothing was written to.
- */
+/** Thrown, not returned: a tap that returns ends in "Card initialized". */
 export const UNVERIFIED_CARD_STATUS =
   'This Keycard could not be verified. Nothing was written to it.';
 
@@ -43,8 +39,7 @@ export function useInitCard(): UseInitCardOperation {
   const pinRef = useRef('');
   const duressPinRef = useRef<string | null>(null);
 
-  // A card with a certificate is judged before a PIN, a PUK or a duress PIN is
-  // written to it (ADR-0013). keycard-shell skips the check on a blank card.
+  // A card with a certificate is judged before anything is written to it (ADR-0013).
   const [showGenuineWarning, setShowGenuineWarning] = useState(false);
   const pendingCardKeyRef = useRef<string | null>(null);
   const { whitelistedCardKeys, approve, handshakeSucceeded } =
@@ -79,11 +74,7 @@ export function useInitCard(): UseInitCardOperation {
             setShowGenuineWarning(true);
             throw new Error(UNVERIFIED_CARD_STATUS);
           }
-          // Such a card takes INIT only inside the secure channel, which the
-          // SDK opens as part of init(), and it has no pairing secret to set.
-          // This needs the SDK fix that awaits that handshake: the 4.0.0
-          // release sends INIT, PIN and PUK included, before the channel is
-          // open. package.json pins a build that has it.
+          // No pairing secret, and the SDK opens the channel inside init(). Needs the pinned SDK fix.
           setStatus('Initializing...');
           const resp = await cmdSet.init(
             pinRef.current,
@@ -92,8 +83,7 @@ export function useInitCard(): UseInitCardOperation {
             duressPin,
           );
           resp.checkOK('Initializing the Keycard failed');
-          // INIT was accepted inside the channel, so the handshake succeeded
-          // and the card holds its certificate's key.
+          // INIT was accepted, so the handshake succeeded.
           if (cardKey !== null) {
             handshakeSucceeded(cardKey);
           }
@@ -120,8 +110,7 @@ export function useInitCard(): UseInitCardOperation {
     [startNFC],
   );
 
-  // The PIN entered for this card is still held, so the second tap needs
-  // nothing typed again.
+  // The PIN is still held, so the second tap needs nothing typed.
   const proceedWithNonGenuine = useCallback(() => {
     const cardKey = pendingCardKeyRef.current;
     if (cardKey) {

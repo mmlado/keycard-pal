@@ -21,12 +21,7 @@ type Props = {
   readingCard: boolean;
 };
 
-/**
- * The generations of the cards the user holds, one checkbox each. Checkboxes
- * rather than the switches the other rows use, because this is one choice of
- * several and not an on/off setting. The last one ticked cannot be unticked: an
- * empty selection says nothing about the user's cards.
- */
+/** Checkboxes, not switches: one choice of several. The last tick is locked. */
 export default function KeycardsInUseSettingsSection({
   onSetFromCard,
   readingCard,
@@ -44,8 +39,7 @@ export default function KeycardsInUseSettingsSection({
         );
     if (next.length > 0) {
       setPreference('generationsInUse', next);
-      // The user has just said which cards they use. A reminder about the
-      // card they last tapped would now come from this edit, not from a tap.
+      // The reminder must follow a tap, never this edit.
       resetLastTappedGeneration();
     }
   };

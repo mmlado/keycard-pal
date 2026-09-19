@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import KeycardsInUseSettingsSection, {
   KEYCARDS_IN_USE_EXPLAINER,
 } from '../src/components/settings/KeycardsInUseSettingsSection';
+
 import {
   getLastTappedGeneration,
   noteTappedGeneration,
@@ -62,8 +63,7 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('KeycardsInUseSettingsSection', () => {
-  // One box per generation, named the way the user reads it. No generation or
-  // secure channel wording.
+  // One box per generation, by its label.
   it('offers each generation by its label', () => {
     renderSection();
     expect(screen.getByText('Keycards in use')).toBeTruthy();
@@ -91,8 +91,7 @@ describe('KeycardsInUseSettingsSection', () => {
     expect(mockSetPreference).toHaveBeenCalledWith('generationsInUse', ['4.0']);
   });
 
-  // Stored in table order whatever order the boxes were ticked in, so the
-  // same selection is always the same stored value.
+  // Stored in table order, whatever order was ticked.
   it('ticks a generation, keeping table order', () => {
     mockInUse = ['4.0'];
     renderSection();
@@ -118,9 +117,7 @@ describe('KeycardsInUseSettingsSection', () => {
     expect(box('4.0').props.accessibilityState.disabled).toBe(false);
   });
 
-  // The dashboard reminder has to follow a tap. Unticking the generation of
-  // the card last used would otherwise raise it from this edit alone, and ask
-  // the user to undo the choice they just made.
+  // The reminder must follow a tap, never this edit.
   it('forgets the last tapped card when the selection is edited', () => {
     noteTappedGeneration('4.0');
     renderSection();

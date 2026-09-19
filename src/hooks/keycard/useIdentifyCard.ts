@@ -18,31 +18,20 @@ export interface UseIdentifyCard {
   /** Null until a tap has completed. Never kept beyond this hook instance. */
   generation: Generation | null;
   start: () => void;
-  /**
-   * The same function as `start`, under the name the NFC sheet's error variant
-   * calls: after an error the reader is disarmed, so re-tapping emits nothing.
-   */
+  /** Same as `start`: after an error the reader is off, so a re-tap emits nothing. */
   retry: () => void;
   cancel: () => void;
   openNFCSettings: (() => void) | undefined;
 }
 
 /**
- * The first tap of an identify-then-operate flow (ADR-0012): SELECT and
- * nothing else. No secure channel, no pairing and no PIN, so it is the
- * shortest tap the app has and cannot move a retry counter. It exists because
- * the user picks an action before the card is known, and an operation the card
- * does not have must be refused before anything is asked of them.
- *
- * The session issues SELECT and refuses a card below the floor before this
- * hook's callback runs, so the hook itself sends no command at all.
+ * The first tap of an identify-then-operate flow (ADR-0012): SELECT only, so no retry counter
+ * can move. The session sends SELECT and enforces the floor; this hook sends nothing.
  */
 export function useIdentifyCard(): UseIdentifyCard {
   const handleConnected = useCallback(
     async (cmdSet: Commandset): Promise<Generation> => {
-      // Read only `applicationInfo`, never SELECT's own return value: on a
-      // card with a certificate the SDK can throw from select() after it has
-      // filled this in, and that state still has to identify the card.
+      // The SDK can throw from select() after filling this in, so read only applicationInfo.
       const appInfo = cmdSet.applicationInfo;
       const generation = appInfo ? cardGeneration(appInfo) : null;
       if (generation === null) {
@@ -64,10 +53,7 @@ export function useIdentifyCard(): UseIdentifyCard {
   } = useNFCOperation<Generation>(handleConnected, {
     // Reading the SELECT response changes nothing on the card.
     retryOnTagLoss: true,
-    // Apple's sheet lingers after the tap, over whatever the screen shows
-    // next. "Success" would read as the whole operation done, and anything
-    // about what comes next would be wrong for some caller: Settings has no
-    // next step, and neither has a card that turns out to lack the feature.
+    // Apple's sheet lingers over the next screen, so this must not read as the whole operation done.
     successMessage: 'Keycard read.',
   });
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import UnselectedKeycardReminder from '../src/components/UnselectedKeycardReminder';
+
 import {
   getLastTappedGeneration,
   noteTappedGeneration,
@@ -73,8 +74,7 @@ describe('UnselectedKeycardReminder', () => {
     expect(screen.getByTestId(REMINDER)).toBeTruthy();
   });
 
-  // With only 3.x ticked nothing is hidden for a 4.x card: what changes is
-  // that a tap is skipped. So the wording may not claim hidden entries.
+  // With only 3.x ticked nothing is hidden for a 4.x card, so the wording may not claim it.
   it('does not claim that entries are hidden', () => {
     mockInUse = ['3.1'];
     noteTappedGeneration('4.0');
@@ -100,8 +100,7 @@ describe('UnselectedKeycardReminder', () => {
     expect(getLastTappedGeneration()).toBeNull();
   });
 
-  // A friend's card should not keep asking. The user can still tick it in
-  // Settings, which this leaves alone.
+  // A dismissed generation stays quiet; Settings is left alone.
   it('stays quiet about that generation for good when closed', () => {
     noteTappedGeneration('3.1');
     render(<UnselectedKeycardReminder />);

@@ -80,8 +80,7 @@ describe('SecretsMenuScreen', () => {
     });
   });
 
-  // The pairing secret screen reads the card as soon as it opens, so its row
-  // carries the NFC mark. PIN and PUK ask for input first and do not.
+  // The pairing secret row taps at once, so it carries the NFC mark.
   describe('NFC indicator', () => {
     it('marks only the pairing secret entry', () => {
       renderScreen();

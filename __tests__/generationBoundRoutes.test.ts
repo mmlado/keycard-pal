@@ -9,8 +9,7 @@ const ROUTES = ['PairingSlots', 'ChangePairingSecret'] as const;
 
 // What the user said about their cards. Only ever decides what a menu draws.
 describe('isRouteHidden', () => {
-  // Pairing went away with applet 4.0, so both pairing destinations are the
-  // ones a user with only newer cards never needs to see.
+  // Pairing went away with applet 4.0.
   it.each(ROUTES)('hides %s when only 4.x cards are ticked', route => {
     expect(isRouteHidden(route, ['4.0'])).toBe(true);
   });
@@ -20,8 +19,7 @@ describe('isRouteHidden', () => {
     expect(isRouteHidden(route, ['3.1', '4.0'])).toBe(false);
   });
 
-  // An empty selection says nothing about the user's cards. An entry hidden on
-  // no evidence could not be reached at all.
+  // An empty selection hides nothing.
   it.each(ROUTES)('shows %s for an empty selection', route => {
     expect(isRouteHidden(route, [])).toBe(false);
   });
@@ -54,8 +52,7 @@ describe('cardHasRoute', () => {
     expect(cardHasRoute(route, '4.0')).toBe(false);
   });
 
-  // Null is a card below the floor. The session refuses those first, so this
-  // answer is never reached; it just must not say yes.
+  // Null is a card below the floor: never a yes.
   it.each(ROUTES)('is false for %s when the card is unknown', route => {
     expect(cardHasRoute(route, null)).toBe(false);
   });
@@ -69,8 +66,7 @@ describe('routeAbsence', () => {
     expect(absence.sheetError.length).toBeGreaterThan(0);
   });
 
-  // The user typed a PIN before this can appear, so it has to say where that
-  // left the card.
+  // A PIN was typed by then, so the copy says nothing was changed.
   it.each(ROUTES)('says nothing happened in the sheet error for %s', route => {
     expect(routeAbsence(route).sheetError).toMatch(/nothing was/);
   });

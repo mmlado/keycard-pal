@@ -1,10 +1,10 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Icons } from '../assets/icons';
-import { DashboardAction, KeycardMenuScreenProps } from '../navigation/types';
-import theme from '../theme';
+import { Icons } from '@/assets/icons';
+import { DashboardAction, KeycardMenuScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import EntryList, { EntryListItem } from '../components/EntryList';
+import EntryList, { EntryListItem } from '@/components/EntryList';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Keycard',

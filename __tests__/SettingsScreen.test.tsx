@@ -11,10 +11,7 @@ import {
 
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
-// ---------------------------------------------------------------------------
-// Mocks — every other section is a stub so this test only proves the screen
-// mounts the Keycard purchase section in both build flavors.
-// ---------------------------------------------------------------------------
+// Mocks: every other section is a stub.
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -31,8 +28,7 @@ jest.mock('../src/assets/icons', () => {
   return { Icons: { openInBrowser: Icon, qr: Icon } };
 });
 
-// Stubbed like every other section, but it keeps its two props: they are how
-// the screen's tap reaches it.
+// A stub that keeps the two props the screen's tap goes through.
 jest.mock('../src/components/settings/KeycardsInUseSettingsSection', () => {
   const { Text } = require('react-native');
   return ({
@@ -54,9 +50,7 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-// One object for the life of the file. The real provider hands out a stable
-// setPreference, and a fresh one per render would re-run the screen's effect on
-// every render, hiding whether it is keyed on the tap finishing.
+// One stable object, like the real provider, or the screen's effect would re-run every render.
 const mockSetPreference = jest.fn();
 const mockPreferencesValue = {
   preferences: mockTestPreferences(),
@@ -179,13 +173,11 @@ describe('SettingsScreen', () => {
     expect(navigation.setOptions).toHaveBeenCalledWith({ title: 'Settings' });
   });
 
-  // The purchase link is the one section that always stays at the top; every
-  // other section is added below it.
+  // The purchase link always stays first.
   it('keeps Buy a Keycard above the layout section', () => {
     const { toJSON } = renderScreen();
     const rendered = JSON.stringify(toJSON());
-    // Both have to be present, or a missing section would make indexOf return
-    // -1 and the ordering assertion would pass for the wrong reason.
+    // Both must be present, or indexOf -1 would pass the ordering check.
     expect(rendered).toContain('Buy a Keycard');
     expect(rendered).toContain('Layout');
     expect(rendered.indexOf('Buy a Keycard')).toBeLessThan(
@@ -208,8 +200,7 @@ describe('SettingsScreen', () => {
       expect(screen.getByText('Reading card')).toBeTruthy();
     });
 
-    // "Buy a Keycard" is the first row of this very screen, and the user stays
-    // here on cancel, so the sheet does not repeat the shop link.
+    // The shop link is already this screen's first row.
     it('keeps the shop link off its NFC sheet', () => {
       mockIdentify = { phase: 'nfc', generation: null };
       renderScreen();
@@ -231,8 +222,7 @@ describe('SettingsScreen', () => {
       ]);
     });
 
-    // A plain re-render at 'done' must not write again: the selection may
-    // have been changed by hand since, and this would silently undo that.
+    // A re-render at 'done' must not write again.
     it('does not narrow again on a re-render with nothing new', () => {
       mockIdentify = { phase: 'done', generation: '3.1' };
       const view = renderScreen();
@@ -243,8 +233,7 @@ describe('SettingsScreen', () => {
       expect(mockSetPreference).not.toHaveBeenCalled();
     });
 
-    // The tap was the user setting the selection, so it must not come back
-    // as a dashboard reminder about that same card.
+    // This tap must not come back as a dashboard reminder.
     it('leaves no reminder behind for the dashboard', () => {
       mockIdentify = { phase: 'done', generation: '3.1' };
       renderScreen();
@@ -257,8 +246,7 @@ describe('SettingsScreen', () => {
       expect(mockSetPreference).not.toHaveBeenCalled();
     });
 
-    // Reading a second card of the same generation has to narrow the
-    // selection again, though the generation it found has not changed.
+    // A second card of the same generation narrows the selection again.
     it('narrows again when another card of the same generation is read', () => {
       mockIdentify = { phase: 'done', generation: '3.1' };
       const view = renderScreen();
@@ -279,8 +267,7 @@ describe('SettingsScreen', () => {
       ]);
     });
 
-    // The user is in Settings to change settings; cancelling a read is not a
-    // reason to leave, and a finished one has nowhere to go either.
+    // Cancelling or finishing a read keeps the user in Settings.
     it('stays in Settings when the read is cancelled', () => {
       mockIdentify = { phase: 'nfc', generation: null };
       renderScreen();

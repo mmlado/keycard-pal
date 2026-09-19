@@ -14,21 +14,7 @@ import PrimaryButton from '@/components/PrimaryButton';
 import UnselectedKeycardReminder from '@/components/UnselectedKeycardReminder';
 import WalletConnectDashboardCard from '@/components/walletConnect/DashboardCard.online';
 
-/**
- * How long the confirmation toast stays up on iOS.
- *
- * A finished Keycard operation lands here while Apple's system NFC sheet still
- * covers the bottom of the screen — the same band the Snackbar uses — and that
- * sheet outlives the default 3 s. Measured on device (iPhone 11 / iOS 26.5, 3
- * rounds): the sheet cleared 3168/3575/3517 ms after the session was
- * invalidated, so a 3 s toast was gone, or nearly, before anything was visible.
- *
- * The toast is therefore shown immediately and simply outlasts the sheet — it
- * is already in place as the sheet slides away, revealed rather than animated
- * in. Gating it on AppState 'active' instead was tried and reverted: iOS posts
- * that only once the dismissal animation has finished, which left a visible
- * dead beat and then a toast that jumped up into an empty screen.
- */
+/** Apple's NFC sheet covers the toast for about 3.5 s after a tap (measured), so the toast outlasts it. */
 const IOS_TOAST_DURATION_MS = 7000;
 const TOAST_DURATION_MS = 3000;
 

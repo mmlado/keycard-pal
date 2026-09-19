@@ -71,8 +71,7 @@ jest.mock('react-native-keycard', () => ({
 
 const mockSelect = jest.fn();
 
-// What each Commandset was built with: the CA keys and the whitelist decide
-// whether the SDK opens a channel with a certificate card at all.
+// What each Commandset was built with: CA keys and whitelist.
 const mockCommandsetArgs: unknown[][] = [];
 
 jest.mock('keycard-sdk', () => ({
@@ -521,8 +520,7 @@ describe('useNFCSession', () => {
       expect(result.current.phase).toBe('idle');
     });
 
-    // Apple's sheet outlives the app's own toast, so the operation's wording
-    // goes there too rather than relying on the generic "Success".
+    // The operation's wording goes onto Apple's sheet.
     describe('success message on the iOS sheet', () => {
       const Platform = require('react-native').Platform;
       const origOS = Platform.OS;
@@ -712,8 +710,7 @@ describe('useNFCSession', () => {
     const TOO_OLD =
       'This Keycard runs applet 3.0. Keycard Pal needs applet 3.1 or newer.';
 
-    // The real SDK assigns applicationInfo inside select(), so the mock does
-    // the same rather than handing the hook a pre-built command set.
+    // Like the real SDK, the mock assigns applicationInfo inside select().
     function selectReturning(applicationInfo: object) {
       mockSelect.mockImplementation(function (this: {
         applicationInfo?: object;
@@ -757,8 +754,7 @@ describe('useNFCSession', () => {
       expect(result.current.phase).toBe('done');
     });
 
-    // The dashboard reminder reads this. It is a note, not a gate: the card
-    // goes on to the operation whatever the user ticked in Settings.
+    // A note for the dashboard reminder, never a gate.
     describe('noting the tapped generation', () => {
       beforeEach(() => {
         resetLastTappedGeneration();
@@ -799,9 +795,7 @@ describe('useNFCSession', () => {
     });
   });
 
-  // Cards with a certificate (ADR-0013). The SDK judges the certificate inside
-  // select() and throws for an unknown CA, but only after it has filled in
-  // applicationInfo, so the card is still readable.
+  // Cards with a certificate (ADR-0013): the SDK throws for an unknown CA after filling in applicationInfo.
   describe('certificate trust', () => {
     const UNKNOWN_CA =
       'Card certificate verification failed: unknown CA public key and card not whitelisted';
@@ -839,8 +833,7 @@ describe('useNFCSession', () => {
       expect(mockCommandsetArgs[0][2]).toEqual([]);
     });
 
-    // Asked on every tap, so an approval given a moment ago is already in
-    // force on the tap that follows it.
+    // Asked on every tap, so a fresh approval is in force on the next one.
     it('asks for the whitelist on every tap, and waits for it', async () => {
       const approved = new Uint8Array(33).fill(2);
       const whitelistedCardKeys = jest.fn().mockResolvedValue([approved]);
@@ -875,8 +868,7 @@ describe('useNFCSession', () => {
       expect(mockStopNFCWithError).not.toHaveBeenCalled();
     });
 
-    // The floor and the reminder both read applicationInfo, which such a card
-    // has, so they behave exactly as they do for any other card.
+    // The floor and the reminder work as for any other card.
     it('still notes the generation of such a card', async () => {
       selectThrowing(UNKNOWN_CA, { appVersion: 0x0400 });
       resetLastTappedGeneration();
@@ -884,8 +876,7 @@ describe('useNFCSession', () => {
       expect(getLastTappedGeneration()).toBe('4.0');
     });
 
-    // Without applicationInfo there is no card to describe, so the refusal
-    // stands as the error it is.
+    // Without applicationInfo the refusal stands.
     it('fails when the refusal came with nothing about the card', async () => {
       selectThrowing(UNKNOWN_CA);
       const { result } = await tap();
@@ -894,8 +885,7 @@ describe('useNFCSession', () => {
       expect(mockOnCardConnected).not.toHaveBeenCalled();
     });
 
-    // Any other throw from select() is a failure, certificate or not. In
-    // particular a card that cannot prove its key must never be waved through.
+    // Any other throw is a failure: a card that cannot prove its key is never waved through.
     it.each([
       [
         'Card authentication failed: invalid signature',
@@ -1001,8 +991,7 @@ describe('useNFCSession', () => {
     });
   });
 
-  // T2/T3: tag loss is classified from the error itself, never from the
-  // ordering of the disconnect event (which loses the race on Android).
+  // Tag loss is classified from the error, never from event ordering.
   describe('tag-loss classification', () => {
     async function startAndFail(
       result: { current: ReturnType<typeof useNFCSession> },
@@ -1078,9 +1067,7 @@ describe('useNFCSession', () => {
       expect(result.current.phase).toBe('done');
     });
 
-    // A tap that lands while the previous run is still unwinding must not be
-    // dropped: the tag is already on the antenna, so no new discovery fires
-    // and the user would have to physically remove and re-tap.
+    // A tap during unwinding is replayed, not dropped.
     it('replays a connect that arrives while a run is still in flight', async () => {
       let releaseFirstRun: (() => void) | null = null;
       mockOnCardConnected
@@ -1171,11 +1158,7 @@ describe('useNFCSession', () => {
       expect(mockStopNFCWithError).toHaveBeenCalled();
     });
 
-    // Until SELECT has answered, nothing but SELECT has been sent, and SELECT
-    // changes nothing on the card. A write has nothing to replay yet, so its
-    // card can be waited for like any other. Calling that "mid-operation"
-    // stranded the user on an error while the card reconnected underneath it
-    // (seen on a phone, 2026-09-18).
+    // Before SELECT answers there is nothing to replay, so even a write waits (seen on a phone, 2026-09-18).
     describe('a card that leaves before SELECT has answered', () => {
       it('is waited for, even in an operation that may not be replayed', async () => {
         mockSelect.mockRejectedValueOnce(new Error(ANDROID_TAG_LOST));
@@ -1211,8 +1194,7 @@ describe('useNFCSession', () => {
         expect(result.current.phase).toBe('done');
       });
 
-      // The wait is still bounded: a card that never settles ends in an error
-      // the user can act on, not in a sheet that waits forever.
+      // The wait is still bounded.
       it('still gives up after three losses in a row', async () => {
         mockSelect.mockRejectedValue(new Error(ANDROID_TAG_LOST));
         const { result } = makeHook();
@@ -1232,8 +1214,7 @@ describe('useNFCSession', () => {
         expect(mockOnCardConnected).not.toHaveBeenCalled();
       });
 
-      // Once SELECT has answered the operation has started, and the rule for
-      // writes is unchanged: no silent replay.
+      // After SELECT a write is never silently replayed.
       it('does not cover a loss after SELECT in such an operation', async () => {
         const { result } = makeHook();
         await startAndFail(result, ANDROID_TAG_LOST);
@@ -1318,9 +1299,7 @@ describe('useNFCSession', () => {
       expect(result.current.phase).toBe('done');
     });
 
-    // The counter only accumulates when there is no forward progress: a loss
-    // during SELECT itself (card connects and instantly drops). A loss after a
-    // successful SELECT resets the bound by design.
+    // Only losses without a successful SELECT accumulate.
     async function failDuringSelect() {
       mockSelect.mockRejectedValueOnce(new Error(ANDROID_TAG_LOST));
       await act(async () => {
@@ -1348,10 +1327,7 @@ describe('useNFCSession', () => {
       });
       await failDuringSelect();
       await failDuringSelect();
-      // SELECT succeeds (forward progress) but the op drops the tag after it:
-      // the counter restarts (0 → 1 for the post-SELECT loss). One more
-      // select-level loss makes 2 — without the reset it would be 4 and the
-      // bound would already have fired.
+      // A successful SELECT resets the count: without that the bound would already have fired.
       await failOnce();
       await failDuringSelect();
       expect(result.current.phase).toBe('nfc');
@@ -1371,8 +1347,7 @@ describe('useNFCSession', () => {
     });
   });
 
-  // T10: iOS reopens the session after Apple's 60s cap, bounded and
-  // foreground-gated. Android keeps the immediate error.
+  // iOS reopens the session after Apple's 60 s cap, bounded and in the foreground only.
   describe('iOS timeout auto-restart', () => {
     let Platform: { OS: string };
     let origOS: string;
@@ -1490,9 +1465,7 @@ describe('useNFCSession', () => {
     });
   });
 
-  // Apple's system sheet is the only NFC UI on iOS — Pal's own sheet is gated to
-  // Android — so every user-facing status has to be pushed into it explicitly or
-  // it is invisible there.
+  // Apple's sheet is the only NFC UI on iOS, so every status is pushed into it.
   describe('iOS system sheet status mirroring', () => {
     function withPlatform(os: string, body: () => Promise<void>) {
       const Platform = require('react-native').Platform;
@@ -1536,9 +1509,7 @@ describe('useNFCSession', () => {
       });
     });
 
-    // The reason this whole mechanism exists: during a reconnect wait the
-    // session stays up and Pal renders nothing on iOS, so the sheet is the only
-    // place the user can be told to re-tap.
+    // During a reconnect wait the sheet is the only place to say "tap again".
     it('pushes the reconnect nudge on a classified tag loss', async () => {
       await withPlatform('ios', async () => {
         mockOnCardConnected.mockRejectedValue(new Error(IOS_TAG_LOST));
@@ -1568,8 +1539,7 @@ describe('useNFCSession', () => {
       });
     });
 
-    // stopNFCWithError already puts the message on the sheet as it tears the
-    // session down; pushing it first would be a redundant second write.
+    // The error stop already puts the message on the sheet.
     it('leaves error copy to stopNFCWithError', async () => {
       await withPlatform('ios', async () => {
         mockOnCardConnected.mockRejectedValue(

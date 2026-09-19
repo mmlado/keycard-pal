@@ -160,8 +160,7 @@ describe('NFCBottomSheet — Android sheet', () => {
     });
   });
 
-  // T5: variant selection — phase always wins over presence, and an omitted
-  // cardPresence behaves exactly as before the field existed.
+  // Phase wins over presence; an omitted cardPresence changes nothing.
   describe('cardPresence variant selection', () => {
     it('phase nfc + presence lost renders the disconnected hint', () => {
       renderSheet(makeNfc('nfc', { cardPresence: 'lost' }));
@@ -211,9 +210,7 @@ describe('NFCBottomSheet — Android sheet', () => {
     });
   });
 
-  // #258: the no-card exit ends the session exactly like Cancel (which may
-  // also leave the host screen) before opening the shop, so the sheet never
-  // sits over the browser or the QR screen.
+  // #258: the no-card exit cancels first, then opens the shop.
   describe('buy-a-Keycard link', () => {
     it('shows the link while waiting for a card', () => {
       renderSheet(makeNfc('nfc'));
@@ -226,8 +223,7 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(screen.queryByText(BUY_KEYCARD_LINK)).toBeNull();
     });
 
-    // An error raised with the card still on the antenna (wrong PIN, bad
-    // MAC, uninitialised card) proves the user owns one: recovery only.
+    // An error with the card present shows recovery only.
     it('hides the link on an error while the card is still present', () => {
       renderSheet(
         makeNfc('error', { cardPresence: 'connected', retry: jest.fn() }),
@@ -246,8 +242,7 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(screen.getByText(BUY_KEYCARD_LINK)).toBeTruthy();
     });
 
-    // Settings keeps the user in place on cancel and already carries the
-    // purchase link itself, so its sheet leaves this one out.
+    // Settings carries the purchase link itself.
     it.each(['nfc', 'error'] as const)(
       'leaves the link out in phase %s when the host screen asks',
       phase => {
@@ -419,13 +414,7 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(screen.queryByText('Tap your Keycard')).toBeNull();
     });
 
-    // The PIN pad used to sit in a full-screen Modal, which covered the
-    // navigator's header and so had to paint a fake one. It now fills only the
-    // screen's content area, leaving the real header — and its real back
-    // button and iOS swipe-back gesture — in place. Re-adding either of these
-    // would mean the Modal is back.
-    // The pad stays mounted through its slide-out so it does not vanish the
-    // instant the phase flips; it is removed when that animation reports done.
+    // The pad fills the content area only, never a Modal, and stays mounted through its slide-out.
     it('unmounts the pad once the exit animation finishes', async () => {
       const submitPin = jest.fn();
       const { rerender } = renderSheet(makeNfc('pin_entry', { submitPin }));
@@ -447,11 +436,7 @@ describe('NFCBottomSheet — Android sheet', () => {
       expect(screen.queryByLabelText('Go back')).toBeNull();
     });
 
-    // #282: the overlay is absolutely positioned, so Yoga anchors it to the
-    // host container's padding box and the host's own bottom-inset padding is
-    // covered rather than inherited. The overlay has to pad for the system
-    // navigation bar itself or the bottom keypad row (the 0 key) lands under
-    // it on edge-to-edge Android.
+    // #282: the overlay pads for the navigation bar itself.
     it('pads the overlay by the bottom safe-area inset', () => {
       mockInsets.bottom = 48;
       renderSheet(makeNfc('pin_entry', { submitPin: jest.fn() }));

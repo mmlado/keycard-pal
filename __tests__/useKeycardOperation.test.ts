@@ -598,8 +598,7 @@ describe('useKeycardOperation', () => {
       );
     });
 
-    // An uninitialized 3.x card reports neither an instance UID nor a
-    // version, so there is no card key to look a pairing up by.
+    // A blank 3.x card has no card key to look a pairing up by.
     it('enters error phase when the card is not initialized', async () => {
       const Keycard = require('keycard-sdk').default;
       Keycard.Commandset.mockImplementation(() => ({
@@ -619,10 +618,7 @@ describe('useKeycardOperation', () => {
     });
   });
 
-  // The second tap of an identify-then-operate flow can land on a different
-  // card than the first. By then the PIN is typed, so the check has to come
-  // before anything that could spend an attempt or send a command the card
-  // does not have.
+  // The second tap can land on another card, so the check comes before anything is spent or sent.
   describe('requiresRoute', () => {
     const CERTIFICATE = [...filler(33, 0x02), ...filler(65, 0x09)];
 
@@ -718,8 +714,7 @@ describe('useKeycardOperation', () => {
       );
     });
 
-    // The option is per execute: a bound operation must not leave its route
-    // behind for whatever this hook instance runs next.
+    // The option is per execute; it must not leak into the next run.
     it('does not carry over to the next operation', async () => {
       useCard(v4Select(0x0400, { certificate: CERTIFICATE }));
       const { result } = await tapWithPin({
@@ -745,8 +740,7 @@ describe('useKeycardOperation', () => {
     });
   });
 
-  // Cards that carry a certificate (ADR-0013): no pairing, no IDENTIFY CARD,
-  // and nothing but SELECT answered outside the secure channel.
+  // Cards with a certificate (ADR-0013).
   describe('certificate cards', () => {
     const UNKNOWN_CA =
       'Card certificate verification failed: unknown CA public key and card not whitelisted';
@@ -816,8 +810,7 @@ describe('useKeycardOperation', () => {
         expect(cmdSet.identifyCard).not.toHaveBeenCalled();
       });
 
-      // Such a card answers nothing but SELECT outside the channel, so a name
-      // read sent first would come back 0x6985 and fail the whole operation.
+      // Outside the channel a name read would come back 0x6985.
       it('opens the channel before it reads the name or verifies the PIN', async () => {
         const cmdSet = useCard();
         await start();
@@ -891,9 +884,7 @@ describe('useKeycardOperation', () => {
         expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
       });
 
-      // Anyone can present a copied certificate. Only the card that holds its
-      // private key can sign the handshake, so that is when the approval
-      // becomes worth keeping, and not a moment earlier.
+      // Only the handshake proves the card holds its key, so the approval is kept then.
       it('remembers the approval only once the handshake has succeeded', async () => {
         useUntrustedCard();
         const { result, op } = await start();
@@ -931,8 +922,7 @@ describe('useKeycardOperation', () => {
         expect(op).not.toHaveBeenCalled();
       });
 
-      // The write is not awaited and may fail. The approval then still holds
-      // from memory for this session, and the operation is not disturbed.
+      // The write may fail; the approval still holds from memory.
       it('runs the operation even when the approval cannot be saved', async () => {
         mockApproveCardKey.mockRejectedValue(new Error('storage full'));
         useUntrustedCard();
@@ -956,8 +946,7 @@ describe('useKeycardOperation', () => {
         });
         expect(result.current.phase).toBe('idle');
 
-        // A later approval of a card WITHOUT a certificate must not be filed
-        // as a certificate approval because of this one.
+        // A later approval of a card without a certificate must not be filed as one with.
         useCard();
         const next = await start();
         await tap();
@@ -974,8 +963,7 @@ describe('useKeycardOperation', () => {
       expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
     });
 
-    // A blank card with a certificate has a card key from its first SELECT,
-    // so the missing key is not what gives it away: its status is.
+    // A blank card with a certificate has a card key; its status gives it away.
     it('says so when the card is not initialized', async () => {
       const cmdSet = useCard({ applicationInfo: card({ status: 0x00 }) });
       const { result } = await start();
@@ -988,8 +976,7 @@ describe('useKeycardOperation', () => {
     });
   });
 
-  // The 3.x wire order is what every card in the field depends on, and the
-  // certificate branch was cut out of the same function.
+  // The 3.x wire order must not change.
   describe('cards without a certificate', () => {
     it('still reads the name before it pairs and opens the channel', async () => {
       const cmdSet = makeMockCmdSet();
@@ -1113,9 +1100,7 @@ describe('useKeycardOperation', () => {
     });
 
     it('does NOT swallow a tag loss during the fingerprint export', async () => {
-      // Observed on-device: the card left the field during the export; the
-      // old swallow sent the operation onto a dead channel, which froze in
-      // Processing until the 120 s transceive timeout.
+      // Seen on a device: swallowing this sent the operation onto a dead channel.
       const cmdSet = makeUnnamedCmdSet({
         exportKey: jest
           .fn()
@@ -1138,8 +1123,7 @@ describe('useKeycardOperation', () => {
       });
       await triggerCardConnect();
 
-      // The op never ran on the dead channel; the session entered the
-      // reconnect wait instead.
+      // The op never ran; the session waits for a re-tap.
       expect(operation).not.toHaveBeenCalled();
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
@@ -1500,9 +1484,7 @@ describe('useKeycardOperation', () => {
     });
   });
 
-  // T3/R9: the autoPair window is non-idempotent — PAIR step 2 commits a slot
-  // on the card before the response is read — so a tag loss inside it must
-  // never be silently replayed, even when the operation opted into retry.
+  // PAIR commits a slot before the response is read, so a loss there is never replayed.
   describe('tag loss', () => {
     const TAG_LOST = 'CardIO Error: Error: Tag was lost.';
 
@@ -1555,11 +1537,7 @@ describe('useKeycardOperation', () => {
       expect(mockStopNFCWithError).not.toHaveBeenCalled();
     });
 
-    // R14 amended by the 2026-08-22 device probe: verifyPIN is a
-    // non-idempotent window. The card may decrement its 3-attempt counter
-    // before the response is lost, so an unconfirmed PIN is never silently
-    // resubmitted — the loss is an error, the cached PIN is forgotten, and
-    // retry re-prompts so every attempt is user-authorised.
+    // An unconfirmed PIN is never resubmitted: the loss is an error and retry re-prompts.
     it('during verifyPIN: error, cached PIN forgotten, retry re-prompts', async () => {
       mockLoadPairing.mockResolvedValue({ pairingIndex: 1 } as any);
       const Keycard = require('keycard-sdk').default;
@@ -1593,16 +1571,12 @@ describe('useKeycardOperation', () => {
       await act(async () => {
         result.current.retry();
       });
-      // The unconfirmed PIN was discarded, so retry shows the PIN pad again
-      // instead of restarting the reader with a cached value.
+      // The PIN was discarded, so retry shows the PIN pad.
       expect(result.current.phase).toBe('pin_entry');
       expect(mockStartNFC).not.toHaveBeenCalled();
     });
 
-    // Reported from device: pairing failed, Try again, then the card was
-    // removed during PIN validation and it failed hard rather than showing the
-    // reconnect nudge. These two pin down whether that is the designed
-    // verifyPIN window or a retryUnsafeRef left raised by the earlier failure.
+    // From a device report: is this the verifyPIN window, or a retryUnsafeRef left raised?
     it('after an autoPair failure and retry: a verifyPIN loss still fails hard', async () => {
       mockLoadPairing.mockResolvedValue(null);
       mockCheckGenuine.mockResolvedValue(true);
@@ -1644,9 +1618,7 @@ describe('useKeycardOperation', () => {
       );
     });
 
-    // The load-bearing one: if the earlier hard failure left retryUnsafeRef
-    // raised, this later loss — which IS safe to replay — would wrongly fail
-    // hard too. It must reach the reconnect wait.
+    // A flag left raised by the earlier failure would wrongly fail this safe loss.
     it('an earlier autoPair failure does not poison a later retryable loss', async () => {
       mockLoadPairing.mockResolvedValue(null);
       mockCheckGenuine.mockResolvedValue(true);
@@ -1683,18 +1655,14 @@ describe('useKeycardOperation', () => {
       await act(async () => {
         await capturedOnConnected?.();
       });
-      // Pairing and PIN both succeeded this run; the loss landed in the
-      // operation itself, which opted into retry.
+      // The loss landed in the operation, which opted into retry.
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
       expect(mockStopNFCWithError).not.toHaveBeenCalled();
     });
 
     it('after a verified PIN: a loss during a RE-verify keeps the reconnect wait', async () => {
-      // On every reconnect the handshake re-runs, so verifyPIN runs again. A
-      // known-correct PIN resets the card's attempt counter rather than
-      // decrementing it, so those re-verifies are safe to replay — guarding
-      // them made every card slip during the handshake a hard error.
+      // A PIN that already verified is safe to replay: a correct verify resets the counter.
       mockLoadPairing.mockResolvedValue({ pairingIndex: 1 } as any);
       const Keycard = require('keycard-sdk').default;
       const verifyPIN = jest
@@ -1754,9 +1722,7 @@ describe('useKeycardOperation', () => {
       await act(async () => {
         await capturedOnConnected?.();
       });
-      // verifyPIN succeeded (window closed), the loss hit the op itself: the
-      // PIN is proven correct this session, so replaying it cannot walk the
-      // counter — the reconnect wait stays.
+      // The PIN is proven this session, so the reconnect wait stays.
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
 

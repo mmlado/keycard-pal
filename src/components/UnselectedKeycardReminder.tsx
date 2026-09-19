@@ -13,15 +13,7 @@ import {
   subscribeLastTappedGeneration,
 } from '@/utils/lastTappedGeneration';
 
-/**
- * A reminder that the card just tapped is one the user left unticked under
- * "Keycards in use", so some of what it can do is not in the menus.
- *
- * It follows a tap, never an app update: a tap is evidence the user holds such
- * a card. The card worked regardless, since the selection never refuses one;
- * this only offers to tick it, or to stop mentioning it. Nothing is drawn while
- * the last tapped card is one the user ticked, or one they closed this for.
- */
+/** Shown after a tap of an unticked generation, never after an app update. Offers to tick it, or to stay quiet. */
 export default function UnselectedKeycardReminder() {
   const { preferences, setPreference } = usePreferences();
   const tapped = useSyncExternalStore(
@@ -36,8 +28,7 @@ export default function UnselectedKeycardReminder() {
   }
 
   const label = generationLabel(tapped);
-  // Rebuilt from the table so the stored order never depends on the order in
-  // which generations were added.
+  // Rebuilt from the table, so the stored order is always table order.
   const inTableOrder = (wanted: readonly string[]) =>
     GENERATIONS.map(entry => entry.generation).filter(
       known => known === tapped || wanted.includes(known),

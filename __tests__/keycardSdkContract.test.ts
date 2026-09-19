@@ -2,22 +2,9 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Asserts the INSTALLED keycard-sdk carries the fix that initializing an
- * applet 4.0 card depends on.
- *
- * keycard-sdk 4.0.0 as released does not await the Secure Channel V2 handshake
- * inside `Commandset.init()`. It builds the INIT command while the channel is
- * still opening, so the new PIN and PUK leave the phone unencrypted, outside
- * any channel, and the card refuses them with 0x6985. Seen on a real card on
- * 2026-09-18. `package.json` therefore pins a fork build that awaits the
- * handshake, by commit, the way the bridge is pinned (ADR-0008).
- *
- * `dist/` is built by `prepare` at install time, so neither the lockfile SHA
- * nor the fork's sources prove what ships. This reads node_modules directly.
- * It goes red if the pin is moved back to a release without the fix, which is
- * exactly the mistake a routine "bump to ^4.0.x" would be. Once upstream has
- * released the fix, the pin can go back to a version range and this test stays
- * as it is.
+ * Reads the INSTALLED keycard-sdk: the 4.0.0 release does not await the V2 handshake in
+ * `init()` and sends INIT in the clear (seen on a card, 2026-09-18). package.json pins a build
+ * with the fix (ADR-0008); this goes red if the pin moves to a release without it.
  */
 const commandset = readFileSync(
   join(__dirname, '..', 'node_modules', 'keycard-sdk', 'dist', 'commandset.js'),
