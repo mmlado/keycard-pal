@@ -29,11 +29,10 @@ describe('WalletConnect packages stay on a free license', () => {
   });
 
   it.each([
-    '@reown/walletkit',
-    '@walletconnect/core',
-    '@walletconnect/react-native-compat',
-  ])('%s is pinned to an exact version', name => {
-    const range = readJson('package.json').dependencies[name];
-    expect(range).toMatch(/^\d+\.\d+\.\d+$/);
+    ['@reown/walletkit', '1.2.10'],
+    ['@walletconnect/core', '2.21.7'],
+    ['@walletconnect/react-native-compat', '2.21.8'],
+  ])('%s is pinned to %s', (name, version) => {
+    expect(readJson('package.json').dependencies[name]).toBe(version);
   });
 });
