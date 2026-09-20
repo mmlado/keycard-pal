@@ -9,8 +9,16 @@ interface InjectedExecOps {
     @Inject ExecOperations getExecOps()
 }
 
-// __FILE__ and debug info carry the checkout path and the Gradle home.
 android {
+    // React Native's Gradle plugin puts the build machine's first non-loopback
+    // IPv4 address in this resource, in every variant. A release never reads it.
+    buildTypes {
+        release {
+            resValue 'string', 'react_native_dev_server_ip', 'localhost'
+        }
+    }
+
+    // __FILE__ and debug info carry the checkout path and the Gradle home.
     defaultConfig {
         def repoRoot = rootProject.projectDir.parentFile.absolutePath
         def gradleHome = gradle.gradleUserHomeDir.absolutePath

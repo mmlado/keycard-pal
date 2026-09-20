@@ -23,6 +23,12 @@ them native libraries:
   over debug info still holding absolute paths. That includes libraries built by
   their own CMake project (`librnscreens`), where the app's compiler flags never
   arrive.
+- `resources.arsc` holds a string resource named `react_native_dev_server_ip`.
+  React Native's Gradle plugin fills it with the first non-loopback IPv4 address
+  of the machine doing the build, in every variant, release included
+  (`AgpConfiguratorUtils.configureDevServerLocation`). Released APKs up to
+  v1.10.0 carry the CI runner's address. Only the Metro connection reads it, and
+  a release build never opens one.
 
 ## Decision
 
@@ -30,6 +36,8 @@ them native libraries:
 
 - passes `-ffile-prefix-map` for the checkout and for the Gradle home to the
   app's CMake build;
+- overrides `react_native_dev_server_ip` to `localhost` on the release build
+  type, which is the plugin's own fallback value;
 - removes `.note.gnu.build-id` from every release native library, in `doLast` of
   AGP's own `strip<Variant>DebugSymbols` task. A separate task would race AGP's.
 
@@ -54,6 +62,10 @@ Measured on both flavors, comparing whole universal APK files by SHA-256:
   22.22.2, 22.22.3 and 24.13.1.
 - **A `WC_PROJECT_ID` in the environment or `.env` is**, for the full flavor.
   No release build has one (#328), and builds are only compared without it.
+- **The build machine's IP address was**, until the override above. It was the
+  last difference left: with it in place 911 of 912 APK entries already matched
+  between this machine and F-Droid's buildserver, and `resources.arsc` was the
+  one that did not.
 
 ## Considered options
 
@@ -62,12 +74,16 @@ Measured on both flavors, comparing whole universal APK files by SHA-256:
 - **Build inside a fixed path or container everywhere.** Hides the path problem
   instead of removing it, and the F-Droid buildserver's path is not ours to set.
 - **Strip the build id in a separate Gradle task.** Races AGP's strip task.
+- **Patch `react_native_dev_server_ip` out of `node_modules`.** A build type's
+  `resValue` is the supported way to override it and survives a reinstall.
 
 ## Consequences
 
 - Anyone can rebuild a release and compare it with the published file.
 - A release must never be built with a JDK that links a non-mainline system
   zlib. On a Fedora machine that means Temurin only.
+- A release APK no longer tells its users which address the machine that built
+  it had on its network.
 - The proof has to be repeated after a React Native, AGP, NDK or JDK upgrade:
   two `git worktree` checkouts at different paths, a second `GRADLE_USER_HOME`
   seeded with a copy of `~/.gradle/caches/modules-2`,
