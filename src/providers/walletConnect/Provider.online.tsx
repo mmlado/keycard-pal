@@ -55,11 +55,9 @@ export function WalletConnectProvider({
 
   useEffect(() => {
     let mounted = true;
-    let removeListeners: (() => void) | undefined;
 
-    wcClient.getClient().then(client => {
-      if (!mounted) return;
-
+    // Subscribing creates nothing: the client only exists after pair().
+    const unsubscribe = wcClient.onClient(client => {
       function onProposal(event: SessionProposalEvent) {
         if (!mounted) return;
         setPhase({ kind: 'proposal', proposal: event });
@@ -140,16 +138,18 @@ export function WalletConnectProvider({
       client.on('session_request', onRequest);
       client.on('session_delete', onDelete);
 
-      removeListeners = () => {
+      return () => {
         client.off('session_proposal', onProposal);
         client.off('session_request', onRequest);
         client.off('session_delete', onDelete);
+        // The client was replaced (new Project ID): its session went with it.
+        onDelete();
       };
     });
 
     return () => {
       mounted = false;
-      removeListeners?.();
+      unsubscribe();
     };
   }, []);
 
