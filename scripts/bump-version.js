@@ -46,6 +46,22 @@ const repo = 'https://github.com/mmlado/keycard-pal';
 console.log(`Bumping ${pkg.version} → ${newVersion} (code: ${versionCode})`);
 
 // ---------------------------------------------------------------------------
+// src/constants/app.ts
+// ---------------------------------------------------------------------------
+
+const appConstantsPath = path.join(ROOT, 'src/constants/app.ts');
+const appConstants = fs.readFileSync(appConstantsPath, 'utf8');
+const bumpedAppConstants = appConstants.replace(
+  /APP_VERSION = '\d+\.\d+\.\d+'/,
+  `APP_VERSION = '${newVersion}'`,
+);
+if (bumpedAppConstants === appConstants) {
+  console.error('APP_VERSION not found in src/constants/app.ts');
+  process.exit(1);
+}
+fs.writeFileSync(appConstantsPath, bumpedAppConstants);
+
+// ---------------------------------------------------------------------------
 // package.json
 // ---------------------------------------------------------------------------
 
@@ -161,7 +177,7 @@ fs.writeFileSync(
 const branch = `release/v${newVersion}`;
 execSync(`git checkout -b ${branch}`, { stdio: 'inherit' });
 execSync(
-  'git add package.json package-lock.json android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md fdroiddata-com.keycardpal.yml fastlane/metadata/android/en-US/changelogs',
+  'git add package.json package-lock.json src/constants/app.ts android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md fdroiddata-com.keycardpal.yml fastlane/metadata/android/en-US/changelogs',
   { stdio: 'inherit' },
 );
 execSync(`git commit -m "chore: bump version to ${newVersion}"`, {

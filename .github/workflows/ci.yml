@@ -45,3 +45,23 @@ jobs:
           files: ./coverage/lcov.info
           flags: jest
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  bundles:
+    name: Offline bundle check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the offline and online bundles
+        run: npm run check:bundles
