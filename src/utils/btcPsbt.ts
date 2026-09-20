@@ -1,13 +1,6 @@
 /* eslint-disable no-bitwise */
 import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
-import {
-  Psbt,
-  Transaction,
-  address,
-  networks,
-  payments,
-  script as bscript,
-} from 'bitcoinjs-lib';
+import { Psbt, Transaction, address, networks, payments } from 'bitcoinjs-lib';
 import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
@@ -246,58 +239,83 @@ function isBip322MessagePsbt(psbt: Psbt): boolean {
   );
 }
 
-function scriptNamesPubkey(candidate: Buffer, pubkey: Buffer): boolean {
-  const chunks = bscript.decompile(candidate);
-  return (
-    chunks?.some(chunk => Buffer.isBuffer(chunk) && chunk.equals(pubkey)) ??
-    false
-  );
+// The payment builders throw on a key or script they do not recognise, and a
+// PSBT off the wire carries whatever it likes. Refusing to build is an answer:
+// a script the builder will not make from this key is not this key's script.
+function scriptEqualsPayment(
+  script: Buffer,
+  build: () => Buffer | undefined,
+): boolean {
+  try {
+    const candidate = build();
+    return candidate !== undefined && script.equals(candidate);
+  } catch {
+    return false;
+  }
 }
 
-// Whether spending this output needs the entry's key: on its own for
-// single-sig, or as one of the keys the script names for multisig. An entry
-// that fails this points at a key the output cannot be spent with, so it says
-// nothing about whose output it is and is thrown out here, before any tap.
+// Whether a signature by this key is needed to satisfy the script, read off
+// the script's own template: it is the key of a p2pk, p2pkh or p2wpkh, or one
+// of the keys of a bare multisig. Merely appearing in the script is not
+// enough, since `<our key> OP_DROP <their key> OP_CHECKSIG` pushes our key
+// into a script only they can spend. Any template this cannot read is
+// answered no, so an exotic script loses the label instead of borrowing it.
+function scriptRequiresPubkey(script: Buffer, pubkey: Buffer): boolean {
+  const singleSig = [payments.p2wpkh, payments.p2pkh, payments.p2pk].some(
+    build => scriptEqualsPayment(script, () => build({ pubkey }).output),
+  );
+
+  if (singleSig) {
+    return true;
+  }
+
+  try {
+    const { pubkeys } = payments.p2ms({ output: script });
+    return pubkeys?.some(key => key.equals(pubkey)) ?? false;
+  } catch {
+    return false;
+  }
+}
+
+// Whether spending this output needs the entry's key. For a script output the
+// wrapper has to hash to the script the PSBT hands over as well, or a witness
+// or redeem script from anywhere would do. An entry that fails this points at
+// a key the output cannot be spent with, so it says nothing about whose output
+// it is and is thrown out here, before any tap.
 function outputNeedsPubkey(
   output: PsbtOutput,
   script: Buffer,
   pubkey: Buffer,
 ): boolean {
-  try {
-    const { witnessScript, redeemScript } = output;
+  const { witnessScript, redeemScript } = output;
 
-    if (witnessScript) {
-      const wsh = payments.p2wsh({ redeem: { output: witnessScript } }).output!;
-      const nested =
-        redeemScript !== undefined &&
-        redeemScript.equals(wsh) &&
-        script.equals(payments.p2sh({ redeem: { output: wsh } }).output!);
-
-      return (
-        (script.equals(wsh) || nested) &&
-        scriptNamesPubkey(witnessScript, pubkey)
+  if (witnessScript) {
+    const asWsh = () =>
+      payments.p2wsh({ redeem: { output: witnessScript } }).output;
+    const nested =
+      redeemScript !== undefined &&
+      scriptEqualsPayment(redeemScript, asWsh) &&
+      scriptEqualsPayment(
+        script,
+        () => payments.p2sh({ redeem: { output: redeemScript } }).output,
       );
-    }
-
-    if (redeemScript) {
-      return (
-        script.equals(
-          payments.p2sh({ redeem: { output: redeemScript } }).output!,
-        ) &&
-        (redeemScript.equals(payments.p2wpkh({ pubkey }).output!) ||
-          scriptNamesPubkey(redeemScript, pubkey))
-      );
-    }
 
     return (
-      script.equals(payments.p2wpkh({ pubkey }).output!) ||
-      script.equals(payments.p2pkh({ pubkey }).output!) ||
-      script.equals(payments.p2pk({ pubkey }).output!)
+      (scriptEqualsPayment(script, asWsh) || nested) &&
+      scriptRequiresPubkey(witnessScript, pubkey)
     );
-  } catch {
-    // A key the payment builders refuse cannot be the key of any script.
-    return false;
   }
+
+  if (redeemScript) {
+    return (
+      scriptEqualsPayment(
+        script,
+        () => payments.p2sh({ redeem: { output: redeemScript } }).output,
+      ) && scriptRequiresPubkey(redeemScript, pubkey)
+    );
+  }
+
+  return scriptRequiresPubkey(script, pubkey);
 }
 
 // Taproot entries are left out whole: matching one against the output needs

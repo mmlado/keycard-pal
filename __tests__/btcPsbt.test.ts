@@ -90,6 +90,28 @@ function psbtWithChangeClaim({
   return psbt.toBuffer().toString('hex');
 }
 
+// A PSBT whose only output is the one under test, carrying one derivation
+// entry. The input is there to keep the unsigned transaction unambiguous:
+// a zero-input transaction serialises to bytes that read back as segwit.
+function psbtWithOutput(
+  output: Record<string, unknown> & { script: Buffer },
+  pubkey: Buffer = CARD_PUBKEY,
+): string {
+  const { Psbt, networks } = require('bitcoinjs-lib');
+  const psbt = new Psbt({ network: networks.testnet });
+
+  psbt.addInput({ hash: Buffer.alloc(32, 0xaa), index: 0 });
+  psbt.addOutput({
+    ...output,
+    value: 9_000,
+    bip32Derivation: [
+      { masterFingerprint: CARD_FINGERPRINT, path: CHANGE_PATH, pubkey },
+    ],
+  });
+
+  return psbt.toBuffer().toString('hex');
+}
+
 // PSBT with one input (m/84'/0'/0'/0/0) and two outputs (one change, one recipient)
 // Built with bitcoinjs-lib in a real environment; values are plausible testnet amounts.
 // We use a pre-serialised hex to keep the test self-contained.
@@ -391,8 +413,118 @@ describe('inspectBtcPsbt change claims', () => {
     expect(summary.outputs[1].claimsChange).toBe(true);
   });
 
+  it.each([['p2pkh'], ['p2pk']])('keeps a claim on a %s output', form => {
+    const { payments, networks } = require('bitcoinjs-lib');
+    const summary = inspectBtcPsbt(
+      psbtWithOutput({
+        script: payments[form]({
+          pubkey: CARD_PUBKEY,
+          network: networks.testnet,
+        }).output!,
+      }),
+    );
+    expect(summary.outputs[0].claimsChange).toBe(true);
+  });
+
+  it('keeps a claim on a p2sh-wrapped p2wpkh output', () => {
+    const { payments, networks } = require('bitcoinjs-lib');
+    const redeem = payments.p2wpkh({
+      pubkey: CARD_PUBKEY,
+      network: networks.testnet,
+    });
+    const summary = inspectBtcPsbt(
+      psbtWithOutput({
+        script: payments.p2sh({ redeem, network: networks.testnet }).output!,
+        redeemScript: redeem.output!,
+      }),
+    );
+    expect(summary.outputs[0].claimsChange).toBe(true);
+  });
+
+  it('drops a claim whose redeem script does not hash to the output', () => {
+    const { payments, networks } = require('bitcoinjs-lib');
+    const summary = inspectBtcPsbt(
+      psbtWithOutput({
+        script: payments.p2sh({
+          redeem: payments.p2wpkh({
+            pubkey: OTHER_PUBKEY,
+            network: networks.testnet,
+          }),
+          network: networks.testnet,
+        }).output!,
+        redeemScript: payments.p2wpkh({
+          pubkey: CARD_PUBKEY,
+          network: networks.testnet,
+        }).output!,
+      }),
+    );
+    expect(summary.outputs[0].claimsChange).toBe(false);
+  });
+
+  it('drops a claim whose key is only pushed, not required, by the script', () => {
+    // <card key> OP_DROP <their key> OP_CHECKSIG: the card's key is in the
+    // script and spends nothing. Reading "is the key there" rather than "does
+    // the script need it" would call this output the user's change.
+    const { payments, networks, script, opcodes } = require('bitcoinjs-lib');
+    const decoy = script.compile([
+      CARD_PUBKEY,
+      opcodes.OP_DROP,
+      OTHER_PUBKEY,
+      opcodes.OP_CHECKSIG,
+    ]);
+    const summary = inspectBtcPsbt(
+      psbtWithOutput({
+        script: payments.p2wsh({
+          redeem: { output: decoy },
+          network: networks.testnet,
+        }).output!,
+        witnessScript: decoy,
+      }),
+    );
+    expect(summary.outputs[0].claimsChange).toBe(false);
+  });
+
+  it('keeps a p2pkh claim whose key the witness forms would refuse', () => {
+    // An uncompressed key has no p2wpkh form at all. Asking p2wpkh first must
+    // not cost the output its p2pkh answer.
+    const { payments, networks } = require('bitcoinjs-lib');
+    const uncompressed = Buffer.concat([
+      Buffer.from([0x04]),
+      Buffer.alloc(64, 0x05),
+    ]);
+    const summary = inspectBtcPsbt(
+      psbtWithOutput(
+        {
+          script: payments.p2pkh({
+            pubkey: uncompressed,
+            network: networks.testnet,
+          }).output!,
+        },
+        uncompressed,
+      ),
+    );
+    expect(summary.outputs[0].claimsChange).toBe(true);
+  });
+
   it('keeps a claim on a multisig output that names the key in its script', () => {
-    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const { payments, networks } = require('bitcoinjs-lib');
+    const multisig = payments.p2ms({
+      m: 2,
+      pubkeys: [CARD_PUBKEY, OTHER_PUBKEY],
+      network: networks.testnet,
+    });
+    const summary = inspectBtcPsbt(
+      psbtWithOutput({
+        script: payments.p2wsh({ redeem: multisig, network: networks.testnet })
+          .output!,
+        witnessScript: multisig.output!,
+      }),
+    );
+    expect(summary.outputs[0].claimsChange).toBe(true);
+  });
+
+  it('keeps a claim on a p2sh-wrapped multisig output', () => {
+    const { payments, networks } = require('bitcoinjs-lib');
     const multisig = payments.p2ms({
       m: 2,
       pubkeys: [CARD_PUBKEY, OTHER_PUBKEY],
@@ -402,38 +534,19 @@ describe('inspectBtcPsbt change claims', () => {
       redeem: multisig,
       network: networks.testnet,
     });
-
-    const psbt = new Psbt({ network: networks.testnet });
-    psbt.addInput({
-      hash: Buffer.alloc(32, 0xaa),
-      index: 0,
-      bip32Derivation: [
-        {
-          masterFingerprint: CARD_FINGERPRINT,
-          path: "m/48'/1'/0'/2'/0/0",
-          pubkey: CARD_PUBKEY,
-        },
-      ],
-    });
-    psbt.addOutput({
-      script: wsh.output!,
-      value: 9_000,
-      witnessScript: multisig.output!,
-      bip32Derivation: [
-        {
-          masterFingerprint: CARD_FINGERPRINT,
-          path: "m/48'/1'/0'/2'/1/0",
-          pubkey: CARD_PUBKEY,
-        },
-      ],
-    });
-
-    const summary = inspectBtcPsbt(psbt.toBuffer().toString('hex'));
+    const summary = inspectBtcPsbt(
+      psbtWithOutput({
+        script: payments.p2sh({ redeem: wsh, network: networks.testnet })
+          .output!,
+        redeemScript: wsh.output!,
+        witnessScript: multisig.output!,
+      }),
+    );
     expect(summary.outputs[0].claimsChange).toBe(true);
   });
 
   it('drops a multisig claim whose key is in no part of the script', () => {
-    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const { payments, networks } = require('bitcoinjs-lib');
     const multisig = payments.p2ms({
       m: 2,
       pubkeys: [
@@ -442,27 +555,13 @@ describe('inspectBtcPsbt change claims', () => {
       ],
       network: networks.testnet,
     });
-    const wsh = payments.p2wsh({
-      redeem: multisig,
-      network: networks.testnet,
-    });
-
-    const psbt = new Psbt({ network: networks.testnet });
-    psbt.addInput({ hash: Buffer.alloc(32, 0xaa), index: 0 });
-    psbt.addOutput({
-      script: wsh.output!,
-      value: 9_000,
-      witnessScript: multisig.output!,
-      bip32Derivation: [
-        {
-          masterFingerprint: CARD_FINGERPRINT,
-          path: "m/48'/1'/0'/2'/1/0",
-          pubkey: CARD_PUBKEY,
-        },
-      ],
-    });
-
-    const summary = inspectBtcPsbt(psbt.toBuffer().toString('hex'));
+    const summary = inspectBtcPsbt(
+      psbtWithOutput({
+        script: payments.p2wsh({ redeem: multisig, network: networks.testnet })
+          .output!,
+        witnessScript: multisig.output!,
+      }),
+    );
     expect(summary.outputs[0].claimsChange).toBe(false);
   });
 
@@ -704,8 +803,7 @@ describe('BtcSigningSession', () => {
     await expect(session.signWithKeycard(cmdSet)).rejects.toThrow(
       new RegExp(
         `Output 2 \\(tb1.*\\) is marked as change, but the key this Keycard ` +
-          `holds at ${CHANGE_PATH.replace(/'/g, "'")} is not the key that ` +
-          `output pays`,
+          `holds at ${CHANGE_PATH} is not the key that output pays`,
       ),
     );
     expect(cmdSet.signWithPath).not.toHaveBeenCalled();
