@@ -1,20 +1,12 @@
-# Draft fdroiddata recipe for the FULL flavor, application id com.keycardpal.
-# In a fork of https://gitlab.com/fdroid/fdroiddata it goes to metadata/com.keycardpal.yml.
-# Same repo, commit and scanner rules as fdroiddata-com.keycardpal.offline.yml; only the
-# flavor, the output, the Ads wording and NonFreeNet differ. The first release it can build
-# is the one carrying the WalletConnect pin (#317). Remove all comments before submitting.
+# Draft fdroiddata recipe for the OFFLINE flavor, application id com.keycardpal.offline.
+# In a fork of https://gitlab.com/fdroid/fdroiddata it goes to
+# metadata/com.keycardpal.offline.yml. Its sibling is fdroiddata-com.keycardpal.yml (full).
+# Remove all comments before submitting.
 
 AntiFeatures:
   Ads:
-    en-US: Buy a Keycard entries open an affiliate link to the Keycard shop, and the
-      developer earns a commission on purchases made through it.
-  NonFreeNet:
-    en-US: Optional features, all disabled by default, connect to network services that
-      are not free software. WalletConnect uses the Reown relay with a project ID you
-      provide yourself, transaction simulation uses Tenderly with an API key you provide
-      yourself, ENS names are looked up through a public Ethereum RPC endpoint you can
-      change, and token images are downloaded from CoinGecko, GitHub and CoinMarketCap.
-      Signing by QR code works without any of them.
+    en-US: Buy a Keycard entries show a QR code of an affiliate link to the Keycard
+      shop, and the developer earns a commission on purchases made through it.
 Categories:
   - Security
   - Wallet
@@ -54,8 +46,8 @@ Builds:
       - cd ../..
       - npm ci
     gradle:
-      - full
-    output: build/outputs/apk/full/release/keycard-pal-full-release-universal.apk
+      - offline
+    output: build/outputs/apk/offline/release/keycard-pal-offline-release-universal.apk
     rm:
       - ios
     prebuild:

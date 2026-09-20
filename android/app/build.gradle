@@ -264,3 +264,5 @@ dependencies {
         add("fullImplementation", project(":${name}"))
     }
 }
+
+apply from: "../reproducible-builds.gradle"

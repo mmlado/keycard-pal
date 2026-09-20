@@ -24,8 +24,8 @@ Keycard Pal comes in two variants:
 
 | Variant | Package ID | Internet |
 |---------|-----------|----------|
-| **Keycard Pal** | `com.keycardpal` | Optional — for future opt-in security features (ENS, simulation) |
-| **Keycard Pal Offline** | `com.keycardpal.offline` | Never — `INTERNET` permission is absent from the manifest |
+| **Keycard Pal** | `com.keycardpal` | Optional. WalletConnect, ENS names, Tenderly simulation and token images, each off until you turn it on in Settings |
+| **Keycard Pal Offline** | `com.keycardpal.offline` | Never. The `INTERNET` permission is absent from the manifest |
 
 Both variants are fully functional for signing and key management. Keycard Pal Offline is the right choice if you want a hard, manifest-level guarantee of no network access.
 
@@ -57,7 +57,7 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 - Import a recovery phrase (BIP-39, 12 or 24 words, with optional passphrase)
 - Import SLIP-39 Shamir Secret Sharing shares
 - Genuine Keycard verification before first pairing
-- Two variants: Keycard Pal Offline (no internet, manifest-level guarantee) and Keycard Pal (optional internet for future security features)
+- Two variants: Keycard Pal Offline (no internet, manifest-level guarantee) and Keycard Pal (optional, opt-in online features: WalletConnect, ENS names, Tenderly transaction simulation, token images)
 
 ## Requirements
 
@@ -147,6 +147,17 @@ cd android && ./gradlew assembleOfflineRelease   # Keycard Pal Offline (com.keyc
 npm test      # Jest test suite
 npm run lint  # ESLint
 ```
+
+## How it is built
+
+Keycard Pal is developed with substantial help from AI coding assistants (Claude and
+Codex). I decide what gets built, read and test what goes in, and maintain it myself. What
+keeps that honest is in the repository: a Jest suite of about 2,100 tests that runs on every
+pull request, 15 architecture decision records explaining why things are the way they are,
+a check that the offline build carries no online code, and release APKs that anyone can
+rebuild byte for byte. Fixes that belonged upstream were sent upstream, to `keycard-sdk`
+and to the React Native Keycard bridge. Every release is tested on real Keycards and real
+phones before it ships.
 
 ## Buy me a coffee
 
