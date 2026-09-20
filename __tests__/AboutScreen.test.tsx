@@ -156,7 +156,7 @@ describe('AboutScreen', () => {
 
   it('shows QR for a contributor profile', () => {
     renderScreen();
-    fireEvent.press(screen.getByLabelText(/Show QR code for .+/));
+    fireEvent.press(screen.getAllByLabelText(/Show QR code for .+/)[0]);
     expect(mockUseNavigationNavigate).toHaveBeenCalledWith('UrlQR', {
       url: expect.stringContaining('github.com'),
       title: expect.any(String),
@@ -165,7 +165,7 @@ describe('AboutScreen', () => {
 
   it('opens a contributor profile in the browser', () => {
     renderScreen();
-    fireEvent.press(screen.getByLabelText(/Open .* GitHub profile/));
+    fireEvent.press(screen.getAllByLabelText(/Open .* GitHub profile/)[0]);
     expect(Linking.openURL).toHaveBeenCalledWith(
       expect.stringContaining('github.com'),
     );
