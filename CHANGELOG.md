@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - WalletConnect needs your own Project ID, entered in Settings, on every build including Google Play; without one a `wc:` code is ignored
 - The offline build's JavaScript is now checked for online-only code on every pull request and in every release APK
 - Release APKs now build byte-identically on any machine, so anyone can rebuild one and compare it with the published file
+- The store description now covers both builds, and the F-Droid repository labels the affiliate links as `Ads` and the online build's optional services as `NonFreeNet`
 
 ### Fixed
 

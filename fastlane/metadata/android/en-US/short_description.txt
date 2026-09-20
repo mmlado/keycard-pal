@@ -1,1 +1,1 @@
-Air-gapped Ethereum and Bitcoin signing. Requires a Keycard NFC smart card.
+Sign Ethereum and Bitcoin by QR code with a Keycard NFC smart card

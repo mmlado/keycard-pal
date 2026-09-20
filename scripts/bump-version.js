@@ -148,17 +148,22 @@ fs.writeFileSync(changelogPath, changelog);
 // F-Droid metadata and Fastlane changelog
 // ---------------------------------------------------------------------------
 
-const fdroidMetadataPath = path.join(ROOT, 'fdroiddata-com.keycardpal.yml');
-if (fs.existsSync(fdroidMetadataPath)) {
-  let fdroidMetadata = fs.readFileSync(fdroidMetadataPath, 'utf8');
-  fdroidMetadata = fdroidMetadata
-    .replace(/versionName: \d+\.\d+\.\d+/, `versionName: ${newVersion}`)
-    .replace(/versionCode: \d+/, `versionCode: ${versionCode}`)
-    .replace(/commit: v\d+\.\d+\.\d+/, `commit: v${newVersion}`)
-    .replace(/CurrentVersion: \d+\.\d+\.\d+/, `CurrentVersion: ${newVersion}`)
-    .replace(/CurrentVersionCode: \d+/, `CurrentVersionCode: ${versionCode}`);
-  fs.writeFileSync(fdroidMetadataPath, fdroidMetadata);
-}
+const FDROID_RECIPES = [
+  'fdroiddata-com.keycardpal.yml',
+  'fdroiddata-com.keycardpal.offline.yml',
+];
+FDROID_RECIPES.map(file => path.join(ROOT, file))
+  .filter(recipePath => fs.existsSync(recipePath))
+  .forEach(recipePath => {
+    const recipe = fs
+      .readFileSync(recipePath, 'utf8')
+      .replace(/versionName: \d+\.\d+\.\d+/, `versionName: ${newVersion}`)
+      .replace(/versionCode: \d+/, `versionCode: ${versionCode}`)
+      .replace(/commit: v\d+\.\d+\.\d+/, `commit: v${newVersion}`)
+      .replace(/CurrentVersion: \d+\.\d+\.\d+/, `CurrentVersion: ${newVersion}`)
+      .replace(/CurrentVersionCode: \d+/, `CurrentVersionCode: ${versionCode}`);
+    fs.writeFileSync(recipePath, recipe);
+  });
 
 const fastlaneChangelogDir = path.join(
   ROOT,
@@ -177,7 +182,9 @@ fs.writeFileSync(
 const branch = `release/v${newVersion}`;
 execSync(`git checkout -b ${branch}`, { stdio: 'inherit' });
 execSync(
-  'git add package.json package-lock.json src/constants/app.ts android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md fdroiddata-com.keycardpal.yml fastlane/metadata/android/en-US/changelogs',
+  `git add package.json package-lock.json src/constants/app.ts android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md ${FDROID_RECIPES.join(
+    ' ',
+  )} fastlane/metadata/android/en-US/changelogs`,
   { stdio: 'inherit' },
 );
 execSync(`git commit -m "chore: bump version to ${newVersion}"`, {

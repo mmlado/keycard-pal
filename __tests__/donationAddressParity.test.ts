@@ -63,6 +63,23 @@ describe('donation addresses', () => {
   });
 });
 
+describe('F-Droid metadata', () => {
+  const bitcoinAddress = [
+    ...read('src/components/about/Donation/List.tsx').matchAll(ADDRESS_PATTERN),
+  ]
+    .map(match => match[1])
+    .find(address => address.startsWith('bc1'));
+
+  it.each([
+    'fdroiddata-com.keycardpal.yml',
+    'fdroiddata-com.keycardpal.offline.yml',
+    'fdroid/metadata/com.keycardpal.yml',
+    'fdroid/metadata/com.keycardpal.offline.yml',
+  ])('%s carries the Bitcoin address the app shows', file => {
+    expect(read(file)).toMatch(new RegExp(`^Bitcoin: ${bitcoinAddress}$`, 'm'));
+  });
+});
+
 describe('FUNDING.yml', () => {
   const funding = read('.github/FUNDING.yml');
 

@@ -1,3 +1,7 @@
+AntiFeatures:
+  Ads:
+    en-US: Buy a Keycard entries show a QR code of an affiliate link to the Keycard
+      shop, and the developer earns a commission on purchases made through it.
 Categories:
   - Money
   - Security
@@ -6,11 +10,18 @@ License: MIT
 
 SourceCode: https://github.com/mmlado/keycard-pal
 IssueTracker: https://github.com/mmlado/keycard-pal/issues
+Donate: https://github.com/mmlado/keycard-pal/blob/HEAD/DONATE.md
+Bitcoin: bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf
 
-Summary: Air-gapped Ethereum and Bitcoin signing with a Keycard NFC smart card.
+Summary: Air-gapped Ethereum and Bitcoin signing with a Keycard NFC smart card
 Description: |
   Keycard Pal Offline is an air-gapped Android companion app for Status Keycard
   NFC smart cards. Signs Ethereum and Bitcoin requests without exposing
   private keys to a networked device. No INTERNET permission. Communication
   with watch-only wallets happens through animated QR codes (Blockchain Commons
   UR format); communication with the Keycard happens over NFC.
+
+  Advertisement: the Buy a Keycard entries in this app show a QR code of an
+  affiliate link. The developer earns a commission on purchases made through it.
+  No app feature depends on buying through it, and every feature of the app is
+  free.
