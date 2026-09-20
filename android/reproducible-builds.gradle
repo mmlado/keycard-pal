@@ -1,0 +1,64 @@
+// Applied from app/build.gradle. Keeps machine-specific bytes out of the native
+// libraries so a release APK is identical wherever it is built (#316).
+
+import javax.inject.Inject
+import org.apache.tools.ant.taskdefs.condition.Os
+import org.gradle.process.ExecOperations
+
+interface InjectedExecOps {
+    @Inject ExecOperations getExecOps()
+}
+
+// __FILE__ and debug info carry the checkout path and the Gradle home.
+android {
+    defaultConfig {
+        def repoRoot = rootProject.projectDir.parentFile.absolutePath
+        def gradleHome = gradle.gradleUserHomeDir.absolutePath
+        def prefixMaps = [
+            "-ffile-prefix-map=${repoRoot}/=",
+            "-ffile-prefix-map=${gradleHome}/=.gradle/",
+        ]
+        externalNativeBuild {
+            cmake {
+                cppFlags(*prefixMaps)
+                cFlags(*prefixMaps)
+            }
+        }
+    }
+}
+
+def llvmStrip() {
+    def hostTag = Os.isFamily(Os.FAMILY_MAC) ? 'darwin-x86_64'
+        : Os.isFamily(Os.FAMILY_WINDOWS) ? 'windows-x86_64'
+        : 'linux-x86_64'
+    def exe = Os.isFamily(Os.FAMILY_WINDOWS) ? 'llvm-strip.exe' : 'llvm-strip'
+    def tool = new File(android.ndkDirectory, "toolchains/llvm/prebuilt/${hostTag}/bin/${exe}")
+    if (!tool.exists()) {
+        throw new GradleException("llvm-strip not found at ${tool}")
+    }
+    return tool.absolutePath
+}
+
+// The linker hashes the build id over debug info that still holds absolute
+// paths, in libraries built outside the app's CMake project too.
+afterEvaluate {
+    android.applicationVariants.configureEach { variant ->
+        if (variant.buildType.name != 'release') {
+            return
+        }
+        def injected = project.objects.newInstance(InjectedExecOps)
+        tasks.named("strip${variant.name.capitalize()}DebugSymbols").configure { stripTask ->
+            stripTask.doLast {
+                def libs = stripTask.outputs.files.collectMany { out ->
+                    fileTree(dir: out, include: '**/*.so').files
+                }
+                if (libs.isEmpty()) {
+                    throw new GradleException("no native libraries to strip in ${stripTask.path}")
+                }
+                injected.execOps.exec {
+                    commandLine([llvmStrip(), '--remove-section=.note.gnu.build-id'] + libs.collect { it.absolutePath })
+                }
+            }
+        }
+    }
+}
