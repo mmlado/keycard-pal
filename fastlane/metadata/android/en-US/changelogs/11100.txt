@@ -1,0 +1,7 @@
+Keycards with applet 4.0 are now supported, alongside 3.x. A new Keycards in use setting leaves out the entries and taps your cards do not need.
+
+Bitcoin: a PSBT asking to sign with anything but SIGHASH_ALL is now refused, and an output is called change only once your Keycard confirms it.
+
+WalletConnect, in the online build, now needs your own Project ID, entered in Settings.
+
+Release APKs now build byte for byte the same on any machine.
