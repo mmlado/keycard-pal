@@ -83,8 +83,15 @@ function run(...args) {
   return spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8' });
 }
 
-function runOnZip(entries) {
-  const filePath = writeFixture(buildZip(entries));
+const BUNDLE = 'assets/index.android.bundle';
+
+// Every fixture gets a clean JS bundle unless it brings its own.
+function runOnZip(entries, { bundle = true } = {}) {
+  const withBundle =
+    !bundle || entries.some(entry => entry.name === BUNDLE)
+      ? entries
+      : [...entries, { name: BUNDLE, data: 'var x=1;' }];
+  const filePath = writeFixture(buildZip(withBundle));
   try {
     return run('--apk', filePath);
   } finally {
@@ -160,6 +167,32 @@ describe('check-offline-apk', () => {
     expect(result.stderr).toContain(
       'lib/armeabi-v7a/libuniffi_yttrium_wcpay.so',
     );
+  });
+
+  it('fails on a JS bundle that carries an online-only marker', () => {
+    const result = runOnZip([
+      { name: 'classes.dex', data: CLEAN_DEX },
+      { name: BUNDLE, data: 'fetch("https://api.tenderly.co/api/v1")' },
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('api.tenderly.co (JS bundle)');
+  });
+
+  it('inflates a deflated JS bundle before scanning it', () => {
+    const result = runOnZip([
+      { name: 'classes.dex', data: CLEAN_DEX },
+      { name: BUNDLE, data: 'x="RNCNetInfo"', method: METHOD_DEFLATED },
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('RNCNetInfo (JS bundle)');
+  });
+
+  it('fails on an APK without a JS bundle', () => {
+    const result = runOnZip([{ name: 'classes.dex', data: CLEAN_DEX }], {
+      bundle: false,
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(BUNDLE);
   });
 
   it('fails on a file that is not a zip', () => {

@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A Keycard with an applet older than 3.1 is now refused with a message that names both versions
 - WalletConnect moved back to its last Apache-2.0 releases (`@reown/walletkit` 1.2.10); newer ones ship under a non-free license
+- The offline build's JavaScript is now checked for online-only code on every pull request and in every release APK
 
 ### Fixed
 
