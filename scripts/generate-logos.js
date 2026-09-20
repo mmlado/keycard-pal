@@ -145,7 +145,7 @@ async function main() {
   const sortedIndex = Object.fromEntries(
     Object.entries(index).sort(([a], [b]) => a.localeCompare(b)),
   );
-  fs.writeFileSync(INDEX_FILE, JSON.stringify(sortedIndex) + '\n');
+  fs.writeFileSync(INDEX_FILE, JSON.stringify(sortedIndex, null, 2) + '\n');
   console.log(
     `Done - fetched ${ok}, skipped/failed ${fail}, total ${
       Object.keys(index).length
