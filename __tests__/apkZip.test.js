@@ -34,6 +34,15 @@ describe('apk-zip', () => {
     expect(readZipEntries(withComment)).toHaveLength(1);
   });
 
+  it('ignores an end-record signature inside the zip comment', () => {
+    const zip = buildZip([{ name: 'a', data: 'x' }]);
+    const comment = Buffer.alloc(30);
+    comment.writeUInt32LE(0x06054b50, 0);
+    zip.writeUInt16LE(comment.length, zip.length - 2);
+    const entries = readZipEntries(Buffer.concat([zip, comment]));
+    expect(entries.map(e => e.name)).toEqual(['a']);
+  });
+
   it('rejects a file that is not a zip', () => {
     expect(() =>
       readZipEntries(Buffer.from('definitely not a zip file')),

@@ -19,7 +19,11 @@ function readZipEntries(buf) {
     i >= 0 && i >= buf.length - minEocd - maxCommentLength;
     i--
   ) {
-    if (buf.readUInt32LE(i) === EOCD_SIGNATURE) {
+    // The comment may contain the signature: a real record ends the file.
+    if (
+      buf.readUInt32LE(i) === EOCD_SIGNATURE &&
+      i + minEocd + buf.readUInt16LE(i + 20) === buf.length
+    ) {
       eocd = i;
       break;
     }
