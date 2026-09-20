@@ -34,6 +34,62 @@ jest.mock('../src/utils/cryptoAccount', () => ({
 // Minimal valid PSBT v0 (magic + empty global + no inputs/outputs)
 const MINIMAL_PSBT_HEX = '70736274ff01000a0200000000000000000000';
 
+const CARD_PUBKEY = Buffer.alloc(33, 0x02);
+const OTHER_PUBKEY = Buffer.alloc(33, 0x03);
+const CARD_FINGERPRINT = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+const OTHER_FINGERPRINT = Buffer.from([0x0b, 0xad, 0x0b, 0xad]);
+const CHANGE_PATH = "m/84'/1'/0'/1/0";
+
+// One input the card can sign, one recipient output, and one output the PSBT
+// marks as change. The knobs forge each half of that claim on its own: the
+// script the change output pays to, the key its derivation entry names, and
+// the wallet that entry says the key belongs to.
+function psbtWithChangeClaim({
+  paysTo = CARD_PUBKEY,
+  namesKey = CARD_PUBKEY,
+  fingerprint = CARD_FINGERPRINT,
+  path = CHANGE_PATH,
+}: {
+  paysTo?: Buffer;
+  namesKey?: Buffer;
+  fingerprint?: Buffer;
+  path?: string;
+} = {}): string {
+  const { Psbt, payments, networks } = require('bitcoinjs-lib');
+  const spend = payments.p2wpkh({
+    pubkey: CARD_PUBKEY,
+    network: networks.testnet,
+  }).output!;
+  const change = payments.p2wpkh({
+    pubkey: paysTo,
+    network: networks.testnet,
+  }).output!;
+
+  const psbt = new Psbt({ network: networks.testnet });
+  psbt.addInput({
+    hash: Buffer.alloc(32, 0xaa),
+    index: 0,
+    witnessUtxo: { script: spend, value: 100_000 },
+    bip32Derivation: [
+      {
+        masterFingerprint: CARD_FINGERPRINT,
+        path: "m/84'/1'/0'/0/0",
+        pubkey: CARD_PUBKEY,
+      },
+    ],
+  });
+  psbt.addOutput({ script: spend, value: 90_000 });
+  psbt.addOutput({
+    script: change,
+    value: 9_000,
+    bip32Derivation: [
+      { masterFingerprint: fingerprint, path, pubkey: namesKey },
+    ],
+  });
+
+  return psbt.toBuffer().toString('hex');
+}
+
 // PSBT with one input (m/84'/0'/0'/0/0) and two outputs (one change, one recipient)
 // Built with bitcoinjs-lib in a real environment; values are plausible testnet amounts.
 // We use a pre-serialised hex to keep the test self-contained.
@@ -210,10 +266,10 @@ describe('inspectBtcPsbt', () => {
     expect(summary.network).toBe('testnet');
   });
 
-  it('marks outputs with bip32Derivation as change', () => {
+  it('reports a change claim only for the output that carries one', () => {
     const summary = inspectBtcPsbt(TESTNET_WPKH_PSBT_HEX);
-    expect(summary.outputs[0].isChange).toBe(false);
-    expect(summary.outputs[1].isChange).toBe(true);
+    expect(summary.outputs[0].claimsChange).toBe(false);
+    expect(summary.outputs[1].claimsChange).toBe(true);
   });
 
   it('reports totalOutputSats as sum of all outputs', () => {
@@ -312,6 +368,132 @@ describe('inspectBtcPsbt', () => {
 });
 
 // ---------------------------------------------------------------------------
+// inspectBtcPsbt – change claims
+// ---------------------------------------------------------------------------
+
+describe('inspectBtcPsbt change claims', () => {
+  it('keeps a claim whose key is the key the output pays', () => {
+    const summary = inspectBtcPsbt(psbtWithChangeClaim());
+    expect(summary.outputs[1].claimsChange).toBe(true);
+  });
+
+  it('drops a forged entry naming a key the output cannot be spent with', () => {
+    const summary = inspectBtcPsbt(
+      psbtWithChangeClaim({ paysTo: OTHER_PUBKEY }),
+    );
+    expect(summary.outputs[1].claimsChange).toBe(false);
+  });
+
+  it('leaves a foreign fingerprint to the card rather than deciding on it', () => {
+    const summary = inspectBtcPsbt(
+      psbtWithChangeClaim({ fingerprint: OTHER_FINGERPRINT }),
+    );
+    expect(summary.outputs[1].claimsChange).toBe(true);
+  });
+
+  it('keeps a claim on a multisig output that names the key in its script', () => {
+    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const multisig = payments.p2ms({
+      m: 2,
+      pubkeys: [CARD_PUBKEY, OTHER_PUBKEY],
+      network: networks.testnet,
+    });
+    const wsh = payments.p2wsh({
+      redeem: multisig,
+      network: networks.testnet,
+    });
+
+    const psbt = new Psbt({ network: networks.testnet });
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xaa),
+      index: 0,
+      bip32Derivation: [
+        {
+          masterFingerprint: CARD_FINGERPRINT,
+          path: "m/48'/1'/0'/2'/0/0",
+          pubkey: CARD_PUBKEY,
+        },
+      ],
+    });
+    psbt.addOutput({
+      script: wsh.output!,
+      value: 9_000,
+      witnessScript: multisig.output!,
+      bip32Derivation: [
+        {
+          masterFingerprint: CARD_FINGERPRINT,
+          path: "m/48'/1'/0'/2'/1/0",
+          pubkey: CARD_PUBKEY,
+        },
+      ],
+    });
+
+    const summary = inspectBtcPsbt(psbt.toBuffer().toString('hex'));
+    expect(summary.outputs[0].claimsChange).toBe(true);
+  });
+
+  it('drops a multisig claim whose key is in no part of the script', () => {
+    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const multisig = payments.p2ms({
+      m: 2,
+      pubkeys: [
+        OTHER_PUBKEY,
+        Buffer.concat([Buffer.from([0x02]), Buffer.alloc(32, 0x09)]),
+      ],
+      network: networks.testnet,
+    });
+    const wsh = payments.p2wsh({
+      redeem: multisig,
+      network: networks.testnet,
+    });
+
+    const psbt = new Psbt({ network: networks.testnet });
+    psbt.addInput({ hash: Buffer.alloc(32, 0xaa), index: 0 });
+    psbt.addOutput({
+      script: wsh.output!,
+      value: 9_000,
+      witnessScript: multisig.output!,
+      bip32Derivation: [
+        {
+          masterFingerprint: CARD_FINGERPRINT,
+          path: "m/48'/1'/0'/2'/1/0",
+          pubkey: CARD_PUBKEY,
+        },
+      ],
+    });
+
+    const summary = inspectBtcPsbt(psbt.toBuffer().toString('hex'));
+    expect(summary.outputs[0].claimsChange).toBe(false);
+  });
+
+  it('shows a taproot output as a plain output, tweak unverifiable here', () => {
+    const { Psbt, networks } = require('bitcoinjs-lib');
+    const tapInternalKey = Buffer.alloc(32, 0x07);
+
+    const psbt = new Psbt({ network: networks.testnet });
+    psbt.addInput({ hash: Buffer.alloc(32, 0xaa), index: 0 });
+    psbt.addOutput({
+      script: Buffer.concat([Buffer.from([0x51, 0x20]), tapInternalKey]),
+      value: 9_000,
+    });
+    // Straight onto the field: addOutput tweaks the key to check it, which
+    // needs an ECC library the app does not carry. A PSBT off the wire is
+    // under no such obligation.
+    psbt.data.outputs[0].tapBip32Derivation = [
+      {
+        masterFingerprint: CARD_FINGERPRINT,
+        path: "m/86'/1'/0'/1/0",
+        pubkey: tapInternalKey,
+        leafHashes: [],
+      },
+    ];
+
+    const summary = inspectBtcPsbt(psbt.toBuffer().toString('hex'));
+    expect(summary.outputs[0].claimsChange).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // inspectBtcPsbt – sighash types
 // ---------------------------------------------------------------------------
 
@@ -375,7 +557,6 @@ describe('inspectBtcPsbt sighash refusal', () => {
 describe('BtcSigningSession', () => {
   const { pubKeyFingerprint } = require('../src/utils/cryptoAccount');
   const Keycard = require('keycard-sdk').default;
-  const CARD_PUBKEY = Buffer.alloc(33, 0x02);
   const cmdSet = {
     exportKey: jest.fn(() => ({
       checkOK: jest.fn(),
@@ -489,6 +670,55 @@ describe('BtcSigningSession', () => {
       expect(cmdSet.signWithPath).not.toHaveBeenCalled();
     },
   );
+
+  it('signs once the card confirms the output marked as change is its own', async () => {
+    const session = new BtcSigningSession(psbtWithChangeClaim());
+
+    const result = await session.signWithKeycard(cmdSet);
+
+    expect(result).toMatchObject({ signedInputs: 1, totalInputs: 1 });
+    expect(cmdSet.exportKey).toHaveBeenCalledWith(0, true, CHANGE_PATH, false);
+  });
+
+  it('refuses a change output whose keys all belong to another wallet', async () => {
+    const session = new BtcSigningSession(
+      psbtWithChangeClaim({ fingerprint: OTHER_FINGERPRINT }),
+    );
+
+    await expect(session.signWithKeycard(cmdSet)).rejects.toThrow(
+      BtcPsbtRefusedError,
+    );
+    await expect(session.signWithKeycard(cmdSet)).rejects.toThrow(
+      /Output 2 \(tb1.*\) is marked as change, but every key it names belongs to another wallet/,
+    );
+    expect(cmdSet.signWithPath).not.toHaveBeenCalled();
+  });
+
+  it('refuses a change output the card turns out not to hold the key for', async () => {
+    // Consistent with itself: the entry names the very key the output pays,
+    // under this card's fingerprint. Only the card can call the bluff.
+    const session = new BtcSigningSession(
+      psbtWithChangeClaim({ paysTo: OTHER_PUBKEY, namesKey: OTHER_PUBKEY }),
+    );
+
+    await expect(session.signWithKeycard(cmdSet)).rejects.toThrow(
+      new RegExp(
+        `Output 2 \\(tb1.*\\) is marked as change, but the key this Keycard ` +
+          `holds at ${CHANGE_PATH.replace(/'/g, "'")} is not the key that ` +
+          `output pays`,
+      ),
+    );
+    expect(cmdSet.signWithPath).not.toHaveBeenCalled();
+  });
+
+  it('asks the card for nothing beyond the master key when nothing claims change', async () => {
+    const session = new BtcSigningSession(psbtWithSighashTypes([0x01]));
+
+    await session.signWithKeycard(cmdSet);
+
+    expect(cmdSet.exportKey).toHaveBeenCalledTimes(1);
+    expect(cmdSet.exportKey).toHaveBeenCalledWith(0, true, 'm', false);
+  });
 
   it('hands the signer a constant allow-list, not the type the input asked for', async () => {
     const session = new BtcSigningSession(psbtWithSighashTypes([0x01]));

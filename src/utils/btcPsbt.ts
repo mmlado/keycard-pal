@@ -1,6 +1,13 @@
 /* eslint-disable no-bitwise */
 import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
-import { Psbt, Transaction, address, networks } from 'bitcoinjs-lib';
+import {
+  Psbt,
+  Transaction,
+  address,
+  networks,
+  payments,
+  script as bscript,
+} from 'bitcoinjs-lib';
 import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
@@ -13,7 +20,11 @@ type NetworkName = 'mainnet' | 'testnet' | 'unknown';
 export type BtcPsbtOutputSummary = {
   address: string;
   valueSats: number;
-  isChange: boolean;
+  // The PSBT's own claim that this output comes back to the wallet, kept
+  // only when the key it names is a key the output can be spent with.
+  // Nothing on this side of the QR code can confirm whose key that is;
+  // the tapped card does, before any input is signed.
+  claimsChange: boolean;
 };
 
 export type BtcPsbtSummary = {
@@ -36,6 +47,19 @@ type SignableInput = {
   index: number;
   path: string;
   pubkey: Buffer;
+};
+
+type PsbtOutput = Psbt['data']['outputs'][number];
+
+type Bip32Derivation = NonNullable<PsbtOutput['bip32Derivation']>[number];
+
+// One output the PSBT marks as its own, with the derivation entries that
+// survived the local check. Carries the address so a refusal can name the
+// output the user saw on the review, not just its position.
+type ChangeClaim = {
+  index: number;
+  address: string;
+  derivations: Bip32Derivation[];
 };
 
 // Only a SIGHASH_ALL signature commits to the outputs the review showed. A
@@ -160,6 +184,12 @@ function extractInputPath(
   return input.bip32Derivation?.[0]?.path;
 }
 
+function inferNetwork(psbt: Psbt): NetworkName {
+  return inferNetworkFromPath(
+    psbt.data.inputs[0] ? extractInputPath(psbt.data.inputs[0]) : undefined,
+  );
+}
+
 function getInputUtxo(
   psbt: Psbt,
   index: number,
@@ -216,11 +246,82 @@ function isBip322MessagePsbt(psbt: Psbt): boolean {
   );
 }
 
-function isChangeOutput(output: Psbt['data']['outputs'][number]): boolean {
+function scriptNamesPubkey(candidate: Buffer, pubkey: Buffer): boolean {
+  const chunks = bscript.decompile(candidate);
   return (
-    (output.bip32Derivation?.length ?? 0) > 0 ||
-    (output.tapBip32Derivation?.length ?? 0) > 0
+    chunks?.some(chunk => Buffer.isBuffer(chunk) && chunk.equals(pubkey)) ??
+    false
   );
+}
+
+// Whether spending this output needs the entry's key: on its own for
+// single-sig, or as one of the keys the script names for multisig. An entry
+// that fails this points at a key the output cannot be spent with, so it says
+// nothing about whose output it is and is thrown out here, before any tap.
+function outputNeedsPubkey(
+  output: PsbtOutput,
+  script: Buffer,
+  pubkey: Buffer,
+): boolean {
+  try {
+    const { witnessScript, redeemScript } = output;
+
+    if (witnessScript) {
+      const wsh = payments.p2wsh({ redeem: { output: witnessScript } }).output!;
+      const nested =
+        redeemScript !== undefined &&
+        redeemScript.equals(wsh) &&
+        script.equals(payments.p2sh({ redeem: { output: wsh } }).output!);
+
+      return (
+        (script.equals(wsh) || nested) &&
+        scriptNamesPubkey(witnessScript, pubkey)
+      );
+    }
+
+    if (redeemScript) {
+      return (
+        script.equals(
+          payments.p2sh({ redeem: { output: redeemScript } }).output!,
+        ) &&
+        (redeemScript.equals(payments.p2wpkh({ pubkey }).output!) ||
+          scriptNamesPubkey(redeemScript, pubkey))
+      );
+    }
+
+    return (
+      script.equals(payments.p2wpkh({ pubkey }).output!) ||
+      script.equals(payments.p2pkh({ pubkey }).output!) ||
+      script.equals(payments.p2pk({ pubkey }).output!)
+    );
+  } catch {
+    // A key the payment builders refuse cannot be the key of any script.
+    return false;
+  }
+}
+
+// Taproot entries are left out whole: matching one against the output needs
+// the taproot tweak, and the app does not sign Taproot inputs yet (#35). A
+// Taproot output is shown as a plain output rather than on the PSBT's word.
+function collectChangeClaims(psbt: Psbt, network: NetworkName): ChangeClaim[] {
+  return psbt.txOutputs.flatMap((txOutput, index) => {
+    const output = psbt.data.outputs[index];
+    const derivations = (output?.bip32Derivation ?? []).filter(derivation =>
+      outputNeedsPubkey(output, txOutput.script, derivation.pubkey),
+    );
+
+    if (derivations.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        index,
+        address: decodeAddress(txOutput.script, network),
+        derivations,
+      },
+    ];
+  });
 }
 
 function parseKeycardSignature(data: Uint8Array): KeycardSignature {
@@ -241,14 +342,73 @@ function hasPartialSigForPubkey(
   );
 }
 
-async function exportMasterFingerprint(cmdSet: Commandset): Promise<number> {
-  const rootResp = await cmdSet.exportKey(0, true, 'm', false);
-  rootResp.checkOK();
+async function exportPublicKey(
+  cmdSet: Commandset,
+  path: string,
+): Promise<Uint8Array> {
+  const resp = await cmdSet.exportKey(0, true, path, false);
+  resp.checkOK();
 
-  const tlv = new Keycard.BERTLV(rootResp.data);
+  const tlv = new Keycard.BERTLV(resp.data);
   tlv.enterConstructed(TLV_KEY_TEMPLATE);
-  const pubKey = tlv.readPrimitive(TLV_PUB_KEY);
-  return pubKeyFingerprint(pubKey);
+  return tlv.readPrimitive(TLV_PUB_KEY);
+}
+
+async function exportMasterFingerprint(cmdSet: Commandset): Promise<number> {
+  return pubKeyFingerprint(await exportPublicKey(cmdSet, 'm'));
+}
+
+// The half of the change check that only the card can answer. The scan
+// already proved the entry's key is a key of the output; what is left is
+// whether that key is this card's, which is one export per change output,
+// normally one. Runs before the first signature, so a forged claim costs
+// the user a refusal and not a signed transaction.
+async function assertChangeClaimsBelongToCard(
+  psbt: Psbt,
+  network: NetworkName,
+  cmdSet: Commandset,
+  masterFingerprint: number,
+  setStatus?: (status: string) => void,
+): Promise<void> {
+  for (const claim of collectChangeClaims(psbt, network)) {
+    const where = `Output ${claim.index + 1} (${claim.address})`;
+    const mine = claim.derivations.filter(
+      derivation =>
+        derivation.masterFingerprint.readUInt32BE(0) === masterFingerprint,
+    );
+
+    if (mine.length === 0) {
+      throw new BtcPsbtRefusedError(
+        `${where} is marked as change, but every key it names belongs to ` +
+          'another wallet. Money sent there does not come back to this ' +
+          'Keycard.',
+      );
+    }
+
+    setStatus?.(`Checking change output ${claim.index + 1}...`);
+
+    let owned = false;
+    for (const derivation of mine) {
+      const exported = Buffer.from(
+        Keycard.CryptoUtils.compressPublicKey(
+          await exportPublicKey(cmdSet, derivation.path),
+        ),
+      );
+
+      if (exported.equals(derivation.pubkey)) {
+        owned = true;
+        break;
+      }
+    }
+
+    if (!owned) {
+      throw new BtcPsbtRefusedError(
+        `${where} is marked as change, but the key this Keycard holds at ` +
+          `${mine[0].path} is not the key that output pays. Money sent ` +
+          'there does not come back to you.',
+      );
+    }
+  }
 }
 
 function buildSignableInputs(
@@ -292,15 +452,15 @@ export function inspectBtcPsbt(psbtHex: string): BtcPsbtSummary {
   const requestType = isBip322MessagePsbt(psbt)
     ? 'bip322-message'
     : 'transaction';
-  const network =
-    inferNetworkFromPath(
-      psbt.data.inputs[0] ? extractInputPath(psbt.data.inputs[0]) : undefined,
-    ) ?? 'unknown';
+  const network = inferNetwork(psbt);
 
+  const claimed = new Set(
+    collectChangeClaims(psbt, network).map(claim => claim.index),
+  );
   const outputs = psbt.txOutputs.map((output, index) => ({
     address: decodeAddress(output.script, network),
     valueSats: output.value,
-    isChange: isChangeOutput(psbt.data.outputs[index]),
+    claimsChange: claimed.has(index),
   }));
 
   let feeSats: number | undefined;
@@ -326,11 +486,14 @@ export function inspectBtcPsbt(psbtHex: string): BtcPsbtSummary {
 export class BtcSigningSession {
   private readonly psbt: Psbt;
 
+  private readonly network: NetworkName;
+
   constructor(psbtHex: string) {
     this.psbt = toPsbt(psbtHex);
     // Closes the gap the allow-list leaves: bitcoinjs reads an explicit
     // SIGHASH_DEFAULT on a non-Taproot input as SIGHASH_ALL and lets it pass.
     assertSighashTypesAreSignable(this.psbt);
+    this.network = inferNetwork(this.psbt);
   }
 
   getPsbtHex(): string {
@@ -349,6 +512,14 @@ export class BtcSigningSession {
         'This Keycard cannot sign any inputs in this transaction.',
       );
     }
+
+    await assertChangeClaimsBelongToCard(
+      this.psbt,
+      this.network,
+      cmdSet,
+      masterFingerprint,
+      setStatus,
+    );
 
     let signedInputs = 0;
 

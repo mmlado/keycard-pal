@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - A PSBT whose input asks for a sighash type other than SIGHASH_ALL is now turned away when it is scanned, with a message naming the type and what it leaves free to change; such an input used to be signed with whatever type it asked for, so an approved signature could end up covering none of the outputs on the review
+- A PSBT output is called change only once the tapped Keycard confirms it pays a key the card holds; the label used to be taken from the PSBT, which a hostile wallet could put on an output paying itself
 - WalletConnect now uses the Project ID entered in Settings; builds without a built-in ID could not pair at all
 - WalletConnect no longer connects to its relay when the app starts, only after a `wc:` code is scanned
 - The About screen's license list now names the WalletConnect, NetInfo and text-encoding packages of the online build
