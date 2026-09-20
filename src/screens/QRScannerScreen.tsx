@@ -8,7 +8,10 @@ import theme from '../theme';
 import CameraView from '../components/CameraView';
 import { type ReadCodeEvent } from '../components/Camera';
 import { handleUR } from '../utils/ur';
-import { detectWcUri } from '../utils/walletConnect/qrDetector.online';
+import {
+  detectWcUri,
+  refreshWcDetection,
+} from '../utils/walletConnect/qrDetector.online';
 
 export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
   const isFocused = useIsFocused();
@@ -26,6 +29,7 @@ export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
       scannedRef.current = false;
       setProgress(0);
       decoderRef.current = null;
+      refreshWcDetection();
     }, []),
   );
 

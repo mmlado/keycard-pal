@@ -135,9 +135,8 @@ jobs:
       # Runs after the GitHub release so a Play problem never blocks it.
       # Signed with the dedicated Play *upload* keystore, not the release
       # keystore: Play App Signing re-signs com.keycardpal with a Google-managed
-      # key, so this signature only authenticates the upload. Built in its own
-      # step so WC_PROJECT_ID reaches only the AAB — embedding it in the
-      # GitHub-release APKs would make them unreproducible for F-Droid.
+      # key, so this signature only authenticates the upload. No build carries a
+      # WalletConnect Project ID: users enter their own in Settings (#328).
       - name: Decode Play upload keystore
         run: |
           echo "${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}" | base64 --decode > android/app/play-upload.keystore
@@ -147,7 +146,6 @@ jobs:
           ANDROID_KEYSTORE_PATH: play-upload.keystore
           ANDROID_KEY_ALIAS: upload
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
-          WC_PROJECT_ID: ${{ secrets.WC_PROJECT_ID }}
         run: cd android && ./gradlew bundleFullRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
 
       - name: Stage Play artifacts

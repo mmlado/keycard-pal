@@ -35,7 +35,7 @@ Any future network-touching feature added to the online build must follow the sa
 - New network-touching features require a Settings toggle before shipping, unless they qualify under the gesture-gated exception.
 - Token images are disabled by default; users must opt in via Settings.
 - The `preferencesStorage` module grows one load/save pair per opt-in feature.
-- WalletConnect v2 ships without a Settings toggle; the `wc:` QR scan + session approval gates all network activity.
+- WalletConnect v2 ships without a Settings toggle; the `wc:` QR scan + session approval gates all network activity. The client is created by `pair()` and by nothing else: until #328 the provider created it when it mounted, which opened the relay connection at app start on builds with a built-in Project ID. `__tests__/walletConnectClient.test.ts` and `__tests__/WalletConnectProvider.test.tsx` hold the rule.
 
 ## Revisit if
 

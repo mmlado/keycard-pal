@@ -4,26 +4,32 @@ import { Core } from '@walletconnect/core';
 import { WalletKit, WalletKitTypes } from '@reown/walletkit';
 
 import { APP_NAME } from '@/constants/app';
-import { WC_PROJECT_ID } from '@/utils/buildConfig';
+import { loadWCProjectId } from '@/storage/walletConnect';
 
-let _client: Awaited<ReturnType<typeof WalletKit.init>> | null = null;
-let _initPromise: Promise<Awaited<ReturnType<typeof WalletKit.init>>> | null =
-  null;
+type Client = Awaited<ReturnType<typeof WalletKit.init>>;
+type ClientListener = (client: Client) => (() => void) | void;
 
-async function getClient(
-  projectIdOverride?: string,
-): Promise<Awaited<ReturnType<typeof WalletKit.init>>> {
-  if (_client) {
-    return _client;
+let _client: Client | null = null;
+let _initPromise: Promise<Client> | null = null;
+const _listeners = new Set<ClientListener>();
+const _detach = new Map<ClientListener, () => void>();
+
+function attach(listener: ClientListener, client: Client) {
+  const detach = listener(client);
+  if (detach) {
+    _detach.set(listener, detach);
   }
-  if (_initPromise) {
-    return _initPromise;
-  }
-  const projectId = projectIdOverride ?? WC_PROJECT_ID;
+}
+
+function detachAll() {
+  _detach.forEach(detach => detach());
+  _detach.clear();
+}
+
+async function createClient(): Promise<Client> {
+  const projectId = await loadWCProjectId();
   if (!projectId) {
-    throw new Error(
-      'WalletConnect Project ID is not configured. Set WC_PROJECT_ID in build environment or override it in Settings.',
-    );
+    throw new Error('WalletConnect needs a Project ID. Enter one in Settings.');
   }
 
   const memoryStorage = new Map<string, string>();
@@ -41,7 +47,7 @@ async function getClient(
     } as any,
   });
 
-  _initPromise = WalletKit.init({
+  return WalletKit.init({
     core,
     metadata: {
       name: APP_NAME,
@@ -49,21 +55,52 @@ async function getClient(
       url: 'https://keycardpal.com',
       icons: [],
     },
-  }).catch(e => {
-    _initPromise = null;
-    throw e;
   });
+}
 
-  _client = await _initPromise;
-  return _client;
+// Creating the client opens the relay connection, so nothing may call this
+// before the user scans a wc: code (ADR-0003).
+function getClient(): Promise<Client> {
+  if (_initPromise) {
+    return _initPromise;
+  }
+  const promise: Promise<Client> = createClient().then(
+    client => {
+      if (_initPromise === promise) {
+        _client = client;
+        _listeners.forEach(listener => attach(listener, client));
+      }
+      return client;
+    },
+    e => {
+      if (_initPromise === promise) {
+        _initPromise = null;
+      }
+      throw e;
+    },
+  );
+  _initPromise = promise;
+  return promise;
 }
 
 export type WCClientEventMap = WalletKitTypes.EventArguments;
 
 export const wcClient = {
   getClient,
-  pair: async (uri: string, projectIdOverride?: string) => {
-    const client = await getClient(projectIdOverride);
+  /** Runs `listener` for the client once it exists, and again for each new one. */
+  onClient: (listener: ClientListener) => {
+    _listeners.add(listener);
+    if (_client) {
+      attach(listener, _client);
+    }
+    return () => {
+      _listeners.delete(listener);
+      _detach.get(listener)?.();
+      _detach.delete(listener);
+    };
+  },
+  pair: async (uri: string) => {
+    const client = await getClient();
     await client.pair({ uri });
   },
   respondSuccess: async (id: number, topic: string, result: string) => {
@@ -97,6 +134,8 @@ export const wcClient = {
     });
   },
   resetClient: () => {
+    detachAll();
+    _client?.core.relayer.transportClose().catch(() => {});
     _client = null;
     _initPromise = null;
   },

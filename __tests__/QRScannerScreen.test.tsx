@@ -68,7 +68,9 @@ jest.mock('../src/utils/ur', () => ({
 }));
 
 const mockDetectWcUri = jest.fn();
+const mockRefreshWcDetection = jest.fn().mockResolvedValue(undefined);
 jest.mock('../src/utils/walletConnect/qrDetector.online', () => ({
+  refreshWcDetection: () => mockRefreshWcDetection(),
   detectWcUri: (...args: any[]) => mockDetectWcUri(...args),
 }));
 
@@ -219,6 +221,21 @@ describe('QRScannerScreen', () => {
   });
 
   describe('onCodeScanned — WalletConnect URI', () => {
+    it('refreshes WalletConnect detection when the screen gains focus', async () => {
+      await renderScreen();
+      expect(mockRefreshWcDetection).toHaveBeenCalled();
+    });
+
+    it('treats a wc: code like any unknown code when detection declines it', async () => {
+      mockDetectWcUri.mockReturnValue(false);
+      await renderScreen();
+      await act(async () => {
+        scan('wc:abc123@2?relay-protocol=irn');
+      });
+      expect(navigation.navigate).not.toHaveBeenCalled();
+      expect(mockReceivedPart).not.toHaveBeenCalled();
+    });
+
     it('sets scannedRef and returns early when detectWcUri returns true', async () => {
       mockDetectWcUri.mockReturnValue(true);
       await renderScreen();
