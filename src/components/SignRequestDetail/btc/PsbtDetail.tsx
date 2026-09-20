@@ -65,7 +65,7 @@ export default function PsbtDetail({ summary }: { summary: BtcPsbtSummary }) {
             <View key={`${output.address}-${index}`} style={styles.row}>
               <InfoRow
                 label={`Output ${index + 1}${
-                  output.isChange ? ' (Change)' : ''
+                  output.claimsChange ? ' (marked as change by the wallet)' : ''
                 }`}
                 value={`${output.address}\n${formatSats(output.valueSats)}`}
               />
