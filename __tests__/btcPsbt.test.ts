@@ -3,6 +3,7 @@ import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
 import { URDecoder } from '@ngraveio/bc-ur';
 
 import {
+  BtcPsbtRefusedError,
   BtcSigningSession,
   buildCryptoPsbtUR,
   inspectBtcPsbt,
@@ -128,6 +129,41 @@ const BIP322_PSBT_HEX = (() => {
 
   return psbt.toBuffer().toString('hex');
 })();
+
+// One spendable input per entry; undefined leaves PSBT_IN_SIGHASH_TYPE off.
+function psbtWithSighashTypes(sighashTypes: Array<number | undefined>): string {
+  const { Psbt, payments, networks } = require('bitcoinjs-lib');
+  const fakePubkey = Buffer.alloc(33, 0x02);
+  const { output } = payments.p2wpkh({
+    pubkey: fakePubkey,
+    network: networks.testnet,
+  });
+  const psbt = new Psbt({ network: networks.testnet });
+
+  sighashTypes.forEach((sighashType, index) => {
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xa0 + index),
+      index: 0,
+      witnessUtxo: { script: output!, value: 100_000 },
+      bip32Derivation: [
+        {
+          masterFingerprint: Buffer.from([0xde, 0xad, 0xbe, 0xef]),
+          path: `m/84'/1'/0'/0/${index}`,
+          pubkey: fakePubkey,
+        },
+      ],
+    });
+
+    // Not through addInput, which refuses a falsy sighash type.
+    if (sighashType !== undefined) {
+      psbt.data.inputs[index].sighashType = sighashType;
+    }
+  });
+
+  psbt.addOutput({ script: output!, value: 90_000 });
+
+  return psbt.toBuffer().toString('hex');
+}
 
 // ---------------------------------------------------------------------------
 // parseCryptoPsbtRequest
@@ -275,8 +311,71 @@ describe('inspectBtcPsbt', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// inspectBtcPsbt – sighash types
+// ---------------------------------------------------------------------------
+
+describe('inspectBtcPsbt sighash refusal', () => {
+  const REFUSED: Array<[string, number]> = [
+    ['SIGHASH_DEFAULT', 0x00],
+    ['SIGHASH_NONE', 0x02],
+    ['SIGHASH_SINGLE', 0x03],
+    ['SIGHASH_ALL|ANYONECANPAY', 0x81],
+    ['SIGHASH_NONE|ANYONECANPAY', 0x82],
+    ['SIGHASH_SINGLE|ANYONECANPAY', 0x83],
+  ];
+
+  it.each(REFUSED)('refuses an input that asks for %s', (name, sighashType) => {
+    const hex = psbtWithSighashTypes([sighashType]);
+    expect(() => inspectBtcPsbt(hex)).toThrow(BtcPsbtRefusedError);
+    expect(() => inspectBtcPsbt(hex)).toThrow(name);
+  });
+
+  it('names what SIGHASH_NONE leaves loose', () => {
+    expect(() => inspectBtcPsbt(psbtWithSighashTypes([0x02]))).toThrow(
+      'leaves every output free to change',
+    );
+  });
+
+  it('names what SIGHASH_SINGLE leaves loose', () => {
+    expect(() => inspectBtcPsbt(psbtWithSighashTypes([0x03]))).toThrow(
+      'leaves every output but one free to change',
+    );
+  });
+
+  it('names what ANYONECANPAY leaves loose on top of the base type', () => {
+    expect(() => inspectBtcPsbt(psbtWithSighashTypes([0x82]))).toThrow(
+      'leaves every output free to change and lets inputs be added or removed',
+    );
+  });
+
+  it('falls back to the raw value for an unrecognised sighash type', () => {
+    expect(() => inspectBtcPsbt(psbtWithSighashTypes([0x44]))).toThrow(
+      'sighash type 0x44',
+    );
+  });
+
+  it('points at the refused input by its position', () => {
+    expect(() => inspectBtcPsbt(psbtWithSighashTypes([0x01, 0x02]))).toThrow(
+      'Input 2 asks to be signed with SIGHASH_NONE',
+    );
+  });
+
+  it('accepts an input with no sighash type', () => {
+    const summary = inspectBtcPsbt(psbtWithSighashTypes([undefined]));
+    expect(summary.inputCount).toBe(1);
+  });
+
+  it('accepts an input that asks for SIGHASH_ALL', () => {
+    const summary = inspectBtcPsbt(psbtWithSighashTypes([0x01]));
+    expect(summary.inputCount).toBe(1);
+  });
+});
+
 describe('BtcSigningSession', () => {
   const { pubKeyFingerprint } = require('../src/utils/cryptoAccount');
+  const Keycard = require('keycard-sdk').default;
+  const CARD_PUBKEY = Buffer.alloc(33, 0x02);
   const cmdSet = {
     exportKey: jest.fn(() => ({
       checkOK: jest.fn(),
@@ -285,10 +384,31 @@ describe('BtcSigningSession', () => {
     signWithPath: jest.fn(),
   } as any;
 
+  // Each reader gets its own BERTLV, so both start at the front of the list.
+  function mockCardAnswers(publicKey: Buffer) {
+    Keycard.BERTLV.mockImplementation(() => {
+      const values = [
+        publicKey,
+        Buffer.alloc(32, 0x11),
+        Buffer.alloc(32, 0x22),
+      ];
+      let next = 0;
+      return {
+        enterConstructed: jest.fn(),
+        readPrimitive: jest.fn(() => values[next++]),
+      };
+    });
+  }
+
   beforeEach(() => {
     cmdSet.exportKey.mockClear();
     cmdSet.signWithPath.mockClear();
+    cmdSet.signWithPath.mockResolvedValue({
+      checkOK: jest.fn(),
+      data: new Uint8Array([1, 2, 3]),
+    });
     pubKeyFingerprint.mockReturnValue(0xdeadbeef);
+    mockCardAnswers(CARD_PUBKEY);
   });
 
   it('throws when the Keycard fingerprint matches no inputs', async () => {
@@ -331,6 +451,52 @@ describe('BtcSigningSession', () => {
 
     await expect(session.signWithKeycard(cmdSet)).rejects.toThrow(
       'Taproot inputs are not supported yet.',
+    );
+    expect(cmdSet.signWithPath).not.toHaveBeenCalled();
+  });
+
+  it('signs an input that asks for SIGHASH_ALL, and commits to that type', async () => {
+    const { Psbt } = require('bitcoinjs-lib');
+    const session = new BtcSigningSession(psbtWithSighashTypes([0x01]));
+
+    const result = await session.signWithKeycard(cmdSet);
+
+    expect(result).toMatchObject({ signedInputs: 1, totalInputs: 1 });
+    expect(cmdSet.signWithPath).toHaveBeenCalledTimes(1);
+
+    const signed = Psbt.fromBuffer(Buffer.from(result.psbtHex, 'hex'));
+    const signature = signed.data.inputs[0].partialSig![0].signature;
+    expect(signature[signature.length - 1]).toBe(0x01);
+  });
+
+  it('signs an input with no sighash type as SIGHASH_ALL', async () => {
+    const { Psbt } = require('bitcoinjs-lib');
+    const session = new BtcSigningSession(psbtWithSighashTypes([undefined]));
+
+    const result = await session.signWithKeycard(cmdSet);
+
+    const signed = Psbt.fromBuffer(Buffer.from(result.psbtHex, 'hex'));
+    const signature = signed.data.inputs[0].partialSig![0].signature;
+    expect(signature[signature.length - 1]).toBe(0x01);
+  });
+
+  it.each([0x00, 0x02, 0x03, 0x81, 0x82, 0x83])(
+    'refuses a PSBT whose input claims sighash type %i instead of signing it',
+    sighashType => {
+      expect(
+        () => new BtcSigningSession(psbtWithSighashTypes([sighashType])),
+      ).toThrow(BtcPsbtRefusedError);
+      expect(cmdSet.signWithPath).not.toHaveBeenCalled();
+    },
+  );
+
+  it('hands the signer a constant allow-list, not the type the input asked for', async () => {
+    const session = new BtcSigningSession(psbtWithSighashTypes([0x01]));
+    // Past the constructor, bitcoinjs is the last gate.
+    (session as any).psbt.data.inputs[0].sighashType = 0x02;
+
+    await expect(session.signWithKeycard(cmdSet)).rejects.toThrow(
+      'Sighash type is not allowed',
     );
     expect(cmdSet.signWithPath).not.toHaveBeenCalled();
   });

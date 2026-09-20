@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 import { CryptoPSBT } from '@keystonehq/bc-ur-registry';
 import { Psbt, Transaction, address, networks } from 'bitcoinjs-lib';
 import Keycard from 'keycard-sdk';
@@ -35,11 +36,81 @@ type SignableInput = {
   index: number;
   path: string;
   pubkey: Buffer;
-  sighashType?: number;
 };
+
+// Only a SIGHASH_ALL signature commits to the outputs the review showed. A
+// constant, never the PSBT's own claim. SIGHASH_DEFAULT joins it with #35.
+const SIGNABLE_SIGHASH_TYPES = [Transaction.SIGHASH_ALL];
+
+const SIGHASH_BASE_NAMES: Record<number, string> = {
+  [Transaction.SIGHASH_DEFAULT]: 'SIGHASH_DEFAULT',
+  [Transaction.SIGHASH_ALL]: 'SIGHASH_ALL',
+  [Transaction.SIGHASH_NONE]: 'SIGHASH_NONE',
+  [Transaction.SIGHASH_SINGLE]: 'SIGHASH_SINGLE',
+};
+
+// SIGHASH_ALL and SIGHASH_DEFAULT have no entry: neither leaves an output loose.
+const SIGHASH_BASE_RISKS: Record<number, string> = {
+  [Transaction.SIGHASH_NONE]: 'leaves every output free to change',
+  [Transaction.SIGHASH_SINGLE]: 'leaves every output but one free to change',
+};
+
+// Apart from a parse failure, so the scan can say why instead of blaming bytes.
+export class BtcPsbtRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BtcPsbtRefusedError';
+  }
+}
 
 function toPsbt(psbtHex: string): Psbt {
   return Psbt.fromBuffer(Buffer.from(psbtHex, 'hex'));
+}
+
+function describeSighashType(sighashType: number): string {
+  const name =
+    SIGHASH_BASE_NAMES[sighashType & ~Transaction.SIGHASH_ANYONECANPAY];
+  if (name === undefined) {
+    return `sighash type 0x${sighashType.toString(16)}`;
+  }
+
+  return (sighashType & Transaction.SIGHASH_ANYONECANPAY) !== 0
+    ? `${name}|ANYONECANPAY`
+    : name;
+}
+
+function describeSighashRisk(sighashType: number): string | undefined {
+  const risks = [
+    SIGHASH_BASE_RISKS[sighashType & ~Transaction.SIGHASH_ANYONECANPAY],
+  ];
+
+  if ((sighashType & Transaction.SIGHASH_ANYONECANPAY) !== 0) {
+    risks.push('lets inputs be added or removed');
+  }
+
+  const named = risks.filter(Boolean);
+  return named.length > 0 ? named.join(' and ') : undefined;
+}
+
+function assertSighashTypesAreSignable(psbt: Psbt): void {
+  for (const [index, input] of psbt.data.inputs.entries()) {
+    const sighashType = input.sighashType;
+    if (
+      sighashType === undefined ||
+      SIGNABLE_SIGHASH_TYPES.includes(sighashType)
+    ) {
+      continue;
+    }
+
+    const risk = describeSighashRisk(sighashType);
+    throw new BtcPsbtRefusedError(
+      `Input ${index + 1} asks to be signed with ` +
+        `${describeSighashType(sighashType)}` +
+        (risk ? `, which ${risk} after you approve it` : '') +
+        '. Keycard Pal signs only with SIGHASH_ALL, whose signature covers ' +
+        'every input and output on the review.',
+    );
+  }
 }
 
 function inferNetworkFromPath(path: string | undefined): NetworkName {
@@ -202,7 +273,6 @@ function buildSignableInputs(
         index,
         path: derivation.path,
         pubkey: derivation.pubkey,
-        sighashType: input.sighashType,
       },
     ];
   });
@@ -217,6 +287,8 @@ export function parseCryptoPsbtRequest(cbor: Buffer): { psbtHex: string } {
 
 export function inspectBtcPsbt(psbtHex: string): BtcPsbtSummary {
   const psbt = toPsbt(psbtHex);
+  assertSighashTypesAreSignable(psbt);
+
   const requestType = isBip322MessagePsbt(psbt)
     ? 'bip322-message'
     : 'transaction';
@@ -256,6 +328,9 @@ export class BtcSigningSession {
 
   constructor(psbtHex: string) {
     this.psbt = toPsbt(psbtHex);
+    // Closes the gap the allow-list leaves: bitcoinjs reads an explicit
+    // SIGHASH_DEFAULT on a non-Taproot input as SIGHASH_ALL and lets it pass.
+    assertSighashTypesAreSignable(this.psbt);
   }
 
   getPsbtHex(): string {
@@ -313,7 +388,7 @@ export class BtcSigningSession {
             return parsed.signature;
           },
         },
-        signable.sighashType ? [signable.sighashType] : undefined,
+        SIGNABLE_SIGHASH_TYPES,
       );
 
       signedInputs += 1;
