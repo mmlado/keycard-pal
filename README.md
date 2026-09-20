@@ -32,17 +32,18 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 ## Screenshots
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_dashboard.png" width="30%" alt="Dashboard" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_connect_software_wallet.png" width="30%" alt="Connect software wallet" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_nfc_scan.png" width="30%" alt="NFC scan" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_welcome.png" width="30%" alt="Welcome" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_scan_qr_code.png" width="30%" alt="Scan QR code" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_eth_transaction.png" width="30%" alt="Ethereum transaction review" />
 </p>
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_show_qr_code.png" width="30%" alt="Show QR code" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05_scan_qr_code.png" width="30%" alt="Scan QR code" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/06_transaction.png" width="30%" alt="Transaction review" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_eip712_permit.png" width="30%" alt="EIP-712 permit review" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05_btc_psbt.png" width="30%" alt="Bitcoin PSBT review" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/06_signature_qr.png" width="30%" alt="Signature QR code" />
 </p>
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/07_keypair.png" width="30%" alt="Key pair" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/07_seed_phrase.png" width="30%" alt="Recovery phrase backup" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/08_pin_pad.png" width="30%" alt="PIN entry" />
 </p>
 
 ## Features
