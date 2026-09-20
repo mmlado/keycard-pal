@@ -26,7 +26,6 @@ DerivedData
 #
 build/
 android/app/src/main/assets/fonts/
-android/app/src/offline/assets/token-logos/
 .idea
 .gradle
 local.properties

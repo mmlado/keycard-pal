@@ -46,6 +46,26 @@ const repo = 'https://github.com/mmlado/keycard-pal';
 console.log(`Bumping ${pkg.version} → ${newVersion} (code: ${versionCode})`);
 
 // ---------------------------------------------------------------------------
+// Bundled data the release ships
+// ---------------------------------------------------------------------------
+// The tag has to contain what the APK contains, or a build from source is not
+// the build we publish. These ran in the release workflow until 1.11.0, which
+// rewrote the tree after the tag: the published APK carried 1,414 token logos
+// that no checkout had.
+
+const GENERATED = [
+  'src/data/contributors.json',
+  'src/data/token-logos-index.json',
+  'android/app/src/offline/assets/token-logos',
+];
+
+execSync('node scripts/generate-contributors.js', {
+  stdio: 'inherit',
+  cwd: ROOT,
+});
+execSync('node scripts/generate-logos.js', { stdio: 'inherit', cwd: ROOT });
+
+// ---------------------------------------------------------------------------
 // src/constants/app.ts
 // ---------------------------------------------------------------------------
 
@@ -184,7 +204,7 @@ execSync(`git checkout -b ${branch}`, { stdio: 'inherit' });
 execSync(
   `git add package.json package-lock.json src/constants/app.ts android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md ${FDROID_RECIPES.join(
     ' ',
-  )} fastlane/metadata/android/en-US/changelogs`,
+  )} ${GENERATED.join(' ')} fastlane/metadata/android/en-US/changelogs`,
   { stdio: 'inherit' },
 );
 execSync(`git commit -m "chore: bump version to ${newVersion}"`, {
