@@ -38,36 +38,25 @@ function readBundleFromApk(apk) {
   return readEntryData(apk, entry);
 }
 
-function usage() {
-  console.error(
-    'Usage: check-offline-bundle.js (--bundle <path> | --apk <path>) [--expect-present]',
-  );
-  process.exit(1);
-}
+const USAGE =
+  'Usage: check-offline-bundle.js (--bundle <path> | --apk <path>) [--expect-present]';
 
 function argValue(argv, flag) {
   const idx = argv.indexOf(flag);
-  if (idx === -1) {
-    return null;
-  }
-  if (idx + 1 >= argv.length) {
-    usage();
-  }
-  return argv[idx + 1];
+  return idx === -1 ? null : argv[idx + 1];
 }
 
-function main() {
-  const argv = process.argv.slice(2);
+// Returns { status, lines } so the logic is testable without a child process.
+function run(argv) {
   const bundlePath = argValue(argv, '--bundle');
   const apkPath = argValue(argv, '--apk');
   if (!bundlePath === !apkPath) {
-    usage();
+    return { status: 1, lines: [USAGE] };
   }
 
   const resolved = path.resolve(bundlePath || apkPath);
   if (!fs.existsSync(resolved)) {
-    console.error(`Not found: ${resolved}`);
-    process.exit(1);
+    return { status: 1, lines: [`Not found: ${resolved}`] };
   }
 
   let bundle;
@@ -75,35 +64,50 @@ function main() {
     const file = fs.readFileSync(resolved);
     bundle = apkPath ? readBundleFromApk(file) : file;
   } catch (err) {
-    console.error(`Could not read ${resolved}: ${err.message}`);
-    process.exit(1);
+    return {
+      status: 1,
+      lines: [`Could not read ${resolved}: ${err.message}`],
+    };
   }
 
   const found = findMarkers(bundle);
 
   if (argv.includes('--expect-present')) {
     const missing = FORBIDDEN_MARKERS.filter(m => !found.includes(m));
-    if (missing.length > 0) {
-      console.error(
-        'Markers missing from the online bundle, so they are stale:',
-      );
-      missing.forEach(m => console.error(`  - ${m}`));
-      process.exit(1);
-    }
-    console.log('Online bundle check passed: every marker is present.');
-    return;
+    return missing.length > 0
+      ? {
+          status: 1,
+          lines: [
+            'Markers missing from the online bundle, so they are stale:',
+            ...missing.map(m => `  - ${m}`),
+          ],
+        }
+      : {
+          status: 0,
+          lines: ['Online bundle check passed: every marker is present.'],
+        };
   }
 
-  if (found.length > 0) {
-    console.error('Offline bundle contains forbidden online-only markers:');
-    found.forEach(m => console.error(`  - ${m}`));
-    process.exit(1);
-  }
-  console.log('Offline bundle check passed: no online-only markers found.');
+  return found.length > 0
+    ? {
+        status: 1,
+        lines: [
+          'Offline bundle contains forbidden online-only markers:',
+          ...found.map(m => `  - ${m}`),
+        ],
+      }
+    : {
+        status: 0,
+        lines: ['Offline bundle check passed: no online-only markers found.'],
+      };
 }
 
 if (require.main === module) {
-  main();
+  const { status, lines } = run(process.argv.slice(2));
+  lines.forEach(line =>
+    status === 0 ? console.log(line) : console.error(line),
+  );
+  process.exitCode = status;
 }
 
 module.exports = {
@@ -111,4 +115,5 @@ module.exports = {
   FORBIDDEN_MARKERS,
   findMarkers,
   readBundleFromApk,
+  run,
 };

@@ -5,26 +5,37 @@ const os = require('os');
 const path = require('path');
 
 const {
+  BUNDLE_ENTRY,
   FORBIDDEN_MARKERS,
   findMarkers,
+  run,
 } = require('../scripts/check-offline-bundle');
+const { buildZip } = require('./zipFixture.testUtils');
 
 const SCRIPT = path.resolve(__dirname, '../scripts/check-offline-bundle.js');
 const SRC = path.resolve(__dirname, '../src');
 
-function runOnBundle(content, ...flags) {
+function withFile(name, content, fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'offline-bundle-'));
-  const filePath = path.join(dir, 'index.android.bundle');
+  const filePath = path.join(dir, name);
   fs.writeFileSync(filePath, content);
   try {
-    return spawnSync(
-      process.execPath,
-      [SCRIPT, '--bundle', filePath, ...flags],
-      { encoding: 'utf8' },
-    );
+    return fn(filePath);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+
+function runOnBundle(content, ...flags) {
+  return withFile('index.android.bundle', content, file =>
+    run(['--bundle', file, ...flags]),
+  );
+}
+
+function runOnApk(entries, ...flags) {
+  return withFile('app.apk', buildZip(entries), file =>
+    run(['--apk', file, ...flags]),
+  );
 }
 
 function sourceFiles(dir) {
@@ -41,13 +52,13 @@ describe('check-offline-bundle', () => {
   it('passes on a bundle without forbidden markers', () => {
     const result = runOnBundle('var x=1;console.log("hello");');
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('passed');
+    expect(result.lines.join('\n')).toContain('passed');
   });
 
   it.each(FORBIDDEN_MARKERS)('fails on a bundle containing %s', marker => {
     const result = runOnBundle(`var s="${marker}";`);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain(marker);
+    expect(result.lines).toContain(`  - ${marker}`);
   });
 
   it('finds a marker inside binary content', () => {
@@ -99,22 +110,72 @@ describe('check-offline-bundle', () => {
       const [stale, ...rest] = FORBIDDEN_MARKERS;
       const result = runOnBundle(rest.join('\n'), '--expect-present');
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain(stale);
+      expect(result.lines).toEqual([expect.any(String), `  - ${stale}`]);
     });
   });
 
-  it('fails without --bundle or --apk', () => {
-    const result = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf8' });
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('Usage');
+  describe('--apk', () => {
+    it('reads the bundle out of the APK', () => {
+      const result = runOnApk([
+        { name: 'classes.dex', data: 'dex' },
+        { name: BUNDLE_ENTRY, data: 'x="RNCNetInfo"' },
+      ]);
+      expect(result.status).toBe(1);
+      expect(result.lines).toContain('  - RNCNetInfo');
+    });
+
+    it('fails on an APK without a JS bundle', () => {
+      const result = runOnApk([{ name: 'classes.dex', data: 'dex' }]);
+      expect(result.status).toBe(1);
+      expect(result.lines[0]).toContain(BUNDLE_ENTRY);
+    });
+
+    it('fails on a file that is not a zip', () => {
+      const result = withFile('app.apk', 'not a zip', file =>
+        run(['--apk', file]),
+      );
+      expect(result.status).toBe(1);
+      expect(result.lines[0]).toContain('Could not read');
+    });
   });
 
-  it('fails when the bundle does not exist', () => {
-    const result = spawnSync(
-      process.execPath,
-      [SCRIPT, '--bundle', '/nonexistent/bundle.js'],
-      { encoding: 'utf8' },
-    );
-    expect(result.status).toBe(1);
+  describe('arguments', () => {
+    it.each([
+      ['neither --bundle nor --apk', []],
+      ['both', ['--bundle', 'a', '--apk', 'b']],
+      ['a flag without a value', ['--bundle']],
+    ])('prints the usage for %s', (_, argv) => {
+      const result = run(argv);
+      expect(result.status).toBe(1);
+      expect(result.lines[0]).toContain('Usage');
+    });
+
+    it('fails when the file does not exist', () => {
+      const result = run(['--bundle', '/nonexistent/bundle.js']);
+      expect(result.status).toBe(1);
+      expect(result.lines[0]).toContain('Not found');
+    });
+  });
+
+  describe('as a command', () => {
+    it('exits 0 and prints to stdout when the bundle is clean', () => {
+      const result = withFile('index.android.bundle', 'var x=1;', file =>
+        spawnSync(process.execPath, [SCRIPT, '--bundle', file], {
+          encoding: 'utf8',
+        }),
+      );
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('passed');
+    });
+
+    it('exits 1 and prints to stderr when a marker is found', () => {
+      const result = withFile('index.android.bundle', 'RNCNetInfo', file =>
+        spawnSync(process.execPath, [SCRIPT, '--bundle', file], {
+          encoding: 'utf8',
+        }),
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('RNCNetInfo');
+    });
   });
 });
