@@ -153,7 +153,7 @@ npm run lint  # ESLint
 Keycard Pal is developed with substantial help from AI coding assistants (Claude and
 Codex). I decide what gets built, read and test what goes in, and maintain it myself. What
 keeps that honest is in the repository: a Jest suite of about 2,100 tests that runs on every
-pull request, 14 architecture decision records explaining why things are the way they are,
+pull request, 15 architecture decision records explaining why things are the way they are,
 a check that the offline build carries no online code, and release APKs that anyone can
 rebuild byte for byte. Fixes that belonged upstream were sent upstream, to `keycard-sdk`
 and to the React Native Keycard bridge. Every release is tested on real Keycards and real
