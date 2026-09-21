@@ -1,0 +1,1 @@
+Release APKs no longer carry Google's encrypted description of the app's dependency tree, which Android's build tools add to the signature by default
