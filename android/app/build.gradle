@@ -179,6 +179,13 @@ android {
         }
     }
 
+    // AGP puts a Google-encrypted description of the dependency tree in the APK's
+    // signing block. F-Droid's scanner rejects an extra signing block (#316).
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
