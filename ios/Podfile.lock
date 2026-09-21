@@ -2028,7 +2028,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - react-native-compat (2.23.9):
+  - react-native-compat (2.21.8):
     - boost
     - DoubleConversion
     - fast_float
@@ -2056,7 +2056,6 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-    - YttriumWrapper (= 0.10.50)
   - react-native-encrypted-storage (4.0.3):
     - React-Core
   - react-native-get-random-values (2.0.0):
@@ -2906,7 +2905,6 @@ PODS:
     - Yoga
   - SocketRocket (0.7.1)
   - Yoga (0.0.0)
-  - YttriumWrapper (0.10.50)
 
 DEPENDENCIES:
   - "AsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
@@ -3005,7 +3003,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - SocketRocket
-    - YttriumWrapper
 
 EXTERNAL SOURCES:
   AsyncStorage:
@@ -3238,7 +3235,7 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: ad2becc1076529952b6db26d0a1476ec489b9067
   React-mutationobservernativemodule: 867e9c215f21b4308fa98473f3c38585b5897e44
   react-native-blur: 6af83e7e3c4c1446a188d9b2c493600fc4beb173
-  react-native-compat: 0d5b264ac5c04ad1a2ca50e7a8d0a4d6889b14cb
+  react-native-compat: 4127e158ee4fa2d2752e398096178ef7afb09cf4
   react-native-encrypted-storage: 569d114e329b1c2c2d9f8c84bcdbe4478dda2258
   react-native-get-random-values: e2acf4070fe4b7325705a05af047449637a27a21
   react-native-netinfo: a0be8c77f8420a60ddf07eb87be1a36f02a1bd65
@@ -3282,7 +3279,6 @@ SPEC CHECKSUMS:
   RNSVG: 6470d6f2636d71bd4bbc44a4f27fb7444e437b2f
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: e6489bbfdab9b98f8d51993484d6bd40216b7834
-  YttriumWrapper: d7f63336830536f1da41b745ed8bacedb04228c4
 
 PODFILE CHECKSUM: 30ba79d4a11b87327001a5c03c0240d3f0ac91c8
 
