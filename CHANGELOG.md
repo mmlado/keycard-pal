@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Release APKs no longer carry Google's encrypted description of the app's dependency tree, which Android's build tools add to the signature by default
+
 ## [1.11.0] - 2026-09-20
 
 ### Added
