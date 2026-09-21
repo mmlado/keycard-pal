@@ -63,6 +63,19 @@ peer dependency, and two installed copies break every `instanceof` check between
 them. After changing the pin, `npm ls keycard-sdk` must still show a single,
 deduped copy.
 
+## Update, 2026-09-21: `keycard-sdk` is back on a version range
+
+choppu released the `await` as `keycard-sdk` 4.0.1 rather than merging #40, which is still
+open. The Revisit condition below is met, so `package.json` takes `^4.0.1` and the fork pin
+is gone. 4.0.1 also drops a string shared secret on Secure Channel V2 and adds ECDH, a
+Schnorr tweak, NDEF reads and a paged `getData`; Pal calls none of those. `npm ls
+keycard-sdk` still shows one deduped copy, shared with the bridge, whose peer range accepts
+it.
+
+`__tests__/keycardSdkContract.test.ts` stays. It now guards a range rather than a pin, which
+is the case it was written for: a bump that lands on a build without the `await` goes red.
+The bridge keeps its commit-SHA pin, and the decision above is unchanged for it.
+
 ## Revisit
 
 If upstream starts cutting timely npm releases with the required changes,
