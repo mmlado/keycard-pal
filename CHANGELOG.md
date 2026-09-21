@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Updated vulnerable dependencies flagged by Dependabot (js-yaml, svgo, metro, @react-navigation/core); the `decode-uri-component` and `elliptic` alerts remain open because no patched release can be taken
+
 ## [1.11.1] - 2026-09-21
 
 ### Changed
