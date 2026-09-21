@@ -180,10 +180,12 @@ android {
     }
 
     // AGP puts a Google-encrypted description of the dependency tree in the APK's
-    // signing block. F-Droid's scanner rejects an extra signing block (#316).
+    // signing block, which F-Droid's scanner rejects (#316). The Play bundle keeps
+    // it: Google reads it to warn about known-vulnerable SDKs, and F-Droid never
+    // sees an AAB.
     dependenciesInfo {
         includeInApk = false
-        includeInBundle = false
+        includeInBundle = true
     }
 
     buildTypes {
