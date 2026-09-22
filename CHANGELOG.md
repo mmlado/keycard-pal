@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Updated vulnerable dependencies flagged by Dependabot (js-yaml, svgo, metro, @react-navigation/core); the `decode-uri-component` and `elliptic` alerts remain open because no patched release can be taken
+- The online build no longer bundles the offline build's token logo index, which it never read
 
 ## [1.11.1] - 2026-09-21
 
