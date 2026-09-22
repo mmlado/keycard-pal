@@ -52,7 +52,7 @@
     "@walletconnect/react-native-compat": "2.21.8",
     "bitcoinjs-lib": "^6.1.7",
     "fast-text-encoding": "1.0.6",
-    "keycard-sdk": "github:mmlado/keycard-sdk#c232659fb6601d9e3f6c2a6d0db3b90871dd8220",
+    "keycard-sdk": "^4.0.1",
     "node-libs-react-native": "^1.2.1",
     "react": "^19.2.0",
     "react-native": "^0.83.1",

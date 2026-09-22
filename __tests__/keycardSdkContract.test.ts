@@ -2,9 +2,9 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Reads the INSTALLED keycard-sdk: the 4.0.0 release does not await the V2 handshake in
- * `init()` and sends INIT in the clear (seen on a card, 2026-09-18). package.json pins a build
- * with the fix (ADR-0008); this goes red if the pin moves to a release without it.
+ * Reads the INSTALLED keycard-sdk: 4.0.0 did not await the V2 handshake in `init()` and sent
+ * INIT in the clear (seen on a card, 2026-09-18). Fixed upstream in 4.0.1; this goes red if a
+ * bump ever lands on a build without it (ADR-0008).
  */
 const commandset = readFileSync(
   join(__dirname, '..', 'node_modules', 'keycard-sdk', 'dist', 'commandset.js'),
