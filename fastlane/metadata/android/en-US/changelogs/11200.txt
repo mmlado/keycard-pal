@@ -1,0 +1,1 @@
+The donation section is now titled Donations and says that donations are voluntary and nothing in the app is unlocked, changed or promised in return. Updated vulnerable dependencies. Google Play releases now go to open testing first and are promoted to production by hand, so Play trails the GitHub and F-Droid builds by a few days.
