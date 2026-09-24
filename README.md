@@ -68,7 +68,7 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 > **Advertisement:** the purchase link above and the Buy a Keycard links in the Android app
 > are affiliate links. The developer earns a commission on purchases made through them. No app feature
 > depends on buying through them, and every feature of the app is free. The iOS app carries
-> no affiliate link: it points at the product site and earns nothing.
+> no affiliate link and points at the product site instead.
 
 ## Getting the app
 
