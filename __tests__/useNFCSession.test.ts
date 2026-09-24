@@ -947,6 +947,55 @@ describe('useNFCSession', () => {
       expect(result.current.phase).toBe('idle');
     });
 
+    it('counts a user cancel during a tap', async () => {
+      const { result } = makeHook();
+      expect(result.current.userCancels).toBe(0);
+      await act(async () => {
+        result.current.startNFC();
+      });
+      await act(async () => {
+        capturedOnCancelled?.();
+      });
+      expect(result.current.userCancels).toBe(1);
+    });
+
+    it('counts each cancel, so a cancelled re-tap is heard again', async () => {
+      const { result } = makeHook();
+      for (let i = 0; i < 2; i++) {
+        await act(async () => {
+          result.current.startNFC();
+        });
+        await act(async () => {
+          capturedOnCancelled?.();
+        });
+      }
+      expect(result.current.userCancels).toBe(2);
+    });
+
+    it('does not count a cancel outside a tap', async () => {
+      const { result } = makeHook();
+      await act(async () => {
+        capturedOnCancelled?.();
+      });
+      expect(result.current.userCancels).toBe(0);
+    });
+
+    // The overlay phases (PIN pad, pairing password, genuine warning) sit here.
+    it('does not count a cancel after the tap failed', async () => {
+      mockStartNFC.mockResolvedValue({ isSuccess: false });
+      const { result } = makeHook();
+      await act(async () => {
+        result.current.startNFC();
+      });
+      await act(async () => {});
+      expect(result.current.phase).toBe('error');
+      await act(async () => {
+        capturedOnCancelled?.();
+      });
+      expect(result.current.userCancels).toBe(0);
+      expect(result.current.phase).toBe('error');
+    });
+
     it('timeout updates status message when in nfc phase', async () => {
       const { result } = makeHook();
       await act(async () => {

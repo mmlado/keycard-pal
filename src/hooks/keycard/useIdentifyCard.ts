@@ -15,6 +15,7 @@ export interface UseIdentifyCard {
   phase: NFCSessionPhase;
   status: string;
   cardPresence: CardPresence;
+  userCancels: number;
   /** Null until a tap has completed. Never kept beyond this hook instance. */
   generation: Generation | null;
   start: () => void;
@@ -46,6 +47,7 @@ export function useIdentifyCard(): UseIdentifyCard {
     phase,
     status,
     cardPresence,
+    userCancels,
     result,
     start,
     cancel,
@@ -61,6 +63,7 @@ export function useIdentifyCard(): UseIdentifyCard {
     phase,
     status,
     cardPresence,
+    userCancels,
     generation: result,
     start,
     retry: start,

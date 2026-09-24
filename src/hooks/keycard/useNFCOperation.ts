@@ -17,6 +17,7 @@ export interface UseNFCOperation<T> {
   phase: NFCSessionPhase;
   status: string;
   cardPresence: CardPresence;
+  userCancels: number;
   result: T | null;
   start: () => void;
   /** Same as `start`, for the sheet's "Try again": after an error the reader is off. */
@@ -60,6 +61,7 @@ export function useNFCOperation<T>(
     phase,
     status,
     cardPresence,
+    userCancels,
     startNFC,
     reset: nfcReset,
     openNFCSettings,
@@ -81,6 +83,7 @@ export function useNFCOperation<T>(
     phase,
     status,
     cardPresence,
+    userCancels,
     result,
     start: startNFC,
     retry: startNFC,
