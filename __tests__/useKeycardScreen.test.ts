@@ -29,6 +29,43 @@ function makeKeycard(phase: string, result: unknown = null) {
   return { phase: phase as any, result, cancel: jest.fn() };
 }
 
+// React Navigation asks the screen that is about to go first: both reset() and
+// goBack() fire its beforeRemove listeners, and a listener that calls
+// preventDefault cancels the navigation. A bare jest.fn() never does that,
+// which is how a screen whose own back guard vetoed its own departure went
+// unnoticed. `left` records the navigations that survived.
+function makeNavigationThatAsksFirst() {
+  const listeners: ((e: { preventDefault: () => void }) => void)[] = [];
+  const left = jest.fn();
+  const ask = (state?: unknown) => {
+    let prevented = false;
+    const e = {
+      preventDefault: () => {
+        prevented = true;
+      },
+    };
+    listeners.forEach(listener => listener(e));
+    if (!prevented) {
+      left(state);
+    }
+  };
+  const navigation = {
+    goBack: jest.fn(() => ask()),
+    setOptions: jest.fn(),
+    addListener: jest.fn((_type: string, listener: (e: any) => void) => {
+      listeners.push(listener);
+      return jest.fn();
+    }),
+    reset: jest.fn(ask),
+  };
+  return { navigation, left };
+}
+
+/** A step machine like InitCardScreen's: back steps the form, never leaves. */
+function stepGuard() {
+  return jest.fn((e: { preventDefault: () => void }) => e.preventDefault());
+}
+
 function renderScreenHook(options: UseKeycardScreenOptions) {
   return renderHook(
     (props: UseKeycardScreenOptions) => useKeycardScreen(props),
@@ -276,42 +313,7 @@ describe('back guard', () => {
   });
 });
 
-// React Navigation asks the screen that is about to go first: reset() fires its
-// beforeRemove listeners, and a listener that calls preventDefault cancels the
-// navigation. A bare jest.fn() for reset never does that, which is how a screen
-// whose own back guard vetoed its own "done" went unnoticed.
 describe('done navigation against a screen with its own back guard', () => {
-  function makeNavigationThatAsksFirst() {
-    const listeners: ((e: { preventDefault: () => void }) => void)[] = [];
-    const left = jest.fn();
-    const navigation = {
-      goBack: jest.fn(),
-      setOptions: jest.fn(),
-      addListener: jest.fn((_type: string, listener: (e: any) => void) => {
-        listeners.push(listener);
-        return jest.fn();
-      }),
-      reset: jest.fn((state: unknown) => {
-        let prevented = false;
-        const e = {
-          preventDefault: () => {
-            prevented = true;
-          },
-        };
-        listeners.forEach(listener => listener(e));
-        if (!prevented) {
-          left(state);
-        }
-      }),
-    };
-    return { navigation, left };
-  }
-
-  /** A step machine like InitCardScreen's: back steps the form, never leaves. */
-  function stepGuard() {
-    return jest.fn((e: { preventDefault: () => void }) => e.preventDefault());
-  }
-
   // Mounted mid-operation and then finished, the way a real screen gets there:
   // the back guard is long registered by the time the operation is done.
   it('leaves when the operation is done, whatever step the form is on', () => {
@@ -380,6 +382,104 @@ describe('done navigation against a screen with its own back guard', () => {
   });
 });
 
+// Apple's sheet closes the session itself, so every case below runs with the
+// phase already back to 'idle'.
+describe("cancel from Apple's NFC sheet", () => {
+  it('cancels the tap and leaves the screen', () => {
+    const navigation = makeNavigation();
+    const keycard = makeKeycard('idle');
+    const options = { keycard, navigation, title: 'T' };
+    const { rerender } = renderScreenHook(options);
+    expect(keycard.cancel).not.toHaveBeenCalled();
+
+    rerender({ ...options, keycard: { ...keycard, userCancels: 1 } });
+
+    expect(keycard.cancel).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('only cancels with stayOnCancel', () => {
+    const navigation = makeNavigation();
+    const keycard = makeKeycard('idle');
+    const options = { keycard, navigation, title: 'T', stayOnCancel: true };
+    const { rerender } = renderScreenHook(options);
+
+    rerender({ ...options, keycard: { ...keycard, userCancels: 1 } });
+
+    expect(keycard.cancel).toHaveBeenCalledTimes(1);
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  it('cancels again when a re-tap is cancelled too', () => {
+    const navigation = makeNavigation();
+    const keycard = makeKeycard('idle');
+    const options = { keycard, navigation, title: 'T', stayOnCancel: true };
+    const { rerender } = renderScreenHook(options);
+
+    rerender({ ...options, keycard: { ...keycard, userCancels: 1 } });
+    rerender({ ...options, keycard: { ...keycard, userCancels: 2 } });
+
+    expect(keycard.cancel).toHaveBeenCalledTimes(2);
+  });
+
+  it('does nothing while the count holds', () => {
+    const navigation = makeNavigation();
+    const keycard = makeKeycard('nfc');
+    const options = { keycard, navigation, title: 'T' };
+    const { rerender } = renderScreenHook(options);
+
+    rerender({ ...options, keycard: { ...keycard, userCancels: 0 } });
+    rerender({ ...options, keycard: { ...keycard, phase: 'done' as any } });
+
+    expect(keycard.cancel).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  it('does not replay a count that is already up at mount', () => {
+    const navigation = makeNavigation();
+    const keycard = { ...makeKeycard('idle'), userCancels: 3 };
+    renderScreenHook({ keycard, navigation, title: 'T' });
+
+    expect(keycard.cancel).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  it("leaves instead of stepping the screen's own form back", () => {
+    const { navigation, left } = makeNavigationThatAsksFirst();
+    const onBeforeRemove = stepGuard();
+    const keycard = makeKeycard('idle');
+    const options = { keycard, navigation, title: 'T', onBeforeRemove };
+    const { rerender } = renderScreenHook(options);
+
+    rerender({ ...options, keycard: { ...keycard, userCancels: 1 } });
+
+    expect(keycard.cancel).toHaveBeenCalled();
+    expect(onBeforeRemove).not.toHaveBeenCalled();
+    expect(left).toHaveBeenCalled();
+  });
+
+  it('still lets the screen veto a real back press afterwards', () => {
+    const { navigation } = makeNavigationThatAsksFirst();
+    const onBeforeRemove = stepGuard();
+    const keycard = makeKeycard('idle');
+    const options = {
+      keycard,
+      navigation,
+      title: 'T',
+      onBeforeRemove,
+      stayOnCancel: true,
+    };
+    const { rerender } = renderScreenHook(options);
+
+    rerender({ ...options, keycard: { ...keycard, userCancels: 1 } });
+    const e = { preventDefault: jest.fn() };
+    capturedBeforeRemove(navigation as any)(e);
+
+    expect(onBeforeRemove).toHaveBeenCalledWith(e);
+    expect(e.preventDefault).toHaveBeenCalled();
+  });
+});
+
 describe('activeKeycard override', () => {
   it('guard, title, and cancel key on activeKeycard; done keys on keycard', () => {
     const navigation = makeNavigation();
@@ -416,6 +516,49 @@ describe('activeKeycard override', () => {
       activeKeycard: makeKeycard('done', 'shares'),
     });
     expect(navigation.reset).not.toHaveBeenCalled();
+  });
+
+  it("Apple's cancel keys on the active hook", () => {
+    const navigation = makeNavigation();
+    const keycard = makeKeycard('idle');
+    const activeKeycard = makeKeycard('idle');
+    const options = { keycard, navigation, title: 'T', activeKeycard };
+    const { rerender } = renderScreenHook(options);
+
+    rerender({ ...options, keycard: { ...keycard, userCancels: 1 } });
+    expect(navigation.goBack).not.toHaveBeenCalled();
+
+    rerender({
+      ...options,
+      keycard: { ...keycard, userCancels: 1 },
+      activeKeycard: { ...activeKeycard, userCancels: 1 },
+    });
+    expect(activeKeycard.cancel).toHaveBeenCalledTimes(1);
+    expect(keycard.cancel).not.toHaveBeenCalled();
+    expect(navigation.goBack).toHaveBeenCalledTimes(1);
+  });
+
+  // Slip39Screen hands over from the generate hook to the load hook mid-screen.
+  it('does not read a hand-over between hooks as a cancel', () => {
+    const navigation = makeNavigation();
+    const keycard = makeKeycard('idle');
+    const generate = makeKeycard('idle');
+    const options = {
+      keycard,
+      navigation,
+      title: 'T',
+      stayOnCancel: true,
+    };
+    const { rerender } = renderScreenHook({
+      ...options,
+      activeKeycard: { ...generate, userCancels: 1 },
+    });
+
+    rerender({ ...options, activeKeycard: { ...keycard, userCancels: 0 } });
+    expect(keycard.cancel).not.toHaveBeenCalled();
+
+    rerender({ ...options, activeKeycard: { ...keycard, userCancels: 1 } });
+    expect(keycard.cancel).toHaveBeenCalledTimes(1);
   });
 
   it("PIN-entry title keys on the active hook's phase", () => {

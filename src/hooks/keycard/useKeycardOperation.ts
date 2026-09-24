@@ -62,6 +62,7 @@ export interface UseKeycardOperation<T> {
   phase: KeycardPhase;
   status: string;
   cardPresence: CardPresence;
+  userCancels: number;
   cardName: string | null;
   cardFingerprint: number | null;
   result: T | null;
@@ -440,6 +441,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     phase: nfcPhase,
     status,
     cardPresence,
+    userCancels,
     result,
     start: startNFC,
     cancel: nfcCancel,
@@ -583,6 +585,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     phase,
     status,
     cardPresence,
+    userCancels,
     cardName,
     cardFingerprint,
     result,
