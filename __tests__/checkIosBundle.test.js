@@ -31,6 +31,14 @@ function runOnBundle(content) {
 
 describe('check-ios-bundle', () => {
   const source = fs.readFileSync(PURCHASE_LINK, 'utf8');
+  // Fixtures follow the source: a legitimate referral-code change should not
+  // fail these, and should not quietly leave them checking a dead code.
+  const sourceUrl = literal(source, 'KEYCARD_PURCHASE_URL');
+  const sourceHost = new URL(sourceUrl).host;
+  const sourceCode = new URL(sourceUrl).pathname
+    .split('/')
+    .filter(Boolean)
+    .pop();
 
   describe('what it looks for', () => {
     // The referral code is Status's to change. Written down here, this check
@@ -85,13 +93,15 @@ describe('check-ios-bundle', () => {
     });
 
     it.each([
-      ['the affiliate URL', 'var u="https://get.keycard.tech/vuxxnf";'],
-      ['the bare shop host', 'var u="get.keycard.tech";'],
-      ['the referral code alone', 'var u="/vuxxnf";'],
+      ['the affiliate URL', `var u="${sourceUrl}";`],
+      ['the bare shop host', `var u="${sourceHost}";`],
+      ['the referral code alone', `var u="/${sourceCode}";`],
       [
         'the disclosure copy',
         'var t="Advertisement: affiliate link, pays the developer a commission.";',
       ],
+      // Neither exact string, so only the bare word catches it.
+      ['a relabelled disclosure', 'var t="Advertisement: sponsored link";'],
     ])('fails a bundle carrying %s', (_label, content) => {
       const { status, lines } = runOnBundle(content);
 
@@ -101,12 +111,12 @@ describe('check-ios-bundle', () => {
 
     it('names every marker it found, not just the first', () => {
       const { lines } = runOnBundle(
-        'var u="https://get.keycard.tech/vuxxnf";var t="Advertisement: affiliate link. The developer earns a commission if you buy a Keycard.";',
+        `var u="${sourceUrl}";var t="Advertisement: affiliate link. The developer earns a commission if you buy a Keycard.";`,
       );
 
       const report = lines.join('\n');
-      expect(report).toMatch(/get\.keycard\.tech/);
-      expect(report).toMatch(/vuxxnf/);
+      expect(report).toContain(sourceHost);
+      expect(report).toContain(sourceCode);
       expect(report).toMatch(/Advertisement/);
     });
   });
@@ -131,9 +141,7 @@ describe('check-ios-bundle', () => {
     it('refuses to pass when the disclosure copy is missing', () => {
       const stripped = source.replace('AFFILIATE_DISCLOSURE_SHORT', 'GONE');
 
-      expect(() => markersFrom(stripped)).toThrow(
-        /AFFILIATE_DISCLOSURE_SHORT/,
-      );
+      expect(() => markersFrom(stripped)).toThrow(/AFFILIATE_DISCLOSURE_SHORT/);
     });
 
     it('fails on a missing bundle rather than reporting success', () => {

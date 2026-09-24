@@ -54,7 +54,9 @@ function markersFrom(source) {
     throw new Error(`no referral code in the affiliate URL: ${url}`);
   }
 
-  const markers = [url, host, referralCode];
+  // The bare word as well as both exact strings: a relabelled disclosure,
+  // "Advertisement: sponsored link", matches neither of them.
+  const markers = [url, host, referralCode, 'Advertisement'];
 
   for (const name of ['AFFILIATE_DISCLOSURE', 'AFFILIATE_DISCLOSURE_SHORT']) {
     const copy = literal(source, name);
