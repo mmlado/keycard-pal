@@ -128,6 +128,19 @@ describe('Android purchase surfaces', () => {
     expectDisclosure(AFFILIATE_DISCLOSURE);
   });
 
+  // The same button offline, where the tap shows a QR code instead of opening
+  // a browser. Both icon arms render; the shared icons mock answers every key
+  // with the same component, so the assertion stays on what is true.
+  it('keeps the button and its label without a network', () => {
+    mockConnected = false;
+
+    render(<WelcomeScreen navigation={navigation} route={route} />);
+
+    expect(screen.getByTestId('welcome-buy-keycard')).toBeTruthy();
+    expect(screen.getByText('Buy a Keycard')).toBeTruthy();
+    expectDisclosure(AFFILIATE_DISCLOSURE);
+  });
+
   // 2. Settings, the permanent home of the link. The short wording is used
   // where a row has no room for the full sentence.
   it('labels the Settings row', () => {

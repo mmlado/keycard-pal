@@ -144,6 +144,24 @@ describe('check-ios-bundle', () => {
       expect(() => markersFrom(stripped)).toThrow(/AFFILIATE_DISCLOSURE_SHORT/);
     });
 
+    it('refuses to pass when it cannot read the purchase link at all', () => {
+      const { status, lines } = withBundle('var a=1;', file =>
+        run(['--bundle', file], '/nope/no-such-purchase-link.ts'),
+      );
+
+      expect(status).toBe(1);
+      expect(lines.join('\n')).toMatch(/checks nothing/);
+    });
+
+    it('fails when the bundle path is not a readable file', () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-bundle-dir-'));
+      try {
+        expect(run(['--bundle', dir]).status).toBe(1);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
     it('fails on a missing bundle rather than reporting success', () => {
       const { status } = run(['--bundle', '/nope/does-not-exist.bundle']);
 

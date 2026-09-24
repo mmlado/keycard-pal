@@ -82,7 +82,7 @@ function argValue(argv, flag) {
   return idx === -1 ? null : argv[idx + 1];
 }
 
-function run(argv) {
+function run(argv, sourcePath = PURCHASE_LINK_SOURCE) {
   const bundlePath = argValue(argv, '--bundle');
   if (!bundlePath) {
     return { status: 1, lines: [USAGE] };
@@ -95,7 +95,7 @@ function run(argv) {
 
   let markers;
   try {
-    markers = markersFrom(fs.readFileSync(PURCHASE_LINK_SOURCE, 'utf8'));
+    markers = markersFrom(fs.readFileSync(sourcePath, 'utf8'));
   } catch (err) {
     return {
       status: 1,
