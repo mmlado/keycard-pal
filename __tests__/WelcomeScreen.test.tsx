@@ -3,11 +3,6 @@ import { Linking } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import WelcomeScreen from '../src/screens/WelcomeScreen';
-import {
-  AFFILIATE_DISCLOSURE,
-  BUY_KEYCARD_LABEL,
-  KEYCARD_PURCHASE_URL,
-} from '../src/constants/keycard';
 
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
@@ -75,6 +70,15 @@ async function pressBuy() {
   });
 }
 
+// This file runs in the ios project, where the screen's action block resolves
+// to WelcomeActions.ios.tsx and the purchase constants to purchaseLink.ios.ts.
+// Resolution, not Platform.OS, decides that, so there is nothing to pin and no
+// way to reach the affiliate wording from here: the Android action block is
+// asserted in the android project under __tests__/android/.
+//
+// The URL and the label are written out instead of imported. They are the
+// claim the App Store review turns on, and a constant would follow the source
+// it is meant to hold in place.
 describe('WelcomeScreen', () => {
   beforeEach(() => {
     mockSetPreference.mockClear();
@@ -113,33 +117,54 @@ describe('WelcomeScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('Dashboard');
   });
 
-  it('opens the affiliate purchase link in the browser when there is a network', async () => {
+  // Get started is the only primary button here. The card is a prerequisite to
+  // state, not a purchase to close, so the pointer under it is a link that
+  // names where the information lives and asks for nothing.
+  it('states the hardware requirement and points at it without an offer', () => {
+    render(<WelcomeScreen navigation={navigation} route={route} />);
+
+    expect(
+      screen.getByText('Keycard Pal needs a Keycard to work.'),
+    ).toBeTruthy();
+    expect(screen.getByText('keycard.tech')).toBeTruthy();
+    expect(screen.queryByText('Buy a Keycard')).toBeNull();
+    expect(
+      screen.getByTestId('welcome-buy-keycard').props.accessibilityRole,
+    ).toBe('link');
+  });
+
+  // Nothing is earned on this build, so there is nothing to disclose and the
+  // Advertisement label would be a false statement rather than a safe extra.
+  it('shows no advertisement label', () => {
+    render(<WelcomeScreen navigation={navigation} route={route} />);
+
+    expect(screen.queryByTestId('affiliate-disclosure')).toBeNull();
+    expect(screen.queryByText(/Advertisement/i)).toBeNull();
+  });
+
+  it('opens the product site in the browser when there is a network', async () => {
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
     await pressBuy();
 
-    expect(Linking.openURL).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
+    // The product site, not the shop, and no referral parameter on the end.
+    expect(Linking.openURL).toHaveBeenCalledWith('https://keycard.tech');
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('shows the purchase link as a QR code without a network (always in the offline build)', async () => {
+  it('shows the link as a QR code without a network (always in the offline build)', async () => {
     mockConnected = false;
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
     await pressBuy();
 
+    // No note under the QR code: the offline screen is the whole placement,
+    // and there is no commission behind it to admit to.
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
-      url: KEYCARD_PURCHASE_URL,
-      title: BUY_KEYCARD_LABEL,
-      note: AFFILIATE_DISCLOSURE,
+      url: 'https://keycard.tech',
+      title: 'keycard.tech',
+      note: undefined,
     });
     expect(Linking.openURL).not.toHaveBeenCalled();
-  });
-
-  it('shows the buy button', () => {
-    render(<WelcomeScreen navigation={navigation} route={route} />);
-
-    expect(screen.getByText('Buy a Keycard')).toBeTruthy();
-    expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
   });
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import NFCSheet from '../src/components/NFCBottomSheet/NFCSheet';
+import { NO_CARD_EXIT_LABEL } from '../src/constants/purchaseLink';
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -190,7 +191,7 @@ describe('NFCSheet', () => {
   // way out. It is a quiet link, shown only while the app is asking for a
   // card — never once a card is connected, merely moved, or done.
   describe('buy-a-Keycard link', () => {
-    const link = "Don't have a Keycard?";
+    const link = NO_CARD_EXIT_LABEL;
 
     it('shows the link while scanning when onBuyKeycard is provided', () => {
       render(

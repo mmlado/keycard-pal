@@ -4,10 +4,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import SettingsScreen, { dashboardEntry } from '../src/screens/SettingsScreen';
 import {
-  AFFILIATE_DISCLOSURE,
   BUY_KEYCARD_LABEL,
   KEYCARD_PURCHASE_URL,
-} from '../src/constants/keycard';
+} from '../src/constants/purchaseLink';
 
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
@@ -143,7 +142,7 @@ function renderScreen() {
 
 async function pressBuy() {
   await act(async () => {
-    fireEvent.press(screen.getByText('Buy a Keycard'));
+    fireEvent.press(screen.getByText(BUY_KEYCARD_LABEL));
   });
 }
 
@@ -174,16 +173,15 @@ describe('SettingsScreen', () => {
   });
 
   // The purchase link always stays first.
-  it('keeps Buy a Keycard above the layout section', () => {
+  it('keeps the Keycard row above the layout section', () => {
     const { toJSON } = renderScreen();
     const rendered = JSON.stringify(toJSON());
     // Both must be present, or indexOf -1 would pass the ordering check.
-    expect(rendered).toContain('Buy a Keycard');
+    expect(rendered).toContain(BUY_KEYCARD_LABEL);
     expect(rendered).toContain('Layout');
-    expect(rendered.indexOf('Buy a Keycard')).toBeLessThan(
+    expect(rendered.indexOf(BUY_KEYCARD_LABEL)).toBeLessThan(
       rendered.indexOf('Layout'),
     );
-    expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
   });
 
   // For the user who would rather tap a card than read applet versions.
@@ -282,7 +280,7 @@ describe('SettingsScreen', () => {
     Platform.OS = 'android';
     try {
       renderScreen();
-      expect(screen.getByText('Buy a Keycard')).toBeTruthy();
+      expect(screen.getByText(BUY_KEYCARD_LABEL)).toBeTruthy();
     } finally {
       Platform.OS = origOS;
     }
@@ -295,21 +293,43 @@ describe('SettingsScreen', () => {
     expect(dashboardEntry.label).toBe('Settings');
   });
 
-  it('offers the Keycard purchase link in the browser when there is a network', async () => {
-    renderScreen();
-    await pressBuy();
-    expect(Linking.openURL).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
-  });
-
-  it('offers the Keycard purchase link as a QR code without a network (always in the offline build)', async () => {
-    mockConnected = false;
-    renderScreen();
-    await pressBuy();
-    expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
-      url: KEYCARD_PURCHASE_URL,
-      title: BUY_KEYCARD_LABEL,
-      note: AFFILIATE_DISCLOSURE,
+  // The permanent home of the purchase link, and the only one an iOS user
+  // reaches without an NFC failure.
+  //
+  // This file runs in the ios project, so `constants/purchaseLink` and
+  // `components/AffiliateDisclosure` resolve to their `.ios` twins: the
+  // product site with no referral parameter, and a disclosure that renders
+  // nothing. Resolution decides that, not Platform.OS, so there is no
+  // platform to pin here and no way to reach the affiliate wording from this
+  // file at all. The Android arm lives under `__tests__/android/`.
+  describe('the Keycard purchase link', () => {
+    it('shows no advertisement label, because nothing is earned', () => {
+      renderScreen();
+      expect(screen.queryByTestId('affiliate-disclosure')).toBeNull();
     });
-    expect(Linking.openURL).not.toHaveBeenCalled();
+
+    it('opens the product site in the browser when there is a network', async () => {
+      renderScreen();
+      await pressBuy();
+      // 'https://keycard.tech', the product site, never the shop URL the
+      // Android build carries a referral parameter on.
+      expect(Linking.openURL).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
+    });
+
+    it('shows it as a QR code without a network (always in the offline build)', async () => {
+      mockConnected = false;
+      renderScreen();
+      await pressBuy();
+      // On the build that pays a commission the QR screen is the whole
+      // placement, so the route carries the disclosure as its note. Here
+      // there is no commission and so no note: saying anything about
+      // commercial status would be a claim, not a disclosure.
+      expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
+        url: KEYCARD_PURCHASE_URL,
+        title: BUY_KEYCARD_LABEL,
+        note: undefined,
+      });
+      expect(Linking.openURL).not.toHaveBeenCalled();
+    });
   });
 });

@@ -2,10 +2,10 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { Linking } from 'react-native';
 
 import {
-  AFFILIATE_DISCLOSURE,
   BUY_KEYCARD_LABEL,
   KEYCARD_PURCHASE_URL,
-} from '@/constants/keycard';
+  PURCHASE_QR_NOTE,
+} from '@/constants/purchaseLink';
 import { navigationRef } from '@/navigation/navigationRef';
 
 import {
@@ -17,14 +17,16 @@ import {
 /**
  * The one buy-a-Keycard action, shared by every surface that offers it.
  *
- * With a network connection the affiliate link opens in the browser.
- * Without one the link is shown as a QR code to scan with another device,
- * so the tap is never a dead end. The offline build's connectivity stub
- * always reports disconnected, so it never calls Linking.openURL.
- * `opensInBrowser` tracks the live network state for the matching icon.
+ * With a network connection the link opens in the browser. Without one it is
+ * shown as a QR code to scan with another device, so the tap is never a dead
+ * end. The offline build's connectivity stub always reports disconnected, so
+ * it never calls Linking.openURL. `opensInBrowser` tracks the live network
+ * state for the matching icon.
  *
- * The QR route carries the affiliate disclosure as `note`: offline that
- * screen is the placement, and a caller cannot be trusted to remember it.
+ * Which URL, and whether the QR screen carries a disclosure at all, belongs
+ * to `constants/purchaseLink` and its `.ios` twin. Nothing here asks what
+ * platform it is on: offline that screen is the whole placement, and a caller
+ * cannot be trusted to remember the label, so the route carries it.
  *
  * Navigation goes through the container ref rather than the caller's route:
  * the NFC sheet leaves its screen before this resolves, and a popped route's
@@ -48,7 +50,7 @@ export function useBuyKeycard(): {
       navigationRef.navigate('UrlQR', {
         url: KEYCARD_PURCHASE_URL,
         title: BUY_KEYCARD_LABEL,
-        note: AFFILIATE_DISCLOSURE,
+        note: PURCHASE_QR_NOTE,
       });
     }
   }, []);

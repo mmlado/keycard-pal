@@ -65,9 +65,10 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 - Android 7.0+ (API 24)
 - A [Status Keycard](https://get.keycard.tech/vuxxnf) NFC smart card
 
-> **Advertisement:** the Keycard links in this project and in the app are affiliate links.
-> The developer earns a commission on purchases made through them. No app feature depends
-> on buying through them, and every feature of the app is free.
+> **Advertisement:** the purchase link above and the Buy a Keycard links in the Android app
+> are affiliate links. The developer earns a commission on purchases made through them. No app feature
+> depends on buying through them, and every feature of the app is free. The iOS app carries
+> no affiliate link and points at the product site instead.
 
 ## Getting the app
 

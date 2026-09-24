@@ -77,7 +77,8 @@ export type RootStackParamList = {
     url: string;
     title?: string;
     /** Shown under the URL. Carries the affiliate disclosure when the QR is
-     *  the affiliate link, which is the whole commercial surface offline. */
+     *  the affiliate link, which is the whole commercial surface offline, and
+     *  nothing on a build whose link earns no commission. */
     note?: string;
   };
   Settings: undefined;

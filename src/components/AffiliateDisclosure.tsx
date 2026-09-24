@@ -5,7 +5,7 @@ import { Text } from 'react-native-paper';
 import {
   AFFILIATE_DISCLOSURE,
   AFFILIATE_DISCLOSURE_SHORT,
-} from '@/constants/keycard';
+} from '@/constants/purchaseLink';
 import theme from '@/theme';
 
 type AffiliateDisclosureProps = {
@@ -21,6 +21,10 @@ type AffiliateDisclosureProps = {
  * only place the copy lives. A label, not a control: no Pressable, and never
  * behind a tap, tooltip or collapsed region, which would not count as a
  * disclosure at all.
+ *
+ * `AffiliateDisclosure.ios.tsx` is the twin for the build that earns nothing.
+ * It renders nothing and imports nothing, which is what keeps this copy out
+ * of the iOS bundle; the five surfaces stay identical across platforms.
  */
 export default function AffiliateDisclosure({
   short,

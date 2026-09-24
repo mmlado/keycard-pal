@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { Icons } from '@/assets/icons';
-import { BUY_KEYCARD_LABEL } from '@/constants/keycard';
+import { BUY_KEYCARD_LABEL } from '@/constants/purchaseLink';
 import theme from '@/theme';
 
 import AffiliateDisclosure from '@/components/AffiliateDisclosure';
