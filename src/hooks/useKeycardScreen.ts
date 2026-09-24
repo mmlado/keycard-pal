@@ -10,6 +10,8 @@ export type KeycardScreenKeycard = {
   phase: KeycardPhase;
   result?: unknown;
   cancel: () => void;
+  /** Absent on a hand-built keycard. See UseNFCSessionOperation.userCancels. */
+  userCancels?: number;
 };
 
 export type KeycardScreenNavigation = {
@@ -71,8 +73,9 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
   optionsRef.current = options;
   const activeRef = useRef(active);
   activeRef.current = active;
-  // Raised just before this hook leaves the screen because the operation is
-  // done. React Navigation asks the screen being removed first (beforeRemove),
+  // Raised just before this hook takes the screen off itself, because the
+  // operation is done or because the user cancelled Apple's NFC sheet.
+  // React Navigation asks the screen being removed first (beforeRemove),
   // and a screen's own back guard cannot tell that from a back press: it would
   // veto the navigation and step its entry form back instead, leaving the user
   // on a finished screen under a success sheet that has no Cancel.
@@ -143,6 +146,24 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
       navigation.goBack();
     }
   }, [navigation]);
+
+  // Cancel on Apple's NFC sheet, the only one iOS gives during a tap.
+  const userCancels = active.userCancels ?? 0;
+  const seenUserCancelsRef = useRef(userCancels);
+  useEffect(() => {
+    const seen = seenUserCancelsRef.current;
+    seenUserCancelsRef.current = userCancels;
+    // A count that drops is activeKeycard switching hooks, not a cancel.
+    if (userCancels <= seen) {
+      return;
+    }
+    // The session is back to 'idle' already, so the back guard below would read
+    // the screen as idle and step its form back instead of leaving.
+    if (!optionsRef.current.stayOnCancel) {
+      leavingRef.current = true;
+    }
+    onCancel();
+  }, [userCancels, onCancel]);
 
   return { onCancel };
 }

@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Updated vulnerable dependencies flagged by Dependabot (js-yaml, svgo, metro, @react-navigation/core); the `decode-uri-component` and `elliptic` alerts remain open because no patched release can be taken
 - The online build no longer bundles the offline build's token logo index, which it never read
 
+### Fixed
+
+- On iOS, tapping Cancel on Apple's NFC sheet now leaves the operation screen and clears the cached PIN, instead of leaving an empty screen with only the back arrow to get out of
+
 ## [1.11.1] - 2026-09-21
 
 ### Changed

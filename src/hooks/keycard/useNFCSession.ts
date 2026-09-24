@@ -62,6 +62,8 @@ export interface UseNFCSessionOperation {
   phase: NFCSessionPhase;
   status: string;
   cardPresence: CardPresence;
+  /** Cancels from Apple's NFC sheet. A count, so a cancelled re-tap is a second signal. */
+  userCancels: number;
   startNFC: () => void;
   reset: () => void;
   openNFCSettings: (() => void) | undefined;
@@ -81,6 +83,7 @@ export default function useNFCSession(
   const [phase, setPhase] = useState<NFCSessionPhase>('idle');
   const [status, setStatus] = useState('');
   const [cardPresence, setCardPresence] = useState<CardPresence>('waiting');
+  const [userCancels, setUserCancels] = useState(0);
   const [nfcDisabled, setNfcDisabled] = useState(false);
   const onNFCAvailableRef = useRef(options.onNFCAvailable);
   onNFCAvailableRef.current = options.onNFCAvailable;
@@ -324,7 +327,11 @@ export default function useNFCSession(
     );
     const cancelledSub = RNKeycard.Core.onNFCUserCancelled(() => {
       console.log('[Keycard] NFC cancelled by user');
-      setPhase(prev => (prev === 'nfc' ? 'idle' : prev));
+      // The overlay phases stopped the tap on purpose; the sheet closing behind
+      // them must not tear them down.
+      if (phaseRef.current !== 'nfc') return;
+      setPhase('idle');
+      setUserCancels(n => n + 1);
     });
     const timeoutSub = RNKeycard.Core.onNFCTimeout(() => {
       console.log('[Keycard] NFC timed out');
@@ -458,6 +465,7 @@ export default function useNFCSession(
     phase,
     status,
     cardPresence,
+    userCancels,
     startNFC,
     reset,
     openNFCSettings,
