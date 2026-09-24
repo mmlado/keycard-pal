@@ -129,19 +129,8 @@ jobs:
     name: Upload draft to Google Play
     runs-on: ubuntu-latest
     needs: build
-    # Builds its own bundle, on purpose. The APK job ends at the GitHub
-    # release, so the F-Droid repository job is never held up by a Play
-    # problem, and the APKs are not built in a workspace that later swaps in
-    # another keystore. Building twice is safe because everything the APK
-    # contains is committed, so both builds have the same inputs (#316).
-    #
-    # Uploads the AAB as a DRAFT release on the Play track — rollout stays a
-    # manual step in the Play Console, by design. Self-arming: the steps are
-    # skipped while the PLAY_SERVICE_ACCOUNT_JSON secret is absent and run on
-    # every release once it exists. (Google rejects API uploads until the
-    # app's first bundle has been uploaded by hand in the Console.) The gate
-    # lives on the steps because the secrets context is not available in a
-    # job-level `if`.
+    # Builds its own bundle rather than reusing the APK job's workspace (#338).
+    # The secret gate is per step because `secrets` is unavailable in a job `if`.
     permissions:
       contents: read
     env:
@@ -229,9 +218,8 @@ jobs:
           releaseFiles: play/*.aab
           # Draft: uploaded and visible in the Console, never rolled out by CI.
           status: draft
-          # Track the draft lands on; change via the PLAY_TRACK repo variable
-          # (e.g. the closed track's name, later 'production').
-          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          # 'beta' is Play's name for open testing.
+          track: ${{ vars.PLAY_TRACK || 'beta' }}
           whatsNewDirectory: play/whatsnew
 
   fdroid:

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Google Play releases now go to open testing first and are promoted to production by hand, so Play trails the GitHub and F-Droid builds by a few days
 - Updated vulnerable dependencies flagged by Dependabot (js-yaml, svgo, metro, @react-navigation/core); the `decode-uri-component` and `elliptic` alerts remain open because no patched release can be taken
 - The online build no longer bundles the offline build's token logo index, which it never read
 
