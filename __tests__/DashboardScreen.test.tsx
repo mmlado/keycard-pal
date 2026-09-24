@@ -3,6 +3,7 @@ import { AppState, Platform, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardScreen from '../src/screens/DashboardScreen';
+import { BUY_KEYCARD_LABEL } from '../src/constants/purchaseLink';
 import {
   noteTappedGeneration,
   resetLastTappedGeneration,
@@ -341,6 +342,6 @@ describe('DashboardScreen', () => {
   it('does not render the buy-Keycard notice', async () => {
     await renderScreen();
     expect(screen.queryByText('Keycard required')).toBeNull();
-    expect(screen.queryByText('Buy a Keycard')).toBeNull();
+    expect(screen.queryByText(BUY_KEYCARD_LABEL)).toBeNull();
   });
 });

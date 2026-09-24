@@ -1,8 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { KEYCARD_PURCHASE_URL } from '../src/constants/keycard';
-
 /**
  * The donation addresses exist twice: on the About screen and in DONATE.md,
  * which the repository's Sponsor button points at (#298). Two copies that
@@ -91,8 +89,14 @@ describe('FUNDING.yml', () => {
     expect(funding).not.toMatch(/^\s*github:/m);
   });
 
+  // Spelled out rather than imported from `constants/purchaseLink`, which now
+  // resolves to a different URL per platform: importing it would only ever
+  // pin whichever twin this run happened to resolve, and a funding file is one
+  // file for every build. What has to be absent is any Keycard shop pointer at
+  // all, affiliate or bare, so all three spellings are named here.
   it('carries no affiliate link', () => {
-    expect(funding).not.toContain(KEYCARD_PURCHASE_URL);
+    expect(funding).not.toContain('get.keycard.tech');
+    expect(funding).not.toContain('vuxxnf');
     expect(funding).not.toContain('keycard.tech');
   });
 });

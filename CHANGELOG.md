@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Google Play releases now go to open testing first and are promoted to production by hand, so Play trails the GitHub and F-Droid builds by a few days
+- The iOS build ships without the affiliate link and the Advertisement labels, pointing at the product site instead; a new check on the built bundle proves it carries neither. Android and the GitHub APKs are unchanged
+- The About screen no longer names other mobile platforms, which an iOS app may not do
 - Updated vulnerable dependencies flagged by Dependabot (js-yaml, svgo, metro, @react-navigation/core); the `decode-uri-component` and `elliptic` alerts remain open because no patched release can be taken
 - The online build no longer bundles the offline build's token logo index, which it never read
 

@@ -5,14 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../assets/icons';
 import { APP_NAME } from '../constants/app';
-import { BUY_KEYCARD_LABEL } from '../constants/keycard';
 import type { WelcomeScreenProps } from '../navigation/types';
 import theme from '../theme';
 
-import AffiliateDisclosure from '../components/AffiliateDisclosure';
-import PrimaryButton from '../components/PrimaryButton';
+import WelcomeActions from '../components/WelcomeActions';
 
-import { useBuyKeycard } from '../hooks/useBuyKeycard';
 import { usePreferences } from '../hooks/usePreferences';
 
 type Feature = {
@@ -48,7 +45,6 @@ const features: Feature[] = [
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const insets = useSafeAreaInsets();
 
-  const { buyKeycard, opensInBrowser } = useBuyKeycard();
   const { setPreference } = usePreferences();
 
   const handleGetStarted = useCallback(() => {
@@ -90,20 +86,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
         </View>
       </ScrollView>
 
-      <View style={styles.actions}>
-        <PrimaryButton
-          label={BUY_KEYCARD_LABEL}
-          onPress={buyKeycard}
-          icon={opensInBrowser ? Icons.openInBrowser : Icons.qr}
-          testID="welcome-buy-keycard"
-        />
-        <AffiliateDisclosure style={styles.disclosure} />
-        <PrimaryButton
-          label="Get started"
-          onPress={handleGetStarted}
-          testID="welcome-get-started"
-        />
-      </View>
+      <WelcomeActions onGetStarted={handleGetStarted} />
     </View>
   );
 }
@@ -163,15 +146,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     marginTop: 2,
-  },
-  actions: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    backgroundColor: theme.colors.background,
-    gap: 8,
-  },
-  disclosure: {
-    textAlign: 'center',
-    paddingHorizontal: 8,
   },
 });
