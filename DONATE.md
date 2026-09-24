@@ -1,7 +1,6 @@
 # Donate
 
-If Keycard Pal keeps your funds safe, you can send a coffee my way. It helps keep the
-project maintained and open-source.
+If you want to send the developer something, these are the addresses.
 
 | Chain    | Address                                      |
 |----------|----------------------------------------------|
@@ -14,7 +13,7 @@ scanned as a QR code.
 ## Nothing is given in return
 
 Donations are entirely voluntary. Nothing in the app is unlocked, changed or promised in
-return, and there are no tiers, perks, badges or supporter lists. Every feature works the
+return. There are no tiers, perks, badges or supporter lists, and every feature works the
 same whether you donate or not.
 
 ## What a donation reveals

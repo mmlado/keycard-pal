@@ -3,6 +3,10 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { Linking } from 'react-native';
 
 import AboutScreen from '../src/screens/AboutScreen';
+import {
+  DONATION_STANDING_LINE,
+  DONATION_TITLE,
+} from '../src/components/about/Donation/copy';
 import { PROJECT_GITHUB_URL } from '../src/constants/app';
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -81,7 +85,11 @@ describe('AboutScreen', () => {
     expect(screen.getByLabelText('Keycard Pal app icon')).toBeTruthy();
     expect(screen.getByText('GitHub project')).toBeTruthy();
     expect(screen.getByText(/Keycard required/)).toBeTruthy();
-    expect(screen.getByText('Buy me a coffee')).toBeTruthy();
+    expect(screen.getByText(DONATION_TITLE)).toBeTruthy();
+    // The line is rendered inside a longer sentence, so match it as a substring.
+    expect(
+      screen.getByText(DONATION_STANDING_LINE, { exact: false }),
+    ).toBeTruthy();
     expect(screen.getByText(bitcoinAddress)).toBeTruthy();
     expect(screen.getByText(ethereumAddress)).toBeTruthy();
     const labels = screen
