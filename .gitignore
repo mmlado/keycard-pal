@@ -25,7 +25,6 @@ DerivedData
 # Android/IntelliJ
 #
 build/
-android/app/src/main/assets/fonts/
 .idea
 .gradle
 local.properties
