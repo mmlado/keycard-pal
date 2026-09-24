@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { Icons } from '@/assets/icons';
+import { NO_CARD_EXIT_LABEL } from '@/constants/purchaseLink';
 import theme from '@/theme';
 
 import AffiliateDisclosure from '@/components/AffiliateDisclosure';
@@ -169,7 +170,7 @@ export default function NFCSheet({
             onPress={onBuyKeycard}
           >
             <Text variant="bodySmall" style={styles.buyKeycardText}>
-              Don't have a Keycard?
+              {NO_CARD_EXIT_LABEL}
             </Text>
           </Pressable>
           <AffiliateDisclosure short style={styles.buyKeycardDisclosure} />

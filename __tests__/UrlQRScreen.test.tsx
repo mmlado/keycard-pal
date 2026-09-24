@@ -3,10 +3,9 @@ import { render, screen } from '@testing-library/react-native';
 
 import UrlQRScreen from '../src/screens/UrlQRScreen';
 import {
-  AFFILIATE_DISCLOSURE,
   BUY_KEYCARD_LABEL,
   KEYCARD_PURCHASE_URL,
-} from '../src/constants/keycard';
+} from '../src/constants/purchaseLink';
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -36,6 +35,10 @@ function renderScreen(params: { url: string; title?: string; note?: string }) {
   return render(<UrlQRScreen navigation={navigation} route={route} />);
 }
 
+// The purchase constants are a build-time seam, so the URL and label below are
+// whichever twin this project resolves, not a fixed pair. Nothing here asserts
+// on their contents: the screen is platform-neutral and renders what it is
+// handed, and pinning the copy would only restate purchaseLink's own tests.
 describe('UrlQRScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -67,21 +70,27 @@ describe('UrlQRScreen', () => {
     expect(mockSetString).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
   });
 
-  describe('the affiliate note', () => {
+  describe('the route note', () => {
     // This screen is the whole commercial surface in the offline build: the
-    // buy link routes here instead of the browser, so the disclosure has to
-    // reach it through the route params.
+    // buy link routes here instead of the browser, so a disclosure can only
+    // reach the user through the route params. The screen itself never reaches
+    // for the copy, which is why a literal stands in below rather than an
+    // import: the disclosure strings exist on one arm of the seam only, and
+    // the note plumbing has to hold on both.
     it('renders the note when the route carries one', () => {
       renderScreen({
         url: KEYCARD_PURCHASE_URL,
         title: BUY_KEYCARD_LABEL,
-        note: AFFILIATE_DISCLOSURE,
+        note: 'A note carried by the route.',
       });
 
       expect(screen.getByTestId('url-qr-note')).toBeTruthy();
-      expect(screen.getByText(AFFILIATE_DISCLOSURE)).toBeTruthy();
+      expect(screen.getByText('A note carried by the route.')).toBeTruthy();
     });
 
+    // Not just the no-disclosure links: iOS exports PURCHASE_QR_NOTE as
+    // undefined, so every buy link on that build arrives here noteless and the
+    // screen has to stay silent instead of leaving an empty line under the QR.
     it('renders nothing when the route carries no note', () => {
       renderScreen({ url: 'https://github.com/mmlado/keycard-pal' });
 

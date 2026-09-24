@@ -27,6 +27,7 @@
     "generate": "npm run generate:tokens && npm run generate:chains && npm run generate:abi && npm run generate:selectors",
     "check:offline-bundle": "node scripts/check-offline-bundle.js",
     "check:bundles": "node scripts/check-bundles.js",
+    "check:ios-bundle": "node scripts/check-ios-bundle.js",
     "check:offline-apk": "node scripts/check-offline-apk.js"
   },
   "dependencies": {

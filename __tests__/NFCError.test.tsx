@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import NFCError from '../src/components/NFCBottomSheet/NFCError';
+import { NO_CARD_EXIT_LABEL } from '../src/constants/purchaseLink';
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -125,7 +126,7 @@ describe('NFCError', () => {
   // a user without a card lands. The link is quiet and never competes with
   // Try again.
   describe('buy-a-Keycard link', () => {
-    const link = "Don't have a Keycard?";
+    const link = NO_CARD_EXIT_LABEL;
 
     it('shows the link when onBuyKeycard is provided', () => {
       render(

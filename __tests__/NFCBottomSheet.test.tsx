@@ -11,10 +11,10 @@ import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import type { NFCOperation } from '../src/components/NFCBottomSheet';
 import type { KeycardPhase } from '../src/hooks/keycard/useKeycardOperation';
 import {
-  AFFILIATE_DISCLOSURE,
   BUY_KEYCARD_LABEL,
   KEYCARD_PURCHASE_URL,
-} from '../src/constants/keycard';
+  NO_CARD_EXIT_LABEL,
+} from '../src/constants/purchaseLink';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -37,8 +37,11 @@ jest.mock('../src/navigation/navigationRef', () => ({
   },
 }));
 
-const BUY_KEYCARD_LINK = "Don't have a Keycard?";
-const PURCHASE_URL = KEYCARD_PURCHASE_URL;
+const BUY_KEYCARD_LINK = NO_CARD_EXIT_LABEL;
+// Both describes below get the iOS build's purchase link, whatever they pin
+// Platform.OS to: the file the sheet imports is chosen by module resolution,
+// and this project resolves the .ios twins. So the no-card exit points at the
+// product site here, and the affiliate URL is the android project's to assert.
 
 async function pressBuyKeycardLink() {
   await act(async () => {
@@ -215,7 +218,9 @@ describe('NFCBottomSheet — Android sheet', () => {
     it('shows the link while waiting for a card', () => {
       renderSheet(makeNfc('nfc'));
       expect(screen.getByText(BUY_KEYCARD_LINK)).toBeTruthy();
-      expect(screen.getByTestId('affiliate-disclosure')).toBeTruthy();
+      // The disclosure the sheet renders next to this link resolves to the iOS
+      // twin, which draws nothing, so there is no label to find here. The
+      // android arm covers the label that has to sit beside the paid link.
     });
 
     it('hides the link once a card is connected', () => {
@@ -261,7 +266,7 @@ describe('NFCBottomSheet — Android sheet', () => {
       renderSheet(makeNfc('nfc'));
       await pressBuyKeycardLink();
       expect(onCancel).toHaveBeenCalledTimes(1);
-      expect(Linking.openURL).toHaveBeenCalledWith(PURCHASE_URL);
+      expect(Linking.openURL).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
       expect(mockNavigate).not.toHaveBeenCalled();
     });
 
@@ -270,10 +275,12 @@ describe('NFCBottomSheet — Android sheet', () => {
       renderSheet(makeNfc('error', { retry: jest.fn() }));
       await pressBuyKeycardLink();
       expect(onCancel).toHaveBeenCalledTimes(1);
+      // Nothing is earned on the build this project resolves, so the route
+      // carries no note for the QR screen to print under the code.
       expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
-        url: PURCHASE_URL,
+        url: KEYCARD_PURCHASE_URL,
         title: BUY_KEYCARD_LABEL,
-        note: AFFILIATE_DISCLOSURE,
+        note: undefined,
       });
       expect(Linking.openURL).not.toHaveBeenCalled();
     });
@@ -510,16 +517,19 @@ describe('NFCBottomSheet — iOS error overlay', () => {
     expect(screen.queryByText('Try again')).toBeNull();
   });
 
-  it('offers the no-card exit and cancels before opening the shop', async () => {
+  // No commission on this build, so no referral code and no label: the exit
+  // points at the product site and says nothing about an advertisement.
+  it('offers the no-card exit and cancels before opening the product site', async () => {
     mockConnected = false;
     renderSheet(makeNfc('error', { status: 'Session timed out' }));
     await pressBuyKeycardLink();
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
-      url: PURCHASE_URL,
+      url: KEYCARD_PURCHASE_URL,
       title: BUY_KEYCARD_LABEL,
-      note: AFFILIATE_DISCLOSURE,
+      note: undefined,
     });
+    expect(screen.queryByTestId('affiliate-disclosure')).toBeNull();
   });
 
   it('does not show iOS error overlay when phase is nfc', () => {

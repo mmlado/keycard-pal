@@ -50,7 +50,11 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
       <AppIdentityHeader />
 
       <Text style={styles.description}>
-        {`${APP_NAME} is an open-source air-gapped hardware wallet companion for Android and iOS. It communicates with a Keycard via NFC, scans and produces animated QR codes in UR format, and supports Ethereum and Bitcoin signing — keeping your private keys offline at all times.`}
+        {/* No other mobile platform may be named here: this string ships
+            inside the iOS binary, and App Store guideline 2.3.10 forbids it
+            in the app and its metadata alike. Neutral wording rather than a
+            build-flavour string, because the sentence needs neither. */}
+        {`${APP_NAME} is an open-source air-gapped hardware wallet companion. It communicates with a Keycard via NFC, scans and produces animated QR codes in UR format, and supports Ethereum and Bitcoin signing — keeping your private keys offline at all times.`}
       </Text>
 
       <View style={styles.projectLinkRow}>
