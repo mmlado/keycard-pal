@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The Inter font is now bundled in the Android app; the About, Welcome, loading, menu and license screens fell back to the system font. Its license is listed on the About screen
+
 ## [1.12.0] - 2026-09-24
 
 ### Changed
