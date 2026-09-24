@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-24
+
 ### Changed
 
 - Google Play releases now go to open testing first and are promoted to production by hand, so Play trails the GitHub and F-Droid builds by a few days
@@ -393,7 +395,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.11.1...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/mmlado/keycard-pal/compare/v1.11.1...v1.12.0
 [1.11.1]: https://github.com/mmlado/keycard-pal/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/mmlado/keycard-pal/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/mmlado/keycard-pal/compare/v1.9.3...v1.10.0
