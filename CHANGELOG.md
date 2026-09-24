@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The donation section is titled Donations and states that donations are voluntary and that nothing in the app is unlocked, changed or promised in return; the same words are in DONATE.md
 - Updated vulnerable dependencies flagged by Dependabot (js-yaml, svgo, metro, @react-navigation/core); the `decode-uri-component` and `elliptic` alerts remain open because no patched release can be taken
 - The online build no longer bundles the offline build's token logo index, which it never read
+- The Google Play bundle keeps the dependency list Google reads to warn about vulnerable SDKs; the APKs still leave it out
 
 ### Fixed
 
