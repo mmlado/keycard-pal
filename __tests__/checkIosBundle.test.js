@@ -1,3 +1,4 @@
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -5,10 +6,12 @@ const path = require('path');
 const {
   findMarkers,
   literal,
+  main,
   markersFrom,
   run,
 } = require('../scripts/check-ios-bundle');
 
+const SCRIPT = path.resolve(__dirname, '../scripts/check-ios-bundle.js');
 const PURCHASE_LINK = path.resolve(
   __dirname,
   '../src/constants/purchaseLink.ts',
@@ -176,5 +179,75 @@ describe('check-ios-bundle', () => {
   it('matches markers as substrings of the bundle', () => {
     expect(findMarkers('abc-needle-def', ['needle'])).toEqual(['needle']);
     expect(findMarkers('nothing here', ['needle'])).toEqual([]);
+  });
+
+  describe('as a command', () => {
+    // main() is what the CLI guard calls; exercised in-process so the routing
+    // of lines to stdout or stderr is covered, then once more as a real child
+    // process so the exit code is proven end to end.
+    it('routes a clean result to stdout and returns 0', () => {
+      const log = jest.fn();
+      const error = jest.fn();
+      const status = withBundle('var url="https://keycard.tech";', file =>
+        main(['--bundle', file], { log, error }),
+      );
+
+      expect(status).toBe(0);
+      expect(log).toHaveBeenCalledWith(expect.stringMatching(/passed/));
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it('writes to the console when no streams are given', () => {
+      const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const status = withBundle('var url="https://keycard.tech";', file =>
+          main(['--bundle', file]),
+        );
+
+        expect(status).toBe(0);
+        expect(log).toHaveBeenCalledWith(expect.stringMatching(/passed/));
+        expect(error).not.toHaveBeenCalled();
+      } finally {
+        log.mockRestore();
+        error.mockRestore();
+      }
+    });
+
+    it('routes a failure to stderr and returns 1', () => {
+      const log = jest.fn();
+      const error = jest.fn();
+      const status = withBundle(`var u="${sourceUrl}";`, file =>
+        main(['--bundle', file], { log, error }),
+      );
+
+      expect(status).toBe(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringMatching(/must not ship on iOS/),
+      );
+      expect(log).not.toHaveBeenCalled();
+    });
+
+    it('exits 0 and prints to stdout when the bundle is clean', () => {
+      const result = withBundle('var url="https://keycard.tech";', file =>
+        spawnSync(process.execPath, [SCRIPT, '--bundle', file], {
+          encoding: 'utf8',
+        }),
+      );
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('passed');
+    });
+
+    it('exits 1 and prints to stderr when a marker is found', () => {
+      const result = withBundle(`var u="${sourceUrl}";`, file =>
+        spawnSync(process.execPath, [SCRIPT, '--bundle', file], {
+          encoding: 'utf8',
+        }),
+      );
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(sourceHost);
+    });
   });
 });

@@ -134,18 +134,22 @@ function run(argv, sourcePath = PURCHASE_LINK_SOURCE) {
       };
 }
 
+/** The command: prints run()'s lines to stdout or stderr, returns its status. */
+function main(argv, { log = console.log, error = console.error } = {}) {
+  const { status, lines } = run(argv);
+  lines.forEach(line => (status === 0 ? log(line) : error(line)));
+  return status;
+}
+
 if (require.main === module) {
-  const { status, lines } = run(process.argv.slice(2));
-  lines.forEach(line =>
-    status === 0 ? console.log(line) : console.error(line),
-  );
-  process.exitCode = status;
+  process.exitCode = main(process.argv.slice(2));
 }
 
 module.exports = {
   PURCHASE_LINK_SOURCE,
   findMarkers,
   literal,
+  main,
   markersFrom,
   run,
 };
