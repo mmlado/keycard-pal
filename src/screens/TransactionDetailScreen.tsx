@@ -8,6 +8,7 @@ import type { TransactionDetailScreenProps } from '../navigation/types';
 import theme from '../theme';
 
 import SignRequestDetail from '../components/SignRequestDetail';
+import SimulationAddressProvider from '../components/SignRequestDetail/SimulationAddressProvider';
 import PrimaryButton from '../components/PrimaryButton';
 import { useWalletConnectSession } from '../hooks/useWalletConnectSession.online';
 import { buildSignKeycardParams } from '../utils/signNavigation';
@@ -67,35 +68,43 @@ export default function TransactionDetailScreen({
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+      <SimulationAddressProvider
+        derivationPath={
+          result.kind === 'eth-sign-request'
+            ? result.request.derivationPath
+            : undefined
+        }
       >
-        <SignRequestDetail result={result} />
-      </ScrollView>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <SignRequestDetail result={result} />
+        </ScrollView>
 
-      {keycardParams !== null && (
-        <View style={[styles.actions, { paddingBottom: insets.bottom + 16 }]}>
-          {wcContext && (
-            <Button
-              mode="outlined"
-              onPress={handleReject}
-              textColor={theme.colors.error}
-            >
-              Reject
-            </Button>
-          )}
-          <PrimaryButton
-            label={
-              isBip322Message || result.kind === 'btc-sign-request'
-                ? 'Sign message'
-                : 'Sign transaction'
-            }
-            onPress={handleSign}
-            icon={Icons.nfcActivate}
-          />
-        </View>
-      )}
+        {keycardParams !== null && (
+          <View style={[styles.actions, { paddingBottom: insets.bottom + 16 }]}>
+            {wcContext && (
+              <Button
+                mode="outlined"
+                onPress={handleReject}
+                textColor={theme.colors.error}
+              >
+                Reject
+              </Button>
+            )}
+            <PrimaryButton
+              label={
+                isBip322Message || result.kind === 'btc-sign-request'
+                  ? 'Sign message'
+                  : 'Sign transaction'
+              }
+              onPress={handleSign}
+              icon={Icons.nfcActivate}
+            />
+          </View>
+        )}
+      </SimulationAddressProvider>
     </View>
   );
 }

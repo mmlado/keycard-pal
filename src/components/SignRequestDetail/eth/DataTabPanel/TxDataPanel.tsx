@@ -4,7 +4,6 @@ import { SegmentedButtons } from 'react-native-paper';
 
 import type { EthSignRequest } from '@/types';
 
-import NFCBottomSheet from '@/components/NFCBottomSheet';
 import InfoRow from '@/components/InfoRow';
 import { computeCalldataDigest } from '@/utils/erc8213';
 import type { ParsedTx } from '@/utils/txParser';
@@ -32,13 +31,11 @@ export default function TxDataPanel({
   const initialTab: Tab = hasDecodedCall ? 'decoded' : 'digests';
   const [tab, setTab] = useState<Tab>(initialTab);
 
-  const {
-    showSimulationTab,
-    simulationState,
-    addressOp,
-    handleSimulate,
-    handleCancelNfc,
-  } = useSimulation(request, tx, chainId);
+  const { showSimulationTab, simulationState, handleSimulate } = useSimulation(
+    request,
+    tx,
+    chainId,
+  );
 
   const calldataDigest = useMemo(
     () => computeCalldataDigest(calldata),
@@ -93,7 +90,6 @@ export default function TxDataPanel({
           />
         )}
       </View>
-      <NFCBottomSheet nfc={addressOp} onCancel={handleCancelNfc} />
     </View>
   );
 }
