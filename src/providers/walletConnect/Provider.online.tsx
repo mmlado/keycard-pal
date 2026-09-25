@@ -44,9 +44,9 @@ export function WalletConnectProvider({
   const activeRequestRef = useRef<WCRequest | null>(null);
   const addressPathRef = useRef<Map<string, string>>(new Map());
   const respondedRef = useRef(false);
-  // The generated types make currentState a nullable string.
+  // The generated types make currentState a nullable string; only 'active' is ever tested.
   const appStateRef = useRef<AppStateStatus>(
-    (AppState.currentState ?? 'unknown') as AppStateStatus,
+    AppState.currentState as AppStateStatus,
   );
 
   useEffect(() => {

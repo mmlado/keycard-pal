@@ -119,9 +119,9 @@ https://fdroid.keycardpal.com/repo/
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.13.0+
 - JDK 17
-- Android SDK with NDK 27.1.12297006
+- Android SDK platform 37 and build-tools 37.0.0, with NDK 27.1.12297006
 
 ### Setup
 
