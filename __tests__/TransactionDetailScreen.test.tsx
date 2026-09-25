@@ -10,7 +10,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   default: { getItem: jest.fn(), setItem: jest.fn() },
 }));
 
-jest.mock('../src/components/NFCBottomSheet', () => () => null);
+jest.mock('../src/components/NFCBottomSheet', () => {
+  const { View } = require('react-native');
+  return () => <View testID="nfc-sheet" />;
+});
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
   useKeycardOp: () => ({
     phase: 'idle',
@@ -232,6 +235,22 @@ const fullRequest: EthSignRequest = {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('TransactionDetailScreen – simulation NFC sheet', () => {
+  it('mounts the sheet on the screen root, outside the scrolling content', () => {
+    renderScreen({ kind: 'eth-sign-request', request: fullRequest });
+    const root = screen.toJSON() as any;
+    const rootChildren = (root.children as any[]).filter(
+      child => typeof child === 'object',
+    );
+    expect(
+      rootChildren.some(child => child.props?.testID === 'nfc-sheet'),
+    ).toBe(true);
+    // Nothing inside the ScrollView carries it.
+    const scroll = rootChildren.find(child => child.type === 'RCTScrollView');
+    expect(JSON.stringify(scroll)).not.toContain('nfc-sheet');
+  });
+});
 
 describe('TransactionDetailScreen – error result', () => {
   it('renders without crashing', async () => {

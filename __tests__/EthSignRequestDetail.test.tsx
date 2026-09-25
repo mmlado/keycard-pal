@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import { RLP } from '@ethereumjs/rlp';
 
+import SimulationAddressProvider from '../src/components/SignRequestDetail/SimulationAddressProvider';
 import EthSignRequestDetail from '../src/components/SignRequestDetail/eth/SignRequestDetail';
 import type { EthSignRequest } from '../src/types';
 
@@ -144,7 +145,11 @@ function eip2930TxHex(value: bigint = 500_000_000_000_000_000n): string {
 }
 
 function renderDetail(request: EthSignRequest) {
-  return render(<EthSignRequestDetail request={request} />);
+  return render(
+    <SimulationAddressProvider derivationPath={request.derivationPath}>
+      <EthSignRequestDetail request={request} />
+    </SimulationAddressProvider>,
+  );
 }
 
 function typedDataHex(payload: unknown): string {

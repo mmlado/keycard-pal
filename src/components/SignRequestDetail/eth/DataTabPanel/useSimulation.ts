@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Keycard from 'keycard-sdk';
 
 import type { EthSignRequest } from '@/types';
 import type { ParsedTx } from '@/utils/txParser';
 
-import { useKeycardOp } from '@/hooks/keycard/useKeycardOperation';
+import { useSimulationAddressOp } from '@/components/SignRequestDetail/SimulationAddressProvider';
+
 import { useTenderlyConfig } from '@/hooks/useTenderlyConfig.online';
 import { simulateTransaction } from '@/utils/tenderly/client.online';
-import { pubKeyToEthAddress } from '@/utils/ethereumAddress';
 
 import type { SimulationState } from './SimulationPanel';
 
@@ -32,8 +31,6 @@ export function useSimulation(
 
   const simulationRunIdRef = useRef(0);
 
-  const derivationPathRef = useRef(request.derivationPath);
-  derivationPathRef.current = request.derivationPath;
   const credentialsRef = useRef(credentials);
   credentialsRef.current = credentials;
   const txRef = useRef(tx);
@@ -69,26 +66,8 @@ export function useSimulation(
     }
   }, []);
 
-  const addressOp = useKeycardOp<string>(
-    useCallback(async cmdSet => {
-      const resp = await cmdSet.exportExtendedKey(
-        0,
-        derivationPathRef.current,
-        false,
-      );
-      resp.checkOK();
-      const key = Keycard.BIP32KeyPair.extendedKey(resp.data);
-      return pubKeyToEthAddress(key.publicKey!);
-    }, []),
-    // Read-only key export: safe to re-run from SELECT on a re-tap.
-    { requiresPin: true, retryOnTagLoss: true },
-  );
-
-  const {
-    phase: addressPhase,
-    result: addressResult,
-    cancel: cancelAddress,
-  } = addressOp;
+  const addressOp = useSimulationAddressOp();
+  const { phase: addressPhase, result: addressResult } = addressOp;
 
   useEffect(() => {
     if (addressPhase !== 'done' || !addressResult) return;
@@ -104,18 +83,8 @@ export function useSimulation(
     }
   }, [cachedAddress, addressOp, runSimulation]);
 
-  const handleCancelNfc = useCallback(() => {
-    cancelAddress();
-  }, [cancelAddress]);
-
   const showSimulationTab =
     credentials !== null && tx.to !== undefined && chainId !== undefined;
 
-  return {
-    showSimulationTab,
-    simulationState,
-    addressOp,
-    handleSimulate,
-    handleCancelNfc,
-  };
+  return { showSimulationTab, simulationState, handleSimulate };
 }
