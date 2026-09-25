@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '@/assets/icons';
 import { DashboardAction, SecretsMenuScreenProps } from '@/navigation/types';
@@ -15,6 +16,7 @@ export const dashboardEntry: DashboardAction = {
 export default function SecretsMenuScreen({
   navigation,
 }: SecretsMenuScreenProps) {
+  const insets = useSafeAreaInsets();
   const entries: EntryListItem[] = [
     {
       label: 'Change PIN',
@@ -38,7 +40,7 @@ export default function SecretsMenuScreen({
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <EntryList entries={entries} />
     </View>
   );

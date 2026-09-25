@@ -1,12 +1,15 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { URDecoder } from '@ngraveio/bc-ur';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+
 import type { QRScannerScreenProps } from '../navigation/types';
 import theme from '../theme';
 
 import CameraView from '../components/CameraView';
 import { type ReadCodeEvent } from '../components/Camera';
+
 import { handleUR } from '../utils/ur';
 import {
   detectWcUri,
@@ -15,6 +18,7 @@ import {
 
 export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
   const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: 'Scan' });
@@ -85,7 +89,10 @@ export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
   return (
     <CameraView onReadCode={isFocused ? onCodeScanned : () => {}}>
       {progress > 0 && (
-        <View style={styles.progressTrack}>
+        <View
+          testID="scan-progress"
+          style={[styles.progressTrack, { bottom: insets.bottom + 27 }]}
+        >
           <View
             style={[styles.progressFill, { width: `${progress * 100}%` }]}
           />
@@ -98,7 +105,6 @@ export default function QRScannerScreen({ navigation }: QRScannerScreenProps) {
 const styles = StyleSheet.create({
   progressTrack: {
     position: 'absolute',
-    bottom: 27,
     left: 20,
     width: 335,
     height: 16,

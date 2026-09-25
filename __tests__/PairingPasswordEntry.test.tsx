@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 
 import PairingPasswordEntry from '../src/components/NFCBottomSheet/PairingPasswordEntry';
@@ -7,8 +8,10 @@ import PairingPasswordEntry from '../src/components/NFCBottomSheet/PairingPasswo
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -39,13 +42,32 @@ function renderEntry(
 beforeEach(() => {
   onSubmit.mockClear();
   onCancel.mockClear();
+  mockInsets.top = 0;
+  mockInsets.bottom = 0;
 });
+
+function containerStyle() {
+  return StyleSheet.flatten(
+    screen.getByTestId('pairing-password-entry').props.style,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe('PairingPasswordEntry', () => {
+  it('pads the top by at least 24', () => {
+    renderEntry();
+    expect(containerStyle().paddingTop).toBe(24);
+  });
+
+  it('pads the top by the status bar inset when that is larger', () => {
+    mockInsets.top = 48;
+    renderEntry();
+    expect(containerStyle().paddingTop).toBe(48);
+  });
+
   it('renders title and body text', () => {
     renderEntry();
     expect(screen.getByText('Custom pairing password')).toBeTruthy();

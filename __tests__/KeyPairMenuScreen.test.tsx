@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import KeyPairMenuScreen, {
@@ -11,8 +12,10 @@ import { testPreferences as mockTestPreferences } from './preferences.testUtils'
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -48,6 +51,14 @@ function renderScreen() {
 describe('KeyPairMenuScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
+    mockInsets.bottom = 0;
+  });
+
+  it('keeps the last entry above the bottom inset', () => {
+    mockInsets.bottom = 34;
+    const { toJSON } = renderScreen();
+    const root = toJSON() as any;
+    expect(StyleSheet.flatten(root.props.style).paddingBottom).toBe(34);
   });
 
   // The heading names the format, so labels stay short.

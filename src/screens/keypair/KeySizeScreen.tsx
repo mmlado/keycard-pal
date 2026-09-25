@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../../assets/icons';
 import { KeySizeScreenProps } from '../../navigation/types';
@@ -7,6 +8,7 @@ import theme from '../../theme';
 import EntryList from '../../components/EntryList';
 
 export default function KeySizeScreen({ navigation }: KeySizeScreenProps) {
+  const insets = useSafeAreaInsets();
   // Icon marks the phrase length; the label carries the passphrase variant.
   const entries = [
     {
@@ -45,7 +47,7 @@ export default function KeySizeScreen({ navigation }: KeySizeScreenProps) {
     },
   ];
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <EntryList entries={entries} />
     </View>
   );

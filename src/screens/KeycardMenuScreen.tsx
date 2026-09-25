@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '@/assets/icons';
 import { DashboardAction, KeycardMenuScreenProps } from '@/navigation/types';
@@ -15,6 +16,7 @@ export const dashboardEntry: DashboardAction = {
 export default function KeycardMenuScreen({
   navigation,
 }: KeycardMenuScreenProps) {
+  const insets = useSafeAreaInsets();
   const entries: EntryListItem[] = [
     {
       label: 'Initialize',
@@ -52,7 +54,7 @@ export default function KeycardMenuScreen({
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <EntryList entries={entries} />
     </View>
   );
