@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Downloads ERC-20 token logos from the URLs in src/data/tokens.json and saves
- * them as individual files under android/app/src/offline/assets/token-logos/.
+ * Downloads ERC-20 token logos from the URLs in src/data/tokens.json, shrinks
+ * each to fit MAX_SIDE px in its own format, and saves them as individual files
+ * under android/app/src/offline/assets/token-logos/.
  *
  * Also writes src/data/token-logos-index.json as { "chainId:address": "ext" }
  * so tokenMetadata.ts can construct asset:/ URIs at runtime.
@@ -11,6 +12,10 @@
  * - Skips entries already present in the generated index (idempotent).
  * - Fetch errors are silently skipped; those tokens fall back to remote URL.
  *
+ * The output is a function of the downloaded bytes alone, so a second run over
+ * the same inputs writes the same files. A change to MAX_SIDE or the encoder
+ * settings needs a --clean run.
+ *
  * Run: node scripts/generate-logos.js
  */
 
@@ -18,6 +23,7 @@ const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
 
 const TOKENS_FILE = path.join(__dirname, '..', 'src', 'data', 'tokens.json');
 const INDEX_FILE = path.join(
@@ -39,6 +45,8 @@ const ASSETS_DIR = path.join(
 );
 const CONCURRENCY = 20;
 const TIMEOUT_MS = 10_000;
+// A 32 dp icon on an xxxhdpi screen; the row draws 20 dp today.
+const MAX_SIDE = 128;
 
 const MIME_TO_EXT = {
   'image/png': 'png',
@@ -46,6 +54,36 @@ const MIME_TO_EXT = {
   'image/webp': 'webp',
   'image/gif': 'gif',
 };
+
+const FORMAT_TO_EXT = {
+  png: 'png',
+  jpeg: 'jpg',
+  webp: 'webp',
+  gif: 'gif',
+};
+
+// Fit within MAX_SIDE without enlarging, keep the format, strip metadata.
+async function shrink(data) {
+  const image = sharp(data, { animated: false });
+  const { format } = await image.metadata();
+  const ext = FORMAT_TO_EXT[format];
+  if (!ext) throw new Error(`unsupported format: ${format}`);
+  const resized = image.resize({
+    width: MAX_SIDE,
+    height: MAX_SIDE,
+    fit: 'inside',
+    withoutEnlargement: true,
+  });
+  const encoded =
+    ext === 'png'
+      ? resized.png({ palette: true, compressionLevel: 9 })
+      : ext === 'jpg'
+      ? resized.jpeg({ quality: 80, mozjpeg: true })
+      : ext === 'webp'
+      ? resized.webp({ quality: 80 })
+      : resized.gif();
+  return { ext, data: await encoded.toBuffer() };
+}
 
 function fetchBuffer(url) {
   return new Promise((resolve, reject) => {
@@ -67,14 +105,13 @@ function fetchBuffer(url) {
       }
       const contentType = res.headers['content-type'] ?? '';
       const mime = contentType.split(';')[0].trim();
-      const ext = MIME_TO_EXT[mime];
-      if (!ext) {
+      if (!MIME_TO_EXT[mime]) {
         res.resume();
         return reject(new Error(`unsupported mime: ${mime}`));
       }
       const chunks = [];
       res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve({ ext, data: Buffer.concat(chunks) }));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
       res.on('error', reject);
     });
     req.on('timeout', () => {
@@ -130,7 +167,7 @@ async function main() {
   const tasks = candidates.map(t => async () => {
     const key = `${t.chainId}:${t.address}`;
     try {
-      const { ext, data } = await fetchBuffer(t.logoURI);
+      const { ext, data } = await shrink(await fetchBuffer(t.logoURI));
       const filename = `${t.chainId}-${t.address}.${ext}`;
       fs.writeFileSync(path.join(ASSETS_DIR, filename), data);
       index[key] = ext;

@@ -71,6 +71,12 @@ describe('TokenSymbolRow', () => {
     });
   });
 
+  it('decodes the logo at the drawn size', () => {
+    mockImagesEnabled = true;
+    render(<TokenSymbolRow token={remoteToken} />);
+    expect(screen.getByTestId('token-logo').props.resizeMethod).toBe('resize');
+  });
+
   it('renders nothing for logoURI when token has no logo', () => {
     mockImagesEnabled = true;
     render(<TokenSymbolRow token={noLogoToken} />);

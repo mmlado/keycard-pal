@@ -16,8 +16,14 @@ function TokenLogo({
 }) {
   if (!INTERNET_ENABLED && !uri.startsWith('asset:/')) return null;
   if (!imagesEnabled && !uri.startsWith('asset:/')) return null;
+  // Android decodes at the drawn size only with this; the default decodes the whole file.
   return (
-    <Image source={{ uri }} style={styles.tokenLogo} testID="token-logo" />
+    <Image
+      source={{ uri }}
+      style={styles.tokenLogo}
+      resizeMethod="resize"
+      testID="token-logo"
+    />
   );
 }
 
