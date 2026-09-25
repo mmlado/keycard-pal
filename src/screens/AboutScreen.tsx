@@ -41,7 +41,7 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
 
   return (
     <ScrollView
-      style={[styles.scroll, { paddingTop: insets.top }]}
+      style={styles.scroll}
       contentContainerStyle={[
         styles.content,
         { paddingBottom: insets.bottom + 24 },

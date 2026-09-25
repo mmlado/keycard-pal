@@ -1,5 +1,5 @@
 import React, { act } from 'react';
-import { Keyboard, TextInput } from 'react-native';
+import { Keyboard, StyleSheet, TextInput } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
@@ -13,8 +13,10 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -323,6 +325,23 @@ describe('MnemonicScreen', () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
       expect(screen.getByTestId('camera')).toBeTruthy();
+    });
+
+    it('fills the screen under the header without a top inset of its own', async () => {
+      mockInsets.top = 48;
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      // The camera mock's nearest host ancestor is CameraView's container.
+      let overlay = screen.getByTestId('camera').parent;
+      while (overlay && overlay.type !== 'View') {
+        overlay = overlay.parent;
+      }
+      const style = StyleSheet.flatten(overlay!.props.style);
+      expect(style.position).toBe('absolute');
+      expect(style.paddingTop).toBeUndefined();
+      mockInsets.top = 0;
     });
 
     it('dismisses the keyboard so it does not cover the viewfinder', async () => {
