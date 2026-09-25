@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../../assets/icons';
 import {
@@ -18,6 +19,7 @@ export const dashboardEntry: DashboardAction = {
 export default function KeyPairMenuScreen({
   navigation,
 }: KeyPairMenuScreenProps) {
+  const insets = useSafeAreaInsets();
   // The two seed formats offer the same three actions, so the heading carries
   // the format and each label only has to say what the action does.
   const sections = [
@@ -64,7 +66,7 @@ export default function KeyPairMenuScreen({
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <EntryList sections={sections} />
     </View>
   );

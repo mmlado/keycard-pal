@@ -42,6 +42,10 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text: RNText, Switch };
 });
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // ---------------------------------------------------------------------------

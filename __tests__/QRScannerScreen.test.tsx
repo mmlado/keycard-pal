@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 
 import QRScannerScreen from '../src/screens/QRScannerScreen';
@@ -7,8 +8,10 @@ import QRScannerScreen from '../src/screens/QRScannerScreen';
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -163,6 +166,20 @@ describe('QRScannerScreen', () => {
       });
       // Progress > 0 renders the progress bar (identified by its fill colour)
       expect(JSON.stringify(renderer.toJSON())).toContain('#1C8A80');
+    });
+
+    it('keeps the progress bar above the bottom inset', async () => {
+      mockInsets.bottom = 34;
+      mockEstimatedPercent.mockReturnValue(0.5);
+      const renderer = await renderScreen();
+      await act(async () => {
+        scan('ur:eth-sign-request/part1');
+      });
+      const style = StyleSheet.flatten(
+        renderer.getByTestId('scan-progress').props.style,
+      );
+      expect(style.bottom).toBe(34 + 27);
+      mockInsets.bottom = 0;
     });
   });
 
