@@ -196,7 +196,7 @@ export default function MnemonicScreen({
 
       {scanning && (
         <CameraView
-          style={[StyleSheet.absoluteFill, { paddingTop: insets.top }]}
+          style={StyleSheet.absoluteFill}
           onReadCode={handleCodeScanned}
         >
           {scanError && (
