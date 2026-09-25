@@ -49,13 +49,19 @@ def llvmStrip() {
 
 // The linker hashes the build id over debug info that still holds absolute
 // paths, in libraries built outside the app's CMake project too.
+def releaseVariantNames = []
+androidComponents {
+    onVariants(selector().withBuildType('release')) { variant ->
+        releaseVariantNames << variant.name
+    }
+}
+
+// AGP has created the variant tasks by the time this runs, and a missing strip
+// task fails loudly, which the reproducibility proof depends on.
 afterEvaluate {
-    android.applicationVariants.configureEach { variant ->
-        if (variant.buildType.name != 'release') {
-            return
-        }
+    releaseVariantNames.each { variantName ->
         def injected = project.objects.newInstance(InjectedExecOps)
-        tasks.named("strip${variant.name.capitalize()}DebugSymbols").configure { stripTask ->
+        tasks.named("strip${variantName.capitalize()}DebugSymbols").configure { stripTask ->
             stripTask.doLast {
                 def libs = stripTask.outputs.files.collectMany { out ->
                     fileTree(dir: out, include: '**/*.so').files

@@ -27,7 +27,7 @@ react {
     //   The list of variants to that are debuggable. For those we're going to
     //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    debuggableVariants = ["fullDebug", "offlineDebug"]
+    debuggableVariants = ["fullDebug", "fullDebugOptimized", "offlineDebug", "offlineDebugOptimized"]
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -207,9 +207,9 @@ android {
     }
 }
 
-// AGP 8.x finalizes outputFileName before afterEvaluate runs; onVariants is the correct hook.
 androidComponents {
     onVariants(selector().all()) { variant ->
+        // outputFileName is finalized before afterEvaluate runs; this is the hook for it.
         variant.outputs.forEach { output ->
             def abi = output.filters.find {
                 it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
@@ -217,6 +217,21 @@ androidComponents {
             output.outputFileName.set(
                 "keycard-pal-${variant.flavorName}-${variant.buildType}-${abi}.apk"
             )
+        }
+
+        // The Metro bundle task gets a --require script that sets ONLINE_BUILD,
+        // which is what swaps `.online` modules for `.offline` stubs (metro.config.js).
+        def isFull = variant.flavorName == "full"
+        def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
+        tasks.matching { it.name == taskName }.configureEach {
+            def envScript = layout.buildDirectory.file("metro-env-${variant.name}.js").get().asFile
+            // Set --require at configuration time; write the file in doFirst so
+            // it survives a preceding `clean` task that would delete build/.
+            nodeExecutableAndArgs.set(nodeExecutableAndArgs.get().toList() + ["--require", envScript.absolutePath])
+            doFirst {
+                envScript.parentFile.mkdirs()
+                envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
+            }
         }
     }
 }
@@ -227,21 +242,6 @@ afterEvaluate {
         checkTask.setDependsOn(checkTask.dependsOn.findAll { dep ->
             !(dep instanceof TaskProvider && dep.name.startsWith("ktlint"))
         })
-    }
-
-    android.applicationVariants.all { variant ->
-        def isFull = variant.productFlavors.any { it.name == "full" }
-        def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
-        tasks.matching { it.name == taskName }.configureEach {
-            def envScript = file("${buildDir}/metro-env-${variant.name}.js")
-            // Set --require at configuration time; write the file in doFirst so
-            // it survives a preceding `clean` task that would delete build/.
-            nodeExecutableAndArgs.set(nodeExecutableAndArgs.get().toList() + ["--require", envScript.absolutePath])
-            doFirst {
-                envScript.parentFile.mkdirs()
-                envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
-            }
-        }
     }
 }
 

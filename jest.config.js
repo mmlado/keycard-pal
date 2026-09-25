@@ -2,12 +2,12 @@
 // ship, not just in what they do at runtime. `constants/purchaseLink` and
 // `components/AffiliateDisclosure` have `.ios` twins, and Metro — and Jest —
 // resolve them by platform, so a single run can only ever exercise one of
-// them. Jest's react-native preset defaults to ios, which is left alone: the
+// them. React Native's jest preset defaults to ios, which is left alone: the
 // whole existing suite is the iOS arm. Tests under `__tests__/android/` run
 // in a second project with android resolution, which is the only way to
 // assert that the affiliate link and its Advertisement labels are still there.
 const base = {
-  preset: 'react-native',
+  preset: '@react-native/jest-preset',
   fakeTimers: { enableGlobally: true },
   testEnvironmentOptions: {
     customExportConditions: ['require', 'node', 'node-addons'],
