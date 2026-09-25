@@ -26,10 +26,7 @@ export default function App() {
   return (
     <SafeAreaProvider style={styles.root}>
       <PaperProvider theme={theme}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor={theme.colors.background}
-        />
+        <StatusBar barStyle="light-content" />
         <PreferencesProvider>
           <Navigator />
         </PreferencesProvider>

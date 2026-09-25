@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   /** Yoga anchors an absolute child to the padding box, so the overlay pads for the navigation bar itself (#282). */
   pinOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: theme.colors.background,
   },
 });

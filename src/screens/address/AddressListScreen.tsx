@@ -96,7 +96,7 @@ export default function AddressListScreen({
               style={styles.footer}
               color={theme.colors.primary}
             />
-          ) : null
+          ) : undefined
         }
         renderItem={renderItem}
       />

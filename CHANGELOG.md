@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Android release builds use R8's optimized resource shrinking, which drops resources the old name-matching heuristic kept
 - Android release builds run R8's code optimization pass, which the default ProGuard file had switched off
 - The offline build's bundled token logos are stored at 128 px instead of full size, and the token row decodes them at the size it draws
+- React Native 0.87 with Android Gradle Plugin 9; building needs Node 22 and the Android 37 SDK platform
 
 ### Fixed
 

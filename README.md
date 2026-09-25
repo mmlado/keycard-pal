@@ -10,7 +10,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
   <a href="https://codecov.io/gh/mmlado/keycard-pal"><img src="https://codecov.io/gh/mmlado/keycard-pal/branch/main/graph/badge.svg" alt="Test coverage" /></a>
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" /></a>
-  <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/React%20Native-0.83-blue.svg" alt="React Native" /></a>
+  <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/React%20Native-0.87-blue.svg" alt="React Native" /></a>
   <a href="https://github.com/mmlado/keycard-pal/releases/latest"><img src="https://img.shields.io/github/v/release/mmlado/keycard-pal" alt="GitHub release" /></a>
   <img src="https://img.shields.io/github/last-commit/mmlado/keycard-pal.svg" alt="Last commit" />
   <img src="https://img.shields.io/github/stars/mmlado/keycard-pal.svg?style=social" alt="Stars" />

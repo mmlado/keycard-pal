@@ -68,7 +68,7 @@ export default function AddressSelectionPhase({
               color={theme.colors.primary}
               style={styles.listFooter}
             />
-          ) : null
+          ) : undefined
         }
       />
       <View style={styles.proposalActions}>
