@@ -1,6 +1,7 @@
 package com.keycardpal
 
 import android.app.Application
+import androidx.appcompat.app.AppCompatDelegate
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -21,6 +22,9 @@ class MainApplication : Application(), ReactApplication {
     }
 
     override fun onCreate() {
+        // The app is dark on every phone. React Native's edge-to-edge setup picks the
+        // system bar icon colours from night mode, for the activity and every Modal.
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         super.onCreate()
         loadReactNative(this)
     }
