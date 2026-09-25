@@ -92,6 +92,7 @@
     "prettier": "2.8.8",
     "react-native-asset": "^2.2.14",
     "react-native-svg-transformer": "^1.5.3",
+    "sharp": "^0.35.4",
     "typescript": "^5.8.3"
   },
   "overrides": {
