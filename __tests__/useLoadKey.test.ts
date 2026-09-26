@@ -86,6 +86,15 @@ describe('deriveMnemonicKeyPair', () => {
     expect(mockFromBinarySeed).toHaveBeenCalledWith(Buffer.from('seed'));
   });
 
+  it('normalizes Unicode before deriving the seed', () => {
+    deriveMnemonicKeyPair(['あおぞら'], 'ＴＲＥＺＯＲ café');
+
+    expect(mockToBinarySeed).toHaveBeenCalledWith(
+      'あおそ\u3099ら',
+      'TREZOR cafe\u0301',
+    );
+  });
+
   it('passes passphrase to toBinarySeed when provided', () => {
     deriveMnemonicKeyPair(WORDS, 'my passphrase');
 
