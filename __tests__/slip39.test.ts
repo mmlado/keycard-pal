@@ -57,6 +57,18 @@ describe('slip39 utilities', () => {
     expect(Buffer.from(secret).toString('utf8')).toBe('ABCDEFGHIJKLMNOP');
   });
 
+  it('normalizes the passphrase to NFKD before recovery', () => {
+    const secret = recoverSlip39Secret(SHARES.slice(0, 2), 'ＴＲＥＺＯＲ');
+
+    expect(Buffer.from(secret).toString('utf8')).toBe('ABCDEFGHIJKLMNOP');
+  });
+
+  it('recovers the same secret from equivalent passphrase forms', () => {
+    expect(recoverSlip39Secret(SHARES.slice(0, 2), 'caf\u00e9')).toEqual(
+      recoverSlip39Secret(SHARES.slice(0, 2), 'cafe\u0301'),
+    );
+  });
+
   it('rejects duplicate shares', () => {
     expect(() => getSlip39ShareProgress([SHARES[0], SHARES[0]])).toThrow(
       /Duplicate SLIP39 share/,

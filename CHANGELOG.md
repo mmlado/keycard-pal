@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Recovery phrase and SLIP39 passphrases are normalized to NFKD, as BIP39 and SLIP-0039 require; a passphrase holding characters NFKD changes now derives a different key than earlier versions did
 - The Inter font is now bundled in the Android app; the About, Welcome, loading, menu and license screens fell back to the system font. Its license is listed on the About screen
 - The Keycard, Key pair, Key size and Secrets menus, the scan progress bar, the unverified-card warning and the pairing-password prompt now keep clear of the home indicator, the navigation bar and the status bar
 - The recovery phrase check, the About screen and the SeedQR scanner no longer start a status-bar height below the header
