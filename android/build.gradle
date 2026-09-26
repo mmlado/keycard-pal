@@ -5,7 +5,8 @@ buildscript {
         compileSdkVersion = 37
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
-        kotlinVersion = "2.2.0"
+        // The Kotlin Gradle plugin AGP 9 applies; async-storage picks its KSP from this.
+        kotlinVersion = "2.2.10"
     }
     repositories {
         google()
