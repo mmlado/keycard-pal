@@ -72,7 +72,8 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 
 ## Getting the app
 
-Download the latest APK from [Releases](../../releases) and sideload it onto your device.
+Keycard Pal (`com.keycardpal`) is on Google Play. Both variants, including Keycard Pal
+Offline, are on the developer's F-Droid repository and attached to every GitHub release.
 
 <p>
   <a href="https://github.com/mmlado/keycard-pal/releases/latest">
@@ -84,6 +85,9 @@ Download the latest APK from [Releases](../../releases) and sideload it onto you
   <a href="https://fdroid.keycardpal.com/repo?fingerprint=24EB891A8A617F8BF20892CB0CF9267709BA94056E64242AD9EDF638C2FED3D2">
     <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="70" />
   </a>
+  <a href="https://play.google.com/store/apps/details?id=com.keycardpal">
+    <img src="assets/badges/badge_play.png" alt="Get it on Google Play" height="70" />
+  </a>
 </p>
 
 For most users, install the universal APK. ABI-specific split APKs are also attached to releases for smaller downloads on known device architectures.
@@ -93,6 +97,17 @@ For most users, install the universal APK. ABI-specific split APKs are also atta
 - Package ID: `com.keycardpal` (Keycard Pal) / `com.keycardpal.offline` (Keycard Pal Offline)
 - SHA-256 hash of signing certificate: `A8:3C:11:4B:1F:42:01:DA:FB:D0:3E:22:1F:1C:29:28:EC:B5:2B:78:BD:A5:E9:3F:29:6F:ED:F2:29:8E:54:6B`
 - `SHA256SUMS.txt` is attached to each GitHub Release to verify APK file hashes.
+- The certificate above signs the GitHub and F-Droid builds. The Google Play copy is re-signed by Play App Signing and has a different one.
+
+### Install from Google Play
+
+[Keycard Pal on Google Play](https://play.google.com/store/apps/details?id=com.keycardpal)
+carries `com.keycardpal` only; Keycard Pal Offline is not on Play.
+
+Because Play re-signs the app with a Google-managed key, the Play copy and the builds from
+GitHub or F-Droid have different signatures and cannot replace each other on a device.
+Pick one source and stay with it; switching means uninstalling first, which removes the
+pairing data stored on the phone.
 
 ### Install with Obtainium
 
