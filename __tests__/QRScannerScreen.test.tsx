@@ -169,8 +169,9 @@ describe('QRScannerScreen', () => {
     });
 
     it('feeds every frame of a multi-part UR to the decoder', async () => {
-      // iOS used to latch after the first emit, so a multi-part UR received one
-      // part and stalled (#307).
+      // Pins the JS half of #307: the screen has to keep feeding the decoder.
+      // The latch that broke it lived in CameraView.m, which Jest never
+      // compiles, so nothing here fails if it comes back.
       mockEstimatedPercent.mockReturnValueOnce(0.25).mockReturnValueOnce(0.5);
       await renderScreen();
       await act(async () => {

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The offline build's bundled token logos are stored at 128 px instead of full size, and the token row decodes them at the size it draws
 - On Android the app draws behind the system bars on every version, the way Android 15 and later already forced it to, and its bar icons stay light whatever the phone's light or dark setting
 - React Native 0.87 with Android Gradle Plugin 9; building needs Node 22 and the Android 37 SDK platform
+- The SeedQR scanner's rejection notice clears itself a moment after the camera moves off the offending code, replacing the "Tap to retry" control it needed back when a bad scan stopped the scanner
 
 ### Fixed
 

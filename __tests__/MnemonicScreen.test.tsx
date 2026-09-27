@@ -391,7 +391,7 @@ describe('MnemonicScreen', () => {
       jest.restoreAllMocks();
     });
 
-    it('clears error when Tap to retry is pressed', async () => {
+    it('clears the error once the camera stops reporting it', async () => {
       renderScreen();
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
@@ -399,9 +399,27 @@ describe('MnemonicScreen', () => {
       triggerScan('notahex!!!');
       expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
       await act(async () => {
-        fireEvent.press(screen.getByText('Tap to retry'));
+        jest.advanceTimersByTime(2000);
       });
       expect(screen.queryByText(/Not a valid SeedQR/)).toBeNull();
+    });
+
+    it('holds the error while the bad code stays in view', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan('notahex!!!');
+      // Each frame re-arms the timer and discards the previous one, so the
+      // notice must never lapse underneath a code the camera is still seeing.
+      // Asserting between frames is what catches a stale timer firing late.
+      for (let i = 0; i < 3; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(1500);
+        });
+        expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
+        triggerScan('notahex!!!');
+      }
     });
 
     it('dismisses overlay when beforeRemove fires while scanning', async () => {

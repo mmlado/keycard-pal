@@ -85,8 +85,9 @@
 - (void)captureOutput:(AVCaptureOutput *)output
     didOutputMetadataObjects:(NSArray<__kindof AVMetadataObject *> *)metadataObjects
              fromConnection:(AVCaptureConnection *)connection {
-  // Every decoded frame is dispatched, as on Android: a multi-part UR needs one
-  // event per frame, and the consumers debounce.
+  // Deliberately no emit-once guard: a multi-part UR needs one event per frame.
+  // Duplicate parts are absorbed by the decoder, and QRScannerScreen stops
+  // itself once the UR completes.
   for (AVMetadataObject *obj in metadataObjects) {
     if ([obj isKindOfClass:[AVMetadataMachineReadableCodeObject class]]) {
       NSString *value = ((AVMetadataMachineReadableCodeObject *)obj).stringValue;
