@@ -38,7 +38,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Keycard Pal needs camera access to scan QR codes.</string>
 	<key>RCTNewArchEnabled</key>
-	<false/>
+	<true/>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Inter_18pt-Medium.ttf</string>
