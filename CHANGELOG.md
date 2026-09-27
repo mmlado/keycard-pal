@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The Keycard, Key pair, Key size and Secrets menus, the scan progress bar, the unverified-card warning and the pairing-password prompt now keep clear of the home indicator, the navigation bar and the status bar
 - The recovery phrase check, the About screen and the SeedQR scanner no longer start a status-bar height below the header
 - Simulating a transaction whose request carries no address now shows the PIN pad over the whole screen instead of inside the data panel
+- On iOS the scanner reads every frame it decodes, so animated multi-part requests now complete and a rejected SeedQR can be scanned again without leaving the screen
 
 ## [1.12.0] - 2026-09-24
 

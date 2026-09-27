@@ -5,7 +5,6 @@
 @property (nonatomic, strong) AVCaptureSession *session;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
 @property (nonatomic, strong) dispatch_queue_t sessionQueue;
-@property (nonatomic, assign) BOOL didEmit;
 @end
 
 @implementation CameraView
@@ -14,7 +13,6 @@
   self = [super initWithFrame:frame];
   if (self) {
     _sessionQueue = dispatch_queue_create("tech.gapsign.camera", DISPATCH_QUEUE_SERIAL);
-    _didEmit = NO;
   }
   return self;
 }
@@ -80,7 +78,6 @@
     dispatch_async(dispatch_get_main_queue(), ^{
       [self.previewLayer removeFromSuperlayer];
       self.previewLayer = nil;
-      self.didEmit = NO;
     });
   });
 }
@@ -88,13 +85,12 @@
 - (void)captureOutput:(AVCaptureOutput *)output
     didOutputMetadataObjects:(NSArray<__kindof AVMetadataObject *> *)metadataObjects
              fromConnection:(AVCaptureConnection *)connection {
-  if (self.didEmit) return;
-
+  // Every decoded frame is dispatched, as on Android: a multi-part UR needs one
+  // event per frame, and the consumers debounce.
   for (AVMetadataObject *obj in metadataObjects) {
     if ([obj isKindOfClass:[AVMetadataMachineReadableCodeObject class]]) {
       NSString *value = ((AVMetadataMachineReadableCodeObject *)obj).stringValue;
       if (!value) continue;
-      self.didEmit = YES;
       if (self.onReadCode) {
         self.onReadCode(@{@"codeStringValue": value});
       }

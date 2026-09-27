@@ -168,6 +168,38 @@ describe('QRScannerScreen', () => {
       expect(JSON.stringify(renderer.toJSON())).toContain('#1C8A80');
     });
 
+    it('feeds every frame of a multi-part UR to the decoder', async () => {
+      // iOS used to latch after the first emit, so a multi-part UR received one
+      // part and stalled (#307).
+      mockEstimatedPercent.mockReturnValueOnce(0.25).mockReturnValueOnce(0.5);
+      await renderScreen();
+      await act(async () => {
+        scan('ur:eth-sign-request/1-2/part1');
+        scan('ur:eth-sign-request/2-2/part2');
+      });
+      expect(mockReceivedPart).toHaveBeenNthCalledWith(
+        1,
+        'ur:eth-sign-request/1-2/part1',
+      );
+      expect(mockReceivedPart).toHaveBeenNthCalledWith(
+        2,
+        'ur:eth-sign-request/2-2/part2',
+      );
+    });
+
+    it('advances progress across successive frames', async () => {
+      mockEstimatedPercent.mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
+      const renderer = await renderScreen();
+      await act(async () => {
+        scan('ur:eth-sign-request/1-2/part1');
+      });
+      expect(JSON.stringify(renderer.toJSON())).toContain('25%');
+      await act(async () => {
+        scan('ur:eth-sign-request/2-2/part2');
+      });
+      expect(JSON.stringify(renderer.toJSON())).toContain('75%');
+    });
+
     it('keeps the progress bar above the bottom inset', async () => {
       mockInsets.bottom = 34;
       mockEstimatedPercent.mockReturnValue(0.5);
