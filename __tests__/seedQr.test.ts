@@ -201,6 +201,20 @@ describe('decodeCompactSeedQr', () => {
     }
   });
 
+  it('reports a decoder failure instead of throwing into the scan handler', () => {
+    // Unreachable with a validated length today, but the scanner calls this on
+    // every decoded frame, so a throw would redbox rather than show an error.
+    const bip39 = require('@scure/bip39');
+    jest.spyOn(bip39, 'entropyToMnemonic').mockImplementationOnce(() => {
+      throw new Error('boom');
+    });
+    expect(decodeCompactSeedQr(new Uint8Array(16))).toEqual({
+      kind: 'error',
+      message: 'Failed to decode CompactSeedQR: boom',
+    });
+    jest.restoreAllMocks();
+  });
+
   it.each([0, 15, 17, 20, 24, 28, 31, 33])('rejects %i bytes', length => {
     expect(decodeCompactSeedQr(new Uint8Array(length))).toEqual({
       kind: 'error',
