@@ -67,7 +67,11 @@ const VALID_12 =
 const VALID_24 =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art';
 
-const VALID_12_HEX = '00000000000000000000000000000000';
+// Standard SeedQR for VALID_12: eleven "abandon" (index 0) then "about" (index 3).
+const VALID_12_SEEDQR = `${'0000'.repeat(11)}0003`;
+
+// Same stream with the last index moved off "about", so the checksum fails.
+const BAD_CHECKSUM_SEEDQR = `${'0000'.repeat(11)}0004`;
 
 const navigation = {
   navigate: jest.fn(),
@@ -141,10 +145,10 @@ function setInput(text: string) {
   });
 }
 
-function triggerScan(hex: string) {
+function triggerScan(payload: string) {
   act(() => {
     screen.getByTestId('camera').props.onReadCode({
-      nativeEvent: { codeStringValue: hex },
+      nativeEvent: { codeStringValue: payload },
     });
   });
 }
@@ -361,7 +365,7 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan(VALID_12_HEX);
+      triggerScan(VALID_12_SEEDQR);
       expect(screen.queryByTestId('camera')).toBeNull();
       expect(getWordInput().props.value).toBe(VALID_12);
     });
@@ -371,24 +375,29 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan('notahex!!!');
+      triggerScan('not a seedqr');
       expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
       expect(screen.getByTestId('camera')).toBeTruthy();
     });
 
-    it('shows error when decodeSeedQr fails on valid-length hex', async () => {
+    it('shows the decoder error when a well-formed SeedQR fails its checksum', async () => {
       renderScreen();
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      const bip39 = require('@scure/bip39');
-      jest.spyOn(bip39, 'entropyToMnemonic').mockImplementationOnce(() => {
-        throw new Error('decode failure');
-      });
-      triggerScan(VALID_12_HEX);
-      expect(screen.getByText(/decode failure/)).toBeTruthy();
+      triggerScan(BAD_CHECKSUM_SEEDQR);
+      expect(screen.getByText(/failed its checksum/)).toBeTruthy();
       expect(screen.getByTestId('camera')).toBeTruthy();
-      jest.restoreAllMocks();
+    });
+
+    it('does not accept hex entropy', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan('00000000000000000000000000000000');
+      expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
+      expect(screen.getByTestId('camera')).toBeTruthy();
     });
 
     it('clears the error once the camera stops reporting it', async () => {
@@ -396,7 +405,7 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan('notahex!!!');
+      triggerScan('not a seedqr');
       expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
       await act(async () => {
         jest.advanceTimersByTime(2000);
@@ -409,7 +418,7 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan('notahex!!!');
+      triggerScan('not a seedqr');
       // Each frame re-arms the timer and discards the previous one, so the
       // notice must never lapse underneath a code the camera is still seeing.
       // Asserting between frames is what catches a stale timer firing late.
@@ -418,7 +427,7 @@ describe('MnemonicScreen', () => {
           jest.advanceTimersByTime(1500);
         });
         expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
-        triggerScan('notahex!!!');
+        triggerScan('not a seedqr');
       }
     });
 
@@ -427,8 +436,8 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan('notahex!!!');
-      triggerScan(VALID_12_HEX);
+      triggerScan('not a seedqr');
+      triggerScan(VALID_12_SEEDQR);
       expect(screen.queryByText(/Not a valid SeedQR/)).toBeNull();
       // The rejection's timer is still armed at this point. If it survived the
       // success it would fire into a screen that has already moved on.
@@ -445,7 +454,7 @@ describe('MnemonicScreen', () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
       const idle = jest.getTimerCount();
-      triggerScan('notahex!!!');
+      triggerScan('not a seedqr');
       expect(jest.getTimerCount()).toBe(idle + 1);
       view.unmount();
       expect(jest.getTimerCount()).toBe(idle);
@@ -475,7 +484,7 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan(VALID_12_HEX);
+      triggerScan(VALID_12_SEEDQR);
       expect(navigation.navigate).not.toHaveBeenCalled();
     });
   });
