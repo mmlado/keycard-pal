@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - On Android the app draws behind the system bars on every version, the way Android 15 and later already forced it to, and its bar icons stay light whatever the phone's light or dark setting
 - React Native 0.87 with Android Gradle Plugin 9; building needs Node 22 and the Android 37 SDK platform
 - The SeedQR scanner's rejection notice clears itself a moment after the camera moves off the offending code, replacing the "Tap to retry" control it needed back when a bad scan stopped the scanner
-- The recovery phrase scanner reads Standard SeedQR and no longer reads hex-encoded entropy
+- The recovery phrase scanner reads Standard SeedQR and CompactSeedQR, and no longer reads hex-encoded entropy
 
 ### Fixed
 
@@ -24,6 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The recovery phrase check, the About screen and the SeedQR scanner no longer start a status-bar height below the header
 - Simulating a transaction whose request carries no address now shows the PIN pad over the whole screen instead of inside the data panel
 - On iOS the scanner reads every frame it decodes, so animated multi-part requests now complete and a rejected SeedQR can be scanned again without leaving the screen
+- Tapping near the SeedQR icon no longer puts the cursor in the recovery phrase box instead of opening the scanner, and the keyboard can no longer reappear over the viewfinder
 
 ## [1.12.0] - 2026-09-24
 

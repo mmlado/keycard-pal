@@ -92,6 +92,7 @@
     "eslint-plugin-ft-flow": "^3.0.11",
     "eslint-plugin-react-native": "^5.0.0",
     "jest": "^29.6.3",
+    "jsqr": "^1.4.0",
     "prettier": "2.8.8",
     "react-native-asset": "^2.2.14",
     "react-native-svg-transformer": "^1.5.3",

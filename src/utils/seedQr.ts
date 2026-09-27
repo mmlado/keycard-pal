@@ -1,4 +1,4 @@
-import { validateMnemonic } from '@scure/bip39';
+import { entropyToMnemonic, validateMnemonic } from '@scure/bip39';
 import { wordlist as englishWordlist } from '@scure/bip39/wordlists/english.js';
 
 export type SeedQrDecodeResult =
@@ -9,6 +9,9 @@ export type SeedQrDecodeResult =
 // concatenated, in QR numeric mode. 12 words is 48 digits, 24 words is 96.
 const DIGITS_PER_INDEX = 4;
 const VALID_DIGIT_LENGTHS = [48, 96];
+
+// CompactSeedQR: the raw entropy in QR byte mode, checksum bits truncated.
+const VALID_ENTROPY_LENGTHS = [16, 32];
 
 export function decodeSeedQr(payload: string): SeedQrDecodeResult {
   const cleaned = payload.trim();
@@ -52,4 +55,31 @@ export function isSeedQrPayload(value: string): boolean {
   return (
     /^[0-9]+$/.test(cleaned) && VALID_DIGIT_LENGTHS.includes(cleaned.length)
   );
+}
+
+export function decodeCompactSeedQr(entropy: Uint8Array): SeedQrDecodeResult {
+  if (!VALID_ENTROPY_LENGTHS.includes(entropy.length)) {
+    return {
+      kind: 'error',
+      message: `Invalid CompactSeedQR: expected 16 or 32 bytes, got ${entropy.length}`,
+    };
+  }
+
+  try {
+    // No checksum to verify: it is truncated from the payload and derived here,
+    // so any 16 or 32 bytes are a well-formed phrase.
+    return {
+      kind: 'success',
+      words: entropyToMnemonic(entropy, englishWordlist).split(' '),
+    };
+  } catch (e: any) {
+    return {
+      kind: 'error',
+      message: `Failed to decode CompactSeedQR: ${e.message}`,
+    };
+  }
+}
+
+export function isCompactSeedQrBytes(bytes: Uint8Array): boolean {
+  return VALID_ENTROPY_LENGTHS.includes(bytes.length);
 }
