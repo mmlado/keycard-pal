@@ -29,7 +29,13 @@ import {
 import { useVerifyFingerprint } from '../../hooks/keycard/useVerifyFingerprint';
 import { deriveMnemonicFingerprint } from '../../hooks/keycard/useVerifyMnemonic';
 import { useKeycardScreen } from '../../hooks/useKeycardScreen';
-import { decodeSeedQr, isSeedQrPayload } from '../../utils/seedQr';
+import {
+  decodeCompactSeedQr,
+  decodeSeedQr,
+  isCompactSeedQrBytes,
+  isSeedQrPayload,
+  type SeedQrDecodeResult,
+} from '../../utils/seedQr';
 
 const SCAN_ERROR_LINGER_MS = 2000;
 
@@ -157,15 +163,22 @@ export default function MnemonicScreen({
 
   const handleCodeScanned = useCallback(
     (event: ReadCodeEvent) => {
-      const value = event.nativeEvent.codeStringValue;
-      if (!value) return;
+      const { codeStringValue, codeBytesBase64 } = event.nativeEvent;
+      const bytes = codeBytesBase64
+        ? new Uint8Array(Buffer.from(codeBytesBase64, 'base64'))
+        : null;
+      if (!codeStringValue && !bytes) return;
 
-      if (!isSeedQrPayload(value)) {
+      let decoded: SeedQrDecodeResult;
+      if (bytes && isCompactSeedQrBytes(bytes)) {
+        decoded = decodeCompactSeedQr(bytes);
+      } else if (codeStringValue && isSeedQrPayload(codeStringValue)) {
+        decoded = decodeSeedQr(codeStringValue);
+      } else {
         rejectScan('Not a valid SeedQR. Scan a 12 or 24 word SeedQR.');
         return;
       }
 
-      const decoded = decodeSeedQr(value);
       if (decoded.kind === 'error') {
         rejectScan(decoded.message);
         return;
@@ -201,6 +214,9 @@ export default function MnemonicScreen({
           onWordsChange={setWords}
           onScanPress={handleScanPress}
           scanTestID="scan-seedqr-button"
+          // Keyboard.dismiss() alone leaves the input focused, so Android can put
+          // the keyboard straight back up under the camera overlay.
+          editable={!scanning}
         />
 
         <TextInput

@@ -2,7 +2,13 @@
 
 Date: 2026-05-06
 
-Status: Accepted
+Status: Superseded by [0016](0016-scanner-reports-byte-mode-payloads.md)
+
+> Superseded 2026-09-27. The decision below still holds: the scanner stays CameraX and
+> ZXing, and VisionCamera is still rejected for the dependency chain recorded here.
+> ADR-0016 changes one thing, the JavaScript surface this ADR fixes at a single decoded
+> string. A byte-mode payload cannot be represented as a string, so `ReadCodeEvent` gained
+> an optional `codeBytesBase64`.
 
 ## Context
 

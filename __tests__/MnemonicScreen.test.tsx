@@ -153,6 +153,19 @@ function triggerScan(payload: string) {
   });
 }
 
+// A CompactSeedQR is byte mode, so the string side is empty on iOS and
+// charset-mangled on Android; the bytes are the only readable form.
+function triggerByteScan(hex: string, codeStringValue = '') {
+  act(() => {
+    screen.getByTestId('camera').props.onReadCode({
+      nativeEvent: {
+        codeStringValue,
+        codeBytesBase64: Buffer.from(hex, 'hex').toString('base64'),
+      },
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -196,6 +209,20 @@ describe('MnemonicScreen', () => {
     it('renders SeedQR scan icon inside the seed-phrase input', async () => {
       renderScreen();
       expect(screen.getByTestId('scan-seedqr-button')).toBeTruthy();
+    });
+
+    it('gives the scan icon the whole strip the input reserves for it', async () => {
+      // The glyph is small but the input reserves 48 of padding for it. If the
+      // button only covers the glyph, a tap lower in that strip lands on the text
+      // and opens the keyboard instead of the scanner.
+      renderScreen();
+      const style = StyleSheet.flatten(
+        screen.getByTestId('scan-seedqr-button').props.style,
+      );
+      expect(style.position).toBe('absolute');
+      expect(style.width).toBe(48);
+      expect(style.top).toBe(0);
+      expect(style.bottom).toBe(0);
     });
   });
 
@@ -348,6 +375,26 @@ describe('MnemonicScreen', () => {
       mockInsets.top = 0;
     });
 
+    it('makes the word input non-editable while the camera is open', async () => {
+      // Keyboard.dismiss() leaves the input focused, so Android can re-show the
+      // keyboard over the viewfinder. Dropping editable blurs it for good.
+      renderScreen();
+      expect(getWordInput().props.editable).toBe(true);
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      expect(getWordInput().props.editable).toBe(false);
+    });
+
+    it('re-enables the word input once the scanner closes', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan(VALID_12_SEEDQR);
+      expect(getWordInput().props.editable).toBe(true);
+    });
+
     it('dismisses the keyboard so it does not cover the viewfinder', async () => {
       // The scanner is an overlay on this screen, so the word input keeps
       // focus and the keyboard stays up over the camera unless dismissed.
@@ -388,6 +435,55 @@ describe('MnemonicScreen', () => {
       triggerScan(BAD_CHECKSUM_SEEDQR);
       expect(screen.getByText(/failed its checksum/)).toBeTruthy();
       expect(screen.getByTestId('camera')).toBeTruthy();
+    });
+
+    it('fills word input from a CompactSeedQR carried as bytes', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerByteScan('00000000000000000000000000000000');
+      expect(screen.queryByTestId('camera')).toBeNull();
+      expect(getWordInput().props.value).toBe(VALID_12);
+    });
+
+    it('prefers the bytes over a mangled string for a byte-mode payload', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      // What ZXing hands over when it guesses a charset for binary.
+      triggerByteScan('00000000000000000000000000000000', '\u0000\uFFFD\uFFFD');
+      expect(getWordInput().props.value).toBe(VALID_12);
+    });
+
+    it('rejects a byte payload that is not 16 or 32 bytes', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerByteScan('deadbeef');
+      expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
+      expect(screen.getByTestId('camera')).toBeTruthy();
+    });
+
+    it('still reads a Standard SeedQR when the payload also arrives as bytes', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      // Some encoders put digits in byte mode; 48 bytes is neither 16 nor 32,
+      // so the digit path has to pick it up.
+      const digits = VALID_12_SEEDQR;
+      act(() => {
+        screen.getByTestId('camera').props.onReadCode({
+          nativeEvent: {
+            codeStringValue: digits,
+            codeBytesBase64: Buffer.from(digits, 'ascii').toString('base64'),
+          },
+        });
+      });
+      expect(getWordInput().props.value).toBe(VALID_12);
     });
 
     it('does not accept hex entropy', async () => {

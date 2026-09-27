@@ -28,6 +28,7 @@ type Props = {
   onWordCountChange?: (wordCount: number) => void;
   onScanPress?: () => void;
   scanTestID?: string;
+  editable?: boolean;
   inputStyle?: StyleProp<TextStyle>;
   wrapperStyle?: StyleProp<ViewStyle>;
 };
@@ -46,6 +47,7 @@ export default function MnemonicWordEntry({
   onWordCountChange,
   onScanPress,
   scanTestID,
+  editable = true,
   inputStyle,
   wrapperStyle,
 }: Props) {
@@ -114,6 +116,7 @@ export default function MnemonicWordEntry({
             ]}
             value={value}
             onChangeText={onChangeText}
+            editable={editable}
             multiline
             autoCapitalize="none"
             autoCorrect={false}
@@ -206,10 +209,17 @@ const styles = StyleSheet.create({
   wordInputWithScan: {
     paddingRight: 48,
   },
+  // Covers the whole strip `wordInputWithScan` reserves, not just the glyph: the
+  // input is 128 high, so a tap low in that strip used to land on the text and
+  // open the keyboard instead of the scanner. No text renders under it.
   scanIcon: {
+    alignItems: 'center',
+    bottom: 0,
+    paddingTop: 8,
     position: 'absolute',
-    right: 12,
-    top: 8,
+    right: 0,
+    top: 0,
+    width: 48,
   },
   errorText: {
     color: theme.colors.error,

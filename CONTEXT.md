@@ -65,6 +65,10 @@ _Avoid_: Pairing password (when referring to the derived bytes)
 The `{pairingIndex, pairingKey}` result stored in AsyncStorage after a successful `autoPair`. Once stored, subsequent connections load this and bypass `autoPair` entirely — no pairing password needed.
 _Avoid_: Pairing data, pairing record
 
+The three terms that follow, and the EIP-7730 relationships below them, are the vocabulary of
+work that is not on `main`: the clear-signing pipeline lives on an unmerged branch (#179). They
+are recorded here so the branch and the app agree on names, not because the app ships them.
+
 **EIP-7730 descriptor**:
 A JSON file from the Ledger clear-signing registry that maps a specific contract deployment (chainId + address) to human-readable display rules for its function calls and EIP-712 messages.
 _Avoid_: Clear-signing file, display metadata file
