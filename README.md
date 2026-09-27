@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://keycardpal.com"><img src="https://img.shields.io/badge/website-keycardpal.com-FF6400" alt="Website" /></a>
   <a href="https://github.com/mmlado/keycard-pal/actions/workflows/ci.yml"><img src="https://github.com/mmlado/keycard-pal/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/mmlado/keycard-pal/actions/workflows/android-release.yml"><img src="https://github.com/mmlado/keycard-pal/actions/workflows/android-release.yml/badge.svg" alt="Build & Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
@@ -74,6 +75,7 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 
 Keycard Pal (`com.keycardpal`) is on Google Play. Both variants, including Keycard Pal
 Offline, are on the developer's F-Droid repository and attached to every GitHub release.
+The same channels, with screenshots, are at [keycardpal.com](https://keycardpal.com).
 
 <p>
   <a href="https://github.com/mmlado/keycard-pal/releases/latest">
