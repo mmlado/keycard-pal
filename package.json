@@ -5,7 +5,8 @@
   "scripts": {
     "android": "ONLINE_BUILD=true react-native run-android --mode fullDebug",
     "android:offline": "react-native run-android --mode offlineDebug",
-    "ios": "set -a; [ -f .env ] && . ./.env; set +a; react-native run-ios",
+    "ios": "set -a; [ -f .env ] && . ./.env; set +a; react-native run-ios --device",
+    "ios:sim": "set -a; [ -f .env ] && . ./.env; set +a; react-native run-ios",
     "lint": "eslint .",
     "lint:android": "cd android && ./gradlew ktlintCheck",
     "lint:ios": "cd ios && swiftlint lint",
