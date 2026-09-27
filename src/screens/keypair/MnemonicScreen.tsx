@@ -160,13 +160,12 @@ export default function MnemonicScreen({
       const value = event.nativeEvent.codeStringValue;
       if (!value) return;
 
-      const cleaned = value.trim().toLowerCase();
-      if (!isSeedQrPayload(cleaned)) {
-        rejectScan('Not a valid SeedQR. Scan a hex-encoded BIP39 entropy QR.');
+      if (!isSeedQrPayload(value)) {
+        rejectScan('Not a valid SeedQR. Scan a 12 or 24 word SeedQR.');
         return;
       }
 
-      const decoded = decodeSeedQr(cleaned);
+      const decoded = decodeSeedQr(value);
       if (decoded.kind === 'error') {
         rejectScan(decoded.message);
         return;
