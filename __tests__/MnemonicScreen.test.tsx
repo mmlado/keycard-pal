@@ -422,6 +422,35 @@ describe('MnemonicScreen', () => {
       }
     });
 
+    it('drops the pending timer when a later frame scans clean', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan('notahex!!!');
+      triggerScan(VALID_12_HEX);
+      expect(screen.queryByText(/Not a valid SeedQR/)).toBeNull();
+      // The rejection's timer is still armed at this point. If it survived the
+      // success it would fire into a screen that has already moved on.
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect(getWordInput().props.value).toBe(VALID_12);
+      expect(screen.queryByText(/Not a valid SeedQR/)).toBeNull();
+    });
+
+    it('clears a pending timer when the screen unmounts', async () => {
+      const view = renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      const idle = jest.getTimerCount();
+      triggerScan('notahex!!!');
+      expect(jest.getTimerCount()).toBe(idle + 1);
+      view.unmount();
+      expect(jest.getTimerCount()).toBe(idle);
+    });
+
     it('dismisses overlay when beforeRemove fires while scanning', async () => {
       let capturedCallback: ((e: any) => void) | null = null;
       navigation.addListener.mockImplementation(
