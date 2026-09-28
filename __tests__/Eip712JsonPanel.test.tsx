@@ -94,6 +94,7 @@ describe('Eip712JsonPanel', () => {
     render(<Eip712JsonPanel request={request} eip712={eip712} chainId={1} />);
     fireEvent.press(screen.getByText('Digests'));
     expect(screen.getByText(/EIP-712 Digest: 0x[0-9a-f]{64}/)).toBeTruthy();
+    expect(screen.getByTestId('digest-explainer')).toBeTruthy();
   });
 
   it('switches to Raw tab and shows raw JSON', () => {

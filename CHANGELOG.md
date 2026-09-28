@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The Digests tab of an Ethereum sign request explains what the digest is and links to the ERC-8213 specification, opened in the browser or shown as a QR code when there is no network
+
 ### Changed
 
 - Android release builds use R8's optimized resource shrinking, which drops resources the old name-matching heuristic kept
