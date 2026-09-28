@@ -184,6 +184,7 @@ describe('TxDataPanel', () => {
       render(<TxDataPanel tx={txNoData} request={request} chainId={1} />);
       expect(screen.getByText('Digests')).toBeTruthy();
       expect(screen.queryByText(/Calldata Digest:/)).toBeNull();
+      expect(screen.queryByTestId('digest-explainer')).toBeNull();
     });
   });
 
@@ -200,6 +201,7 @@ describe('TxDataPanel', () => {
       render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Digests'));
       expect(screen.getByText(/Calldata Digest: 0x[0-9a-f]{64}/)).toBeTruthy();
+      expect(screen.getByTestId('digest-explainer')).toBeTruthy();
     });
 
     it('switches to Raw tab and shows signData', () => {

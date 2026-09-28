@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons } from 'react-native-paper';
 
+import { EIP712_DIGEST_EXPLAINER } from '@/constants/erc8213';
 import type { EthSignRequest } from '@/types';
 
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
@@ -10,7 +11,7 @@ import InfoRow from '@/components/InfoRow';
 import { type Eip712Summary } from '@/utils/eip712';
 import { classifyEthPayload } from '@/utils/ethPayload';
 
-import { DigestRow, SectionHeader } from './shared';
+import { DigestExplainer, DigestRow, SectionHeader } from './shared';
 import SpecialEip712Section from './SpecialEip712Section';
 
 type Tab = 'details' | 'digests' | 'raw';
@@ -84,7 +85,10 @@ export default function Eip712JsonPanel({
           </>
         )}
         {tab === 'digests' && eip712Digest && (
-          <DigestRow label="EIP-712 Digest" value={eip712Digest} />
+          <>
+            <DigestRow label="EIP-712 Digest" value={eip712Digest} />
+            <DigestExplainer text={EIP712_DIGEST_EXPLAINER} />
+          </>
         )}
         {tab === 'raw' && (
           <View style={styles.row}>
