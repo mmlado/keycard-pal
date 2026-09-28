@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { Keyboard, StyleSheet } from 'react-native';
+import { act, render, screen, fireEvent } from '@testing-library/react-native';
 
 import PairingPasswordEntry from '../src/components/NFCBottomSheet/PairingPasswordEntry';
 
@@ -10,9 +10,22 @@ import PairingPasswordEntry from '../src/components/NFCBottomSheet/PairingPasswo
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 
+let keyboardShow: ((event: any) => void) | null = null;
+let keyboardHide: (() => void) | null = null;
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockInsets,
 }));
+
+jest.spyOn(Keyboard, 'addListener').mockImplementation((event, callback) => {
+  if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
+    keyboardShow = callback as (event: any) => void;
+  }
+  if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
+    keyboardHide = callback as () => void;
+  }
+  return { remove: jest.fn() } as any;
+});
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -44,6 +57,8 @@ beforeEach(() => {
   onCancel.mockClear();
   mockInsets.top = 0;
   mockInsets.bottom = 0;
+  keyboardShow = null;
+  keyboardHide = null;
 });
 
 function containerStyle() {
@@ -66,6 +81,21 @@ describe('PairingPasswordEntry', () => {
     mockInsets.top = 48;
     renderEntry();
     expect(containerStyle().paddingTop).toBe(48);
+  });
+
+  it('pads the bottom above the keyboard while it is up', () => {
+    mockInsets.bottom = 34;
+    renderEntry();
+
+    act(() => {
+      keyboardShow?.({ endCoordinates: { height: 336 } });
+    });
+    expect(containerStyle().paddingBottom).toBe(344);
+
+    act(() => {
+      keyboardHide?.();
+    });
+    expect(containerStyle().paddingBottom).toBe(42);
   });
 
   it('renders title and body text', () => {
