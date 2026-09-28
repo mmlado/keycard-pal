@@ -45,6 +45,11 @@ export default function SetCardNameScreen({
     };
   }, []);
 
+  // Android reports the keyboard height with the navigation bar inset already
+  // taken off, so it has to be added back.
+  const keyboardPadding =
+    keyboardHeight + (Platform.OS === 'android' ? insets.bottom : 0) + 8;
+
   const handleSubmit = useCallback(() => {
     try {
       setError(null);
@@ -60,7 +65,7 @@ export default function SetCardNameScreen({
         styles.container,
         {
           paddingBottom:
-            keyboardHeight > 0 ? keyboardHeight + 8 : insets.bottom + 16,
+            keyboardHeight > 0 ? keyboardPadding : insets.bottom + 16,
         },
       ]}
     >
