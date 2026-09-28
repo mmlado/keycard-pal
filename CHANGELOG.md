@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tapping near the SeedQR icon no longer puts the cursor in the recovery phrase box instead of opening the scanner, and the keyboard can no longer reappear over the viewfinder
 - The custom pairing password prompt keeps Continue and Cancel above the keyboard
 - The Save button on Set card name stays above the keyboard in three-button navigation, where it sat partly behind it
+- Tapping a text field in Settings scrolls it above the keyboard instead of leaving it hidden behind one, and the headings and helper text around it stay reachable by scrolling while the keyboard is up. This affected the WalletConnect Project ID, the ENS RPC URL and the three Tenderly fields
 
 ## [1.12.0] - 2026-09-24
 
