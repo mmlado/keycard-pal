@@ -2,13 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons } from 'react-native-paper';
 
+import { CALLDATA_DIGEST_EXPLAINER } from '@/constants/erc8213';
 import type { EthSignRequest } from '@/types';
 
 import InfoRow from '@/components/InfoRow';
 import { computeCalldataDigest } from '@/utils/erc8213';
 import type { ParsedTx } from '@/utils/txParser';
 
-import { DigestRow } from './shared';
+import { DigestExplainer, DigestRow } from './shared';
 import DecodedCallSection from './DecodedCallSection';
 import SimulationPanel from './SimulationPanel';
 import { useSimulation } from './useSimulation';
@@ -76,7 +77,10 @@ export default function TxDataPanel({
           />
         )}
         {tab === 'digests' && calldataDigest && (
-          <DigestRow label="Calldata Digest" value={calldataDigest} />
+          <>
+            <DigestRow label="Calldata Digest" value={calldataDigest} />
+            <DigestExplainer text={CALLDATA_DIGEST_EXPLAINER} />
+          </>
         )}
         {tab === 'raw' && (
           <View style={styles.row}>

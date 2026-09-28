@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons } from 'react-native-paper';
 
+import { EIP712_DIGEST_EXPLAINER } from '@/constants/erc8213';
 import type { EthSignRequest } from '@/types';
 
 import InfoRow from '@/components/InfoRow';
@@ -10,7 +11,7 @@ import { type Eip712Prehashed } from '@/utils/eip712';
 import { computeEip712DigestFromPrehashed } from '@/utils/erc8213';
 import { classifyEthPayload } from '@/utils/ethPayload';
 
-import { DigestRow, SectionHeader } from './shared';
+import { DigestExplainer, DigestRow, SectionHeader } from './shared';
 
 type Tab = 'details' | 'digests' | 'raw';
 
@@ -76,6 +77,7 @@ export default function Eip712PrehashedPanel({
               label="Message Hash"
               value={eip712Prehashed.messageHash}
             />
+            <DigestExplainer text={EIP712_DIGEST_EXPLAINER} />
           </>
         )}
         {tab === 'raw' && (
