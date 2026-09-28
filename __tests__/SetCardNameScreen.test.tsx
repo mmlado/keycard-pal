@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Keyboard } from 'react-native';
+import { Keyboard, Platform } from 'react-native';
 
 import SetCardNameScreen from '../src/screens/SetCardNameScreen';
 
@@ -14,8 +14,15 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
+let mockBottomInset = 0;
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: mockBottomInset,
+    left: 0,
+    right: 0,
+  }),
 }));
 
 jest.mock('react-native-paper', () => {
@@ -88,6 +95,7 @@ describe('SetCardNameScreen', () => {
     navigation.setOptions.mockClear();
     keyboardDidShow = null;
     keyboardDidHide = null;
+    mockBottomInset = 0;
   });
 
   it('submits the entered card name', () => {
@@ -154,5 +162,45 @@ describe('SetCardNameScreen', () => {
     });
 
     expect(JSON.stringify(toJSON())).toContain('"paddingBottom":16');
+  });
+
+  it('clears the keyboard by the same margin in both Android navigation modes', () => {
+    const origOS = Platform.OS;
+    Platform.OS = 'android';
+
+    try {
+      // Android reports the IME height with the navigation bar inset taken
+      // off, so the same keyboard frame is reported shorter under the taller
+      // three-button bar.
+      const modes = [
+        { inset: 63, reported: 280 },
+        { inset: 126, reported: 217 },
+      ];
+
+      for (const { inset, reported } of modes) {
+        mockBottomInset = inset;
+        const { toJSON, unmount } = renderScreen();
+
+        act(() => {
+          keyboardDidShow?.({ endCoordinates: { height: reported } });
+        });
+
+        expect(JSON.stringify(toJSON())).toContain('"paddingBottom":351');
+        unmount();
+      }
+    } finally {
+      Platform.OS = origOS;
+    }
+  });
+
+  it('does not add the bottom inset on iOS, where the keyboard height includes it', () => {
+    mockBottomInset = 34;
+    const { toJSON } = renderScreen();
+
+    act(() => {
+      keyboardDidShow?.({ endCoordinates: { height: 280 } });
+    });
+
+    expect(JSON.stringify(toJSON())).toContain('"paddingBottom":288');
   });
 });
