@@ -41,8 +41,12 @@ export function useExternalLink(link: ExternalLink): {
 
   const open = useCallback(async () => {
     if (await isNetworkConnected()) {
-      Linking.openURL(url);
-      return;
+      try {
+        await Linking.openURL(url);
+        return;
+      } catch {
+        // No app answers the URL. Fall through to the QR code.
+      }
     }
     if (navigationRef.isReady()) {
       navigationRef.navigate('UrlQR', { url, title, note });

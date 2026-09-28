@@ -67,6 +67,21 @@ describe('useExternalLink', () => {
     });
   });
 
+  it('falls back to the QR code when no app answers the URL', async () => {
+    (Linking.openURL as jest.Mock).mockRejectedValue(new Error('no handler'));
+    const { result } = renderHook(() => useExternalLink(link));
+
+    await act(async () => {
+      await result.current.open();
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
+      url: link.url,
+      title: link.title,
+      note: link.note,
+    });
+  });
+
   it('does nothing when the navigator is not ready', async () => {
     mockConnected = false;
     mockNavReady = false;

@@ -4,11 +4,13 @@ export const ERC8213_URL = 'https://github.com/ethereum/ERCs/pull/1639';
 export const ERC8213_LINK_LABEL = 'What is ERC-8213?';
 export const ERC8213_QR_TITLE = 'ERC-8213';
 
+// The calldata digest covers the calldata and nothing else: ERC-8213 leaves
+// the recipient, the value and the chain out of it on purpose.
 export const CALLDATA_DIGEST_EXPLAINER =
   'A digest is a short fingerprint of what you are about to sign. This one ' +
-  'covers the transaction calldata. Compare it with the digest shown by the ' +
-  'app that created the request: if they match, the call reached your ' +
-  'Keycard unchanged.';
+  'covers the calldata only, not the recipient, the amount or the chain. ' +
+  'Compare it with the digest shown by the app that created the request: if ' +
+  'they match, the calldata is unchanged.';
 
 export const EIP712_DIGEST_EXPLAINER =
   'A digest is a short fingerprint of what you are about to sign. This one ' +
