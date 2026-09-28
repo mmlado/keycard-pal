@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,7 +27,29 @@ export default function PairingPasswordEntry({
   onCancel,
 }: Props) {
   const [password, setPassword] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      e => setKeyboardHeight(e.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardHeight(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  /** The sheet's Modal never resizes for the keyboard, and Android reports a height that leaves out the navigation bar. */
+  const paddingBottom =
+    keyboardHeight > 0
+      ? keyboardHeight + (Platform.OS === 'android' ? insets.bottom : 0) + 8
+      : Math.max(insets.bottom, 16) + 8;
 
   const handleSubmit = () => {
     const trimmed = password.trim();
@@ -36,7 +65,7 @@ export default function PairingPasswordEntry({
         styles.container,
         {
           paddingTop: Math.max(insets.top, 24),
-          paddingBottom: Math.max(insets.bottom, 16) + 8,
+          paddingBottom,
         },
       ]}
     >
