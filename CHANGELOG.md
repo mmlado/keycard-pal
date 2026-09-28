@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Simulating a transaction whose request carries no address now shows the PIN pad over the whole screen instead of inside the data panel
 - On iOS the scanner reads every frame it decodes, so animated multi-part requests now complete and a rejected SeedQR can be scanned again without leaving the screen
 - Tapping near the SeedQR icon no longer puts the cursor in the recovery phrase box instead of opening the scanner, and the keyboard can no longer reappear over the viewfinder
+- Tapping a text field in Settings scrolls it above the keyboard instead of leaving it hidden behind one, and the headings and helper text around it stay reachable by scrolling while the keyboard is up. This affected the WalletConnect Project ID, the ENS RPC URL and the three Tenderly fields
 
 ## [1.12.0] - 2026-09-24
 

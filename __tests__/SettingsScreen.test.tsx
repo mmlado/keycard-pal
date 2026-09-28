@@ -16,6 +16,11 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+// The screen is rendered outside a navigator, where the real hook throws.
+jest.mock('@react-navigation/elements', () => ({
+  useHeaderHeight: () => 64,
+}));
+
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
   return { MD3DarkTheme: { colors: {} }, Text };
