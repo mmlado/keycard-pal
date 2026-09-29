@@ -23,19 +23,26 @@ an online Metro crashes at startup on the first missing native module, loudly an
 
 ## What has to pass
 
-Run all four before opening a pull request. The first three are CI jobs, so a pull request
-that skips them fails there instead.
+These are the CI jobs, run exactly as CI runs them. A pull request that skips them fails
+there instead.
 
 ```sh
-npx jest --no-coverage
-npx eslint src __tests__
-npm run typecheck                                   # must report zero errors, not "no new errors"
-npm run format
+npm test               # jest; CI runs it with coverage
+npm run lint           # eslint over the whole repo, not just src and __tests__
+npm run typecheck      # must report zero errors, not "no new errors"
+npm run format:check   # prettier in check mode
+npm run check:bundles  # bundles the app both ways and checks each direction
 ```
 
-`npm run check:bundles` is worth running if you touched anything near the build boundary. It
-bundles the app both ways and checks each direction in under a minute, with no Android
-toolchain.
+Two of those have a writing counterpart worth knowing. `npm run format` applies the
+formatting that `format:check` verifies, and `npx jest --no-coverage` is quicker while you
+iterate, though it is not what CI measures.
+
+`check:bundles` is the Offline bundle check job. It takes under a minute and needs no Android
+toolchain, and it is the one that catches an online import reaching the offline build. CI also
+runs an iOS bundle check on every pull request, which builds an iOS bundle and fails if it
+carries any affiliate marker; `npm run check:ios-bundle -- --bundle <file>` is the same check
+against a bundle you have already built.
 
 ## The rules that catch people out
 
