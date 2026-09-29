@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-09-28
+
 ### Added
 
 - The Digests tab of an Ethereum sign request explains what the digest is and links to the ERC-8213 specification, opened in the browser or shown as a QR code when there is no network
@@ -423,7 +425,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/mmlado/keycard-pal/compare/v1.12.0...v1.13.0
 [1.12.0]: https://github.com/mmlado/keycard-pal/compare/v1.11.1...v1.12.0
 [1.11.1]: https://github.com/mmlado/keycard-pal/compare/v1.11.0...v1.11.1
 [1.11.0]: https://github.com/mmlado/keycard-pal/compare/v1.10.0...v1.11.0
