@@ -169,7 +169,8 @@ cd ios && pod install   # iOS only
 ```sh
 npm start        # Terminal 1: Metro bundler
 npm run android  # Terminal 2: build and install
-npm run ios      # or on an iPhone or simulator
+npm run ios      # or on a connected iPhone
+npm run ios:sim  # or on the iOS Simulator
 ```
 
 ### Release build
