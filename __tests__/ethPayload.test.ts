@@ -93,6 +93,22 @@ describe('classifyEthPayload', () => {
     expect(classifyEthPayload('01aabbcc', 3).kind).toBe('personal-message');
   });
 
+  it('dataType=3 → personal-message carrying the ERC-191 digest', () => {
+    const messageHex = Buffer.from('hello world', 'utf8').toString('hex');
+    const payload = classifyEthPayload(messageHex, 3);
+    if (payload.kind !== 'personal-message') throw new Error('unreachable');
+    // keccak256("\x19Ethereum Signed Message:\n11hello world")
+    expect(payload.digest).toBe(
+      '0xd9eba16ed0ecae432b71fe008c98cc872bb4cc214d3220a36f365326cf807d68',
+    );
+  });
+
+  it('dataType=3 with bytes that are not UTF-8 still carries a digest', () => {
+    const payload = classifyEthPayload('fffe80', 3);
+    if (payload.kind !== 'personal-message') throw new Error('unreachable');
+    expect(payload.digest).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+
   it('dataType=2 with full typed-data JSON → eip712-json with the ERC-8213 digest', () => {
     const payload = classifyEthPayload(TYPED_DATA_JSON_HEX, 2);
     expect(payload.kind).toBe('eip712-json');
@@ -262,6 +278,13 @@ describe('signingDigest', () => {
 // payload.digest; the card receives signingDigest(payload).
 
 describe('displayed digest === signed bytes', () => {
+  it('personal-message: displayed digest is byte-identical to the signed hash', () => {
+    const messageHex = Buffer.from('hello world', 'utf8').toString('hex');
+    const payload = classifyEthPayload(messageHex, 3);
+    if (payload.kind !== 'personal-message') throw new Error('unreachable');
+    expect(hex(signingDigest(payload))).toBe(payload.digest);
+  });
+
   it('eip712-json: displayed digest is byte-identical to the signed hash', () => {
     const payload = classifyEthPayload(TYPED_DATA_JSON_HEX, 2);
     if (payload.kind !== 'eip712-json') throw new Error('unreachable');
