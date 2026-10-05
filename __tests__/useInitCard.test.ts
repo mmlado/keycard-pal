@@ -114,6 +114,19 @@ describe('useInitCard', () => {
       expect(result.current.status).toBe('');
       expect(result.current.result).toBeNull();
     });
+
+    // Shown and written down before any tap (ADR-0007).
+    it('holds a 12-digit PUK from the start', () => {
+      const { result } = renderHook(() => useInitCard());
+      expect(result.current.puk).toMatch(/^\d{12}$/);
+    });
+
+    it('keeps the same PUK across renders', () => {
+      const { result, rerender } = renderHook(() => useInitCard());
+      const puk = result.current.puk;
+      rerender(undefined);
+      expect(result.current.puk).toBe(puk);
+    });
   });
 
   describe('start', () => {
@@ -270,12 +283,35 @@ describe('useInitCard', () => {
 
       expect(mockInit).toHaveBeenCalledWith(
         '123456',
-        expect.stringMatching(/^\d{12}$/),
+        result.current.puk,
         expect.anything(),
         undefined,
       );
       expect(result.current.phase).toBe('done');
-      expect(result.current.result).toMatch(/^\d{12}$/);
+    });
+
+    // The digits already on paper are the digits the card gets.
+    it('sends the same PUK on a tap after a failed one', async () => {
+      mockSelect.mockResolvedValueOnce({ sw: 0x6a82 });
+      const { result } = renderHook(() => useInitCard());
+      const puk = result.current.puk;
+      await act(async () => {
+        result.current.start('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+
+      await act(async () => {
+        result.current.retry();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(result.current.puk).toBe(puk);
+      expect(mockInit.mock.calls[0][1]).toBe(puk);
     });
 
     it('passes duress pin when provided', async () => {
@@ -347,9 +383,9 @@ describe('useInitCard', () => {
         expect(result.current.phase).toBe('done');
       });
 
-      it('returns the PUK it sent', async () => {
+      it('sends the PUK it shows', async () => {
         const { result } = await startAndTap();
-        expect(result.current.result).toBe(mockInit.mock.calls[0][1]);
+        expect(mockInit.mock.calls[0][1]).toBe(result.current.puk);
       });
 
       it('passes the duress PIN when one was chosen', async () => {
@@ -432,9 +468,8 @@ describe('useInitCard', () => {
 
         expect(lastWhitelist()).toEqual([new Uint8Array(IDENTITY_KEY)]);
         expect(mockInit.mock.calls[0][0]).toBe('123456');
+        expect(mockInit.mock.calls[0][1]).toBe(result.current.puk);
         expect(result.current.phase).toBe('done');
-        // The screen only leaves once there is a result to show for it.
-        expect(result.current.result).toMatch(/^[0-9]{12}$/);
       });
 
       // An accepted INIT proves the handshake succeeded.

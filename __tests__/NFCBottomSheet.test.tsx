@@ -163,6 +163,30 @@ describe('NFCBottomSheet — Android sheet', () => {
     });
   });
 
+  // A blocked PIN fails every retry the same way, so the sheet offers the
+  // unblock flow where Try again would be.
+  describe('blocked PIN', () => {
+    it('offers Unblock PIN in place of Try again', () => {
+      renderSheet(makeNfc('error', { pinBlocked: true, retry: jest.fn() }));
+      expect(screen.getByText('Unblock PIN')).toBeTruthy();
+      expect(screen.queryByText('Try again')).toBeNull();
+      expect(screen.queryByText('Tap your card to try again')).toBeNull();
+    });
+
+    it('cancels the tap, then opens the unblock screen', () => {
+      renderSheet(makeNfc('error', { pinBlocked: true, retry: jest.fn() }));
+      fireEvent.press(screen.getByText('Unblock PIN'));
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).toHaveBeenCalledWith('UnblockPin');
+    });
+
+    it('keeps Try again while the PIN is not blocked', () => {
+      renderSheet(makeNfc('error', { pinBlocked: false, retry: jest.fn() }));
+      expect(screen.getByText('Try again')).toBeTruthy();
+      expect(screen.queryByText('Unblock PIN')).toBeNull();
+    });
+  });
+
   // Phase wins over presence; an omitted cardPresence changes nothing.
   describe('cardPresence variant selection', () => {
     it('phase nfc + presence lost renders the disconnected hint', () => {
@@ -515,6 +539,25 @@ describe('NFCBottomSheet — iOS error overlay', () => {
   it('hides Try again button when retry prop is absent', () => {
     renderSheet(makeNfc('error', { status: 'err' }));
     expect(screen.queryByText('Try again')).toBeNull();
+  });
+
+  it('offers Unblock PIN in place of Try again for a blocked PIN', () => {
+    renderSheet(
+      makeNfc('error', {
+        status: 'blocked',
+        pinBlocked: true,
+        retry: jest.fn(),
+      }),
+    );
+    expect(screen.getByText('Unblock PIN')).toBeTruthy();
+    expect(screen.queryByText('Try again')).toBeNull();
+  });
+
+  it('cancels the tap, then opens the unblock screen', () => {
+    renderSheet(makeNfc('error', { status: 'blocked', pinBlocked: true }));
+    fireEvent.press(screen.getByText('Unblock PIN'));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith('UnblockPin');
   });
 
   // No commission on this build, so no referral code and no label: the exit

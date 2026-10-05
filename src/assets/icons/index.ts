@@ -87,6 +87,7 @@ export const Icons = {
   // Secrets menu
   pin: mdi('dialpad', onSurface),
   puk: mdi('lock-reset', onSurface),
+  unblockPin: mdi('lock-open-variant-outline', onSurface),
   pairingSecret: mdi('handshake-outline', onSurface),
 
   // Coins use the currency mark, not the brand logo.

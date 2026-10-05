@@ -19,7 +19,7 @@ import { cardGeneration, secureChannelVersion } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
 import { pubKeyFingerprint } from '@/utils/cryptoAccount';
 import { checkGenuine } from '@/utils/genuineCheck';
-import { isTagLostError } from '@/utils/keycardErrors';
+import { attemptsLeft, isTagLostError } from '@/utils/keycardErrors';
 import { displayKeycardName, parseKeycardName } from '@/utils/keycardName';
 import { useCertificateApprovals } from './useCertificateApprovals';
 import {
@@ -67,6 +67,8 @@ export interface UseKeycardOperation<T> {
   cardFingerprint: number | null;
   result: T | null;
   pinError: string | null;
+  /** The card has no PIN attempts left; the error offers the unblock flow. */
+  pinBlocked: boolean;
   pairingPasswordError: string | null;
   execute: (op: KeycardOperationFn<T>, options?: ExecuteOptions) => void;
   submitPin: (pin: string) => void;
@@ -82,10 +84,13 @@ export interface UseKeycardOperation<T> {
 export const PAIRING_PASSWORD_NEEDED_STATUS =
   'This Keycard needs its pairing password.';
 export const NOT_GENUINE_STATUS = 'This Keycard may not be genuine.';
+export const PIN_BLOCKED_STATUS =
+  "This Keycard's PIN is blocked. Unblock it with your PUK.";
 
 export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [waitingForPin, setWaitingForPin] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [pinBlocked, setPinBlocked] = useState(false);
   const [cardName, setCardName] = useState<string | null>(null);
   const [cardFingerprint, setCardFingerprint] = useState<number | null>(null);
 
@@ -138,9 +143,11 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         if (e instanceof WrongPINException) {
           const attempts = e.getRetryAttempts();
           if (attempts === 0) {
-            throw new Error('Card is locked. Use Unblock Card option.');
+            pinRef.current = '';
+            setPinBlocked(true);
+            throw new Error(PIN_BLOCKED_STATUS);
           }
-          setPinError(`PIN is not valid. ${attempts} attempts left.`);
+          setPinError(`PIN is not valid. ${attemptsLeft(attempts)}.`);
         }
         pinRef.current = '';
         throw e;
@@ -478,6 +485,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       retryOnTagLossRef.current = options.retryOnTagLoss ?? false;
       successMessageRef.current = options.successMessage;
       operationRunningRef.current = false;
+      setPinBlocked(false);
       setWaitingForPairingPassword(false);
       setPairingPasswordError(null);
       customPairingPasswordRef.current = null;
@@ -509,6 +517,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       // A newly entered PIN is unconfirmed again.
       pinVerifiedRef.current = false;
       setPinError(null);
+      setPinBlocked(false);
       setWaitingForPin(false);
       startNFC();
     },
@@ -557,6 +566,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const clearKeycardState = useCallback(() => {
     setWaitingForPin(false);
     setPinError(null);
+    setPinBlocked(false);
     setCardName(null);
     setCardFingerprint(null);
     pinRef.current = '';
@@ -590,6 +600,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     cardFingerprint,
     result,
     pinError,
+    pinBlocked,
     pairingPasswordError,
     execute,
     submitPin,

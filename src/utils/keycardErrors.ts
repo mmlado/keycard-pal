@@ -34,6 +34,11 @@ const PLAIN_MESSAGES: ReadonlyArray<[RegExp, string]> = [
   ],
 ];
 
+/** The tail of a refused-secret message: "2 attempts left", "1 attempt left". */
+export function attemptsLeft(attempts: number): string {
+  return attempts === 1 ? '1 attempt left' : `${attempts} attempts left`;
+}
+
 /** The text shown for a failed tap: plain words where the failure is known. */
 export function cardErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);

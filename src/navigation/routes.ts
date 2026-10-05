@@ -39,6 +39,7 @@ import Slip39Screen from '../screens/keypair/Slip39Screen';
 // Secrets screens
 import ChangeSecretScreen from '../screens/secrets/ChangeSecretScreen';
 import SecretsMenuScreen from '../screens/secrets/SecretsMenuScreen';
+import UnblockPinScreen from '../screens/secrets/UnblockPinScreen';
 
 const headerStyle = { backgroundColor: theme.colors.background };
 const headerTitleStyle = { fontWeight: '600' as const };
@@ -136,6 +137,11 @@ export const routes: Route[] = [
   {
     name: 'ChangeSecret',
     component: ChangeSecretScreen,
+    options: defaultHeaderOptions,
+  },
+  {
+    name: 'UnblockPin',
+    component: UnblockPinScreen,
     options: defaultHeaderOptions,
   },
 

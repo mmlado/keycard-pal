@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Unblock PIN, under Keycard > Secrets and offered on the blocked-PIN error in place of Try again: set a new PIN, enter the card's PUK and tap
+
+### Fixed
+
+- Initializing a card now shows its PUK before anything is written, behind a reveal and a 10-second write-it-down wait, where earlier versions discarded it and left the card impossible to unblock after three wrong PINs
+- The blocked-PIN error no longer names an "Unblock Card option" the app did not have
+- "1 attempt left" is no longer written as "1 attempts left"
+
 ## [1.13.0] - 2026-09-28
 
 ### Added

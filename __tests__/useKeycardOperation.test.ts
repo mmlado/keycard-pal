@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import {
   NOT_GENUINE_STATUS,
   PAIRING_PASSWORD_NEEDED_STATUS,
+  PIN_BLOCKED_STATUS,
   useKeycardOp,
   useKeycardOperation,
 } from '../src/hooks/keycard/useKeycardOperation';
@@ -1490,10 +1491,75 @@ describe('useKeycardOperation', () => {
       });
 
       expect(result.current.phase).toBe('error');
-      expect(result.current.status).toBe(
-        'Card is locked. Use Unblock Card option.',
-      );
+      expect(result.current.status).toBe(PIN_BLOCKED_STATUS);
       expect(result.current.pinError).toBeNull();
+      // The sheet reads this to offer the unblock flow over a retry.
+      expect(result.current.pinBlocked).toBe(true);
+    });
+
+    it('names no screen the app does not have', () => {
+      expect(PIN_BLOCKED_STATUS).not.toMatch(/option|Unblock Card/);
+      expect(PIN_BLOCKED_STATUS).toMatch(/PUK/);
+    });
+
+    it('drops the blocked flag when a new operation starts', async () => {
+      const { WrongPINException } = require('keycard-sdk/dist/apdu-exception');
+      const err = new WrongPINException(0);
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        verifyPIN: jest.fn().mockResolvedValue({
+          sw: 0x63c0,
+          checkAuthOK: () => {
+            throw err;
+          },
+        }),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      await act(async () => {
+        result.current.submitPin('wrong');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.pinBlocked).toBe(true);
+
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      expect(result.current.pinBlocked).toBe(false);
+    });
+
+    it('counts a single remaining attempt in the singular', async () => {
+      const { WrongPINException } = require('keycard-sdk/dist/apdu-exception');
+      const err = new WrongPINException(1);
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        verifyPIN: jest.fn().mockResolvedValue({
+          sw: 0x63c1,
+          checkAuthOK: () => {
+            throw err;
+          },
+        }),
+      }));
+
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(jest.fn(), { requiresPin: true });
+      });
+      await act(async () => {
+        result.current.submitPin('wrong');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.pinError).toBe('PIN is not valid. 1 attempt left.');
+      expect(result.current.pinBlocked).toBe(false);
     });
   });
 

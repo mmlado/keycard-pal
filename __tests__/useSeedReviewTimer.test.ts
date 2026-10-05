@@ -36,6 +36,23 @@ describe('useSeedReviewTimer', () => {
     expect(result.current.done).toBe(true);
   });
 
+  it('runs for the duration it is given', () => {
+    const { result } = renderHook(() => useSeedReviewTimer(10));
+    expect(result.current.timeLeft).toBe(10);
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(9000);
+    });
+    expect(result.current.timeLeft).toBe(1);
+    expect(result.current.done).toBe(false);
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(result.current.done).toBe(true);
+  });
+
   it('resets and restarts when start() is called again', () => {
     const { result } = renderHook(() => useSeedReviewTimer());
     act(() => {

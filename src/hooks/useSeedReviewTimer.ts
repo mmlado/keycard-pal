@@ -8,8 +8,10 @@ export interface SeedReviewTimer {
   start: () => void;
 }
 
-export function useSeedReviewTimer(): SeedReviewTimer {
-  const [timeLeft, setTimeLeft] = useState(SEED_REVIEW_SECONDS);
+export function useSeedReviewTimer(
+  seconds: number = SEED_REVIEW_SECONDS,
+): SeedReviewTimer {
+  const [timeLeft, setTimeLeft] = useState(seconds);
   const [done, setDone] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -17,7 +19,7 @@ export function useSeedReviewTimer(): SeedReviewTimer {
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    setTimeLeft(SEED_REVIEW_SECONDS);
+    setTimeLeft(seconds);
     setDone(false);
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
@@ -30,7 +32,7 @@ export function useSeedReviewTimer(): SeedReviewTimer {
         return t - 1;
       });
     }, 1000);
-  }, []);
+  }, [seconds]);
 
   useEffect(() => {
     return () => {

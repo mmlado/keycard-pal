@@ -29,6 +29,11 @@ export default function SecretsMenuScreen({
       onPress: () => navigation.navigate('ChangeSecret', { secretType: 'puk' }),
     },
     {
+      label: 'Unblock PIN',
+      icon: Icons.unblockPin,
+      onPress: () => navigation.navigate('UnblockPin'),
+    },
+    {
       label: 'Change Pairing Secret',
       icon: Icons.pairingSecret,
       // Unlike PIN and PUK, this one reads the card as soon as it opens.
