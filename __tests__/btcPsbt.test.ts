@@ -119,7 +119,7 @@ function psbtWithOutput(
 //   - 1 input, 2 outputs
 //   - bip32Derivation on input  → path m/84'/1'/0'/0/0  (testnet)
 //   - bip32Derivation on output[1] (change)
-//   - no feeSats (witnessUtxo missing → psbt.getFee() throws)
+//   - no UTXO on the input, so the fee is unknown
 const TESTNET_WPKH_PSBT_HEX = (() => {
   // We build it programmatically so the test doesn't depend on a magic string.
   const { Psbt, payments, networks } = require('bitcoinjs-lib');
@@ -207,6 +207,44 @@ const BIP322_PSBT_HEX = (() => {
 
   return psbt.toBuffer().toString('hex');
 })();
+
+// One input per entry, carrying a witnessUtxo of that value; undefined leaves
+// the input with no UTXO at all, the way a wallet that wants the fee hidden
+// would send it.
+function psbtSpending(
+  inputValues: Array<number | undefined>,
+  outputValues: number[],
+): string {
+  const { Psbt, payments, networks } = require('bitcoinjs-lib');
+  const { output } = payments.p2wpkh({
+    pubkey: CARD_PUBKEY,
+    network: networks.testnet,
+  });
+  const psbt = new Psbt({ network: networks.testnet });
+
+  inputValues.forEach((value, index) => {
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xa0 + index),
+      index: 0,
+      ...(value === undefined
+        ? {}
+        : { witnessUtxo: { script: output!, value } }),
+      bip32Derivation: [
+        {
+          masterFingerprint: CARD_FINGERPRINT,
+          path: `m/84'/1'/0'/0/${index}`,
+          pubkey: CARD_PUBKEY,
+        },
+      ],
+    });
+  });
+
+  for (const value of outputValues) {
+    psbt.addOutput({ script: output!, value });
+  }
+
+  return psbt.toBuffer().toString('hex');
+}
 
 // One spendable input per entry; undefined leaves PSBT_IN_SIGHASH_TYPE off.
 function psbtWithSighashTypes(sighashTypes: Array<number | undefined>): string {
@@ -360,6 +398,7 @@ describe('inspectBtcPsbt', () => {
     expect(summary.network).toBe('mainnet');
     expect(summary.inputCount).toBe(1);
     expect(summary.totalOutputSats).toBe(70_000);
+    expect(summary.fee).toEqual({ kind: 'known', sats: 10_000 });
   });
 
   it('returns unknown network when no derivation path present', () => {
@@ -386,6 +425,44 @@ describe('inspectBtcPsbt', () => {
 
     const summary = inspectBtcPsbt(psbt.toBuffer().toString('hex'));
     expect(summary.outputs[0].address).toBe('51');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// inspectBtcPsbt – fee
+// ---------------------------------------------------------------------------
+
+describe('inspectBtcPsbt fee', () => {
+  it('reads the fee off an unsigned PSBT whose inputs carry their UTXOs', () => {
+    const summary = inspectBtcPsbt(psbtSpending([100_000], [90_000, 9_577]));
+    expect(summary.fee).toEqual({ kind: 'known', sats: 423 });
+  });
+
+  it('sums every input before subtracting the outputs', () => {
+    const summary = inspectBtcPsbt(
+      psbtSpending([60_000, 40_000], [90_000, 9_000]),
+    );
+    expect(summary.fee).toEqual({ kind: 'known', sats: 1_000 });
+  });
+
+  it('tells a fee of zero apart from a fee it cannot compute', () => {
+    const summary = inspectBtcPsbt(psbtSpending([100_000], [100_000]));
+    expect(summary.fee).toEqual({ kind: 'known', sats: 0 });
+  });
+
+  it('calls the fee unknown when an input carries no UTXO', () => {
+    const summary = inspectBtcPsbt(TESTNET_WPKH_PSBT_HEX);
+    expect(summary.fee).toEqual({ kind: 'unknown', inputsWithoutUtxo: [0] });
+  });
+
+  it('names only the inputs whose value is missing', () => {
+    const summary = inspectBtcPsbt(
+      psbtSpending([100_000, undefined, undefined], [90_000]),
+    );
+    expect(summary.fee).toEqual({
+      kind: 'unknown',
+      inputsWithoutUtxo: [1, 2],
+    });
   });
 });
 

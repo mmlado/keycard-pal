@@ -20,13 +20,21 @@ export type BtcPsbtOutputSummary = {
   claimsChange: boolean;
 };
 
+// What the inputs hold minus what the outputs take. An input with no UTXO
+// attached has no value to add, and one such input is enough to leave the
+// fee unbounded, which is a different fact from a fee of zero and gets its
+// own shape so the review cannot blur the two.
+export type BtcPsbtFee =
+  | { kind: 'known'; sats: number }
+  | { kind: 'unknown'; inputsWithoutUtxo: number[] };
+
 export type BtcPsbtSummary = {
   requestType: 'transaction' | 'bip322-message';
   network: NetworkName;
   inputCount: number;
   outputCount: number;
   outputs: BtcPsbtOutputSummary[];
-  feeSats?: number;
+  fee: BtcPsbtFee;
   totalOutputSats: number;
   bip322Address?: string;
 };
@@ -218,6 +226,29 @@ function getInputUtxo(
   }
 
   return undefined;
+}
+
+// Not psbt.getFee(): bitcoinjs computes a fee only for a finalized PSBT, and
+// every PSBT reviewed here is unsigned. The values come from the PSBT's own
+// UTXO fields, which is as far as the review can see without the chain.
+function summarizeFee(psbt: Psbt, totalOutputSats: number): BtcPsbtFee {
+  const inputsWithoutUtxo: number[] = [];
+  let totalInputSats = 0;
+
+  for (let index = 0; index < psbt.inputCount; index += 1) {
+    const utxo = getInputUtxo(psbt, index);
+    if (utxo) {
+      totalInputSats += utxo.valueSats;
+    } else {
+      inputsWithoutUtxo.push(index);
+    }
+  }
+
+  if (inputsWithoutUtxo.length > 0) {
+    return { kind: 'unknown', inputsWithoutUtxo };
+  }
+
+  return { kind: 'known', sats: totalInputSats - totalOutputSats };
 }
 
 function isBip322MessagePsbt(psbt: Psbt): boolean {
@@ -481,10 +512,10 @@ export function inspectBtcPsbt(psbtHex: string): BtcPsbtSummary {
     claimsChange: claimed.has(index),
   }));
 
-  let feeSats: number | undefined;
-  try {
-    feeSats = psbt.getFee();
-  } catch {}
+  const totalOutputSats = outputs.reduce(
+    (sum, output) => sum + output.valueSats,
+    0,
+  );
 
   return {
     requestType,
@@ -492,8 +523,8 @@ export function inspectBtcPsbt(psbtHex: string): BtcPsbtSummary {
     inputCount: psbt.inputCount,
     outputCount: psbt.txOutputs.length,
     outputs,
-    feeSats,
-    totalOutputSats: outputs.reduce((sum, output) => sum + output.valueSats, 0),
+    fee: summarizeFee(psbt, totalOutputSats),
+    totalOutputSats,
     bip322Address:
       requestType === 'bip322-message' && getInputUtxo(psbt, 0)
         ? decodeAddress(getInputUtxo(psbt, 0)!.script, network)
