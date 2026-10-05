@@ -27,6 +27,8 @@ AutoName: Keycard Pal
 
 RepoType: git
 Repo: https://github.com/mmlado/keycard-pal
+Binaries: https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-offline-release-universal.apk
+AllowedAPKSigningKeys: a83c114b1f4201dafbd03e221f1c2928ecb52b78bda5e93f296fedf2298e546b
 
 Builds:
   - versionName: 1.13.0
