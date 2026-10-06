@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The privacy policy now covers the websites: keycardpal.com and fdroid.keycardpal.com load nothing from third parties, set no cookies and run no analytics
+
 ### Fixed
 
 - On iOS the keyboard closes when the PIN pad comes up, instead of staying open over the digits after typing a recovery phrase or SLIP39 share
