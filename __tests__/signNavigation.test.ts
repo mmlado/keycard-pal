@@ -72,6 +72,7 @@ describe('buildSignKeycardParams', () => {
         inputCount: 1,
         outputCount: 1,
         outputs: [],
+        fee: { kind: 'known', sats: 0 },
         totalOutputSats: 0,
       },
     };

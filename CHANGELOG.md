@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - On iOS the keyboard closes when the PIN pad comes up, instead of staying open over the digits after typing a recovery phrase or SLIP39 share
 - iOS builds work with Xcode 27, which rejected two CocoaPods resource bundles still set to their pods' own deployment targets below iOS 15
+- The Bitcoin PSBT review shows the fee, which it never managed to before; when the PSBT leaves out how much an input holds, the review says the fee is unknown instead of leaving the row out
 
 ## [1.13.0] - 2026-09-28
 
