@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
-import { PAIRING_PASSWORD } from '@/constants/keycard';
+import { PAIRING_PASSWORD, PUK_LENGTH } from '@/constants/keycard';
 
 import { secureChannelVersion } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
@@ -14,12 +14,14 @@ import {
 } from './useNFCOperation';
 
 export type UseInitCardOperation = Omit<
-  UseNFCOperation<string>,
+  UseNFCOperation<void>,
   'start' | 'phase'
 > & {
   phase: KeycardPhase;
+  /** The PUK the card is set up with, shown once the tap has succeeded. */
+  puk: string;
   start: (pin: string, duressPin?: string | null) => void;
-  /** Accepts the card the warning is about and starts the tap that sets it up. */
+  /** The second tap, after the genuine warning. */
   proceedWithNonGenuine: () => void;
 };
 
@@ -28,7 +30,7 @@ export const UNVERIFIED_CARD_STATUS =
   'This Keycard could not be verified. Nothing was written to it.';
 
 function generatePUK(): string {
-  const bytes = new Uint8Array(12);
+  const bytes = new Uint8Array(PUK_LENGTH);
   crypto.getRandomValues(bytes);
   return Array.from(bytes)
     .map(b => b % 10)
@@ -38,6 +40,8 @@ function generatePUK(): string {
 export function useInitCard(): UseInitCardOperation {
   const pinRef = useRef('');
   const duressPinRef = useRef<string | null>(null);
+  // One per screen, so a retry sends the digits done will show.
+  const [puk] = useState(generatePUK);
 
   // A card with a certificate is judged before anything is written to it (ADR-0013).
   const [showGenuineWarning, setShowGenuineWarning] = useState(false);
@@ -64,7 +68,6 @@ export function useInitCard(): UseInitCardOperation {
             'This card is already set up. Use a blank card to initialize.',
           );
         }
-        const puk = generatePUK();
         const duressPin = duressPinRef.current || undefined;
 
         if (appInfo && secureChannelVersion(appInfo) === 'v2') {
@@ -74,7 +77,7 @@ export function useInitCard(): UseInitCardOperation {
             setShowGenuineWarning(true);
             throw new Error(UNVERIFIED_CARD_STATUS);
           }
-          // No pairing secret, and the SDK opens the channel inside init(). Needs the pinned SDK fix.
+          // No pairing on 4.0; the SDK opens the channel in init() (ADR-0008).
           setStatus('Initializing...');
           const resp = await cmdSet.init(
             pinRef.current,
@@ -93,9 +96,8 @@ export function useInitCard(): UseInitCardOperation {
 
         pinRef.current = '';
         duressPinRef.current = null;
-        return puk;
       },
-      [handshakeSucceeded],
+      [handshakeSucceeded, puk],
     ),
     // Mirrors InitCardScreen's done toast.
     { successMessage: 'Card initialized', whitelistedCardKeys },
@@ -139,5 +141,5 @@ export function useInitCard(): UseInitCardOperation {
   // The warning outranks the error the interrupted tap ended in.
   const phase: KeycardPhase = showGenuineWarning ? 'genuine_warning' : nfcPhase;
 
-  return { ...rest, phase, start, cancel, reset, proceedWithNonGenuine };
+  return { ...rest, phase, puk, start, cancel, reset, proceedWithNonGenuine };
 }

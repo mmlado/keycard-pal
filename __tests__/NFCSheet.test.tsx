@@ -118,6 +118,69 @@ describe('NFCSheet', () => {
     });
   });
 
+  // A blocked PIN would fail a retry the same way, so the unblock flow takes
+  // the primary button's place.
+  describe('Unblock PIN button', () => {
+    it('shows Unblock PIN instead of Try again when onUnblockPin is provided', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="blocked"
+          onCancel={onCancel}
+          retry={jest.fn()}
+          onUnblockPin={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('Unblock PIN')).toBeTruthy();
+      expect(screen.queryByText('Try again')).toBeNull();
+      expect(screen.queryByText('Tap your card to try again')).toBeNull();
+    });
+
+    it('calls onUnblockPin alone when pressed', () => {
+      const retry = jest.fn();
+      const onUnblockPin = jest.fn();
+      render(
+        <NFCSheet
+          variant="error"
+          status="blocked"
+          onCancel={onCancel}
+          retry={retry}
+          onUnblockPin={onUnblockPin}
+        />,
+      );
+      fireEvent.press(screen.getByText('Unblock PIN'));
+      expect(onUnblockPin).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('yields to Open NFC Settings', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="NFC off"
+          onCancel={onCancel}
+          openNFCSettings={jest.fn()}
+          onUnblockPin={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('Open NFC Settings')).toBeTruthy();
+      expect(screen.queryByText('Unblock PIN')).toBeNull();
+    });
+
+    it('does not show the button outside the error variant', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status="Tap"
+          onCancel={onCancel}
+          onUnblockPin={jest.fn()}
+        />,
+      );
+      expect(screen.queryByText('Unblock PIN')).toBeNull();
+    });
+  });
+
   describe('retry hint', () => {
     it('shows "Tap your card to try again" when variant is error and no retry is provided', () => {
       render(<NFCSheet variant="error" status="Bad MAC" onCancel={onCancel} />);

@@ -29,11 +29,9 @@ function makeKeycard(phase: string, result: unknown = null) {
   return { phase: phase as any, result, cancel: jest.fn() };
 }
 
-// React Navigation asks the screen that is about to go first: both reset() and
-// goBack() fire its beforeRemove listeners, and a listener that calls
-// preventDefault cancels the navigation. A bare jest.fn() never does that,
-// which is how a screen whose own back guard vetoed its own departure went
-// unnoticed. `left` records the navigations that survived.
+// reset() and goBack() ask the beforeRemove listeners first, as React
+// Navigation does; a bare jest.fn() cannot catch a screen vetoing its own
+// departure. `left` records what went through.
 function makeNavigationThatAsksFirst() {
   const listeners: ((e: { preventDefault: () => void }) => void)[] = [];
   const left = jest.fn();
@@ -382,6 +380,100 @@ describe('done navigation against a screen with its own back guard', () => {
   });
 });
 
+// done.hold: the screen stays on done; every way off it is the Dashboard reset.
+describe('held done', () => {
+  const options = {
+    title: 'T',
+    done: { toast: 'Card initialized', hold: true },
+  };
+  const dashboard = {
+    index: 0,
+    routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
+  };
+
+  it('does not navigate on done', () => {
+    const navigation = makeNavigation();
+    renderScreenHook({ ...options, keycard: makeKeycard('done'), navigation });
+    expect(navigation.reset).not.toHaveBeenCalled();
+  });
+
+  it('leave() resets to Dashboard with the toast, past the screen guard', () => {
+    const { navigation, left } = makeNavigationThatAsksFirst();
+    const onBeforeRemove = stepGuard();
+    const { result } = renderScreenHook({
+      ...options,
+      keycard: makeKeycard('done'),
+      navigation,
+      onBeforeRemove,
+    });
+    result.current.leave();
+    expect(left).toHaveBeenCalledWith(dashboard);
+    expect(onBeforeRemove).not.toHaveBeenCalled();
+  });
+
+  it('leave() computes the toast from the result', () => {
+    const navigation = makeNavigation();
+    const { result } = renderScreenHook({
+      keycard: makeKeycard('done', 'match'),
+      navigation,
+      title: 'T',
+      done: { toast: r => (r === 'match' ? 'Matches' : 'No'), hold: true },
+    });
+    result.current.leave();
+    expect(navigation.reset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routes: [{ name: 'Dashboard', params: { toast: 'Matches' } }],
+      }),
+    );
+  });
+
+  it('hardware back on the held screen leaves, not the screen fallback', () => {
+    const navigation = makeNavigation();
+    const onHardwareBack = jest.fn(() => true);
+    renderScreenHook({
+      ...options,
+      keycard: makeKeycard('done'),
+      navigation,
+      onHardwareBack,
+    });
+    expect(capturedBackHandler(backSpy)()).toBe(true);
+    expect(navigation.reset).toHaveBeenCalledWith(dashboard);
+    expect(onHardwareBack).not.toHaveBeenCalled();
+    expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  it('a back gesture on the held screen is turned into the Dashboard reset', () => {
+    const { navigation, left } = makeNavigationThatAsksFirst();
+    const onBeforeRemove = stepGuard();
+    renderScreenHook({
+      ...options,
+      keycard: makeKeycard('done'),
+      navigation,
+      onBeforeRemove,
+    });
+    // goBack asks the listeners like a swipe would; the hold answers with reset.
+    navigation.goBack();
+    expect(left).toHaveBeenCalledTimes(1);
+    expect(left).toHaveBeenCalledWith(dashboard);
+    expect(onBeforeRemove).not.toHaveBeenCalled();
+  });
+
+  it('holds only on done: a back press before the tap still reaches the screen', () => {
+    const navigation = makeNavigation();
+    const onBeforeRemove = jest.fn();
+    renderScreenHook({
+      ...options,
+      keycard: makeKeycard('idle'),
+      navigation,
+      onBeforeRemove,
+    });
+    const e = { preventDefault: jest.fn() };
+    capturedBeforeRemove(navigation)(e);
+    expect(onBeforeRemove).toHaveBeenCalledWith(e);
+    expect(navigation.reset).not.toHaveBeenCalled();
+  });
+});
+
 // Apple's sheet closes the session itself, so every case below runs with the
 // phase already back to 'idle'.
 describe("cancel from Apple's NFC sheet", () => {
@@ -502,7 +594,7 @@ describe('activeKeycard override', () => {
     result.current.onCancel();
     expect(activeKeycard.cancel).toHaveBeenCalledTimes(2);
 
-    // Done keyed on keycard (idle) — the active hook finishing must not navigate.
+    // Done keys on keycard (idle): the active hook finishing must not navigate.
     expect(navigation.reset).not.toHaveBeenCalled();
   });
 

@@ -4,6 +4,7 @@ import {
 } from 'keycard-sdk/dist/apdu-exception';
 
 import {
+  attemptsLeft,
   CARD_NOT_GENUINE_STATUS,
   cardErrorMessage,
   CONNECTION_NOT_PROTECTED_STATUS,
@@ -11,6 +12,17 @@ import {
   NO_CERTIFICATE_STATUS,
   selectFailureMessage,
 } from '../src/utils/keycardErrors';
+
+describe('attemptsLeft', () => {
+  it('counts one attempt in the singular', () => {
+    expect(attemptsLeft(1)).toBe('1 attempt left');
+  });
+
+  it('counts the rest in the plural', () => {
+    expect(attemptsLeft(2)).toBe('2 attempts left');
+    expect(attemptsLeft(4)).toBe('4 attempts left');
+  });
+});
 
 describe('isTagLostError', () => {
   describe('tag-lost messages (true)', () => {
@@ -51,7 +63,7 @@ describe('isTagLostError', () => {
       // Cause-erasing constants that fire for every apdu error.
       'CardIO Error: Error: Invalid APDUResponse',
       'CardIO Error: Error: Error sending command',
-      'Card is locked. Use Unblock Card option.',
+      "This Keycard's PIN is blocked. Unblock it with your PUK.",
     ])('%s', message => {
       expect(isTagLostError(new Error(message))).toBe(false);
     });

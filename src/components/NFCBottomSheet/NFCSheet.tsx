@@ -20,6 +20,8 @@ type Props = {
   /** Restarts the operation. After an error the bridge stops listening, so a re-tap emits nothing. */
   retry?: () => void;
   openNFCSettings?: () => void;
+  /** Takes the place of Try again, which could only fail the same way. */
+  onUnblockPin?: () => void;
   /** Exit for someone without a card. Shown only while the app is asking for one. */
   onBuyKeycard?: () => void;
 };
@@ -77,6 +79,7 @@ export default function NFCSheet({
   onCancel,
   retry,
   openNFCSettings,
+  onUnblockPin,
   onBuyKeycard,
 }: Props) {
   const showBuyKeycard =
@@ -113,7 +116,19 @@ export default function NFCSheet({
         {status}
       </Text>
 
-      {variant === 'error' && !openNFCSettings && retry && (
+      {variant === 'error' && !openNFCSettings && onUnblockPin && (
+        <Pressable
+          style={styles.settingsButton}
+          android_ripple={{ color: theme.colors.secondaryRipple }}
+          onPress={onUnblockPin}
+        >
+          <Text variant="labelLarge" style={styles.settingsText}>
+            Unblock PIN
+          </Text>
+        </Pressable>
+      )}
+
+      {variant === 'error' && !openNFCSettings && !onUnblockPin && retry && (
         <Pressable
           style={styles.settingsButton}
           android_ripple={{ color: theme.colors.secondaryRipple }}
@@ -125,7 +140,7 @@ export default function NFCSheet({
         </Pressable>
       )}
 
-      {variant === 'error' && !openNFCSettings && !retry && (
+      {variant === 'error' && !openNFCSettings && !onUnblockPin && !retry && (
         <Text variant="bodyMedium" style={styles.retryHint}>
           Tap your card to try again
         </Text>

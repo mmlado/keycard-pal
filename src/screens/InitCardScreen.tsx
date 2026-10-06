@@ -9,6 +9,7 @@ import theme from '../theme';
 import ConfirmPrompt from '../components/ConfirmPropmpt';
 import NFCBottomSheet from '../components/NFCBottomSheet';
 import PinPad from '../components/PinPad';
+import PukReview from '../components/PukReview';
 
 import { useInitCard } from '../hooks/keycard/useInitCard';
 import { useConfirmedEntry } from '../hooks/useConfirmedEntry';
@@ -28,7 +29,15 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   const mainPinRef = useRef('');
 
   const keycard = useInitCard();
-  const { phase, start } = keycard;
+  const { phase, puk, start } = keycard;
+
+  const startInit = useCallback(
+    (duressPin: string | null) => {
+      start(mainPinRef.current, duressPin);
+      mainPinRef.current = '';
+    },
+    [start],
+  );
 
   const pinSetup = useConfirmedEntry(pin => {
     mainPinRef.current = pin;
@@ -36,8 +45,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   });
 
   const duressSetup = useConfirmedEntry(pin => {
-    start(mainPinRef.current, pin);
-    mainPinRef.current = '';
+    startInit(pin);
   });
 
   const handleDuressYes = useCallback(() => {
@@ -45,9 +53,8 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   }, []);
 
   const handleDuressNo = useCallback(() => {
-    start(mainPinRef.current, null);
-    mainPinRef.current = '';
-  }, [start]);
+    startInit(null);
+  }, [startInit]);
 
   const onScreenBack = useCallback(() => {
     if (screenStep === 'pin_setup') {
@@ -64,18 +71,17 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
       return true;
     }
 
-    if (screenStep === 'duress_setup') {
-      const handled = duressSetup.goBack();
-      if (!handled) {
-        setScreenStep('duress_question');
-      }
-      return true;
+    const handled = duressSetup.goBack();
+    if (!handled) {
+      setScreenStep('duress_question');
     }
-
     return true;
   }, [screenStep, pinSetup, duressSetup, navigation]);
 
   const title = (() => {
+    if (phase === 'done') {
+      return 'Write down your PUK';
+    }
     if (screenStep === 'pin_setup') {
       return pinSetup.step === 'entry' ? 'Create a PIN' : 'Confirm your PIN';
     }
@@ -87,11 +93,12 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
       : 'Confirm duress PIN';
   })();
 
-  const { onCancel } = useKeycardScreen({
+  // Done stays for the PUK.
+  const { onCancel, leave } = useKeycardScreen({
     keycard,
     navigation,
     title,
-    done: { toast: 'Card initialized', requireResult: true },
+    done: { toast: 'Card initialized', hold: true },
     onHardwareBack: onScreenBack,
     onBeforeRemove: e => {
       if (screenStep === 'pin_setup' && pinSetup.step === 'confirm') {
@@ -148,7 +155,9 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
         />
       )}
 
-      <NFCBottomSheet nfc={keycard} onCancel={onCancel} showOnDone />
+      {phase === 'done' && <PukReview puk={puk} onDone={leave} />}
+
+      <NFCBottomSheet nfc={keycard} onCancel={onCancel} />
     </View>
   );
 }

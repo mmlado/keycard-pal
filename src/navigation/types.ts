@@ -48,6 +48,7 @@ export type RootStackParamList = {
   InitCard: undefined;
   SecretsMenu: undefined;
   ChangeSecret: { secretType: SecretType };
+  UnblockPin: undefined;
   QRScanner: undefined;
   TransactionDetail: { result: ScanResult; wcContext?: WCContext };
   Keycard: KeycardParams;
@@ -197,6 +198,11 @@ export type SecretsMenuScreenProps = NativeStackScreenProps<
 export type ChangeSecretScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'ChangeSecret'
+>;
+
+export type UnblockPinScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'UnblockPin'
 >;
 
 export type AboutScreenProps = NativeStackScreenProps<

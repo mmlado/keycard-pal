@@ -78,6 +78,11 @@ describe('SecretsMenuScreen', () => {
       expect(screen.getByText('Change PUK')).toBeTruthy();
     });
 
+    it('renders "Unblock PIN" entry', () => {
+      renderScreen();
+      expect(screen.getByText('Unblock PIN')).toBeTruthy();
+    });
+
     it('renders "Change Pairing Secret" entry', () => {
       renderScreen();
       expect(screen.getByText('Change Pairing Secret')).toBeTruthy();
@@ -85,7 +90,7 @@ describe('SecretsMenuScreen', () => {
 
     it('shows a leading icon on every row', () => {
       renderScreen();
-      for (const index of [0, 1, 2]) {
+      for (const index of [0, 1, 2, 3]) {
         expect(screen.getByTestId(`menu-icon-${index}`)).toBeTruthy();
       }
     });
@@ -97,7 +102,8 @@ describe('SecretsMenuScreen', () => {
       renderScreen();
       expect(screen.queryByTestId('menu-nfc-indicator-0')).toBeNull();
       expect(screen.queryByTestId('menu-nfc-indicator-1')).toBeNull();
-      expect(screen.getByTestId('menu-nfc-indicator-2')).toBeTruthy();
+      expect(screen.queryByTestId('menu-nfc-indicator-2')).toBeNull();
+      expect(screen.getByTestId('menu-nfc-indicator-3')).toBeTruthy();
     });
   });
 
@@ -118,6 +124,12 @@ describe('SecretsMenuScreen', () => {
       });
     });
 
+    it('navigates to UnblockPin', () => {
+      renderScreen();
+      fireEvent.press(screen.getByText('Unblock PIN'));
+      expect(navigation.navigate).toHaveBeenCalledWith('UnblockPin');
+    });
+
     it('navigates to ChangeSecret with pairing secretType', () => {
       renderScreen();
       fireEvent.press(screen.getByText('Change Pairing Secret'));
@@ -135,6 +147,7 @@ describe('SecretsMenuScreen', () => {
       expect(screen.queryByText('Change Pairing Secret')).toBeNull();
       expect(screen.getByText('Change PIN')).toBeTruthy();
       expect(screen.getByText('Change PUK')).toBeTruthy();
+      expect(screen.getByText('Unblock PIN')).toBeTruthy();
     });
 
     it('stays when 3.x cards are ticked', () => {

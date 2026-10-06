@@ -12,6 +12,8 @@ type Props = {
   status: string;
   retry?: () => void;
   openNFCSettings?: () => void;
+  /** Takes the place of Try again, which could only fail the same way. */
+  onUnblockPin?: () => void;
   onCancel: () => void;
   /** Quiet exit for someone who reached the tap prompt without owning a
    *  card (on iOS the system sheet times out into this overlay). */
@@ -23,6 +25,7 @@ export default function NFCError({
   status,
   retry,
   openNFCSettings,
+  onUnblockPin,
   onCancel,
   onBuyKeycard,
   paddingBottom = 24,
@@ -43,7 +46,14 @@ export default function NFCError({
           </Text>
         </Pressable>
       )}
-      {!openNFCSettings && retry && (
+      {!openNFCSettings && onUnblockPin && (
+        <Pressable style={styles.retryButton} onPress={onUnblockPin}>
+          <Text variant="labelLarge" style={styles.retryLabel}>
+            Unblock PIN
+          </Text>
+        </Pressable>
+      )}
+      {!openNFCSettings && !onUnblockPin && retry && (
         <Pressable style={styles.retryButton} onPress={retry}>
           <Text variant="labelLarge" style={styles.retryLabel}>
             Try again

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { navigationRef } from '@/navigation/navigationRef';
 import theme from '@/theme';
 
 import PinPad from '@/components/PinPad';
@@ -44,6 +45,8 @@ export type NFCOperation = {
   cardName?: string | null;
   cardFingerprint?: number | null;
   pinError?: string | null;
+  /** The error is a blocked PIN, so it offers the unblock flow instead of a retry. */
+  pinBlocked?: boolean;
   submitPin?: (pin: string) => void;
   pairingPasswordError?: string | null;
   submitPairingPassword?: (password: string) => void;
@@ -74,6 +77,7 @@ export default function NFCBottomSheet({
     cardName,
     cardFingerprint,
     pinError,
+    pinBlocked,
     submitPin,
     pairingPasswordError,
     submitPairingPassword,
@@ -100,6 +104,15 @@ export default function NFCBottomSheet({
     (cardPresence === undefined || cardPresence === 'waiting')
       ? handleBuyKeycard
       : undefined;
+
+  // Leaves the way Cancel does, then opens the flow the error points at.
+  const handleUnblockPin = useCallback(() => {
+    onCancel();
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('UnblockPin');
+    }
+  }, [onCancel]);
+  const onUnblockPin = pinBlocked ? handleUnblockPin : undefined;
 
   const showPinPad = phase === 'pin_entry';
   const showGenuineWarning = phase === 'genuine_warning';
@@ -217,6 +230,7 @@ export default function NFCBottomSheet({
           status={status}
           retry={retry}
           openNFCSettings={openNFCSettings}
+          onUnblockPin={onUnblockPin}
           onCancel={onCancel}
           onBuyKeycard={onBuyKeycard}
           paddingBottom={insets.bottom + 24}
@@ -261,6 +275,7 @@ export default function NFCBottomSheet({
                 onCancel={onCancel}
                 retry={retry}
                 openNFCSettings={openNFCSettings}
+                onUnblockPin={onUnblockPin}
                 onBuyKeycard={onBuyKeycard}
               />
             </Animated.View>

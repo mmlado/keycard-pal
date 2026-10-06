@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - A personal_sign request shows its message as text on a Message tab, or as hex when the bytes are not UTF-8, and its ERC-191 Digest on a Digests tab with the same explanation and ERC-8213 link as the other digests
+- Unblock PIN, under Keycard > Secrets and offered on the blocked-PIN error in place of Try again: set a new PIN, enter the card's PUK and tap
 
 ### Changed
 
@@ -19,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - On iOS the keyboard closes when the PIN pad comes up, instead of staying open over the digits after typing a recovery phrase or SLIP39 share
 - iOS builds work with Xcode 27, which rejected two CocoaPods resource bundles still set to their pods' own deployment targets below iOS 15
 - The Bitcoin PSBT review shows the fee, which it never managed to before; when the PSBT leaves out how much an input holds, the review says the fee is unknown instead of leaving the row out
+- Initializing a card now shows its PUK once the card is set up, behind a reveal, where earlier versions discarded it and left the card impossible to unblock after three wrong PINs
+- The blocked-PIN error no longer names an "Unblock Card option" the app did not have
+- "1 attempt left" is no longer written as "1 attempts left"
 
 ## [1.13.0] - 2026-09-28
 
