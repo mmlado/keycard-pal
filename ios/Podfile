@@ -31,11 +31,17 @@ target 'KeycardPal' do
       # :ccache_enabled => true
     )
 
+    minimum_ios = Gem::Version.new(min_ios_version_supported)
     installer.pods_project.targets.each do |target|
-      next unless target.name == 'fmt'
-
       target.build_configurations.each do |build_configuration|
-        build_configuration.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        settings = build_configuration.build_settings
+        settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17' if target.name == 'fmt'
+
+        # CocoaPods leaves resource bundles at the pod's own minimum, which Xcode 27 rejects below 15.0.
+        deployment_target = settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if deployment_target && Gem::Version.new(deployment_target) < minimum_ios
+          settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
+        end
       end
     end
   end
