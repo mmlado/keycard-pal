@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - On iOS the keyboard closes when the PIN pad comes up, instead of staying open over the digits after typing a recovery phrase or SLIP39 share
+- iOS builds work with Xcode 27, which rejected two CocoaPods resource bundles still set to their pods' own deployment targets below iOS 15
 
 ## [1.13.0] - 2026-09-28
 
