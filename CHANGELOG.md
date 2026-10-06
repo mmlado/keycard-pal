@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- A personal_sign request shows its message as text on a Message tab, or as hex when the bytes are not UTF-8, and its ERC-191 Digest on a Digests tab with the same explanation and ERC-8213 link as the other digests
+
 ### Changed
 
 - The privacy policy now covers the websites: keycardpal.com and fdroid.keycardpal.com load nothing from third parties, set no cookies and run no analytics
