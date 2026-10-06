@@ -1,29 +1,28 @@
 # Draft fdroiddata recipe for the FULL flavor, application id com.keycardpal.
 # In a fork of https://gitlab.com/fdroid/fdroiddata it goes to metadata/com.keycardpal.yml.
 # Same repo, commit and scanner rules as fdroiddata-com.keycardpal.offline.yml; only the
-# flavor, the output, the Ads wording and NonFreeNet differ. The first release it can build
-# is the one carrying the WalletConnect pin (#317). Remove all comments before submitting.
+# flavor, the output, the Ads wording and NonFreeNet differ.
+# `commit:` holds the release tag because scripts/bump-version.js rewrites it on every
+# bump. A submitted recipe needs the full hash of the tagged commit, never the tag.
+# Remove all comments before submitting.
 
 AntiFeatures:
   Ads:
     en-US: Buy a Keycard entries open an affiliate link to the Keycard shop, and the
       developer earns a commission on purchases made through it.
   NonFreeNet:
-    en-US: Optional features, all disabled by default, connect to network services that
-      are not free software. WalletConnect uses the Reown relay with a project ID you
-      provide yourself, transaction simulation uses Tenderly with an API key you provide
-      yourself, ENS names are looked up through a public Ethereum RPC endpoint you can
-      change, and token images are downloaded from CoinGecko, GitHub and CoinMarketCap.
-      Signing by QR code works without any of them.
+    en-US: Optional features, all disabled by default, connect to network services
+      that are not free software. WalletConnect uses the Reown relay with a project
+      ID you provide yourself, transaction simulation uses Tenderly with an API key
+      you provide yourself, ENS names are looked up through a public Ethereum RPC
+      endpoint you can change, and token images are downloaded from CoinGecko, GitHub
+      and CoinMarketCap. Signing by QR code works without any of them.
 Categories:
   - Security
   - Wallet
-
 License: MIT
-
 AuthorName: Mladen Milankovic
 AuthorWebSite: https://github.com/mmlado
-
 SourceCode: https://github.com/mmlado/keycard-pal
 IssueTracker: https://github.com/mmlado/keycard-pal/issues
 Changelog: https://github.com/mmlado/keycard-pal/blob/HEAD/CHANGELOG.md
@@ -34,6 +33,8 @@ AutoName: Keycard Pal
 
 RepoType: git
 Repo: https://github.com/mmlado/keycard-pal
+Binaries:
+  https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-full-release-universal.apk
 
 Builds:
   - versionName: 1.13.0
@@ -41,27 +42,21 @@ Builds:
     commit: v1.13.0
     subdir: android/app
     sudo:
-      - apt-get update
-      - curl -Lo node.tar.gz https://nodejs.org/dist/v22.22.2/node-v22.22.2-linux-x64.tar.gz
-      - echo "978978a635eef872fa68beae09f0aad0bbbae6757e444da80b570964a97e62a3 node.tar.gz"
-        | sha256sum -c -
-      - tar xzf node.tar.gz --strip-components=1 -C /usr/local/
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
       - echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list
       - apt-get update
+      - apt-get install -y -t forky npm
+      - sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
       - apt-get install -y -t bookworm openjdk-17-jdk-headless
       - update-java-alternatives -s java-1.17.0-openjdk-amd64
     init:
       - cd ../..
-      - npm ci
+      - npm ci --allow-git=all
     gradle:
       - full
     output: build/outputs/apk/full/release/keycard-pal-full-release-universal.apk
     rm:
       - ios
-    prebuild:
-      # Dead local Maven repo (async-storage 3.x dropped it). Drop this line once a
-      # release carries the android/build.gradle cleanup.
-      - sed -i -e '/^allprojects {/,/^}/d' ../build.gradle
     scanignore:
       # Hermes compiler: official prebuilt allowed by the Inclusion Policy.
       - node_modules/hermes-compiler/hermesc/linux64-bin/hermesc
@@ -78,6 +73,8 @@ Builds:
     ndk: r27b
     gradleprops:
       - reactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+AllowedAPKSigningKeys: a83c114b1f4201dafbd03e221f1c2928ecb52b78bda5e93f296fedf2298e546b
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

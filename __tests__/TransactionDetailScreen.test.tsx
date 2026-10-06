@@ -456,6 +456,62 @@ describe('TransactionDetailScreen – crypto-psbt result', () => {
     expect(screen.getByText('Bitcoin PSBT')).toBeTruthy();
   });
 
+  it('shows the fee of a PSBT whose input carries its UTXO', async () => {
+    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const psbt = new Psbt({ network: networks.testnet });
+    const { output } = payments.p2wpkh({
+      pubkey: Buffer.alloc(33, 0x02),
+      network: networks.testnet,
+    });
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xaa),
+      index: 0,
+      witnessUtxo: { script: output!, value: 100_000 },
+    });
+    psbt.addOutput({ script: output!, value: 99_577 });
+
+    renderScreen(psbtResult(psbt.toBuffer().toString('hex')));
+    expect(screen.getByText('Fee')).toBeTruthy();
+    expect(screen.getByText('423 sats')).toBeTruthy();
+  });
+
+  it('says the fee is unknown when an input carries no UTXO', async () => {
+    renderScreen(psbtResult(VALID_PSBT_HEX));
+    expect(screen.getByText('Fee')).toBeTruthy();
+    expect(screen.getByText('Unknown')).toBeTruthy();
+    expect(
+      screen.getByText(/does not say how much input 1 holds/),
+    ).toBeTruthy();
+  });
+
+  it('names every input whose value is missing', async () => {
+    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const psbt = new Psbt({ network: networks.testnet });
+    const pubkey = Buffer.alloc(33, 0x02);
+    const { output } = payments.p2wpkh({ pubkey, network: networks.testnet });
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xaa),
+      index: 0,
+      witnessUtxo: { script: output!, value: 100_000 },
+      bip32Derivation: [
+        {
+          masterFingerprint: Buffer.from([0xde, 0xad, 0xbe, 0xef]),
+          path: "m/84'/1'/0'/0/0",
+          pubkey,
+        },
+      ],
+    });
+    psbt.addInput({ hash: Buffer.alloc(32, 0xab), index: 0 });
+    psbt.addInput({ hash: Buffer.alloc(32, 0xac), index: 0 });
+    psbt.addOutput({ script: output!, value: 90_000 });
+
+    renderScreen(psbtResult(psbt.toBuffer().toString('hex')));
+    expect(screen.getByText('Unknown')).toBeTruthy();
+    expect(
+      screen.getByText(/does not say how much inputs 2 and 3 hold,/),
+    ).toBeTruthy();
+  });
+
   it('shows BIP-322 requests as message signing', async () => {
     renderScreen(psbtResult(BIP322_PSBT_HEX));
     expect(screen.getByText('Bitcoin Message')).toBeTruthy();

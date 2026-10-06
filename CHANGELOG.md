@@ -10,6 +10,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A personal_sign request shows its message as text on a Message tab, or as hex when the bytes are not UTF-8, and its ERC-191 Digest on a Digests tab with the same explanation and ERC-8213 link as the other digests
 
+### Changed
+
+- The privacy policy now covers the websites: keycardpal.com and fdroid.keycardpal.com load nothing from third parties, set no cookies and run no analytics
+
+### Fixed
+
+- On iOS the keyboard closes when the PIN pad comes up, instead of staying open over the digits after typing a recovery phrase or SLIP39 share
+- iOS builds work with Xcode 27, which rejected two CocoaPods resource bundles still set to their pods' own deployment targets below iOS 15
+- The Bitcoin PSBT review shows the fee, which it never managed to before; when the PSBT leaves out how much an input holds, the review says the fee is unknown instead of leaving the row out
+
 ## [1.13.0] - 2026-09-28
 
 ### Added
