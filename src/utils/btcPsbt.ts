@@ -205,6 +205,13 @@ function getInputUtxo(
     return undefined;
   }
 
+  if (input.nonWitnessUtxo) {
+    const prevout = nonWitnessPrevout(psbt, index);
+    return prevout
+      ? { script: prevout.script, valueSats: prevout.value }
+      : undefined;
+  }
+
   if (input.witnessUtxo) {
     return {
       script: input.witnessUtxo.script,
@@ -212,20 +219,57 @@ function getInputUtxo(
     };
   }
 
-  if (input.nonWitnessUtxo) {
-    const prevTx = Transaction.fromBuffer(input.nonWitnessUtxo).outs;
-    const prevout = prevTx[psbt.txInputs[index]?.index ?? -1];
-    if (!prevout) {
-      return undefined;
-    }
+  return undefined;
+}
 
-    return {
-      script: prevout.script,
-      valueSats: prevout.value,
-    };
+function nonWitnessPrevout(
+  psbt: Psbt,
+  index: number,
+): { script: Buffer; value: number } | undefined {
+  const nonWitnessUtxo = psbt.data.inputs[index]?.nonWitnessUtxo;
+  const txInput = psbt.txInputs[index];
+  if (!nonWitnessUtxo || !txInput) {
+    return undefined;
   }
 
-  return undefined;
+  const prevTx = Transaction.fromBuffer(nonWitnessUtxo);
+  return prevTx.getHash().equals(txInput.hash)
+    ? prevTx.outs[txInput.index]
+    : undefined;
+}
+
+// bitcoinjs hashes an input against its non-witness record whenever one is
+// present, so the review reads the same record. A previous transaction that
+// does not hold the output the input spends, or a witness record that
+// disagrees with it, would put one amount on the review and another under
+// the signature. No honest wallet produces either, so neither gets a review.
+function assertInputUtxosAgree(psbt: Psbt): void {
+  for (const [index, input] of psbt.data.inputs.entries()) {
+    if (!input.nonWitnessUtxo) {
+      continue;
+    }
+
+    const prevout = nonWitnessPrevout(psbt, index);
+    if (!prevout) {
+      throw new BtcPsbtRefusedError(
+        `Input ${index + 1} comes with a previous transaction that does not ` +
+          'contain the output it spends, so what the input holds cannot be ' +
+          'read off this PSBT.',
+      );
+    }
+
+    if (
+      input.witnessUtxo &&
+      (input.witnessUtxo.value !== prevout.value ||
+        !input.witnessUtxo.script.equals(prevout.script))
+    ) {
+      throw new BtcPsbtRefusedError(
+        `Input ${index + 1} carries two records of the output it spends, ` +
+          'and they disagree about its value or script. The amount on the ' +
+          'review would not be the amount the signature commits to.',
+      );
+    }
+  }
 }
 
 // Not psbt.getFee(): bitcoinjs computes a fee only for a finalized PSBT, and
@@ -497,6 +541,7 @@ export function parseCryptoPsbtRequest(cbor: Buffer): { psbtHex: string } {
 export function inspectBtcPsbt(psbtHex: string): BtcPsbtSummary {
   const psbt = toPsbt(psbtHex);
   assertSighashTypesAreSignable(psbt);
+  assertInputUtxosAgree(psbt);
 
   const requestType = isBip322MessagePsbt(psbt)
     ? 'bip322-message'
@@ -542,6 +587,7 @@ export class BtcSigningSession {
     // Closes the gap the allow-list leaves: bitcoinjs reads an explicit
     // SIGHASH_DEFAULT on a non-Taproot input as SIGHASH_ALL and lets it pass.
     assertSighashTypesAreSignable(this.psbt);
+    assertInputUtxosAgree(this.psbt);
     this.network = inferNetwork(this.psbt);
   }
 

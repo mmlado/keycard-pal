@@ -246,6 +246,54 @@ function psbtSpending(
   return psbt.toBuffer().toString('hex');
 }
 
+// One input spending output 0 of a previous transaction that holds `held`
+// sats, carried as the input's non-witness record. The knobs add a witness
+// record claiming `witnessValue`, or swap the previous transaction for one
+// the input does not spend.
+function psbtWithUtxoRecords({
+  held = 100_000,
+  witnessValue,
+  previousTxSpent = true,
+}: {
+  held?: number;
+  witnessValue?: number;
+  previousTxSpent?: boolean;
+} = {}): string {
+  const { Psbt, Transaction, payments, networks } = require('bitcoinjs-lib');
+  const { output } = payments.p2wpkh({
+    pubkey: CARD_PUBKEY,
+    network: networks.testnet,
+  });
+
+  const prevTx = new Transaction();
+  prevTx.addInput(Buffer.alloc(32, 0x01), 0);
+  prevTx.addOutput(output!, held);
+
+  const otherTx = new Transaction();
+  otherTx.addInput(Buffer.alloc(32, 0x02), 0);
+  otherTx.addOutput(output!, held);
+
+  const psbt = new Psbt({ network: networks.testnet });
+  psbt.addInput({
+    hash: prevTx.getHash(),
+    index: 0,
+    nonWitnessUtxo: (previousTxSpent ? prevTx : otherTx).toBuffer(),
+    ...(witnessValue === undefined
+      ? {}
+      : { witnessUtxo: { script: output!, value: witnessValue } }),
+    bip32Derivation: [
+      {
+        masterFingerprint: CARD_FINGERPRINT,
+        path: "m/84'/1'/0'/0/0",
+        pubkey: CARD_PUBKEY,
+      },
+    ],
+  });
+  psbt.addOutput({ script: output!, value: 90_000 });
+
+  return psbt.toBuffer().toString('hex');
+}
+
 // One spendable input per entry; undefined leaves PSBT_IN_SIGHASH_TYPE off.
 function psbtWithSighashTypes(sighashTypes: Array<number | undefined>): string {
   const { Psbt, payments, networks } = require('bitcoinjs-lib');
@@ -463,6 +511,35 @@ describe('inspectBtcPsbt fee', () => {
       kind: 'unknown',
       inputsWithoutUtxo: [1, 2],
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// inspectBtcPsbt – UTXO records
+// ---------------------------------------------------------------------------
+
+describe('inspectBtcPsbt UTXO records', () => {
+  it('reads the fee off the non-witness record when the witness record agrees', () => {
+    const summary = inspectBtcPsbt(
+      psbtWithUtxoRecords({ witnessValue: 100_000 }),
+    );
+    expect(summary.fee).toEqual({ kind: 'known', sats: 10_000 });
+  });
+
+  it('refuses an input whose two records disagree about its value', () => {
+    const hex = psbtWithUtxoRecords({ witnessValue: 90_423 });
+    expect(() => inspectBtcPsbt(hex)).toThrow(BtcPsbtRefusedError);
+    expect(() => inspectBtcPsbt(hex)).toThrow(
+      'Input 1 carries two records of the output it spends',
+    );
+  });
+
+  it('refuses an input whose previous transaction is not the one it spends', () => {
+    const hex = psbtWithUtxoRecords({ previousTxSpent: false });
+    expect(() => inspectBtcPsbt(hex)).toThrow(BtcPsbtRefusedError);
+    expect(() => inspectBtcPsbt(hex)).toThrow(
+      'Input 1 comes with a previous transaction that does not contain the output it spends',
+    );
   });
 });
 
@@ -846,6 +923,13 @@ describe('BtcSigningSession', () => {
       expect(cmdSet.signWithPath).not.toHaveBeenCalled();
     },
   );
+
+  it('refuses a PSBT whose input records disagree instead of signing it', () => {
+    expect(
+      () => new BtcSigningSession(psbtWithUtxoRecords({ witnessValue: 1 })),
+    ).toThrow(BtcPsbtRefusedError);
+    expect(cmdSet.signWithPath).not.toHaveBeenCalled();
+  });
 
   it('signs once the card confirms the output marked as change is its own', async () => {
     const session = new BtcSigningSession(psbtWithChangeClaim());
