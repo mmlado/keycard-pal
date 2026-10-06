@@ -12,6 +12,13 @@ export const CALLDATA_DIGEST_EXPLAINER =
   'Compare it with the digest shown by the app that created the request: if ' +
   'they match, the calldata is unchanged.';
 
+export const ERC191_DIGEST_EXPLAINER =
+  'A digest is a short fingerprint of what you are about to sign. This one ' +
+  'is the 32-byte value your Keycard signs: the message hashed behind the ' +
+  '"Ethereum Signed Message" prefix, which stops the signature from passing ' +
+  'as a transaction. Compare it with the digest shown by the app that ' +
+  'created the request: if they match, you are signing what it asked for.';
+
 export const EIP712_DIGEST_EXPLAINER =
   'A digest is a short fingerprint of what you are about to sign. This one ' +
   'is the 32-byte value your Keycard signs. Compare it with the digest shown ' +

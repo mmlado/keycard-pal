@@ -3,6 +3,7 @@ import {
   Animated,
   BackHandler,
   Dimensions,
+  Keyboard,
   Modal,
   Platform,
   StyleSheet,
@@ -135,6 +136,9 @@ export default function NFCBottomSheet({
 
   useEffect(() => {
     if (showPinPad) {
+      // The pad is an overlay in the screen's own view tree, not a Modal, so a
+      // text field under it keeps focus and iOS keeps the keyboard up over the pad.
+      Keyboard.dismiss();
       setPinMounted(true);
       Animated.timing(pinSlide, {
         toValue: 0,

@@ -1,4 +1,4 @@
-import { concat, keccak256, pad, toHex } from 'viem';
+import { concat, keccak256, pad, stringToBytes, toHex } from 'viem';
 import type { TypedData, TypedDataDomain } from 'viem';
 
 import { hashTypedData } from 'viem';
@@ -23,6 +23,15 @@ export function computeCalldataDigest(calldataHex: string): string | null {
   } catch {
     return null;
   }
+}
+
+// ERC-8213: ERC-191 Digest for version 0x45 (personal_sign)
+// digest = keccak256("\x19Ethereum Signed Message:\n" || len(message) || message)
+export function computeErc191Digest(message: Uint8Array): string {
+  const prefix = stringToBytes(
+    `\x19Ethereum Signed Message:\n${message.length}`,
+  );
+  return keccak256(concat([prefix, message]));
 }
 
 // ERC-8213: EIP-712 Digest from full typed-data JSON

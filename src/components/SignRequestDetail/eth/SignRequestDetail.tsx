@@ -9,6 +9,7 @@ import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
 import Eip712JsonPanel from './DataTabPanel/Eip712JsonPanel';
 import Eip712PrehashedPanel from './DataTabPanel/Eip712PrehashedPanel';
 import InfoRow from '@/components/InfoRow';
+import PersonalMessagePanel from './DataTabPanel/PersonalMessagePanel';
 import TxDataPanel from './DataTabPanel/TxDataPanel';
 
 import { getChainName, getNativeCurrencySymbol } from '@/utils/chainMetadata';
@@ -126,8 +127,10 @@ export default function SignRequestDetail({
         />
       ) : tx ? (
         <TxDataPanel tx={tx} request={request} chainId={request.chainId} />
+      ) : payload.kind === 'personal-message' ? (
+        <PersonalMessagePanel message={payload} request={request} />
       ) : (
-        // Pure ETH transfer, personal sign, unknown/invalid types
+        // Pure ETH transfer, unknown/invalid types
         <View style={styles.row}>
           <InfoRow label="Data" value={request.signData} />
         </View>

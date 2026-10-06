@@ -9,6 +9,7 @@ import {
 import {
   computeEip712DigestFromJson,
   computeEip712DigestFromPrehashed,
+  computeErc191Digest,
 } from './erc8213';
 
 /**
@@ -27,7 +28,7 @@ export type EthPayload =
   | { kind: 'tx-legacy'; raw: Uint8Array }
   | { kind: 'tx-eip2930'; raw: Uint8Array }
   | { kind: 'tx-eip1559'; raw: Uint8Array }
-  | { kind: 'personal-message'; raw: Uint8Array }
+  | { kind: 'personal-message'; raw: Uint8Array; digest: string }
   | { kind: 'eip712-json'; typedData: Eip712RawTypedData; digest: string }
   | { kind: 'eip712-prehashed'; prehashed: Eip712Prehashed; digest: string }
   | { kind: 'raw-digest'; digest: string }
@@ -81,7 +82,7 @@ export function classifyEthPayload(
   }
 
   if (dataType === 3) {
-    return { kind: 'personal-message', raw };
+    return { kind: 'personal-message', raw, digest: computeErc191Digest(raw) };
   }
 
   if (dataType === 2) {
@@ -141,15 +142,7 @@ export function signingDigest(payload: EthPayload): Uint8Array {
     case 'tx-eip2930':
     case 'tx-eip1559':
       return keccak_256(payload.raw);
-    case 'personal-message': {
-      // EIP-191: keccak256("\x19Ethereum Signed Message:\n{len}{message}")
-      const prefix = `\x19Ethereum Signed Message:\n${payload.raw.length}`;
-      const prefixBytes = new TextEncoder().encode(prefix);
-      const combined = new Uint8Array(prefixBytes.length + payload.raw.length);
-      combined.set(prefixBytes);
-      combined.set(payload.raw, prefixBytes.length);
-      return keccak_256(combined);
-    }
+    case 'personal-message':
     case 'eip712-json':
     case 'eip712-prehashed':
     case 'raw-digest':

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Linking, Platform, StyleSheet } from 'react-native';
+import { Keyboard, Linking, Platform, StyleSheet } from 'react-native';
 import {
   act,
   render,
@@ -465,6 +465,22 @@ describe('NFCBottomSheet — Android sheet', () => {
       const submitPin = jest.fn();
       renderSheet(makeNfc('pin_entry', { submitPin }));
       expect(screen.queryByLabelText('Go back')).toBeNull();
+    });
+
+    // The pad is not a Modal, so the recovery phrase field under it keeps focus
+    // and iOS keeps the keyboard up over the digits unless the pad dismisses it.
+    it('dismisses the keyboard when the pad comes up', () => {
+      const dismiss = jest.spyOn(Keyboard, 'dismiss');
+      const { rerender } = renderSheet(makeNfc('nfc'));
+      expect(dismiss).not.toHaveBeenCalled();
+
+      rerender(
+        <NFCBottomSheet
+          nfc={makeNfc('pin_entry', { submitPin: jest.fn() })}
+          onCancel={onCancel}
+        />,
+      );
+      expect(dismiss).toHaveBeenCalledTimes(1);
     });
 
     // #282: the overlay pads for the navigation bar itself.
