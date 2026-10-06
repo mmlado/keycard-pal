@@ -8,7 +8,7 @@ import {
 import { filler, v4Select } from './selectResponse.testUtils';
 
 // ---------------------------------------------------------------------------
-// RNKeycard mock — captures event callbacks so tests can trigger them
+// RNKeycard mock: captures the event callbacks so tests can fire them
 // ---------------------------------------------------------------------------
 
 let capturedOnConnected: ((...args: any[]) => Promise<void>) | null = null;
@@ -115,7 +115,7 @@ describe('useInitCard', () => {
       expect(result.current.result).toBeNull();
     });
 
-    // Shown and written down before any tap (ADR-0007).
+    // One PUK per screen: sent on every tap, shown once one succeeds.
     it('holds a 12-digit PUK from the start', () => {
       const { result } = renderHook(() => useInitCard());
       expect(result.current.puk).toMatch(/^\d{12}$/);

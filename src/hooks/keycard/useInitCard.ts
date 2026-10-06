@@ -18,13 +18,10 @@ export type UseInitCardOperation = Omit<
   'start' | 'phase'
 > & {
   phase: KeycardPhase;
-  /**
-   * The PUK the card will be set up with. Shown before the tap, so a tap that
-   * commits INIT and then loses the card leaves the user holding it (ADR-0007).
-   */
+  /** The PUK the card is set up with, shown once the tap has succeeded. */
   puk: string;
   start: (pin: string, duressPin?: string | null) => void;
-  /** Accepts the card the warning is about and starts the tap that sets it up. */
+  /** The second tap, after the genuine warning. */
   proceedWithNonGenuine: () => void;
 };
 
@@ -43,7 +40,7 @@ function generatePUK(): string {
 export function useInitCard(): UseInitCardOperation {
   const pinRef = useRef('');
   const duressPinRef = useRef<string | null>(null);
-  // One PUK per screen: a retry after a failed tap sends the digits already written down.
+  // One per screen, so a retry sends the digits done will show.
   const [puk] = useState(generatePUK);
 
   // A card with a certificate is judged before anything is written to it (ADR-0013).
@@ -80,7 +77,7 @@ export function useInitCard(): UseInitCardOperation {
             setShowGenuineWarning(true);
             throw new Error(UNVERIFIED_CARD_STATUS);
           }
-          // No pairing secret, and the SDK opens the channel inside init(). Needs the pinned SDK fix.
+          // No pairing on 4.0; the SDK opens the channel in init() (ADR-0008).
           setStatus('Initializing...');
           const resp = await cmdSet.init(
             pinRef.current,

@@ -38,13 +38,12 @@ export type UseKeycardScreenOptions = {
   /** When set, phase 'done' resets to Dashboard with this toast. */
   done?: {
     toast: string | ((result: unknown) => string);
-    /** Skip navigation while result is null/undefined (e.g. useInitCard). */
+    /** Skip navigation while result is null. */
     requireResult?: boolean;
+    /** The screen shows more after the tap and calls leave() itself. */
+    hold?: boolean;
   };
-  /**
-   * Drives the back guard, the PIN-entry title, and onCancel when a screen
-   * runs more than one keycard hook (see Slip39Screen). Defaults to keycard.
-   */
+  /** The hook the guard, PIN title and onCancel follow when there are two. */
   activeKeycard?: KeycardScreenKeycard;
   /** Hardware-back fallback once the keycard guard passes; BackHandler semantics. */
   onHardwareBack?: () => boolean;
@@ -54,49 +53,48 @@ export type UseKeycardScreenOptions = {
   stayOnCancel?: boolean;
 };
 
-/**
- * The shared phase-to-navigation adapter for screens that run a Keycard
- * operation: done → reset to Dashboard with a toast, back-press during an
- * active tap → cancel the NFC session first, PIN entry → header title.
- * Screens keep only their entry UI and step machines.
- */
+/** Done, back and the PIN-entry title for every Keycard screen, in one place. */
 export function useKeycardScreen(options: UseKeycardScreenOptions): {
   onCancel: () => void;
+  /** Dashboard with the done toast. */
+  leave: () => void;
 } {
   const { navigation } = options;
   const { phase, result } = options.keycard;
   const active = options.activeKeycard ?? options.keycard;
 
-  // Latest-value refs so the back listeners never go stale and never
-  // re-subscribe mid-gesture.
+  // Refs, so the back listeners never re-subscribe mid-gesture.
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const activeRef = useRef(active);
   activeRef.current = active;
-  // Raised just before this hook takes the screen off itself, because the
-  // operation is done or because the user cancelled Apple's NFC sheet.
-  // React Navigation asks the screen being removed first (beforeRemove),
-  // and a screen's own back guard cannot tell that from a back press: it would
-  // veto the navigation and step its entry form back instead, leaving the user
-  // on a finished screen under a success sheet that has no Cancel.
+  // Set before this hook navigates: beforeRemove fires for reset too, and the
+  // screen's back guard would veto it and step its form back.
   const leavingRef = useRef(false);
 
-  useEffect(() => {
-    const done = optionsRef.current.done;
-    if (!done || phase !== 'done') {
-      return;
-    }
-    if (done.requireResult && result == null) {
-      return;
-    }
+  const leave = useCallback(() => {
+    const { done, keycard } = optionsRef.current;
     const toast =
-      typeof done.toast === 'function' ? done.toast(result) : done.toast;
+      typeof done?.toast === 'function'
+        ? done.toast(keycard.result)
+        : done?.toast;
     leavingRef.current = true;
     navigation.reset({
       index: 0,
       routes: [{ name: 'Dashboard', params: { toast } }],
     });
-  }, [phase, result, navigation]);
+  }, [navigation]);
+
+  useEffect(() => {
+    const done = optionsRef.current.done;
+    if (!done || done.hold || phase !== 'done') {
+      return;
+    }
+    if (done.requireResult && result == null) {
+      return;
+    }
+    leave();
+  }, [phase, result, leave]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -112,6 +110,12 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
     return activePhase === 'nfc' || activePhase === 'pin_entry';
   }, []);
 
+  // A held done screen has nothing behind it: back means leave.
+  const heldDone = useCallback(() => {
+    const { done, keycard } = optionsRef.current;
+    return done?.hold === true && keycard.phase === 'done';
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -120,10 +124,14 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
           navigation.goBack();
           return true;
         }
+        if (heldDone()) {
+          leave();
+          return true;
+        }
         return optionsRef.current.onHardwareBack?.() ?? false;
       });
       return () => sub.remove();
-    }, [keycardBusy, navigation]),
+    }, [keycardBusy, heldDone, leave, navigation]),
   );
 
   useEffect(() => {
@@ -135,10 +143,15 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
         activeRef.current.cancel();
         return;
       }
+      if (heldDone()) {
+        e.preventDefault();
+        leave();
+        return;
+      }
       optionsRef.current.onBeforeRemove?.(e);
     });
     return unsubscribe;
-  }, [navigation, keycardBusy]);
+  }, [navigation, keycardBusy, heldDone, leave]);
 
   const onCancel = useCallback(() => {
     activeRef.current.cancel();
@@ -157,13 +170,12 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
     if (userCancels <= seen) {
       return;
     }
-    // The session is back to 'idle' already, so the back guard below would read
-    // the screen as idle and step its form back instead of leaving.
+    // Phase is already 'idle'; the back guard would step the form back.
     if (!optionsRef.current.stayOnCancel) {
       leavingRef.current = true;
     }
     onCancel();
   }, [userCancels, onCancel]);
 
-  return { onCancel };
+  return { onCancel, leave };
 }

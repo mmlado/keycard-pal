@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { BackHandler } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import InitCardScreen, { dashboardEntry } from '../src/screens/InitCardScreen';
@@ -28,16 +29,15 @@ jest.mock('@react-native-community/blur', () => ({
   BlurView: 'BlurView',
 }));
 
-// The PUK review's write-it-down timer, already done unless a test says otherwise.
-let mockTimer = { timeLeft: 0, done: true, start: jest.fn() };
-jest.mock('../src/hooks/useSeedReviewTimer', () => ({
-  useSeedReviewTimer: () => mockTimer,
-}));
-
-// useFocusEffect only registers the hardware-back handler; a no-op here.
-jest.mock('@react-navigation/native', () => ({
-  useFocusEffect: jest.fn(),
-}));
+jest.mock('@react-navigation/native', () => {
+  const { useEffect } = require('react');
+  return {
+    // Run the focus effect like a focused screen would, so hardware back registers.
+    useFocusEffect: (cb: () => void | (() => void)) => {
+      useEffect(cb, [cb]);
+    },
+  };
+});
 
 // PinPad reads the scramble preference from context.
 jest.mock('../src/hooks/usePreferences', () => ({
@@ -100,6 +100,17 @@ function lastBeforeRemoveHandler() {
   return call?.[1];
 }
 
+let backSpy: jest.SpyInstance;
+
+async function pressHardwareBack() {
+  const handler = backSpy.mock.calls.at(-1)![1] as () => boolean;
+  let handled = false;
+  await act(async () => {
+    handled = handler();
+  });
+  return handled;
+}
+
 /** Press a digit key six times to complete a full PIN entry. keyIndex 0 = '1', 1 = '2'. */
 async function enterPin(keyIndex = 0) {
   const digit = String(keyIndex + 1);
@@ -123,7 +134,11 @@ describe('InitCardScreen', () => {
     navigation.goBack.mockClear();
     navigation.reset.mockClear();
     navigation.setOptions.mockClear();
-    mockTimer = { timeLeft: 0, done: true, start: jest.fn() };
+    backSpy = jest.spyOn(BackHandler, 'addEventListener');
+  });
+
+  afterEach(() => {
+    backSpy.mockRestore();
   });
 
   // -------------------------------------------------------------------------
@@ -177,7 +192,6 @@ describe('InitCardScreen', () => {
       navigation.setOptions.mockClear();
       await enterPin(0);
       await enterPin(1);
-      // Title remains 'Confirm your PIN' (no advancement to duress_question)
       expect(navigation.setOptions).not.toHaveBeenCalledWith({
         title: 'Initialize Card',
       });
@@ -197,16 +211,13 @@ describe('InitCardScreen', () => {
       return view;
     }
 
-    it('moves to the PUK review when No is pressed, without tapping yet', async () => {
+    it('starts the tap with the PIN and no duress PIN when No is pressed', async () => {
       await reachConfirmPrompt();
       await act(async () => {
         fireEvent.press(screen.getByText('No, skip'));
       });
-      expect(navigation.setOptions).toHaveBeenCalledWith({
-        title: 'Write down your PUK',
-      });
-      expect(screen.getByText('1234 5678 9012')).toBeTruthy();
-      expect(mockStart).not.toHaveBeenCalled();
+      expect(mockStart).toHaveBeenCalledTimes(1);
+      expect(mockStart).toHaveBeenCalledWith('111111', null);
     });
 
     it('moves to duress_entry when Yes is pressed', async () => {
@@ -245,14 +256,12 @@ describe('InitCardScreen', () => {
       });
     });
 
-    it('moves to the PUK review when duress confirm matches, without tapping yet', async () => {
+    it('starts the tap with the PIN and the duress PIN when the confirmation matches', async () => {
       await reachDuressEntry();
       await enterPin(1);
       await enterPin(1);
-      expect(navigation.setOptions).toHaveBeenCalledWith({
-        title: 'Write down your PUK',
-      });
-      expect(mockStart).not.toHaveBeenCalled();
+      expect(mockStart).toHaveBeenCalledTimes(1);
+      expect(mockStart).toHaveBeenCalledWith('111111', '222222');
     });
 
     it('shows an error when duress confirm does not match', async () => {
@@ -264,28 +273,15 @@ describe('InitCardScreen', () => {
   });
 
   // -------------------------------------------------------------------------
-  // PUK review
+  // PUK after the tap
   // -------------------------------------------------------------------------
 
-  // The last step before the tap: the card is written only once the PUK is on paper.
-  describe('PUK review', () => {
-    async function reachPukReview(withDuress = false) {
-      const view = await renderScreen();
-      await enterPin(0);
-      await enterPin(0);
-      if (withDuress) {
-        await act(async () => {
-          fireEvent.press(screen.getByText('Yes, add duress PIN'));
-        });
-        await enterPin(1);
-        await enterPin(1);
-      } else {
-        await act(async () => {
-          fireEvent.press(screen.getByText('No, skip'));
-        });
-      }
-      return view;
-    }
+  // Only acknowledgement or back leaves the PUK, both for the Dashboard.
+  describe('PUK after the tap', () => {
+    const dashboard = {
+      index: 0,
+      routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
+    };
 
     async function reveal() {
       await act(async () => {
@@ -293,68 +289,40 @@ describe('InitCardScreen', () => {
       });
     }
 
-    it("shows the hook's PUK behind a reveal", async () => {
-      await reachPukReview();
+    it("shows the hook's PUK behind a reveal once done, under its own title", async () => {
+      await renderScreen('done');
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Write down your PUK',
+      });
       expect(screen.getByText('1234 5678 9012')).toBeTruthy();
       expect(screen.UNSAFE_queryAllByType('BlurView' as any)).toHaveLength(1);
       expect(screen.getByText('Reveal PUK')).toBeTruthy();
+      expect(navigation.reset).not.toHaveBeenCalled();
     });
 
-    it('starts the tap with the PIN and no duress PIN once written down', async () => {
-      await reachPukReview();
+    it('goes to the Dashboard once written down', async () => {
+      await renderScreen('done');
       await reveal();
       await act(async () => {
         fireEvent.press(screen.getByText("I've written it down"));
       });
-      expect(mockStart).toHaveBeenCalledTimes(1);
-      expect(mockStart).toHaveBeenCalledWith('111111', null);
+      expect(navigation.reset).toHaveBeenCalledWith(dashboard);
     });
 
-    it('starts the tap with the PIN and the duress PIN once written down', async () => {
-      await reachPukReview(true);
-      await reveal();
-      await act(async () => {
-        fireEvent.press(screen.getByText("I've written it down"));
-      });
-      expect(mockStart).toHaveBeenCalledWith('111111', '222222');
-    });
-
-    it('waits for the review timer before the tap can start', async () => {
-      mockTimer = { timeLeft: 8, done: false, start: jest.fn() };
-      await reachPukReview();
-      await reveal();
-      expect(mockTimer.start).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('Write down your PUK (8s)')).toBeTruthy();
-      const button = screen.getByTestId('primary-button');
-      expect(button.props.accessibilityState.disabled).toBe(true);
-      fireEvent.press(button);
-      expect(mockStart).not.toHaveBeenCalled();
-    });
-
-    it('goes back to the duress question before leaving', async () => {
-      await reachPukReview();
+    it('goes to the Dashboard on back, not to the previous screen', async () => {
+      await renderScreen('done');
       const event = { preventDefault: jest.fn() };
       await act(async () => {
         lastBeforeRemoveHandler()?.(event);
       });
       expect(event.preventDefault).toHaveBeenCalled();
-      expect(screen.getByText('Add a duress PIN?')).toBeTruthy();
+      expect(navigation.reset).toHaveBeenCalledWith(dashboard);
+      expect(navigation.goBack).not.toHaveBeenCalled();
     });
 
-    it('goes back to the duress confirmation when a duress PIN was set', async () => {
-      await reachPukReview(true);
-      navigation.setOptions.mockClear();
-      const event = { preventDefault: jest.fn() };
-      await act(async () => {
-        lastBeforeRemoveHandler()?.(event);
-      });
-      expect(event.preventDefault).toHaveBeenCalled();
-      expect(navigation.setOptions).toHaveBeenCalledWith({
-        title: 'Confirm duress PIN',
-      });
-    });
-
-    it('is hidden while the card is being read', async () => {
+    it('is not shown before the tap or while the card is being read', async () => {
+      await renderScreen('idle');
+      expect(screen.queryByText('Reveal PUK')).toBeNull();
       await renderScreen('nfc');
       expect(screen.queryByText('Reveal PUK')).toBeNull();
     });
@@ -385,10 +353,11 @@ describe('InitCardScreen', () => {
       expect(lastProps().nfc.phase).toBe('error');
     });
 
-    it('nfc.phase is done and showOnDone is true when phase is done', async () => {
+    // The PUK takes the success sheet's place.
+    it('does not ask for the success sheet when phase is done', async () => {
       await renderScreen('done');
       expect(lastProps().nfc.phase).toBe('done');
-      expect(lastProps().showOnDone).toBe(true);
+      expect(lastProps().showOnDone).toBeFalsy();
     });
   });
 
@@ -397,13 +366,9 @@ describe('InitCardScreen', () => {
   // -------------------------------------------------------------------------
 
   describe('navigation', () => {
-    // The PUK was shown before the tap, so done has nothing left to show.
-    it('navigates to Dashboard when phase is done', async () => {
+    it('stays for the PUK when phase is done', async () => {
       await renderScreen('done');
-      expect(navigation.reset).toHaveBeenCalledWith({
-        index: 0,
-        routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
-      });
+      expect(navigation.reset).not.toHaveBeenCalled();
     });
 
     it('cancels NFC when leaving during NFC phase', async () => {
@@ -411,6 +376,22 @@ describe('InitCardScreen', () => {
       const handler = lastBeforeRemoveHandler();
       handler?.({ preventDefault: jest.fn() });
       expect(mockCancel).toHaveBeenCalled();
+    });
+
+    it('returns from PIN confirmation to PIN entry before leaving', async () => {
+      await renderScreen();
+      await enterPin(0);
+      navigation.setOptions.mockClear();
+      const event = { preventDefault: jest.fn() };
+
+      await act(async () => {
+        lastBeforeRemoveHandler()?.(event);
+      });
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Create a PIN',
+      });
     });
 
     it('returns from duress question to PIN confirmation before leaving', async () => {
@@ -444,6 +425,97 @@ describe('InitCardScreen', () => {
 
       expect(event.preventDefault).toHaveBeenCalled();
       expect(screen.getByText('Add a duress PIN?')).toBeTruthy();
+    });
+
+    it('returns from duress confirmation to duress entry before leaving', async () => {
+      await renderScreen();
+      await enterPin(0);
+      await enterPin(0);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Yes, add duress PIN'));
+      });
+      await enterPin(1);
+      navigation.setOptions.mockClear();
+      const event = { preventDefault: jest.fn() };
+
+      await act(async () => {
+        lastBeforeRemoveHandler()?.(event);
+      });
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Create a duress PIN',
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Hardware back
+  // -------------------------------------------------------------------------
+
+  describe('hardware back', () => {
+    it('leaves the screen from PIN entry', async () => {
+      await renderScreen();
+      expect(await pressHardwareBack()).toBe(true);
+      expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('steps PIN confirmation back to entry', async () => {
+      await renderScreen();
+      await enterPin(0);
+      navigation.setOptions.mockClear();
+      expect(await pressHardwareBack()).toBe(true);
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Create a PIN',
+      });
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
+
+    it('returns from the duress question to PIN confirmation', async () => {
+      await renderScreen();
+      await enterPin(0);
+      await enterPin(0);
+      navigation.setOptions.mockClear();
+      await pressHardwareBack();
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Confirm your PIN',
+      });
+    });
+
+    it('returns from duress entry to the duress question', async () => {
+      await renderScreen();
+      await enterPin(0);
+      await enterPin(0);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Yes, add duress PIN'));
+      });
+      await pressHardwareBack();
+      expect(screen.getByText('Add a duress PIN?')).toBeTruthy();
+    });
+
+    it('steps duress confirmation back to duress entry', async () => {
+      await renderScreen();
+      await enterPin(0);
+      await enterPin(0);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Yes, add duress PIN'));
+      });
+      await enterPin(1);
+      navigation.setOptions.mockClear();
+      await pressHardwareBack();
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Create a duress PIN',
+      });
+    });
+
+    it('goes to the Dashboard from the PUK', async () => {
+      await renderScreen('done');
+      expect(await pressHardwareBack()).toBe(true);
+      expect(navigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
+      });
+      expect(navigation.goBack).not.toHaveBeenCalled();
     });
   });
 

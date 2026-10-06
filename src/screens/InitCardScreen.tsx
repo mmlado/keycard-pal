@@ -21,20 +21,23 @@ export const dashboardEntry: DashboardAction = {
   navigate: nav => nav.navigate('InitCard'),
 };
 
-type ScreenStep =
-  | 'pin_setup'
-  | 'duress_question'
-  | 'duress_setup'
-  | 'puk_review';
+type ScreenStep = 'pin_setup' | 'duress_question' | 'duress_setup';
 
 export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   const insets = useSafeAreaInsets();
   const [screenStep, setScreenStep] = useState<ScreenStep>('pin_setup');
   const mainPinRef = useRef('');
-  const duressPinRef = useRef<string | null>(null);
 
   const keycard = useInitCard();
   const { phase, puk, start } = keycard;
+
+  const startInit = useCallback(
+    (duressPin: string | null) => {
+      start(mainPinRef.current, duressPin);
+      mainPinRef.current = '';
+    },
+    [start],
+  );
 
   const pinSetup = useConfirmedEntry(pin => {
     mainPinRef.current = pin;
@@ -42,8 +45,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   });
 
   const duressSetup = useConfirmedEntry(pin => {
-    duressPinRef.current = pin;
-    setScreenStep('puk_review');
+    startInit(pin);
   });
 
   const handleDuressYes = useCallback(() => {
@@ -51,26 +53,8 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   }, []);
 
   const handleDuressNo = useCallback(() => {
-    duressPinRef.current = null;
-    setScreenStep('puk_review');
-  }, []);
-
-  // Nothing is written until the PUK is on paper.
-  const handlePukWrittenDown = useCallback(() => {
-    start(mainPinRef.current, duressPinRef.current);
-    mainPinRef.current = '';
-    duressPinRef.current = null;
-  }, [start]);
-
-  // Back from the PUK lands on the last question answered.
-  const leavePukReview = useCallback(() => {
-    if (duressPinRef.current !== null) {
-      setScreenStep('duress_setup');
-      duressSetup.jumpToConfirm();
-    } else {
-      setScreenStep('duress_question');
-    }
-  }, [duressSetup]);
+    startInit(null);
+  }, [startInit]);
 
   const onScreenBack = useCallback(() => {
     if (screenStep === 'pin_setup') {
@@ -87,42 +71,34 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
       return true;
     }
 
-    if (screenStep === 'duress_setup') {
-      const handled = duressSetup.goBack();
-      if (!handled) {
-        setScreenStep('duress_question');
-      }
-      return true;
+    const handled = duressSetup.goBack();
+    if (!handled) {
+      setScreenStep('duress_question');
     }
-
-    if (screenStep === 'puk_review') {
-      leavePukReview();
-      return true;
-    }
-
     return true;
-  }, [screenStep, pinSetup, duressSetup, leavePukReview, navigation]);
+  }, [screenStep, pinSetup, duressSetup, navigation]);
 
   const title = (() => {
+    if (phase === 'done') {
+      return 'Write down your PUK';
+    }
     if (screenStep === 'pin_setup') {
       return pinSetup.step === 'entry' ? 'Create a PIN' : 'Confirm your PIN';
     }
     if (screenStep === 'duress_question') {
       return 'Initialize Card';
     }
-    if (screenStep === 'puk_review') {
-      return 'Write down your PUK';
-    }
     return duressSetup.step === 'entry'
       ? 'Create a duress PIN'
       : 'Confirm duress PIN';
   })();
 
-  const { onCancel } = useKeycardScreen({
+  // Done stays for the PUK.
+  const { onCancel, leave } = useKeycardScreen({
     keycard,
     navigation,
     title,
-    done: { toast: 'Card initialized' },
+    done: { toast: 'Card initialized', hold: true },
     onHardwareBack: onScreenBack,
     onBeforeRemove: e => {
       if (screenStep === 'pin_setup' && pinSetup.step === 'confirm') {
@@ -142,11 +118,6 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
         if (!handled) {
           setScreenStep('duress_question');
         }
-        return;
-      }
-      if (screenStep === 'puk_review') {
-        e.preventDefault();
-        leavePukReview();
       }
     },
   });
@@ -184,11 +155,9 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
         />
       )}
 
-      {phase === 'idle' && screenStep === 'puk_review' && (
-        <PukReview puk={puk} onDone={handlePukWrittenDown} />
-      )}
+      {phase === 'done' && <PukReview puk={puk} onDone={leave} />}
 
-      <NFCBottomSheet nfc={keycard} onCancel={onCancel} showOnDone />
+      <NFCBottomSheet nfc={keycard} onCancel={onCancel} />
     </View>
   );
 }
