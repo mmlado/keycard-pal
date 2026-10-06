@@ -38,7 +38,8 @@ function FeeRow({ fee }: { fee: BtcPsbtFee }) {
         <Icon source="alert" size={16} color={theme.colors.negative} />
         <Text variant="labelSmall" style={styles.warningText}>
           The PSBT does not say how much {describeInputs(fee.inputsWithoutUtxo)}{' '}
-          holds, so the fee cannot be worked out here and could be any amount.
+          {fee.inputsWithoutUtxo.length === 1 ? 'holds' : 'hold'}, so the fee
+          cannot be worked out here and could be any amount.
         </Text>
       </View>
     </View>
