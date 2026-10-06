@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { BackHandler } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import UnblockPinScreen from '../src/screens/secrets/UnblockPinScreen';
@@ -24,10 +25,15 @@ const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
 >;
 
-// useFocusEffect only registers the hardware-back handler; a no-op here.
-jest.mock('@react-navigation/native', () => ({
-  useFocusEffect: jest.fn(),
-}));
+jest.mock('@react-navigation/native', () => {
+  const { useEffect } = require('react');
+  return {
+    // Run the focus effect like a focused screen would, so hardware back registers.
+    useFocusEffect: (cb: () => void | (() => void)) => {
+      useEffect(cb, [cb]);
+    },
+  };
+});
 
 // PinPad reads the scramble preference from context.
 jest.mock('../src/hooks/usePreferences', () => ({
@@ -93,6 +99,17 @@ function lastBeforeRemoveHandler() {
   return call?.[1];
 }
 
+let backSpy: jest.SpyInstance;
+
+async function pressHardwareBack() {
+  const handler = backSpy.mock.calls.at(-1)![1] as () => boolean;
+  let handled = false;
+  await act(async () => {
+    handled = handler();
+  });
+  return handled;
+}
+
 /** Press one digit key `count` times. keyIndex 0 = '1', 1 = '2'. */
 async function enterDigits(count: number, keyIndex = 0) {
   const digit = String(keyIndex + 1);
@@ -124,6 +141,11 @@ describe('UnblockPinScreen', () => {
     navigation.reset.mockClear();
     navigation.setOptions.mockClear();
     navigation.addListener.mockClear();
+    backSpy = jest.spyOn(BackHandler, 'addEventListener');
+  });
+
+  afterEach(() => {
+    backSpy.mockRestore();
   });
 
   // The new PIN comes first, the way every secret change asks for the new
@@ -268,6 +290,35 @@ describe('UnblockPinScreen', () => {
         lastBeforeRemoveHandler()?.(event);
       });
       expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('hardware back', () => {
+    it('returns from the PUK to the PIN confirmation', async () => {
+      await reachPuk();
+      navigation.setOptions.mockClear();
+      expect(await pressHardwareBack()).toBe(true);
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Confirm new PIN',
+      });
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
+
+    it('steps the confirmation back to the entry', async () => {
+      await renderScreen();
+      await enterDigits(6, 0);
+      navigation.setOptions.mockClear();
+      expect(await pressHardwareBack()).toBe(true);
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Enter new PIN',
+      });
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
+
+    it('leaves the screen from the first entry', async () => {
+      await renderScreen();
+      expect(await pressHardwareBack()).toBe(true);
+      expect(navigation.goBack).toHaveBeenCalledTimes(1);
     });
   });
 });

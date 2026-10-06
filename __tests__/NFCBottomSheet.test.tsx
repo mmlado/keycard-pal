@@ -30,9 +30,10 @@ jest.mock('../src/utils/connectivity.online', () => ({
 }));
 
 const mockNavigate = jest.fn();
+let mockNavigationReady = true;
 jest.mock('../src/navigation/navigationRef', () => ({
   navigationRef: {
-    isReady: () => true,
+    isReady: () => mockNavigationReady,
     navigate: (...args: any[]) => mockNavigate(...args),
   },
 }));
@@ -178,6 +179,18 @@ describe('NFCBottomSheet — Android sheet', () => {
       fireEvent.press(screen.getByText('Unblock PIN'));
       expect(onCancel).toHaveBeenCalledTimes(1);
       expect(mockNavigate).toHaveBeenCalledWith('UnblockPin');
+    });
+
+    it('still cancels when the navigator is not ready, and goes nowhere', () => {
+      mockNavigationReady = false;
+      try {
+        renderSheet(makeNfc('error', { pinBlocked: true, retry: jest.fn() }));
+        fireEvent.press(screen.getByText('Unblock PIN'));
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        expect(mockNavigate).not.toHaveBeenCalled();
+      } finally {
+        mockNavigationReady = true;
+      }
     });
 
     it('keeps Try again while the PIN is not blocked', () => {
