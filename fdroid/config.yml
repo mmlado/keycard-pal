@@ -9,5 +9,6 @@ keystorepass: {env: FDROID_KEYSTORE_PASS}
 keypass: {env: FDROID_KEY_PASS}
 keydname: "CN=keycardpal.com, O=Keycard Pal, C=RS"
 
-archive_older: 3
+# Counts APKs, not releases: three APKs per release, so 9 keeps three releases.
+archive_older: 9
 allow_disabled_algorithms: false
