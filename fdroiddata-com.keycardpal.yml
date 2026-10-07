@@ -34,6 +34,7 @@ AutoName: Keycard Pal
 
 RepoType: git
 Repo: https://github.com/mmlado/keycard-pal
+
 Builds:
   - versionName: 1.14.0
     versionCode: 114001
@@ -53,7 +54,8 @@ Builds:
     gradle:
       - full
     output: build/outputs/apk/full/release/keycard-pal-full-release-armeabi-v7a.apk
-    binary: https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-full-release-armeabi-v7a.apk
+    binary: 
+      https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-full-release-armeabi-v7a.apk
     rm:
       - ios
     scanignore:
@@ -91,7 +93,8 @@ Builds:
     gradle:
       - full
     output: build/outputs/apk/full/release/keycard-pal-full-release-arm64-v8a.apk
-    binary: https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-full-release-arm64-v8a.apk
+    binary: 
+      https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-full-release-arm64-v8a.apk
     rm:
       - ios
     scanignore:
