@@ -29,7 +29,13 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   const mainPinRef = useRef('');
 
   const keycard = useInitCard();
-  const { phase, puk, start } = keycard;
+  const { phase, puk, initSent, start } = keycard;
+
+  // Once INIT went out there is no way back into the entry steps: the PUK is
+  // shown whatever the tap ended in, with the error sheet over it until dismissed.
+  const uncertainPuk = initSent && (phase === 'idle' || phase === 'error');
+  const showPuk = phase === 'done' || uncertainPuk;
+  const entering = phase === 'idle' && !initSent;
 
   const startInit = useCallback(
     (duressPin: string | null) => {
@@ -79,7 +85,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   }, [screenStep, pinSetup, duressSetup, navigation]);
 
   const title = (() => {
-    if (phase === 'done') {
+    if (showPuk) {
       return 'Write down your PUK';
     }
     if (screenStep === 'pin_setup') {
@@ -93,12 +99,14 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
       : 'Confirm duress PIN';
   })();
 
-  // Done stays for the PUK.
+  // The screen stays for the PUK; no toast when the card may not hold it.
   const { onCancel, leave } = useKeycardScreen({
     keycard,
     navigation,
     title,
-    done: { toast: 'Card initialized', hold: true },
+    done: { toast: () => (uncertainPuk ? undefined : 'Card initialized') },
+    hold: showPuk,
+    stayOnCancel: initSent,
     onHardwareBack: onScreenBack,
     onBeforeRemove: e => {
       if (screenStep === 'pin_setup' && pinSetup.step === 'confirm') {
@@ -131,7 +139,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
-      {phase === 'idle' && activePinSetup && (
+      {entering && activePinSetup && (
         <PinPad
           key={activePinSetup.step}
           onComplete={
@@ -144,7 +152,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
         />
       )}
 
-      {phase === 'idle' && screenStep === 'duress_question' && (
+      {entering && screenStep === 'duress_question' && (
         <ConfirmPrompt
           title="Add a duress PIN?"
           description="A duress PIN unlocks the card but shows a decoy account. Use it if you are ever forced to access your wallet under pressure."
@@ -155,7 +163,9 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
         />
       )}
 
-      {phase === 'done' && <PukReview puk={puk} onDone={leave} />}
+      {showPuk && (
+        <PukReview puk={puk} uncertain={uncertainPuk} onDone={leave} />
+      )}
 
       <NFCBottomSheet nfc={keycard} onCancel={onCancel} />
     </View>
