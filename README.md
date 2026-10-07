@@ -111,8 +111,9 @@ Download an APK from the [latest release](https://github.com/mmlado/keycard-pal/
 and sideload it. For most users, install the universal APK. ABI-specific split APKs are also
 attached to releases for smaller downloads on known device architectures. Each split carries
 its own `versionCode` (the universal ends in 0, `armeabi-v7a` in 1, `arm64-v8a` in 2), and all
-three are signed with the same certificate, so a device can move between the universal APK
-and a split, and between GitHub, Obtainium and either F-Droid repository, without reinstalling.
+three are signed with the same certificate, so a device can take a split over the universal APK
+at any time, the universal over a split from the next release on, and move between GitHub,
+Obtainium and either F-Droid repository the same way, without reinstalling.
 
 ### Install with Obtainium
 
