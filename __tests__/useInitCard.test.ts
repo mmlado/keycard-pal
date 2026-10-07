@@ -528,6 +528,145 @@ describe('useInitCard', () => {
     });
   });
 
+  // INIT is the tap's last command, and a write never replays (ADR-0007): a loss
+  // inside it leaves the card's state unknown, and the PUK it may hold is offered.
+  describe('the window after INIT', () => {
+    const TAG_LOST = 'Tag was lost.';
+
+    async function startAndTap(hook = renderHook(() => useInitCard())) {
+      await act(async () => {
+        hook.result.current.start('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return hook;
+    }
+
+    it('is closed before the tap', () => {
+      const { result } = renderHook(() => useInitCard());
+      expect(result.current.initSent).toBe(false);
+    });
+
+    it('is open while the card has INIT and has not answered', async () => {
+      let answer: (resp: unknown) => void = () => {};
+      mockInit.mockReturnValue(new Promise(resolve => (answer = resolve)));
+      const { result } = renderHook(() => useInitCard());
+      await act(async () => {
+        result.current.start('123456');
+      });
+      await act(async () => {
+        capturedOnConnected?.();
+      });
+      expect(result.current.initSent).toBe(true);
+      expect(result.current.phase).toBe('nfc');
+
+      await act(async () => {
+        answer({ sw: 0x9000, checkOK: jest.fn() });
+      });
+      expect(result.current.initSent).toBe(false);
+      expect(result.current.phase).toBe('done');
+    });
+
+    it('stays open when the card leaves the field before answering', async () => {
+      mockInit.mockRejectedValue(new Error(TAG_LOST));
+      const { result } = await startAndTap();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toMatch(/lost mid-operation/);
+      expect(result.current.initSent).toBe(true);
+    });
+
+    it('stays open through a retry that finds the card set up', async () => {
+      mockInit.mockRejectedValue(new Error(TAG_LOST));
+      const { result } = await startAndTap();
+      mockCmdSet.applicationInfo = { initializedCard: true };
+      await act(async () => {
+        result.current.retry();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toMatch(/already set up/);
+      expect(result.current.initSent).toBe(true);
+      expect(mockInit).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes when a retry sets the card up after all', async () => {
+      mockInit.mockRejectedValueOnce(new Error(TAG_LOST));
+      const { result } = await startAndTap();
+      await act(async () => {
+        result.current.retry();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(result.current.initSent).toBe(false);
+    });
+
+    // Dismissing the error is how the screen reaches the PUK.
+    it('survives cancel and ends with reset', async () => {
+      mockInit.mockRejectedValue(new Error(TAG_LOST));
+      const { result } = await startAndTap();
+      await act(async () => {
+        result.current.cancel();
+      });
+      expect(result.current.phase).toBe('idle');
+      expect(result.current.initSent).toBe(true);
+
+      await act(async () => {
+        result.current.reset();
+      });
+      expect(result.current.initSent).toBe(false);
+    });
+
+    it('closes when the card refuses INIT: nothing was written', async () => {
+      mockCmdSet.applicationInfo = v4Select(0x0400, {
+        status: 0x00,
+        certificate: [...filler(33, 0x02), ...filler(65, 0x09)],
+      });
+      mockInit.mockResolvedValue({
+        sw: 0x6985,
+        checkOK: () => {
+          throw new Error('Initializing the Keycard failed');
+        },
+      });
+      const { result } = await startAndTap();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.initSent).toBe(false);
+    });
+
+    it.each([
+      ['SELECT fails', () => mockSelect.mockResolvedValueOnce({ sw: 0x6a82 })],
+      [
+        'the card is already set up',
+        () => {
+          mockCmdSet.applicationInfo = { initializedCard: true };
+        },
+      ],
+      [
+        'the certificate is from an unknown CA',
+        () => {
+          mockCmdSet.applicationInfo = v4Select(0x0400, {
+            status: 0x00,
+            certificate: [...filler(33, 0x02), ...filler(65, 0x09)],
+          });
+          mockSelect.mockRejectedValue(
+            new Error(
+              'Card certificate verification failed: unknown CA public key and card not whitelisted',
+            ),
+          );
+        },
+      ],
+    ])('never opens when %s', async (_name, arrange) => {
+      arrange();
+      const { result } = await startAndTap();
+      expect(mockInit).not.toHaveBeenCalled();
+      expect(result.current.initSent).toBe(false);
+    });
+  });
+
   // Every card in the field: INIT with the pairing secret, exactly as before.
   describe('cards without a certificate', () => {
     it('still goes through the SDK init() with the pairing secret', async () => {

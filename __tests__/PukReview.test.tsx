@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import PukReview, {
   PUK_EXPLAINER,
+  PUK_UNCERTAIN_EXPLAINER,
   formatPUK,
 } from '../src/components/PukReview';
 
@@ -55,6 +56,16 @@ describe('PukReview', () => {
     renderReview();
     expect(screen.getByText(PUK_EXPLAINER)).toBeTruthy();
     expect(PUK_EXPLAINER).toMatch(/set up/);
+  });
+
+  // After a tap lost past INIT the card's state is unknown (#430).
+  it('says the card may or may not be set up when uncertain', () => {
+    render(<PukReview puk={PUK} onDone={onDone} uncertain />);
+    expect(screen.getByText(PUK_UNCERTAIN_EXPLAINER)).toBeTruthy();
+    expect(screen.queryByText(PUK_EXPLAINER)).toBeNull();
+    expect(PUK_UNCERTAIN_EXPLAINER).toMatch(/may or may not have been set up/);
+    expect(PUK_UNCERTAIN_EXPLAINER).toMatch(/initialize it again/);
+    expect(screen.getByText('1234 5678 9012')).toBeTruthy();
   });
 
   it('shows the digits in fours, blurred until revealed', async () => {

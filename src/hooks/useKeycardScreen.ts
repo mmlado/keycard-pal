@@ -37,12 +37,15 @@ export type UseKeycardScreenOptions = {
   pinEntryTitle?: string;
   /** When set, phase 'done' resets to Dashboard with this toast. */
   done?: {
-    toast: string | ((result: unknown) => string);
+    toast: string | ((result: unknown) => string | undefined);
     /** Skip navigation while result is null. */
     requireResult?: boolean;
-    /** The screen shows more after the tap and calls leave() itself. */
-    hold?: boolean;
   };
+  /**
+   * The screen is showing what comes after the tap and calls leave() itself:
+   * done does not navigate, and back means leave(). Scope it to that state.
+   */
+  hold?: boolean;
   /** The hook the guard, PIN title and onCancel follow when there are two. */
   activeKeycard?: KeycardScreenKeycard;
   /** Hardware-back fallback once the keycard guard passes; BackHandler semantics. */
@@ -86,8 +89,8 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
   }, [navigation]);
 
   useEffect(() => {
-    const done = optionsRef.current.done;
-    if (!done || done.hold || phase !== 'done') {
+    const { done, hold } = optionsRef.current;
+    if (!done || hold || phase !== 'done') {
       return;
     }
     if (done.requireResult && result == null) {
@@ -110,11 +113,8 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
     return activePhase === 'nfc' || activePhase === 'pin_entry';
   }, []);
 
-  // A held done screen has nothing behind it: back means leave.
-  const heldDone = useCallback(() => {
-    const { done, keycard } = optionsRef.current;
-    return done?.hold === true && keycard.phase === 'done';
-  }, []);
+  // A held screen has nothing behind it: back means leave.
+  const held = useCallback(() => optionsRef.current.hold === true, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,14 +124,14 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
           navigation.goBack();
           return true;
         }
-        if (heldDone()) {
+        if (held()) {
           leave();
           return true;
         }
         return optionsRef.current.onHardwareBack?.() ?? false;
       });
       return () => sub.remove();
-    }, [keycardBusy, heldDone, leave, navigation]),
+    }, [keycardBusy, held, leave, navigation]),
   );
 
   useEffect(() => {
@@ -143,7 +143,7 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
         activeRef.current.cancel();
         return;
       }
-      if (heldDone()) {
+      if (held()) {
         e.preventDefault();
         leave();
         return;
@@ -151,7 +151,7 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
       optionsRef.current.onBeforeRemove?.(e);
     });
     return unsubscribe;
-  }, [navigation, keycardBusy, heldDone, leave]);
+  }, [navigation, keycardBusy, held, leave]);
 
   const onCancel = useCallback(() => {
     activeRef.current.cancel();

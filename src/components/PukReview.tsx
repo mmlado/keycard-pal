@@ -10,6 +10,8 @@ import PrimaryButton from '@/components/PrimaryButton';
 type Props = {
   puk: string;
   onDone: () => void;
+  /** The tap ended before the card confirmed INIT, so the card may or may not hold this PUK. */
+  uncertain?: boolean;
 };
 
 export const PUK_EXPLAINER =
@@ -17,13 +19,20 @@ export const PUK_EXPLAINER =
   'wrong PIN entries. Write it down and keep it with your recovery phrase. ' +
   'Without it, a blocked card can only be factory reset, which erases its key.';
 
+export const PUK_UNCERTAIN_EXPLAINER =
+  'Setting up your Keycard was interrupted before the card confirmed it, so ' +
+  'the card may or may not have been set up with this PUK. Write it down in ' +
+  'case it was: it unblocks the card after three wrong PIN entries, and ' +
+  'without it a blocked card can only be factory reset, which erases its key. ' +
+  'If the card was not set up, initialize it again and write down the new PUK.';
+
 /** In fours, the way it goes onto paper. */
 export function formatPUK(puk: string): string {
   return puk.replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
-/** Shown once the card is set up. */
-export default function PukReview({ puk, onDone }: Props) {
+/** Shown once the card is set up, or once it may be. */
+export default function PukReview({ puk, onDone, uncertain }: Props) {
   const [revealed, setRevealed] = useState(false);
 
   const handleButton = useCallback(() => {
@@ -40,7 +49,9 @@ export default function PukReview({ puk, onDone }: Props) {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.description}>{PUK_EXPLAINER}</Text>
+        <Text style={styles.description}>
+          {uncertain ? PUK_UNCERTAIN_EXPLAINER : PUK_EXPLAINER}
+        </Text>
         <View style={styles.pukWrapper}>
           <Text style={styles.puk} testID="puk-digits">
             {formatPUK(puk)}
