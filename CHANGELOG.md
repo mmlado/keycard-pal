@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - The privacy policy now covers the websites: keycardpal.com and fdroid.keycardpal.com load nothing from third parties, set no cookies and run no analytics
+- Each ABI split APK carries its own `versionCode`: the universal APK and the Play bundle end in 0, `armeabi-v7a` in 1, `arm64-v8a` in 2, so an F-Droid repository can serve the split that fits the device and a universal install can still take a split as an update
 
 ### Fixed
 
