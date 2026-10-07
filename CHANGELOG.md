@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-07
+
 ### Added
 
 - A personal_sign request shows its message as text on a Message tab, or as hex when the bytes are not UTF-8, and its ERC-191 Digest on a Digests tab with the same explanation and ERC-8213 link as the other digests
@@ -445,7 +447,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.13.0...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.14.0...HEAD
+[1.14.0]: https://github.com/mmlado/keycard-pal/compare/v1.13.0...v1.14.0
 [1.13.0]: https://github.com/mmlado/keycard-pal/compare/v1.12.0...v1.13.0
 [1.12.0]: https://github.com/mmlado/keycard-pal/compare/v1.11.1...v1.12.0
 [1.11.1]: https://github.com/mmlado/keycard-pal/compare/v1.11.0...v1.11.1
