@@ -39,7 +39,9 @@ if (arg === 'major') {
 }
 
 const [MAJOR, MINOR, PATCH] = newVersion.split('.').map(Number);
-const versionCode = MAJOR * 10000 + MINOR * 100 + PATCH;
+// Ends in 0: the ABI splits take the last digit (#432).
+const versionCode = (MAJOR * 10000 + MINOR * 100 + PATCH) * 10;
+const ABI_VERSION_CODES = [versionCode + 1, versionCode + 2];
 const today = new Date().toISOString().slice(0, 10);
 const repo = 'https://github.com/mmlado/keycard-pal';
 
@@ -175,25 +177,42 @@ const FDROID_RECIPES = [
 FDROID_RECIPES.map(file => path.join(ROOT, file))
   .filter(recipePath => fs.existsSync(recipePath))
   .forEach(recipePath => {
+    // checkupdates assigns codes in entry order, so armeabi-v7a comes first.
+    let entry = 0;
     const recipe = fs
       .readFileSync(recipePath, 'utf8')
-      .replace(/versionName: \d+\.\d+\.\d+/, `versionName: ${newVersion}`)
-      .replace(/versionCode: \d+/, `versionCode: ${versionCode}`)
-      .replace(/commit: v\d+\.\d+\.\d+/, `commit: v${newVersion}`)
+      .replace(/versionName: \d+\.\d+\.\d+/g, `versionName: ${newVersion}`)
+      .replace(
+        /^(\s+)versionCode: \d+$/gm,
+        (_, indent) => `${indent}versionCode: ${ABI_VERSION_CODES[entry++]}`,
+      )
+      .replace(/commit: v\d+\.\d+\.\d+/g, `commit: v${newVersion}`)
       .replace(/CurrentVersion: \d+\.\d+\.\d+/, `CurrentVersion: ${newVersion}`)
-      .replace(/CurrentVersionCode: \d+/, `CurrentVersionCode: ${versionCode}`);
+      .replace(
+        /CurrentVersionCode: \d+/,
+        `CurrentVersionCode: ${ABI_VERSION_CODES[ABI_VERSION_CODES.length - 1]}`,
+      );
+    if (entry !== ABI_VERSION_CODES.length) {
+      console.error(
+        `${recipePath}: expected ${ABI_VERSION_CODES.length} build entries, found ${entry}`,
+      );
+      process.exit(1);
+    }
     fs.writeFileSync(recipePath, recipe);
   });
 
+// fdroidserver reads the file per build code, Play per the base.
 const fastlaneChangelogDir = path.join(
   ROOT,
   'fastlane/metadata/android/en-US/changelogs',
 );
 fs.mkdirSync(fastlaneChangelogDir, { recursive: true });
-fs.writeFileSync(
-  path.join(fastlaneChangelogDir, `${versionCode}.txt`),
-  `${releaseNotes}\n`,
-);
+[versionCode, ...ABI_VERSION_CODES].forEach(code => {
+  fs.writeFileSync(
+    path.join(fastlaneChangelogDir, `${code}.txt`),
+    `${releaseNotes}\n`,
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Commit and push branch
