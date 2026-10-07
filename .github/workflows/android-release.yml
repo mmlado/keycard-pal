@@ -243,38 +243,32 @@ jobs:
       - name: Restore keystore
         run: echo "${{ secrets.FDROID_KEYSTORE_B64 }}" | base64 -d > fdroid/keystore.p12
 
-      - name: Restore APKs from all previous releases
+      - name: Download APKs from all releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
         run: |
+          # The release assets share one name across releases, so each tag's APKs
+          # get the tag appended; otherwise every download overwrites the last.
           mkdir -p fdroid/repo
           gh release list --limit 100 --json tagName --jq '.[].tagName' \
-            | grep -v "^${RELEASE_TAG}$" \
             | while read tag; do
+                rm -rf release-apks && mkdir release-apks
                 gh release download "$tag" \
                   --pattern "keycard-pal-offline-release-*.apk" \
                   --pattern "keycard-pal-full-release-*.apk" \
-                  --dir fdroid/repo/ \
-                  --clobber 2>/dev/null || true
+                  --dir release-apks/ 2>/dev/null || true
+                for apk in release-apks/*.apk; do
+                  [ -e "$apk" ] || continue
+                  mv "$apk" "fdroid/repo/$(basename "$apk" .apk)-$tag.apk"
+                done
               done
-
-      - name: Download current release APKs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: |
-          mkdir -p new-apks/
-          gh release download "$RELEASE_TAG" \
-            --pattern "keycard-pal-offline-release-*.apk" \
-            --pattern "keycard-pal-full-release-*.apk" \
-            --dir new-apks/
-          count=$(find new-apks -maxdepth 1 -name "*.apk" | wc -l)
+          rm -rf release-apks
+          count=$(find fdroid/repo -maxdepth 1 -name "*-${RELEASE_TAG}.apk" | wc -l)
           if [ "$count" -eq 0 ]; then
-            echo "No APKs downloaded for $RELEASE_TAG — check release asset names."
+            echo "No APKs downloaded for $RELEASE_TAG, check release asset names."
             exit 1
           fi
-          cp new-apks/*.apk fdroid/repo/
 
       - name: Copy repo icon
         run: cp fastlane/metadata/android/en-US/images/icon.png fdroid/icon.png
@@ -285,6 +279,11 @@ jobs:
         env:
           FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
           FDROID_KEY_PASS: ${{ secrets.FDROID_KEY_PASS }}
+
+      - name: Check the index carries this release
+        env:
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        run: node scripts/check-fdroid-index.js --index fdroid/repo/index-v2.json --tag "$RELEASE_TAG"
 
       - name: Prepare Pages artifact
         run: |
