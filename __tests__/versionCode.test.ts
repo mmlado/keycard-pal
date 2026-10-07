@@ -10,9 +10,16 @@ const base = (major * 10000 + minor * 100 + patch) * 10;
 
 const gradle = read('android/app/build.gradle');
 
-// The recipes are rewritemeta-shaped, so a line scan is enough to read them.
+// The recipes are rewritemeta-shaped, so a line scan is enough to read them;
+// a long value sits on the next line under a bare key.
 function field(block: string, key: string): string | undefined {
-  return block.match(new RegExp(`^\\s*${key}: (.+)$`, 'm'))?.[1];
+  const m = block.match(
+    new RegExp(`^\\s*${key}:[ \\t]*(.*)$\\n?(?:^\\s+(\\S.*)$)?`, 'm'),
+  );
+  if (!m) {
+    return undefined;
+  }
+  return m[1].trim() || m[2]?.trim();
 }
 
 function listItems(block: string, key: string): string[] {
