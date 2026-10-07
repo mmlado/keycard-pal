@@ -4,6 +4,10 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import InitCardScreen, { dashboardEntry } from '../src/screens/InitCardScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
+import {
+  PUK_EXPLAINER,
+  PUK_UNCERTAIN_EXPLAINER,
+} from '../src/components/PukReview';
 
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
@@ -71,25 +75,31 @@ const route = { key: 'InitCard', name: 'InitCard' } as any;
 
 const PUK = '123456789012';
 
-function hookMock(phase: string) {
+function hookMock(phase: string, initSent = false) {
   return {
     phase,
     status: '',
     result: null,
     puk: PUK,
+    initSent,
     start: mockStart,
     cancel: mockCancel,
     reset: mockReset,
   };
 }
 
-async function renderScreen(phase = 'idle') {
-  mockUseInitCard.mockReturnValue(hookMock(phase));
+async function renderScreen(phase = 'idle', initSent = false) {
+  mockUseInitCard.mockReturnValue(hookMock(phase, initSent));
   const result = render(
     <InitCardScreen navigation={navigation} route={route} />,
   );
   await act(async () => {});
   return result;
+}
+
+function lastSheetProps() {
+  const calls = MockNFCBottomSheet.mock.calls;
+  return calls[calls.length - 1][0];
 }
 
 function lastBeforeRemoveHandler() {
@@ -326,6 +336,92 @@ describe('InitCardScreen', () => {
       await renderScreen('nfc');
       expect(screen.queryByText('Reveal PUK')).toBeNull();
     });
+
+    it('says the card is set up', async () => {
+      await renderScreen('done');
+      expect(screen.getByText(PUK_EXPLAINER)).toBeTruthy();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // PUK after a tap lost past INIT (#430)
+  // -------------------------------------------------------------------------
+
+  // The card may hold the PUK, so it is offered under the error, with no toast.
+  describe('PUK after an interrupted INIT', () => {
+    const dashboardNoToast = {
+      index: 0,
+      routes: [{ name: 'Dashboard', params: { toast: undefined } }],
+    };
+
+    it('shows the PUK with the uncertain wording behind the error', async () => {
+      await renderScreen('error', true);
+      expect(screen.getByText(PUK_UNCERTAIN_EXPLAINER)).toBeTruthy();
+      expect(screen.getByText('1234 5678 9012')).toBeTruthy();
+      expect(screen.getByText('Reveal PUK')).toBeTruthy();
+      expect(navigation.setOptions).toHaveBeenCalledWith({
+        title: 'Write down your PUK',
+      });
+      // The error, and its Try again, stay on top.
+      expect(lastSheetProps().nfc.phase).toBe('error');
+    });
+
+    it('keeps the PUK once the error is dismissed, with no way back into entry', async () => {
+      await renderScreen('idle', true);
+      expect(screen.getByText(PUK_UNCERTAIN_EXPLAINER)).toBeTruthy();
+      expect(screen.queryByText('6 digits')).toBeNull();
+      expect(screen.queryByText('Add a duress PIN?')).toBeNull();
+    });
+
+    it('shows no PUK for a tap that failed before INIT', async () => {
+      await renderScreen('error', false);
+      expect(screen.queryByText('Reveal PUK')).toBeNull();
+      expect(screen.queryByText(PUK_UNCERTAIN_EXPLAINER)).toBeNull();
+    });
+
+    it("the sheet's Cancel stays on the screen once INIT went out", async () => {
+      await renderScreen('error', true);
+      await act(async () => {
+        lastSheetProps().onCancel();
+      });
+      expect(mockCancel).toHaveBeenCalledTimes(1);
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
+
+    it("the sheet's Cancel still leaves after a failure before INIT", async () => {
+      await renderScreen('error', false);
+      await act(async () => {
+        lastSheetProps().onCancel();
+      });
+      expect(mockCancel).toHaveBeenCalledTimes(1);
+      expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    });
+
+    it('goes to the Dashboard without a toast once written down', async () => {
+      await renderScreen('idle', true);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Reveal PUK'));
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByText("I've written it down"));
+      });
+      expect(navigation.reset).toHaveBeenCalledWith(dashboardNoToast);
+    });
+
+    it('goes to the Dashboard on back, not into the entry steps', async () => {
+      await renderScreen('idle', true);
+      const event = { preventDefault: jest.fn() };
+      await act(async () => {
+        lastBeforeRemoveHandler()?.(event);
+      });
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(navigation.reset).toHaveBeenCalledWith(dashboardNoToast);
+
+      navigation.reset.mockClear();
+      expect(await pressHardwareBack()).toBe(true);
+      expect(navigation.reset).toHaveBeenCalledWith(dashboardNoToast);
+      expect(navigation.goBack).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -333,31 +429,26 @@ describe('InitCardScreen', () => {
   // -------------------------------------------------------------------------
 
   describe('NFCBottomSheet visibility', () => {
-    function lastProps() {
-      const calls = MockNFCBottomSheet.mock.calls;
-      return calls[calls.length - 1][0];
-    }
-
     it('nfc.phase is idle when phase is idle', async () => {
       await renderScreen('idle');
-      expect(lastProps().nfc.phase).toBe('idle');
+      expect(lastSheetProps().nfc.phase).toBe('idle');
     });
 
     it('nfc.phase is nfc when phase is nfc', async () => {
       await renderScreen('nfc');
-      expect(lastProps().nfc.phase).toBe('nfc');
+      expect(lastSheetProps().nfc.phase).toBe('nfc');
     });
 
     it('nfc.phase is error when phase is error', async () => {
       await renderScreen('error');
-      expect(lastProps().nfc.phase).toBe('error');
+      expect(lastSheetProps().nfc.phase).toBe('error');
     });
 
     // The PUK takes the success sheet's place.
     it('does not ask for the success sheet when phase is done', async () => {
       await renderScreen('done');
-      expect(lastProps().nfc.phase).toBe('done');
-      expect(lastProps().showOnDone).toBeFalsy();
+      expect(lastSheetProps().nfc.phase).toBe('done');
+      expect(lastSheetProps().showOnDone).toBeFalsy();
     });
   });
 

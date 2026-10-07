@@ -380,11 +380,12 @@ describe('done navigation against a screen with its own back guard', () => {
   });
 });
 
-// done.hold: the screen stays on done; every way off it is the Dashboard reset.
-describe('held done', () => {
+// hold: the screen stays on done; every way off it is the Dashboard reset.
+describe('held screen', () => {
   const options = {
     title: 'T',
-    done: { toast: 'Card initialized', hold: true },
+    done: { toast: 'Card initialized' },
+    hold: true,
   };
   const dashboard = {
     index: 0,
@@ -417,7 +418,8 @@ describe('held done', () => {
       keycard: makeKeycard('done', 'match'),
       navigation,
       title: 'T',
-      done: { toast: r => (r === 'match' ? 'Matches' : 'No'), hold: true },
+      done: { toast: r => (r === 'match' ? 'Matches' : 'No') },
+      hold: true,
     });
     result.current.leave();
     expect(navigation.reset).toHaveBeenCalledWith(
@@ -425,6 +427,23 @@ describe('held done', () => {
         routes: [{ name: 'Dashboard', params: { toast: 'Matches' } }],
       }),
     );
+  });
+
+  // InitCardScreen: no "Card initialized" over a PUK the card may not hold.
+  it('leave() sends no toast when the toast function returns none', () => {
+    const navigation = makeNavigation();
+    const { result } = renderScreenHook({
+      keycard: makeKeycard('error'),
+      navigation,
+      title: 'T',
+      done: { toast: () => undefined },
+      hold: true,
+    });
+    result.current.leave();
+    expect(navigation.reset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: 'Dashboard', params: { toast: undefined } }],
+    });
   });
 
   it('hardware back on the held screen leaves, not the screen fallback', () => {
@@ -458,19 +477,37 @@ describe('held done', () => {
     expect(onBeforeRemove).not.toHaveBeenCalled();
   });
 
-  it('holds only on done: a back press before the tap still reaches the screen', () => {
+  // The screen scopes the hold; a back press outside it still reaches the screen.
+  it('follows the hold as it changes', () => {
     const navigation = makeNavigation();
     const onBeforeRemove = jest.fn();
-    renderScreenHook({
+    const base = {
       ...options,
       keycard: makeKeycard('idle'),
       navigation,
       onBeforeRemove,
-    });
+    };
+    const { rerender } = renderScreenHook({ ...base, hold: false });
     const e = { preventDefault: jest.fn() };
     capturedBeforeRemove(navigation)(e);
     expect(onBeforeRemove).toHaveBeenCalledWith(e);
     expect(navigation.reset).not.toHaveBeenCalled();
+
+    rerender({ ...base, hold: true });
+    capturedBeforeRemove(navigation)(e);
+    expect(onBeforeRemove).toHaveBeenCalledTimes(1);
+    expect(navigation.reset).toHaveBeenCalledWith(dashboard);
+  });
+
+  it('navigates on done when the screen is not holding', () => {
+    const navigation = makeNavigation();
+    renderScreenHook({
+      ...options,
+      hold: false,
+      keycard: makeKeycard('done'),
+      navigation,
+    });
+    expect(navigation.reset).toHaveBeenCalledWith(dashboard);
   });
 });
 
