@@ -53,14 +53,22 @@ function main(argv) {
   const versionName = versionNameFromTag(tag);
   const missing = missingPackages(parsed, versionName, packages);
   if (missing.length > 0) {
-    console.error(`${versionName} is missing from ${index} for: ${missing.join(', ')}`);
+    console.error(
+      `${versionName} is missing from ${index} for: ${missing.join(', ')}`,
+    );
     return 1;
   }
   console.log(`${index} carries ${versionName} for ${packages.join(', ')}`);
   return 0;
 }
 
-module.exports = { DEFAULT_PACKAGES, missingPackages, versionNameFromTag };
+module.exports = {
+  DEFAULT_PACKAGES,
+  main,
+  missingPackages,
+  parseArgs,
+  versionNameFromTag,
+};
 
 if (require.main === module) {
   process.exit(main(process.argv.slice(2)));
