@@ -147,8 +147,10 @@ Add an entry under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) using `### Add
 last release, so a bug introduced and fixed inside the same unreleased cycle gets no entry, and
 one shipped feature is one bullet however many commits it took.
 
-Significant architectural or dependency decisions get an ADR in [`docs/adr/`](docs/adr/), with
-date, status, context, decision, rationale, consequences and revisit criteria.
+Significant architectural or dependency decisions get an ADR in [`docs/adr/`](docs/adr/): a
+title, a date, and a paragraph or two giving the context, the decision and why, plus
+considered options and consequences only where they carry something non-obvious. An ADR is
+not edited afterwards; a changed decision gets a new ADR that supersedes the old one.
 
 ## Security
 
