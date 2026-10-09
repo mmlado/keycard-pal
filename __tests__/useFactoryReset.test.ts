@@ -13,6 +13,7 @@ let capturedOnTimeout: (() => void) | null = null;
 const mockStartNFC = jest.fn();
 const mockStopNFC = jest.fn();
 const mockStopNFCWithError = jest.fn();
+const mockStopNFCWithMessage = jest.fn();
 
 jest.mock('react-native-keycard', () => ({
   __esModule: true,
@@ -35,10 +36,15 @@ jest.mock('react-native-keycard', () => ({
         return { remove: jest.fn() };
       },
       startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: () => mockStopNFC(),
-      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
+      stopNFC: (message?: string, isError?: boolean) =>
+        isError
+          ? mockStopNFCWithError(message)
+          : message
+          ? mockStopNFCWithMessage(message)
+          : mockStopNFC(),
       isNFCEnabled: () => Promise.resolve(true),
       openNFCSettings: () => Promise.resolve(true),
+      setNFCMessage: () => Promise.resolve(true),
     },
     NFCCardChannel: class {},
   },
@@ -69,11 +75,13 @@ describe('useFactoryReset', () => {
   beforeEach(() => {
     mockStartNFC.mockResolvedValue(undefined);
     mockStopNFC.mockResolvedValue(undefined);
+    mockStopNFCWithMessage.mockResolvedValue(undefined);
     mockStopNFCWithError.mockResolvedValue(undefined);
     mockSelect.mockResolvedValue({ sw: 0x9000 });
     mockFactoryReset.mockResolvedValue(undefined);
     mockStartNFC.mockClear();
     mockStopNFC.mockClear();
+    mockStopNFCWithMessage.mockClear();
     mockStopNFCWithError.mockClear();
     mockSelect.mockClear();
     mockFactoryReset.mockClear();
@@ -109,6 +117,28 @@ describe('useFactoryReset', () => {
         result.current.start();
       });
       expect(result.current.status).toBe('Tap your Keycard');
+    });
+  });
+
+  // The sheet's "Try again" needs the hook to carry a retry.
+  describe('retry', () => {
+    it('opens the reader again after an error', async () => {
+      mockSelect.mockResolvedValueOnce({ sw: 0x6a82 });
+      const { result } = renderHook(() => useFactoryReset());
+      await act(async () => {
+        result.current.start();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+      mockStartNFC.mockClear();
+
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -182,7 +212,7 @@ describe('useFactoryReset', () => {
       });
       expect(result.current.phase).toBe('nfc');
       expect(result.current.status).toBe(
-        'Connection lost - adjust Keycard position',
+        'Connection lost — hold your Keycard against the phone again',
       );
     });
 

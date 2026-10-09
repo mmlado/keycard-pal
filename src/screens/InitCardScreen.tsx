@@ -1,26 +1,23 @@
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icons } from '../assets/icons';
 import { DashboardAction, InitCardScreenProps } from '../navigation/types';
-
-import { useInitCard } from '../hooks/keycard/useInitCard';
-import { useConfirmedEntry } from '../hooks/useConfirmedEntry';
-
 import theme from '../theme';
+
 import ConfirmPrompt from '../components/ConfirmPropmpt';
 import NFCBottomSheet from '../components/NFCBottomSheet';
 import PinPad from '../components/PinPad';
+import PukReview from '../components/PukReview';
+
+import { useInitCard } from '../hooks/keycard/useInitCard';
+import { useConfirmedEntry } from '../hooks/useConfirmedEntry';
+import { useKeycardScreen } from '../hooks/useKeycardScreen';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Initialize',
+  icon: Icons.cardInit,
   navigate: nav => nav.navigate('InitCard'),
 };
 
@@ -32,7 +29,21 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   const mainPinRef = useRef('');
 
   const keycard = useInitCard();
-  const { phase, result, start, cancel } = keycard;
+  const { phase, puk, initSent, start } = keycard;
+
+  // Once INIT went out there is no way back into the entry steps: the PUK is
+  // shown whatever the tap ended in, with the error sheet over it until dismissed.
+  const uncertainPuk = initSent && (phase === 'idle' || phase === 'error');
+  const showPuk = phase === 'done' || uncertainPuk;
+  const entering = phase === 'idle' && !initSent;
+
+  const startInit = useCallback(
+    (duressPin: string | null) => {
+      start(mainPinRef.current, duressPin);
+      mainPinRef.current = '';
+    },
+    [start],
+  );
 
   const pinSetup = useConfirmedEntry(pin => {
     mainPinRef.current = pin;
@@ -40,42 +51,18 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   });
 
   const duressSetup = useConfirmedEntry(pin => {
-    start(mainPinRef.current, pin);
-    mainPinRef.current = '';
+    startInit(pin);
   });
-
-  useEffect(() => {
-    if (phase !== 'done' || !result) {
-      return;
-    }
-
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
-    });
-  }, [phase, result, navigation]);
-
-  const handleCancel = useCallback(() => {
-    cancel();
-    navigation.goBack();
-  }, [cancel, navigation]);
 
   const handleDuressYes = useCallback(() => {
     setScreenStep('duress_setup');
   }, []);
 
   const handleDuressNo = useCallback(() => {
-    start(mainPinRef.current, null);
-    mainPinRef.current = '';
-  }, [start]);
+    startInit(null);
+  }, [startInit]);
 
-  const goBack = useCallback(() => {
-    if (phase === 'nfc') {
-      cancel();
-      navigation.goBack();
-      return true;
-    }
-
+  const onScreenBack = useCallback(() => {
     if (screenStep === 'pin_setup') {
       const handled = pinSetup.goBack();
       if (!handled) {
@@ -90,30 +77,38 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
       return true;
     }
 
-    if (screenStep === 'duress_setup') {
-      const handled = duressSetup.goBack();
-      if (!handled) {
-        setScreenStep('duress_question');
-      }
-      return true;
+    const handled = duressSetup.goBack();
+    if (!handled) {
+      setScreenStep('duress_question');
     }
-
     return true;
-  }, [phase, screenStep, pinSetup, duressSetup, cancel, navigation]);
+  }, [screenStep, pinSetup, duressSetup, navigation]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const sub = BackHandler.addEventListener('hardwareBackPress', goBack);
-      return () => sub.remove();
-    }, [goBack]),
-  );
+  const title = (() => {
+    if (showPuk) {
+      return 'Write down your PUK';
+    }
+    if (screenStep === 'pin_setup') {
+      return pinSetup.step === 'entry' ? 'Create a PIN' : 'Confirm your PIN';
+    }
+    if (screenStep === 'duress_question') {
+      return 'Initialize Card';
+    }
+    return duressSetup.step === 'entry'
+      ? 'Create a duress PIN'
+      : 'Confirm duress PIN';
+  })();
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', e => {
-      if (phase === 'nfc') {
-        cancel();
-        return;
-      }
+  // The screen stays for the PUK; no toast when the card may not hold it.
+  const { onCancel, leave } = useKeycardScreen({
+    keycard,
+    navigation,
+    title,
+    done: { toast: () => (uncertainPuk ? undefined : 'Card initialized') },
+    hold: showPuk,
+    stayOnCancel: initSent,
+    onHardwareBack: onScreenBack,
+    onBeforeRemove: e => {
       if (screenStep === 'pin_setup' && pinSetup.step === 'confirm') {
         e.preventDefault();
         pinSetup.goBack();
@@ -132,25 +127,8 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
           setScreenStep('duress_question');
         }
       }
-    });
-    return unsubscribe;
-  }, [navigation, phase, screenStep, pinSetup, duressSetup, cancel]);
-
-  const title = (() => {
-    if (screenStep === 'pin_setup') {
-      return pinSetup.step === 'entry' ? 'Create a PIN' : 'Confirm your PIN';
-    }
-    if (screenStep === 'duress_question') {
-      return 'Initialize Card';
-    }
-    return duressSetup.step === 'entry'
-      ? 'Create a duress PIN'
-      : 'Confirm duress PIN';
-  })();
-
-  useLayoutEffect(() => {
-    navigation.setOptions({ title });
-  }, [navigation, title]);
+    },
+  });
 
   const activePinSetup =
     screenStep === 'pin_setup'
@@ -161,7 +139,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
-      {phase === 'idle' && activePinSetup && (
+      {entering && activePinSetup && (
         <PinPad
           key={activePinSetup.step}
           onComplete={
@@ -174,7 +152,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
         />
       )}
 
-      {phase === 'idle' && screenStep === 'duress_question' && (
+      {entering && screenStep === 'duress_question' && (
         <ConfirmPrompt
           title="Add a duress PIN?"
           description="A duress PIN unlocks the card but shows a decoy account. Use it if you are ever forced to access your wallet under pressure."
@@ -185,7 +163,11 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
         />
       )}
 
-      <NFCBottomSheet nfc={keycard} onCancel={handleCancel} showOnDone />
+      {showPuk && (
+        <PukReview puk={puk} uncertain={uncertainPuk} onDone={leave} />
+      )}
+
+      <NFCBottomSheet nfc={keycard} onCancel={onCancel} />
     </View>
   );
 }

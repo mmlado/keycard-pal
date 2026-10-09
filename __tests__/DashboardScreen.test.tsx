@@ -1,8 +1,15 @@
 import React, { act } from 'react';
-import { Linking } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardScreen from '../src/screens/DashboardScreen';
+import { BUY_KEYCARD_LABEL } from '../src/constants/purchaseLink';
+import {
+  noteTappedGeneration,
+  resetLastTappedGeneration,
+} from '../src/utils/lastTappedGeneration';
+
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -12,30 +19,37 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+let lastSnackDuration: number | undefined;
+
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
   return {
     MD3DarkTheme: { colors: {} },
     Text,
-    Snackbar: ({ visible, children }: any) =>
-      visible ? require('react').createElement(Text, null, children) : null,
-  };
-});
-
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      chevronRight: Icon,
-      close: Icon,
-      nfcActivate: Icon,
-      openInBrowser: Icon,
-      qr: Icon,
-      scan: Icon,
+    Snackbar: ({ visible, children, duration }: any) => {
+      lastSnackDuration = duration;
+      return visible
+        ? require('react').createElement(Text, null, children)
+        : null;
     },
   };
 });
+
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+let mockLayout: 'tiles' | 'list' = 'tiles';
+let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
+
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: mockTestPreferences({
+      dashboardLayout: mockLayout,
+      generationsInUse: mockGenerationsInUse,
+      generationRemindersDismissed: [],
+    }),
+    setPreference: jest.fn(),
+  }),
+}));
 
 // Capture the useFocusEffect callback so tests can fire focus events.
 let focusCallback: (() => void) | null = null;
@@ -47,8 +61,25 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockUseNavigationNavigate }),
 }));
 
-const mockDashboardActions: { label: string; navigate: (nav: any) => void }[] =
-  [];
+type MockAction = {
+  label: string;
+  detail?: string;
+  icon: React.ComponentType<any>;
+  navigate: (nav: any) => void;
+};
+
+const mockDashboardActions: MockAction[] = [];
+
+// Forwards props, so the icon carries its testID.
+const Icon = (props: any) => <View {...props} />;
+
+function action(
+  label: string,
+  navigate: (nav: any) => void = jest.fn(),
+  detail?: string,
+): MockAction {
+  return { label, detail, icon: Icon, navigate };
+}
 
 jest.mock('../src/navigation/dashboardActions', () => ({
   get dashboardActions() {
@@ -56,20 +87,10 @@ jest.mock('../src/navigation/dashboardActions', () => ({
   },
 }));
 
-const mockLoadBooleanPreference = jest.fn();
-const mockSaveBooleanPreference = jest.fn();
-
 jest.mock(
   '../src/components/walletConnect/DashboardCard.online',
   () => () => null,
 );
-
-jest.mock('../src/storage/preferencesStorage', () => ({
-  loadDashboardKeycardNoticeDismissed: (...args: any[]) =>
-    mockLoadBooleanPreference(...args),
-  saveDashboardKeycardNoticeDismissed: (...args: any[]) =>
-    mockSaveBooleanPreference(...args),
-}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,6 +100,11 @@ const navigation = {
   navigate: jest.fn(),
   setParams: jest.fn(),
 } as any;
+
+// AppState.currentState is a jest.fn() in the preset, so set it explicitly.
+function setAppState(state: 'active' | 'inactive' | 'background') {
+  (AppState as any).currentState = state;
+}
 
 async function renderScreen(routeParams?: { toast?: string }) {
   focusCallback = null;
@@ -100,12 +126,13 @@ describe('DashboardScreen', () => {
     navigation.setParams.mockClear();
     mockUseNavigationNavigate.mockClear();
     mockDashboardActions.length = 0;
-    mockLoadBooleanPreference.mockReset();
-    mockSaveBooleanPreference.mockReset();
-    mockLoadBooleanPreference.mockResolvedValue(true);
-    mockSaveBooleanPreference.mockResolvedValue(undefined);
     focusCallback = null;
-    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    mockLayout = 'tiles';
+    mockGenerationsInUse = ['3.1', '4.0'];
+    resetLastTappedGeneration();
+    // mockImplementation alone leaves call history from earlier tests in place.
+    (AppState.addEventListener as jest.Mock).mockClear();
+    setAppState('active');
   });
 
   afterEach(() => {
@@ -119,7 +146,7 @@ describe('DashboardScreen', () => {
     });
 
     it('renders one fewer pressable when action list is empty', async () => {
-      mockDashboardActions.push({ label: 'Sentinel', navigate: jest.fn() });
+      mockDashboardActions.push(action('Sentinel'));
       await renderScreen();
       expect(screen.getByText('Sentinel')).toBeTruthy();
 
@@ -132,10 +159,7 @@ describe('DashboardScreen', () => {
 
   describe('action list', () => {
     it('renders items with their labels', async () => {
-      mockDashboardActions.push(
-        { label: 'Action One', navigate: jest.fn() },
-        { label: 'Action Two', navigate: jest.fn() },
-      );
+      mockDashboardActions.push(action('Action One'), action('Action Two'));
       await renderScreen();
       expect(screen.getByText('Action One')).toBeTruthy();
       expect(screen.getByText('Action Two')).toBeTruthy();
@@ -143,10 +167,7 @@ describe('DashboardScreen', () => {
 
     it('calls the action navigate when an item is pressed', async () => {
       const mockNavigate = jest.fn();
-      mockDashboardActions.push({
-        label: 'Test Action',
-        navigate: mockNavigate,
-      });
+      mockDashboardActions.push(action('Test Action', mockNavigate));
       await renderScreen();
       fireEvent.press(screen.getByText('Test Action'));
       expect(mockNavigate).toHaveBeenCalledTimes(1);
@@ -157,13 +178,83 @@ describe('DashboardScreen', () => {
       const mockFirst = jest.fn();
       const mockSecond = jest.fn();
       mockDashboardActions.push(
-        { label: 'First', navigate: mockFirst },
-        { label: 'Second', navigate: mockSecond },
+        action('First', mockFirst),
+        action('Second', mockSecond),
       );
       await renderScreen();
       fireEvent.press(screen.getByText('Second'));
       expect(mockSecond).toHaveBeenCalledTimes(1);
       expect(mockFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  // An odd count promotes the first entry to a hero tile.
+  describe('tile grid', () => {
+    it('renders the first entry as a hero tile when the count is odd', async () => {
+      mockDashboardActions.push(
+        action('One', jest.fn(), 'Hero detail'),
+        action('Two'),
+        action('Three'),
+      );
+      await renderScreen();
+      expect(screen.getByTestId('tile-hero')).toBeTruthy();
+      expect(screen.getByTestId('tile-0')).toBeTruthy();
+      expect(screen.getByTestId('tile-1')).toBeTruthy();
+      expect(screen.queryByTestId('tile-2')).toBeNull();
+    });
+
+    it('renders only standard tiles when the count is even', async () => {
+      mockDashboardActions.push(action('One'), action('Two'));
+      await renderScreen();
+      expect(screen.queryByTestId('tile-hero')).toBeNull();
+      expect(screen.getByTestId('tile-0')).toBeTruthy();
+      expect(screen.getByTestId('tile-1')).toBeTruthy();
+    });
+
+    it('shows the detail line on the hero tile only', async () => {
+      mockDashboardActions.push(
+        action('One', jest.fn(), 'Hero detail'),
+        action('Two', jest.fn(), 'Standard detail'),
+        action('Three'),
+      );
+      await renderScreen();
+      expect(screen.getByText('Hero detail')).toBeTruthy();
+      expect(screen.queryByText('Standard detail')).toBeNull();
+    });
+  });
+
+  // The reminder is mounted only here.
+  describe('unselected Keycard reminder', () => {
+    it('shows after a tap of a card the user left unticked', async () => {
+      mockGenerationsInUse = ['4.0'];
+      noteTappedGeneration('3.1');
+      await renderScreen();
+      expect(screen.getByTestId('unselected-keycard-reminder')).toBeTruthy();
+    });
+
+    it('stays away while the tapped card is one the user ticked', async () => {
+      noteTappedGeneration('3.1');
+      await renderScreen();
+      expect(screen.queryByTestId('unselected-keycard-reminder')).toBeNull();
+    });
+  });
+
+  describe('layout preference', () => {
+    it('renders the list instead of tiles when the preference says list', async () => {
+      mockLayout = 'list';
+      mockDashboardActions.push(action('One'), action('Two'));
+      await renderScreen();
+      expect(screen.queryByTestId('tile-grid')).toBeNull();
+      expect(screen.getByTestId('menu-icon-0')).toBeTruthy();
+      expect(screen.getByText('One')).toBeTruthy();
+    });
+
+    it('renders tiles when the preference says tiles', async () => {
+      mockLayout = 'tiles';
+      mockDashboardActions.push(action('One'), action('Two'));
+      await renderScreen();
+      expect(screen.getByTestId('tile-grid')).toBeTruthy();
+      expect(screen.queryByTestId('menu-icon-0')).toBeNull();
     });
   });
 
@@ -175,7 +266,7 @@ describe('DashboardScreen', () => {
     });
 
     it('does not call navigation.navigate when an action item is pressed', async () => {
-      mockDashboardActions.push({ label: 'Some Action', navigate: jest.fn() });
+      mockDashboardActions.push(action('Some Action'));
       await renderScreen();
       fireEvent.press(screen.getByText('Some Action'));
       expect(navigation.navigate).not.toHaveBeenCalled();
@@ -209,72 +300,48 @@ describe('DashboardScreen', () => {
     });
   });
 
-  describe('keycard notice', () => {
-    it('shows the notice when it has not been dismissed', async () => {
-      mockLoadBooleanPreference.mockResolvedValue(false);
-      await renderScreen();
+  // The toast outlasts Apple's NFC sheet, which covers it for about 3.4 s.
+  describe('toast vs the iOS NFC sheet', () => {
+    const origOS = Platform.OS;
 
-      expect(screen.getByText('Keycard required')).toBeTruthy();
-      expect(screen.getByText('Buy a Keycard')).toBeTruthy();
-      expect(screen.getByText(/ShellSummer9746/)).toBeTruthy();
+    afterEach(() => {
+      Platform.OS = origOS;
     });
 
-    it('hides the notice when it was already dismissed', async () => {
-      await renderScreen();
-      expect(screen.queryByText('Keycard required')).toBeNull();
-    });
-
-    it('opens the purchase link in the browser', async () => {
-      mockLoadBooleanPreference.mockResolvedValue(false);
-      await renderScreen();
-
-      fireEvent.press(screen.getByTestId('dashboard-keycard-purchase-link'));
-
-      expect(Linking.openURL).toHaveBeenCalledWith(
-        'https://get.keycard.tech/vuxxnf',
-      );
-    });
-
-    it('dismisses the notice and remembers that choice', async () => {
-      mockLoadBooleanPreference.mockResolvedValue(false);
-      await renderScreen();
-
+    it('outlasts the NFC sheet on iOS', async () => {
+      Platform.OS = 'ios';
+      await renderScreen({ toast: 'Card name updated' });
       await act(async () => {
-        fireEvent.press(screen.getByTestId('dashboard-keycard-notice-close'));
+        focusCallback?.();
       });
-
-      expect(mockSaveBooleanPreference).toHaveBeenCalledWith(true);
-      expect(screen.queryByText('Keycard required')).toBeNull();
+      expect(lastSnackDuration).toBe(7000);
     });
 
-    it('hides the notice when load rejects', async () => {
-      mockLoadBooleanPreference.mockRejectedValue(new Error('storage error'));
-      await renderScreen();
-      expect(screen.queryByText('Keycard required')).toBeNull();
-    });
-
-    it('dismisses the notice even when save rejects', async () => {
-      mockLoadBooleanPreference.mockResolvedValue(false);
-      mockSaveBooleanPreference.mockRejectedValue(new Error('storage error'));
-      await renderScreen();
-
+    it('keeps the default duration on Android, which has no system sheet', async () => {
+      Platform.OS = 'android';
+      await renderScreen({ toast: 'Card name updated' });
       await act(async () => {
-        fireEvent.press(screen.getByTestId('dashboard-keycard-notice-close'));
+        focusCallback?.();
       });
-
-      expect(screen.queryByText('Keycard required')).toBeNull();
+      expect(lastSnackDuration).toBe(3000);
     });
 
-    it('navigates to UrlQR when the QR icon button is pressed', async () => {
-      mockLoadBooleanPreference.mockResolvedValue(false);
-      await renderScreen();
-
-      fireEvent.press(screen.getByTestId('dashboard-keycard-qr-button'));
-
-      expect(mockUseNavigationNavigate).toHaveBeenCalledWith('UrlQR', {
-        url: 'https://get.keycard.tech/vuxxnf',
-        title: 'Buy a Keycard',
+    // Regression: waiting for AppState 'active' showed the toast late, into an empty screen.
+    it('shows immediately rather than waiting for the app to become active', async () => {
+      Platform.OS = 'ios';
+      setAppState('inactive');
+      await renderScreen({ toast: 'Card name updated' });
+      await act(async () => {
+        focusCallback?.();
       });
+      expect(screen.getByText('Card name updated')).toBeTruthy();
+      expect(AppState.addEventListener).not.toHaveBeenCalled();
     });
+  });
+
+  it('does not render the buy-Keycard notice', async () => {
+    await renderScreen();
+    expect(screen.queryByText('Keycard required')).toBeNull();
+    expect(screen.queryByText(BUY_KEYCARD_LABEL)).toBeNull();
   });
 });

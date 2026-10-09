@@ -1,16 +1,24 @@
 import { useCallback, useRef } from 'react';
 
+import type { SecretType } from '@/navigation/types';
+
 import {
   useKeycardOperation,
   UseKeycardOperation,
 } from './useKeycardOperation';
-import type { SecretType } from '../../navigation/types';
 
 export type UseChangeSecretOperation = Omit<
   UseKeycardOperation<void>,
   'execute'
 > & {
   start: (newSecret: string) => void;
+};
+
+/** Keep equal to ChangeSecretScreen's toasts. */
+const SECRET_CHANGED_MESSAGE: Record<SecretType, string> = {
+  pin: 'PIN changed',
+  puk: 'PUK changed',
+  pairing: 'Pairing secret changed',
 };
 
 export function useChangeSecret(
@@ -37,7 +45,14 @@ export function useChangeSecret(
           newSecretRef.current = '';
           resp.checkOK();
         },
-        { requiresMasterKey: false },
+        {
+          requiresMasterKey: false,
+          // Catches a different card being tapped the second time.
+          requiresRoute:
+            secretType === 'pairing' ? 'ChangePairingSecret' : undefined,
+          // Mirrors ChangeSecretScreen's per-secret done toast.
+          successMessage: SECRET_CHANGED_MESSAGE[secretType],
+        },
       );
     },
     [execute, secretType],

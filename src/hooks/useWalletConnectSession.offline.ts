@@ -28,3 +28,11 @@ export function useWalletConnectSession() {
     ) => {},
   };
 }
+
+import type { SatisfiesOnline } from '@/utils/onlineParity';
+
+// tsc drift guard: this stub must stay interface-compatible with its online twin.
+export type _OnlineParity = SatisfiesOnline<
+  typeof import('./useWalletConnectSession.online'),
+  typeof import('./useWalletConnectSession.offline')
+>;

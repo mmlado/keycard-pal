@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons } from 'react-native-paper';
 
+import { CALLDATA_DIGEST_EXPLAINER } from '@/constants/erc8213';
 import type { EthSignRequest } from '@/types';
 
-import NFCBottomSheet from '@/components/NFCBottomSheet';
 import InfoRow from '@/components/InfoRow';
 import { computeCalldataDigest } from '@/utils/erc8213';
 import type { ParsedTx } from '@/utils/txParser';
 
-import { DigestRow } from './shared';
+import { DigestExplainer, DigestRow } from './shared';
 import DecodedCallSection from './DecodedCallSection';
 import SimulationPanel from './SimulationPanel';
 import { useSimulation } from './useSimulation';
@@ -32,13 +32,11 @@ export default function TxDataPanel({
   const initialTab: Tab = hasDecodedCall ? 'decoded' : 'digests';
   const [tab, setTab] = useState<Tab>(initialTab);
 
-  const {
-    showSimulationTab,
-    simulationState,
-    addressOp,
-    handleSimulate,
-    handleCancelNfc,
-  } = useSimulation(request, tx, chainId);
+  const { showSimulationTab, simulationState, handleSimulate } = useSimulation(
+    request,
+    tx,
+    chainId,
+  );
 
   const calldataDigest = useMemo(
     () => computeCalldataDigest(calldata),
@@ -79,7 +77,10 @@ export default function TxDataPanel({
           />
         )}
         {tab === 'digests' && calldataDigest && (
-          <DigestRow label="Calldata Digest" value={calldataDigest} />
+          <>
+            <DigestRow label="Calldata Digest" value={calldataDigest} />
+            <DigestExplainer text={CALLDATA_DIGEST_EXPLAINER} />
+          </>
         )}
         {tab === 'raw' && (
           <View style={styles.row}>
@@ -93,7 +94,6 @@ export default function TxDataPanel({
           />
         )}
       </View>
-      <NFCBottomSheet nfc={addressOp} onCancel={handleCancelNfc} />
     </View>
   );
 }

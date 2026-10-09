@@ -8,6 +8,7 @@ import IndexedAtRow from './IndexedAtRow';
 import ImportRegistryButton from './ImportRegistryButton';
 
 import { loadIndexedAt } from '@/storage/eip7730Index';
+import type { SatisfiesOnline } from '@/utils/onlineParity';
 
 export default function Eip7730SettingsSection() {
   const [indexedAt, setIndexedAt] = useState<string | null>(null);
@@ -63,3 +64,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
+
+// tsc drift guard: this stub must stay interface-compatible with its online twin.
+export type _OnlineParity = SatisfiesOnline<
+  typeof import('./Eip7730SettingsSection.online'),
+  typeof import('./Eip7730SettingsSection.offline')
+>;

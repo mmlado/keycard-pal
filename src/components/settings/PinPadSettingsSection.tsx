@@ -1,29 +1,15 @@
-import { useEffect, useState } from 'react';
-
-import {
-  loadPinPadScramble,
-  savePinPadScramble,
-} from '../../storage/preferencesStorage';
+import { usePreferences } from '../../hooks/usePreferences';
 
 import SettingsToggleRow from './SettingsToggleRow';
 
 export default function PinPadSettingsSection() {
-  const [scramble, setScramble] = useState(false);
-
-  useEffect(() => {
-    loadPinPadScramble().then(setScramble);
-  }, []);
-
-  const handleToggle = (value: boolean) => {
-    setScramble(value);
-    savePinPadScramble(value).catch(() => setScramble(!value));
-  };
+  const { preferences, setPreference } = usePreferences();
 
   return (
     <SettingsToggleRow
       label="Scramble PIN pad"
-      value={scramble}
-      onValueChange={handleToggle}
+      value={preferences.pinPadScramble}
+      onValueChange={value => setPreference('pinPadScramble', value)}
     />
   );
 }

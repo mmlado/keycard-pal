@@ -1,0 +1,94 @@
+name: Publish Pages (no release)
+
+# Rebuilds and deploys the GitHub Pages site (F-Droid repo + privacy policy)
+# from the already-published release APKs, without cutting a release. Use when
+# a static page (e.g. docs/privacy.html) changes between releases.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pages:
+    name: Publish Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install fdroidserver
+        run: pip install fdroidserver
+
+      - name: Restore keystore
+        run: echo "${{ secrets.FDROID_KEYSTORE_B64 }}" | base64 -d > fdroid/keystore.p12
+
+      - name: Download APKs from all releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The release assets share one name across releases, so each tag's APKs
+          # get the tag appended; otherwise every download overwrites the last.
+          mkdir -p fdroid/repo
+          gh release list --limit 100 --json tagName --jq '.[].tagName' \
+            | while read tag; do
+                rm -rf release-apks && mkdir release-apks
+                gh release download "$tag" \
+                  --pattern "keycard-pal-offline-release-*.apk" \
+                  --pattern "keycard-pal-full-release-*.apk" \
+                  --dir release-apks/ 2>/dev/null || true
+                for apk in release-apks/*.apk; do
+                  [ -e "$apk" ] || continue
+                  mv "$apk" "fdroid/repo/$(basename "$apk" .apk)-$tag.apk"
+                done
+              done
+          rm -rf release-apks
+          count=$(find fdroid/repo -maxdepth 1 -name "*.apk" | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "No release APKs found, refusing to deploy an empty F-Droid repo."
+            exit 1
+          fi
+
+      - name: Copy repo icon
+        run: cp fastlane/metadata/android/en-US/images/icon.png fdroid/icon.png
+
+      - name: Run fdroid update
+        working-directory: fdroid
+        run: fdroid update --verbose
+        env:
+          FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
+          FDROID_KEY_PASS: ${{ secrets.FDROID_KEY_PASS }}
+
+      - name: Check the index carries the latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          latest=$(gh release list --limit 1 --exclude-drafts --exclude-pre-releases \
+            --json tagName --jq '.[0].tagName')
+          node scripts/check-fdroid-index.js --index fdroid/repo/index-v2.json --tag "$latest"
+
+      - name: Prepare Pages artifact
+        run: |
+          mkdir -p pages
+          cp -r fdroid/repo pages/repo
+          cp -r fdroid/archive pages/archive 2>/dev/null || true
+          cp docs/privacy.html pages/privacy.html
+          echo "fdroid.keycardpal.com" > pages/CNAME
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f fdroid/keystore.p12
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages/
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

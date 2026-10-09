@@ -10,12 +10,13 @@ import { EdgeInsets } from 'react-native-safe-area-context';
 import theme from '@/theme';
 import AddressText from '@/components/AddressText';
 import PrimaryButton from '@/components/PrimaryButton';
+import type { AddressRow } from '@/hooks/keycard/useAddressEnumeration';
 
 import styles from './styles';
 
 export default function AddressSelectionPhase({
-  addresses,
-  selectedAddress,
+  rows,
+  selectedRow,
   loading,
   insets,
   onSelect,
@@ -23,11 +24,11 @@ export default function AddressSelectionPhase({
   onConnect,
   onCancel,
 }: {
-  addresses: string[];
-  selectedAddress: string | null;
+  rows: AddressRow[];
+  selectedRow: AddressRow | null;
   loading: boolean;
   insets: EdgeInsets;
-  onSelect: (address: string) => void;
+  onSelect: (row: AddressRow) => void;
   onLoadMore: () => void;
   onConnect: () => void;
   onCancel: () => void;
@@ -43,19 +44,19 @@ export default function AddressSelectionPhase({
         Select address
       </Text>
       <FlatList
-        data={addresses}
-        keyExtractor={item => item}
+        data={rows}
+        keyExtractor={item => item.path}
         style={styles.list}
         renderItem={({ item, index }) => (
           <Pressable style={styles.addrRow} onPress={() => onSelect(item)}>
             <RadioButton.Android
-              value={item}
-              status={selectedAddress === item ? 'checked' : 'unchecked'}
+              value={item.address}
+              status={selectedRow?.path === item.path ? 'checked' : 'unchecked'}
               onPress={() => onSelect(item)}
               color={theme.colors.primary}
             />
             <Text style={styles.addrIndex}>{index}</Text>
-            <AddressText address={item} style={styles.addrText} />
+            <AddressText address={item.address} style={styles.addrText} />
           </Pressable>
         )}
         onEndReached={onLoadMore}
@@ -67,7 +68,7 @@ export default function AddressSelectionPhase({
               color={theme.colors.primary}
               style={styles.listFooter}
             />
-          ) : null
+          ) : undefined
         }
       />
       <View style={styles.proposalActions}>
@@ -81,7 +82,7 @@ export default function AddressSelectionPhase({
         <PrimaryButton
           label="Connect"
           onPress={onConnect}
-          disabled={!selectedAddress}
+          disabled={!selectedRow}
         />
       </View>
     </View>

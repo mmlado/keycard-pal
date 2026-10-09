@@ -1,0 +1,1 @@
+Adds a privacy policy page (fdroid.keycardpal.com/privacy.html) and Google Play distribution. Play builds are signed by Google and cannot replace GitHub/F-Droid installs; pick one install source.

@@ -48,16 +48,12 @@ describe('lookupToken', () => {
 describe('lookupToken logo source', () => {
   afterEach(() => {
     jest.resetModules();
-    jest.dontMock('../src/data/token-logos-index.json');
-    jest.dontMock('../src/utils/buildConfig');
+    jest.dontMock('../src/data/tokenLogosIndex.online');
   });
 
-  it('uses bundled asset URIs when INTERNET is disabled and a local logo exists', () => {
-    jest.doMock('../src/utils/buildConfig', () => ({
-      INTERNET_ENABLED: false,
-    }));
-    jest.doMock('../src/data/token-logos-index.json', () => ({
-      [`${MAINNET}:${USDC_ADDRESS}`]: 'png',
+  it('uses bundled asset URIs for a token in the offline logo index', () => {
+    jest.doMock('../src/data/tokenLogosIndex.online', () => ({
+      tokenLogosIndex: { [`${MAINNET}:${USDC_ADDRESS}`]: 'png' },
     }));
 
     jest.isolateModules(() => {
@@ -70,18 +66,28 @@ describe('lookupToken logo source', () => {
     });
   });
 
-  it('keeps remote logo URIs when INTERNET is enabled', () => {
-    jest.doMock('../src/utils/buildConfig', () => ({ INTERNET_ENABLED: true }));
-    jest.doMock('../src/data/token-logos-index.json', () => ({
-      [`${MAINNET}:${USDC_ADDRESS}`]: 'png',
+  it('keeps remote logo URIs when the index is empty', () => {
+    expect(lookupToken(MAINNET, USDC_ADDRESS)!.logoURI).toMatch(/^https:\/\//);
+  });
+
+  it('resolves the real offline index to an asset URI', () => {
+    const { tokenLogosIndex } =
+      require('../src/data/tokenLogosIndex.offline') as typeof import('../src/data/tokenLogosIndex.offline');
+
+    expect(tokenLogosIndex[`${MAINNET}:${USDC_ADDRESS}`]).toBeTruthy();
+
+    jest.doMock('../src/data/tokenLogosIndex.online', () => ({
+      tokenLogosIndex,
     }));
 
     jest.isolateModules(() => {
-      const { lookupToken: lookupWithRemoteLogo } =
+      const { lookupToken: lookupOffline } =
         require('../src/utils/tokenMetadata') as typeof import('../src/utils/tokenMetadata');
 
-      expect(lookupWithRemoteLogo(MAINNET, USDC_ADDRESS)!.logoURI).toMatch(
-        /^https:\/\//,
+      expect(lookupOffline(MAINNET, USDC_ADDRESS)!.logoURI).toBe(
+        `asset:/token-logos/${MAINNET}-${USDC_ADDRESS}.${
+          tokenLogosIndex[`${MAINNET}:${USDC_ADDRESS}`]
+        }`,
       );
     });
   });

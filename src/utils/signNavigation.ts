@@ -1,5 +1,6 @@
 import type { KeycardParams } from '@/navigation/types';
 import type { ScanResult } from '@/types';
+import { classifyEthPayload } from '@/utils/ethPayload';
 
 export function buildSignKeycardParams(
   result: ScanResult,
@@ -7,6 +8,11 @@ export function buildSignKeycardParams(
   if (result.kind === 'eth-sign-request') {
     const { signData, derivationPath, chainId, requestId, dataType } =
       result.request;
+    // An unclassifiable payload must never reach the Keycard screen — the
+    // review shows the reason and the Sign button is withheld.
+    if (classifyEthPayload(signData, dataType).kind === 'invalid') {
+      return null;
+    }
     return {
       operation: 'sign',
       signMode: 'eth',

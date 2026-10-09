@@ -7,13 +7,13 @@ import React, {
 } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
-import {
-  SUPPORTED_WC_EIP155_CHAIN_IDS,
-  SUPPORTED_WC_METHODS,
-  WCContext,
-} from '@/constants/walletConnect';
+import { SUPPORTED_WC_METHODS, WCContext } from '@/constants/walletConnect';
 import { navigationRef } from '@/navigation/navigationRef';
 import { wcClient } from '@/utils/walletConnect/client.online';
+import {
+  resolveNamespaces,
+  validateProposal,
+} from '@/utils/walletConnect/proposalPolicy';
 import { wcRequestToScanResult } from '@/utils/walletConnect/requestAdapter';
 
 import {
@@ -25,60 +25,9 @@ import {
   WCRequest,
 } from './context';
 
+// Incoming session_request method gate — proposal-time policy lives in
+// utils/walletConnect/proposalPolicy.ts.
 const SUPPORTED_METHODS: string[] = [...SUPPORTED_WC_METHODS];
-
-type ResolvedNamespaces = {
-  approvedChains: string[];
-  approvedMethods: string[];
-  unsupportedNamespaces: string[];
-  unsupportedRequired: string[];
-  unsupportedRequiredChains: string[];
-};
-
-function resolveNamespaces(proposal: SessionProposalEvent): ResolvedNamespaces {
-  const supported = SUPPORTED_WC_EIP155_CHAIN_IDS.map(id => `eip155:${id}`);
-  const unsupportedNamespaces = Object.keys(
-    proposal.params.requiredNamespaces,
-  ).filter(ns => ns !== 'eip155');
-
-  const requiredChains =
-    proposal.params.requiredNamespaces.eip155?.chains ?? [];
-  const optionalChains =
-    proposal.params.optionalNamespaces?.eip155?.chains ?? [];
-  const requestedChains = [...new Set([...requiredChains, ...optionalChains])];
-  const approvedChains =
-    requestedChains.length > 0
-      ? requestedChains.filter(c => supported.includes(c))
-      : supported;
-
-  const requiredMethods =
-    proposal.params.requiredNamespaces.eip155?.methods ?? [];
-  const optionalMethods =
-    proposal.params.optionalNamespaces?.eip155?.methods ?? [];
-  const requestedMethods = [
-    ...new Set([...requiredMethods, ...optionalMethods]),
-  ];
-  const approvedMethods =
-    requestedMethods.length > 0
-      ? requestedMethods.filter(m => SUPPORTED_METHODS.includes(m))
-      : SUPPORTED_METHODS;
-
-  const unsupportedRequired = requiredMethods.filter(
-    m => !SUPPORTED_METHODS.includes(m),
-  );
-
-  const unsupportedRequiredChains = requiredChains.filter(
-    c => !supported.includes(c),
-  );
-
-  return {
-    approvedChains,
-    approvedMethods,
-    unsupportedNamespaces,
-    unsupportedRequired,
-    unsupportedRequiredChains,
-  };
-}
 
 export function WalletConnectProvider({
   children,
@@ -95,7 +44,10 @@ export function WalletConnectProvider({
   const activeRequestRef = useRef<WCRequest | null>(null);
   const addressPathRef = useRef<Map<string, string>>(new Map());
   const respondedRef = useRef(false);
-  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  // The generated types make currentState a nullable string; only 'active' is ever tested.
+  const appStateRef = useRef<AppStateStatus>(
+    AppState.currentState as AppStateStatus,
+  );
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', next => {
@@ -106,11 +58,9 @@ export function WalletConnectProvider({
 
   useEffect(() => {
     let mounted = true;
-    let removeListeners: (() => void) | undefined;
 
-    wcClient.getClient().then(client => {
-      if (!mounted) return;
-
+    // Subscribing creates nothing: the client only exists after pair().
+    const unsubscribe = wcClient.onClient(client => {
       function onProposal(event: SessionProposalEvent) {
         if (!mounted) return;
         setPhase({ kind: 'proposal', proposal: event });
@@ -191,16 +141,18 @@ export function WalletConnectProvider({
       client.on('session_request', onRequest);
       client.on('session_delete', onDelete);
 
-      removeListeners = () => {
+      return () => {
         client.off('session_proposal', onProposal);
         client.off('session_request', onRequest);
         client.off('session_delete', onDelete);
+        // The client was replaced (new Project ID): its session went with it.
+        onDelete();
       };
     });
 
     return () => {
       mounted = false;
-      removeListeners?.();
+      unsubscribe();
     };
   }, []);
 
@@ -260,34 +212,12 @@ export function WalletConnectProvider({
         return;
       }
       const { proposal } = currentPhase;
-      const {
-        approvedChains,
-        approvedMethods,
-        unsupportedNamespaces,
-        unsupportedRequired,
-        unsupportedRequiredChains,
-      } = resolveNamespaces(proposal);
-
-      if (
-        unsupportedNamespaces.length > 0 ||
-        unsupportedRequiredChains.length > 0 ||
-        unsupportedRequired.length > 0
-      ) {
-        const reason =
-          unsupportedNamespaces.length > 0
-            ? `Required namespaces not supported: ${unsupportedNamespaces.join(
-                ', ',
-              )}`
-            : unsupportedRequiredChains.length > 0
-            ? `Required chains not supported: ${unsupportedRequiredChains.join(
-                ', ',
-              )}`
-            : `Required methods not supported: ${unsupportedRequired.join(
-                ', ',
-              )}`;
-        await rejectProposal(proposal, reason);
+      const verdict = validateProposal(proposal);
+      if (!verdict.ok) {
+        await rejectProposal(proposal, verdict.reason);
         return;
       }
+      const { approvedChains, approvedMethods } = resolveNamespaces(proposal);
 
       addressPathRef.current.set(address.toLowerCase(), derivationPath);
       setPhase('approving');

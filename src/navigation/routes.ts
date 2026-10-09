@@ -21,6 +21,7 @@ import SetCardNameScreen from '../screens/SetCardNameScreen';
 import TransactionDetailScreen from '../screens/TransactionDetailScreen';
 import UrlQRScreen from '../screens/UrlQRScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import WelcomeScreen from '../screens/WelcomeScreen';
 
 // Address screens
 import AddressDetailScreen from '../screens/address/AddressDetailScreen';
@@ -38,6 +39,7 @@ import Slip39Screen from '../screens/keypair/Slip39Screen';
 // Secrets screens
 import ChangeSecretScreen from '../screens/secrets/ChangeSecretScreen';
 import SecretsMenuScreen from '../screens/secrets/SecretsMenuScreen';
+import UnblockPinScreen from '../screens/secrets/UnblockPinScreen';
 
 const headerStyle = { backgroundColor: theme.colors.background };
 const headerTitleStyle = { fontWeight: '600' as const };
@@ -49,6 +51,7 @@ const defaultHeaderOptions: NativeStackNavigationOptions = {
   headerTitleStyle,
   headerTitleAlign: 'center',
   headerShadowVisible: false,
+  headerBackButtonDisplayMode: 'minimal',
 };
 
 type Route = {
@@ -58,6 +61,7 @@ type Route = {
 };
 
 export const routes: Route[] = [
+  { name: 'Welcome', component: WelcomeScreen },
   { name: 'Dashboard', component: DashboardScreen },
 
   // Keycard operations
@@ -96,7 +100,7 @@ export const routes: Route[] = [
   {
     name: 'KeyPairMenu',
     component: KeyPairMenuScreen,
-    options: { ...defaultHeaderOptions, title: 'Add keypair' },
+    options: { ...defaultHeaderOptions, title: 'Add key pair' },
   },
   {
     name: 'KeySize',
@@ -133,6 +137,11 @@ export const routes: Route[] = [
   {
     name: 'ChangeSecret',
     component: ChangeSecretScreen,
+    options: defaultHeaderOptions,
+  },
+  {
+    name: 'UnblockPin',
+    component: UnblockPinScreen,
     options: defaultHeaderOptions,
   },
 

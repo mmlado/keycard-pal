@@ -40,6 +40,15 @@ describe('deriveMnemonicFingerprint', () => {
     );
   });
 
+  it('normalizes Unicode before deriving the seed', () => {
+    deriveMnemonicFingerprint(['あおぞら'], 'ＴＲＥＺＯＲ café');
+
+    expect(mockToBinarySeed).toHaveBeenCalledWith(
+      'あおそ\u3099ら',
+      'TREZOR cafe\u0301',
+    );
+  });
+
   it('uses empty string passphrase when omitted', () => {
     deriveMnemonicFingerprint(WORDS);
 

@@ -12,6 +12,8 @@ import { Text } from 'react-native-paper';
 
 import theme from '../theme';
 
+import { Icons } from '@/assets/icons';
+
 type Props = {
   value: string;
   onChangeText: (text: string) => void;
@@ -24,6 +26,9 @@ type Props = {
   onWordErrorChange?: (error: string | null) => void;
   wordCountOptions?: readonly number[];
   onWordCountChange?: (wordCount: number) => void;
+  onScanPress?: () => void;
+  scanTestID?: string;
+  editable?: boolean;
   inputStyle?: StyleProp<TextStyle>;
   wrapperStyle?: StyleProp<ViewStyle>;
 };
@@ -40,6 +45,9 @@ export default function MnemonicWordEntry({
   onWordErrorChange,
   wordCountOptions,
   onWordCountChange,
+  onScanPress,
+  scanTestID,
+  editable = true,
   inputStyle,
   wrapperStyle,
 }: Props) {
@@ -99,17 +107,36 @@ export default function MnemonicWordEntry({
       )}
 
       <View style={styles.inputWrapper}>
-        <TextInput
-          style={[styles.wordInput, inputStyle]}
-          value={value}
-          onChangeText={onChangeText}
-          multiline
-          autoCapitalize="none"
-          autoCorrect={false}
-          spellCheck={false}
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.onSurfacePlaceholder}
-        />
+        <View>
+          <TextInput
+            style={[
+              styles.wordInput,
+              onScanPress && styles.wordInputWithScan,
+              inputStyle,
+            ]}
+            value={value}
+            onChangeText={onChangeText}
+            editable={editable}
+            multiline
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+            placeholder={placeholder}
+            placeholderTextColor={theme.colors.onSurfacePlaceholder}
+          />
+          {onScanPress && (
+            <Pressable
+              style={styles.scanIcon}
+              onPress={onScanPress}
+              hitSlop={12}
+              testID={scanTestID}
+              accessibilityRole="button"
+              accessibilityLabel="Scan SeedQR"
+            >
+              <Icons.qr width={24} height={24} color={theme.colors.onSurface} />
+            </Pressable>
+          )}
+        </View>
         {wordError && <Text style={styles.errorText}>{wordError}</Text>}
         {errors
           .filter((error): error is string => Boolean(error))
@@ -178,6 +205,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 4,
     textAlignVertical: 'top',
+  },
+  wordInputWithScan: {
+    paddingRight: 48,
+  },
+  // Covers the whole strip `wordInputWithScan` reserves, not just the glyph: the
+  // input is 128 high, so a tap low in that strip used to land on the text and
+  // open the keyboard instead of the scanner. No text renders under it.
+  scanIcon: {
+    alignItems: 'center',
+    bottom: 0,
+    paddingTop: 8,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 48,
   },
   errorText: {
     color: theme.colors.error,

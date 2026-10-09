@@ -1,64 +1,125 @@
-# F-Droid metadata file for Keycard Pal
-# Place this file at metadata/com.keycardpal.yml in a fork of:
-# https://gitlab.com/fdroid/fdroiddata
-# Then open a merge request.
+# Draft fdroiddata recipe for the FULL flavor, application id com.keycardpal.
+# In a fork of https://gitlab.com/fdroid/fdroiddata it goes to metadata/com.keycardpal.yml.
+# Same repo, commit and scanner rules as fdroiddata-com.keycardpal.offline.yml; only the
+# flavor, the output, the Ads wording and NonFreeNet differ.
+# `commit:` holds the release tag because scripts/bump-version.js rewrites it on every
+# bump. A submitted recipe needs the full hash of the tagged commit, never the tag.
+# Two build entries, armeabi-v7a then arm64-v8a: checkupdates assigns codes in that order.
+# Remove all comments before submitting.
 
+AntiFeatures:
+  Ads:
+    en-US: Buy a Keycard entries open an affiliate link to the Keycard shop, and the
+      developer earns a commission on purchases made through it.
+  NonFreeNet:
+    en-US: Optional features, all disabled by default, connect to network services
+      that are not free software. WalletConnect uses the Reown relay with a project
+      ID you provide yourself, transaction simulation uses Tenderly with an API key
+      you provide yourself, ENS names are looked up through a public Ethereum RPC
+      endpoint you can change, and token images are downloaded from CoinGecko, GitHub
+      and CoinMarketCap. Signing by QR code works without any of them.
 Categories:
   - Security
-
+  - Wallet
 License: MIT
-
 AuthorName: Mladen Milankovic
 AuthorWebSite: https://github.com/mmlado
-
 SourceCode: https://github.com/mmlado/keycard-pal
 IssueTracker: https://github.com/mmlado/keycard-pal/issues
+Changelog: https://github.com/mmlado/keycard-pal/blob/HEAD/CHANGELOG.md
+Donate: https://github.com/mmlado/keycard-pal/blob/HEAD/DONATE.md
+Bitcoin: bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf
 
-Summary: Air-gapped Ethereum and Bitcoin signing with a Keycard NFC smart card
-Description: |-
-  Keycard Pal works with a Keycard NFC smart card to sign Ethereum and Bitcoin
-  transactions without ever connecting to the internet.
-
-  Requires a Keycard hardware smart card (keycard.tech). The app communicates
-  with the card over NFC — no USB, no Bluetooth, no internet.
-
-  All communication with a watch-only wallet happens through animated QR codes.
-  Your private keys never touch a networked device.
-
-  Features:
-
-  * Sign Ethereum transactions (legacy, EIP-1559, EIP-2930)
-  * Sign EIP-712 typed data with decoded preview before approval
-  * Sign personal messages (EIP-191 / SIWE)
-  * Sign Bitcoin transactions via PSBT
-  * Sign Bitcoin messages (BIP-322)
-  * Export wallet keys to MetaMask, Rabby, Sparrow, BlueWallet, and Bitget
-  * Fully air-gapped — no internet permission, no network calls, no telemetry
+AutoName: Keycard Pal
 
 RepoType: git
 Repo: https://github.com/mmlado/keycard-pal
 
 Builds:
-  - versionName: 1.7.0
-    versionCode: 10700
-    commit: v1.7.0
+  - versionName: 1.14.0
+    versionCode: 114001
+    commit: v1.14.0
     subdir: android/app
     sudo:
-      - apt-get install -y openjdk-17-jdk
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
+      - echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list
+      - apt-get update
+      - apt-get install -y -t forky npm
+      - sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+      - apt-get install -y -t bookworm openjdk-17-jdk-headless
+      - update-java-alternatives -s java-1.17.0-openjdk-amd64
     init:
-      - curl -fsSL https://nodejs.org/dist/v20.19.0/node-v20.19.0-linux-x64.tar.xz -o node.tar.xz
-      - echo "b4e336584d62abefad31baecff7af167268be9bb7dd11f1297112e6eed3ca0d5  node.tar.xz" | sha256sum -c
-      - mkdir -p .fdroid-node
-      - tar -xJf node.tar.xz -C .fdroid-node --strip-components=1
-      - .fdroid-node/bin/npm ci
-    scandelete:
-      - node_modules/
-    scanignore:
-      - android/app/.fdroid-node/
+      - cd ../..
+      - npm ci --allow-git=all
     gradle:
-      - yes
+      - full
+    output: build/outputs/apk/full/release/keycard-pal-full-release-armeabi-v7a.apk
+    binary: 
+      https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-full-release-armeabi-v7a.apk
+    rm:
+      - ios
+    scanignore:
+      # Hermes compiler: official prebuilt allowed by the Inclusion Policy.
+      - node_modules/hermes-compiler/hermesc/linux64-bin/hermesc
+      # "unknown maven repo" false positives in files Gradle has to read.
+      - node_modules/react-native/ReactAndroid/publish.gradle
+      - node_modules/react-native-screens/android/build.gradle
+      - node_modules/react-native-svg/android/build.gradle
+      - node_modules/react-native-safe-area-context/android/build.gradle
+      - node_modules/react-native-encrypted-storage/android/build.gradle
+      - node_modules/@react-native-community/blur/android/build.gradle
+      - node_modules/@react-native-community/netinfo/android/build.gradle
+    scandelete:
+      - node_modules
+    ndk: r27b
+    gradleprops:
+      - reactNativeArchitectures=armeabi-v7a
+
+  - versionName: 1.14.0
+    versionCode: 114002
+    commit: v1.14.0
+    subdir: android/app
+    sudo:
+      - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
+      - echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list
+      - apt-get update
+      - apt-get install -y -t forky npm
+      - sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+      - apt-get install -y -t bookworm openjdk-17-jdk-headless
+      - update-java-alternatives -s java-1.17.0-openjdk-amd64
+    init:
+      - cd ../..
+      - npm ci --allow-git=all
+    gradle:
+      - full
+    output: build/outputs/apk/full/release/keycard-pal-full-release-arm64-v8a.apk
+    binary: 
+      https://github.com/mmlado/keycard-pal/releases/download/v%v/keycard-pal-full-release-arm64-v8a.apk
+    rm:
+      - ios
+    scanignore:
+      # Hermes compiler: official prebuilt allowed by the Inclusion Policy.
+      - node_modules/hermes-compiler/hermesc/linux64-bin/hermesc
+      # "unknown maven repo" false positives in files Gradle has to read.
+      - node_modules/react-native/ReactAndroid/publish.gradle
+      - node_modules/react-native-screens/android/build.gradle
+      - node_modules/react-native-svg/android/build.gradle
+      - node_modules/react-native-safe-area-context/android/build.gradle
+      - node_modules/react-native-encrypted-storage/android/build.gradle
+      - node_modules/@react-native-community/blur/android/build.gradle
+      - node_modules/@react-native-community/netinfo/android/build.gradle
+    scandelete:
+      - node_modules
+    ndk: r27b
+    gradleprops:
+      - reactNativeArchitectures=arm64-v8a
+
+AllowedAPKSigningKeys: a83c114b1f4201dafbd03e221f1c2928ecb52b78bda5e93f296fedf2298e546b
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.7.0
-CurrentVersionCode: 10700
+VercodeOperation:
+  - '%c + 1'
+  - '%c + 2'
+CurrentVersion: 1.14.0
+CurrentVersionCode: 114002

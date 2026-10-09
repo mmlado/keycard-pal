@@ -10,6 +10,7 @@ let capturedOperation: OperationFn | null = null;
 let capturedOptions: {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
+  successMessage?: string;
 } | null = null;
 
 const mockStart = jest.fn();
@@ -17,7 +18,11 @@ const mockStart = jest.fn();
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
   useKeycardOp: (
     fn: OperationFn,
-    opts: { requiresPin?: boolean; requiresMasterKey?: boolean },
+    opts: {
+      requiresPin?: boolean;
+      requiresMasterKey?: boolean;
+      successMessage?: string;
+    },
   ) => {
     capturedOperation = fn;
     capturedOptions = opts;
@@ -50,6 +55,7 @@ describe('useSetCardName', () => {
     expect(capturedOptions).toEqual({
       requiresPin: true,
       requiresMasterKey: false,
+      successMessage: 'Card name updated',
     });
 
     const storeData = jest.fn().mockResolvedValue({ sw: 0x9000 });

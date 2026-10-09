@@ -1,12 +1,4 @@
-import { HDKey } from '@scure/bip32';
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -24,27 +16,32 @@ import { Icons } from '../../assets/icons';
 import AddressText from '../../components/AddressText';
 import NFCBottomSheet from '../../components/NFCBottomSheet';
 
-import { useAddresses } from '../../hooks/keycard/useAddresses';
+import {
+  useAddressEnumeration,
+  type AddressRow as AddressRowData,
+} from '../../hooks/keycard/useAddressEnumeration';
+import { useKeycardScreen } from '../../hooks/useKeycardScreen';
 
 import { pubKeyToBtcAddress } from '../../utils/bitcoinAddress';
 import { pubKeyToEthAddress } from '../../utils/ethereumAddress';
-import { deriveAddresses } from '../../utils/hdAddress';
+import { ACCOUNT_PATHS } from '../../utils/hdAddress';
 
-const BATCH = 20;
 const ADDR_FN = { eth: pubKeyToEthAddress, btc: pubKeyToBtcAddress };
 
 type RowProps = {
-  address: string;
-  index: number;
-  onNavigate: (address: string, index: number) => void;
+  row: AddressRowData;
+  onNavigate: (address: string, path: string) => void;
 };
 
-const AddressRow = memo(({ address, index, onNavigate }: RowProps) => (
-  <Pressable style={styles.row} onPress={() => onNavigate(address, index)}>
-    <Text style={styles.index}>{index}</Text>
-    <AddressText address={address} style={styles.address} />
-    <View style={styles.qrIcon}>
-      <Icons.qr width={20} height={20} color={theme.colors.onSurfaceVariant} />
+const AddressRow = memo(({ row, onNavigate }: RowProps) => (
+  <Pressable
+    style={styles.row}
+    onPress={() => onNavigate(row.address, row.path)}
+  >
+    <AddressText address={row.address} style={styles.address} />
+    <View style={styles.metaRow}>
+      <Text style={styles.path}>{row.path}</Text>
+      <Icons.qr width={16} height={16} color={theme.colors.onSurfaceVariant} />
     </View>
   </Pressable>
 ));
@@ -54,73 +51,42 @@ export default function AddressListScreen({
   navigation,
 }: AddressListScreenProps) {
   const { coin } = route.params;
-  const keycard = useAddresses(coin);
-  const { phase, result: accountKey, start } = keycard;
+  const { rows, loading, loadMore, nfc } = useAddressEnumeration(
+    ACCOUNT_PATHS[coin],
+    ADDR_FN[coin],
+  );
+  const { start } = nfc;
   const insets = useSafeAreaInsets();
 
-  const [addresses, setAddresses] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const externalRef = useRef<HDKey | null>(null);
-  const nextIndexRef = useRef(0);
-
-  useLayoutEffect(() => {
-    if (phase === 'pin_entry') {
-      navigation.setOptions({ title: 'Enter Keycard PIN' });
-    } else {
-      const label = coin === 'eth' ? 'Ethereum' : 'Bitcoin';
-      navigation.setOptions({ title: `${label} Addresses` });
-    }
-  }, [navigation, coin, phase]);
+  const { onCancel } = useKeycardScreen({
+    keycard: nfc,
+    navigation,
+    title: `${coin === 'eth' ? 'Ethereum' : 'Bitcoin'} Addresses`,
+  });
 
   useEffect(() => {
     start();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (phase === 'done' && accountKey) {
-      externalRef.current = accountKey.deriveChild(0);
-      nextIndexRef.current = 0;
-      loadMore();
-    }
-  }, [phase, accountKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const keyExtractor = useCallback((_: string, i: number) => String(i), []);
+  const keyExtractor = useCallback((row: AddressRowData) => row.path, []);
 
   const handleRowPress = useCallback(
-    (address: string, index: number) =>
-      navigation.navigate('AddressDetail', { address, index }),
+    (address: string, derivationPath: string) =>
+      navigation.navigate('AddressDetail', { address, derivationPath }),
     [navigation],
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: string; index: number }) => (
-      <AddressRow address={item} index={index} onNavigate={handleRowPress} />
+    ({ item }: { item: AddressRowData }) => (
+      <AddressRow row={item} onNavigate={handleRowPress} />
     ),
     [handleRowPress],
   );
 
-  const handleCancel = useCallback(() => {
-    keycard.cancel();
-    navigation.goBack();
-  }, [keycard, navigation]);
-
-  const loadMore = useCallback(() => {
-    if (!externalRef.current) return;
-    const from = nextIndexRef.current;
-    nextIndexRef.current += BATCH;
-    setLoading(true);
-    const key = externalRef.current;
-    setTimeout(() => {
-      const batch = deriveAddresses(key, BATCH, ADDR_FN[coin], from);
-      setAddresses(prev => [...prev, ...batch]);
-      setLoading(false);
-    }, 0);
-  }, [coin]);
-
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <FlatList
-        data={addresses}
+        data={rows}
         keyExtractor={keyExtractor}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
@@ -130,12 +96,12 @@ export default function AddressListScreen({
               style={styles.footer}
               color={theme.colors.primary}
             />
-          ) : null
+          ) : undefined
         }
         renderItem={renderItem}
       />
 
-      <NFCBottomSheet nfc={keycard} onCancel={handleCancel} />
+      <NFCBottomSheet nfc={nfc} onCancel={onCancel} />
     </View>
   );
 }
@@ -143,13 +109,25 @@ export default function AddressListScreen({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   row: {
-    flexDirection: 'row',
     padding: 12,
+    gap: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.surfaceVariant,
   },
-  index: { width: 40, color: theme.colors.onSurfaceVariant },
-  address: { flex: 1, color: theme.colors.onSurface, fontFamily: 'monospace' },
+  address: {
+    color: theme.colors.onSurface,
+    fontFamily: 'monospace',
+    textAlign: 'center',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  path: {
+    color: theme.colors.onSurfaceVariant,
+    fontFamily: 'monospace',
+    fontSize: 12,
+  },
   footer: { paddingVertical: 16 },
-  qrIcon: { width: 40, alignItems: 'center', justifyContent: 'center' },
 });

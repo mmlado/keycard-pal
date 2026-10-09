@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import NFCSheet from '../src/components/NFCBottomSheet/NFCSheet';
+import { NO_CARD_EXIT_LABEL } from '../src/constants/purchaseLink';
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -59,8 +60,129 @@ describe('NFCSheet', () => {
     });
   });
 
+  // After an error the bridge reader is disarmed (stopNFCWithError sets the
+  // channel's listening=false), so a re-tap emits nothing — the sheet must
+  // offer an explicit restart when the caller provides one.
+  describe('Try again button', () => {
+    it('shows "Try again" instead of the hint when retry is provided', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="Bad MAC"
+          onCancel={onCancel}
+          retry={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('Try again')).toBeTruthy();
+      expect(screen.queryByText('Tap your card to try again')).toBeNull();
+    });
+
+    it('calls retry when the button is pressed', () => {
+      const retry = jest.fn();
+      render(
+        <NFCSheet
+          variant="error"
+          status="Bad MAC"
+          onCancel={onCancel}
+          retry={retry}
+        />,
+      );
+      fireEvent.press(screen.getByText('Try again'));
+      expect(retry).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not show the button when openNFCSettings is present', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="NFC off"
+          onCancel={onCancel}
+          retry={jest.fn()}
+          openNFCSettings={jest.fn()}
+        />,
+      );
+      expect(screen.queryByText('Try again')).toBeNull();
+      expect(screen.getByText('Open NFC Settings')).toBeTruthy();
+    });
+
+    it('does not show the button outside the error variant', () => {
+      render(
+        <NFCSheet
+          variant="disconnected"
+          status="lost"
+          onCancel={onCancel}
+          retry={jest.fn()}
+        />,
+      );
+      expect(screen.queryByText('Try again')).toBeNull();
+    });
+  });
+
+  // A blocked PIN would fail a retry the same way, so the unblock flow takes
+  // the primary button's place.
+  describe('Unblock PIN button', () => {
+    it('shows Unblock PIN instead of Try again when onUnblockPin is provided', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="blocked"
+          onCancel={onCancel}
+          retry={jest.fn()}
+          onUnblockPin={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('Unblock PIN')).toBeTruthy();
+      expect(screen.queryByText('Try again')).toBeNull();
+      expect(screen.queryByText('Tap your card to try again')).toBeNull();
+    });
+
+    it('calls onUnblockPin alone when pressed', () => {
+      const retry = jest.fn();
+      const onUnblockPin = jest.fn();
+      render(
+        <NFCSheet
+          variant="error"
+          status="blocked"
+          onCancel={onCancel}
+          retry={retry}
+          onUnblockPin={onUnblockPin}
+        />,
+      );
+      fireEvent.press(screen.getByText('Unblock PIN'));
+      expect(onUnblockPin).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('yields to Open NFC Settings', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="NFC off"
+          onCancel={onCancel}
+          openNFCSettings={jest.fn()}
+          onUnblockPin={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('Open NFC Settings')).toBeTruthy();
+      expect(screen.queryByText('Unblock PIN')).toBeNull();
+    });
+
+    it('does not show the button outside the error variant', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status="Tap"
+          onCancel={onCancel}
+          onUnblockPin={jest.fn()}
+        />,
+      );
+      expect(screen.queryByText('Unblock PIN')).toBeNull();
+    });
+  });
+
   describe('retry hint', () => {
-    it('shows "Tap your card to try again" when variant is error', () => {
+    it('shows "Tap your card to try again" when variant is error and no retry is provided', () => {
       render(<NFCSheet variant="error" status="Bad MAC" onCancel={onCancel} />);
       expect(screen.getByText('Tap your card to try again')).toBeTruthy();
     });
@@ -86,6 +208,113 @@ describe('NFCSheet', () => {
         />,
       );
       expect(screen.queryByText('Tap your card to try again')).toBeNull();
+    });
+  });
+
+  // T5: presence variants. 'disconnected' must read as recoverable, not as a
+  // failure — reconnect hint, Cancel available, no failure icon treatment.
+  describe('presence variants', () => {
+    it('disconnected shows the reconnect hint', () => {
+      render(
+        <NFCSheet variant="disconnected" status="lost" onCancel={onCancel} />,
+      );
+      expect(
+        screen.getByText('Hold your Keycard against the phone again'),
+      ).toBeTruthy();
+    });
+
+    it('disconnected keeps the Cancel button (only exit from the wait)', () => {
+      render(
+        <NFCSheet variant="disconnected" status="lost" onCancel={onCancel} />,
+      );
+      fireEvent.press(screen.getByText('Cancel'));
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('disconnected does not show the error retry hint', () => {
+      render(
+        <NFCSheet variant="disconnected" status="lost" onCancel={onCancel} />,
+      );
+      expect(screen.queryByText('Tap your card to try again')).toBeNull();
+    });
+
+    it('connected shows no hints and keeps Cancel', () => {
+      render(
+        <NFCSheet variant="connected" status="Connected" onCancel={onCancel} />,
+      );
+      expect(screen.queryByText('Tap your card to try again')).toBeNull();
+      expect(
+        screen.queryByText('Hold your Keycard against the phone again'),
+      ).toBeNull();
+      expect(screen.getByText('Cancel')).toBeTruthy();
+    });
+  });
+
+  // #258: someone who reaches the tap prompt without owning a card needs a
+  // way out. It is a quiet link, shown only while the app is asking for a
+  // card — never once a card is connected, merely moved, or done.
+  describe('buy-a-Keycard link', () => {
+    const link = NO_CARD_EXIT_LABEL;
+
+    it('shows the link while scanning when onBuyKeycard is provided', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status=""
+          onCancel={onCancel}
+          onBuyKeycard={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(link)).toBeTruthy();
+    });
+
+    it('shows the link in the error variant', () => {
+      render(
+        <NFCSheet
+          variant="error"
+          status="Bad MAC"
+          onCancel={onCancel}
+          retry={jest.fn()}
+          onBuyKeycard={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(link)).toBeTruthy();
+      expect(screen.getByText('Try again')).toBeTruthy();
+    });
+
+    it('calls onBuyKeycard, not onCancel, when pressed', () => {
+      const onBuyKeycard = jest.fn();
+      render(
+        <NFCSheet
+          variant="scanning"
+          status=""
+          onCancel={onCancel}
+          onBuyKeycard={onBuyKeycard}
+        />,
+      );
+      fireEvent.press(screen.getByText(link));
+      expect(onBuyKeycard).toHaveBeenCalledTimes(1);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it.each(['connected', 'disconnected', 'success'] as const)(
+      'hides the link in the %s variant',
+      variant => {
+        render(
+          <NFCSheet
+            variant={variant}
+            status=""
+            onCancel={onCancel}
+            onBuyKeycard={jest.fn()}
+          />,
+        );
+        expect(screen.queryByText(link)).toBeNull();
+      },
+    );
+
+    it('hides the link when onBuyKeycard is not provided', () => {
+      render(<NFCSheet variant="scanning" status="" onCancel={onCancel} />);
+      expect(screen.queryByText(link)).toBeNull();
     });
   });
 
@@ -158,6 +387,33 @@ describe('NFCSheet', () => {
         />,
       );
       expect(screen.getByText('Unnamed card')).toBeTruthy();
+    });
+
+    it('shows the master fingerprint when an unnamed card has one', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status="test"
+          cardName=""
+          cardFingerprint={0x1a2b3c4d}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('1a2b3c4d')).toBeTruthy();
+    });
+
+    it('prefers the card name over the fingerprint when both are present', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status="test"
+          cardName="My Card"
+          cardFingerprint={0x1a2b3c4d}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('My Card')).toBeTruthy();
+      expect(screen.queryByText('1a2b3c4d')).toBeNull();
     });
   });
 

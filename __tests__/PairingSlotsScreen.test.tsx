@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
+import { routeAbsence } from '../src/navigation/generationBoundRoutes';
 import PairingSlotsScreen from '../src/screens/PairingSlotsScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 
@@ -127,6 +128,8 @@ const mockNavigate = jest.fn();
 
 const navigation = {
   goBack: jest.fn(),
+  // Both sessions are torn down on beforeRemove.
+  addListener: jest.fn(() => jest.fn()),
   setOptions: jest.fn(),
   navigate: mockNavigate,
 } as any;
@@ -137,13 +140,16 @@ function makeCheckHook(
     totalSlots: number;
     freeSlots: number;
     ourSlotIndex: number | null;
-    cardUid: string;
+    cardKey: string;
   } | null = null,
+  noPairingSlots = false,
 ) {
   return {
     phase,
-    status: phase === 'checking' ? 'Selecting applet...' : '',
+    cardPresence: phase === 'nfc' ? 'lost' : 'waiting',
+    status: phase === 'nfc' ? 'Selecting applet...' : '',
     slotInfo,
+    noPairingSlots,
     checkSlots: mockCheckSlots,
     cancel: mockCancel,
     reset: jest.fn(),
@@ -208,9 +214,9 @@ describe('PairingSlotsScreen', () => {
         totalSlots: 10,
         freeSlots: 7,
         ourSlotIndex: 3,
-        cardUid: 'abcd',
+        cardKey: 'abcd',
       };
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       expect(mockCheckSlots).not.toHaveBeenCalled();
     });
   });
@@ -222,7 +228,7 @@ describe('PairingSlotsScreen', () => {
     });
 
     it('passes check hook to NFCBottomSheet', () => {
-      renderScreen('checking');
+      renderScreen('nfc');
       const lastCall = MockNFCBottomSheet.mock.calls.at(-1);
       expect(lastCall?.[0].nfc.phase).toBe('nfc');
       expect(lastCall?.[0].showOnDone).toBe(false);
@@ -248,24 +254,24 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('renders slot summary', () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       expect(screen.getByText('Slots free')).toBeTruthy();
       expect(screen.getByText('7 / 10')).toBeTruthy();
     });
 
     it('renders all 10 slots with 1-based numbering', () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       for (let i = 0; i < 10; i++) {
         expect(screen.getByText(`Slot ${i + 1}`)).toBeTruthy();
       }
     });
 
     it('marks our slot as This device', () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       expect(screen.getByText('This device')).toBeTruthy();
     });
   });
@@ -275,18 +281,18 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('shows ConfirmPrompt with correct slot number when a row is pressed', () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 1'));
       expect(screen.getByText('Unpair slot 1?')).toBeTruthy();
       expect(mockExecute).not.toHaveBeenCalled();
     });
 
     it('executes unpair after user confirms', async () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 3'));
       await act(async () => {
         fireEvent.press(screen.getByText('Unpair'));
@@ -294,8 +300,22 @@ describe('PairingSlotsScreen', () => {
       expect(mockExecute).toHaveBeenCalled();
     });
 
+    // The unpair tap can land on another card.
+    it('binds the unpair tap to cards that have pairing slots', async () => {
+      renderScreen('done', slotInfo);
+      fireEvent.press(screen.getByText('Slot 3'));
+      await act(async () => {
+        fireEvent.press(screen.getByText('Unpair'));
+      });
+      expect(mockExecute).toHaveBeenCalledWith(expect.any(Function), {
+        requiresPin: true,
+        requiresMasterKey: false,
+        requiresRoute: 'PairingSlots',
+      });
+    });
+
     it('returns to slot list when user cancels confirmation', () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 3'));
       fireEvent.press(screen.getByText('Cancel'));
       expect(mockExecute).not.toHaveBeenCalled();
@@ -303,7 +323,7 @@ describe('PairingSlotsScreen', () => {
     });
 
     it('deletes local pairing when unpairing our own slot', async () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       // ourSlotIndex is 3, so Slot 4 (1-based) is our slot
       fireEvent.press(screen.getByText('Slot 4'));
       await act(async () => {
@@ -317,7 +337,7 @@ describe('PairingSlotsScreen', () => {
 
     it('keeps unpair success path when local pairing cleanup fails', async () => {
       mockDeletePairing.mockRejectedValueOnce(new Error('storage failed'));
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
 
       fireEvent.press(screen.getByText('Slot 4'));
       await act(async () => {
@@ -330,7 +350,7 @@ describe('PairingSlotsScreen', () => {
     });
 
     it('does not delete local pairing when unpairing another slot', async () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 1'));
       await act(async () => {
         fireEvent.press(screen.getByText('Unpair'));
@@ -340,9 +360,58 @@ describe('PairingSlotsScreen', () => {
     });
   });
 
+  // The one tap it already has explains a card without slots.
+  describe('a card without pairing slots', () => {
+    const absence = routeAbsence('PairingSlots');
+
+    function renderWithoutSlots() {
+      mockUsePairingSlots.mockReturnValue(makeCheckHook('done', null, true));
+      mockUseKeycardOperation.mockReturnValue(makeUnpairHook('idle'));
+      return render(
+        <PairingSlotsScreen navigation={navigation} route={undefined as any} />,
+      );
+    }
+
+    it('explains that the card has none', () => {
+      renderWithoutSlots();
+      expect(screen.getByText(absence.title)).toBeTruthy();
+      expect(screen.getByText(absence.detail)).toBeTruthy();
+    });
+
+    it('draws no slots and no free slot count', () => {
+      renderWithoutSlots();
+      expect(screen.queryByText('Slots free')).toBeNull();
+      expect(screen.queryByText('Slot 1')).toBeNull();
+    });
+
+    it('does not ask for another tap', () => {
+      renderWithoutSlots();
+      expect(
+        screen.queryByText('Tap your Keycard to read the pairing slot status.'),
+      ).toBeNull();
+    });
+
+    // slotInfo stays empty on such a card; the focus effect must not reopen the reader.
+    it('does not start another read on focus', () => {
+      mockUsePairingSlots.mockReturnValue(makeCheckHook('idle', null, true));
+      mockUseKeycardOperation.mockReturnValue(makeUnpairHook('idle'));
+      render(
+        <PairingSlotsScreen navigation={navigation} route={undefined as any} />,
+      );
+      expect(mockCheckSlots).not.toHaveBeenCalled();
+    });
+
+    it('goes back from its one button', () => {
+      navigation.goBack.mockClear();
+      renderWithoutSlots();
+      fireEvent.press(screen.getByText('Go back'));
+      expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('unpairing state', () => {
     it('passes unpair hook to NFCBottomSheet with showOnDone', () => {
-      renderScreen('ready', null, 'nfc');
+      renderScreen('done', null, 'nfc');
       const lastCall = MockNFCBottomSheet.mock.calls.at(-1);
       expect(lastCall?.[0].nfc.phase).toBe('nfc');
       expect(lastCall?.[0].showOnDone).toBe(true);
@@ -351,15 +420,27 @@ describe('PairingSlotsScreen', () => {
 
   describe('cancel NFC', () => {
     it('calls cancelCheck when cancelling during slot check', () => {
-      renderScreen('checking');
+      renderScreen('nfc');
       const lastCall = MockNFCBottomSheet.mock.calls.at(-1);
       lastCall?.[0].onCancel();
       expect(mockCancel).toHaveBeenCalled();
       expect(mockUnpairCancel).not.toHaveBeenCalled();
     });
 
+    // Back can leave mid-session: both readers are torn down.
+    it('cancels both sessions when the screen is removed', () => {
+      renderScreen('nfc');
+      const beforeRemove = navigation.addListener.mock.calls.find(
+        (c: unknown[]) => c[0] === 'beforeRemove',
+      );
+      expect(beforeRemove).toBeTruthy();
+      (beforeRemove?.[1] as () => void)();
+      expect(mockCancel).toHaveBeenCalled();
+      expect(mockUnpairCancel).toHaveBeenCalled();
+    });
+
     it('calls cancelUnpair when cancelling during unpair', () => {
-      renderScreen('ready', null, 'nfc');
+      renderScreen('done', null, 'nfc');
       const lastCall = MockNFCBottomSheet.mock.calls.at(-1);
       lastCall?.[0].onCancel();
       expect(mockUnpairCancel).toHaveBeenCalled();
@@ -372,14 +453,14 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('resets unpair hook and resets NFC state when unpair finishes', () => {
       const mockResetNFCOnly = jest.fn();
       const mockResetUnpair = jest.fn();
       mockUsePairingSlots.mockReturnValue({
-        ...makeCheckHook('ready', slotInfo),
+        ...makeCheckHook('done', slotInfo),
         resetNFCOnly: mockResetNFCOnly,
       });
       mockUseKeycardOperation.mockReturnValue({
@@ -391,7 +472,7 @@ describe('PairingSlotsScreen', () => {
       );
 
       mockUsePairingSlots.mockReturnValue({
-        ...makeCheckHook('ready', slotInfo),
+        ...makeCheckHook('done', slotInfo),
         resetNFCOnly: mockResetNFCOnly,
       });
       mockUseKeycardOperation.mockReturnValue({
@@ -412,11 +493,11 @@ describe('PairingSlotsScreen', () => {
       totalSlots: 10,
       freeSlots: 7,
       ourSlotIndex: 3,
-      cardUid: 'abcd',
+      cardKey: 'abcd',
     };
 
     it('shows snackbar with slot number after unpair operation runs', async () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 2'));
       await act(async () => {
         fireEvent.press(screen.getByText('Unpair'));
@@ -425,7 +506,7 @@ describe('PairingSlotsScreen', () => {
     });
 
     it('hides snackbar when dismissed', async () => {
-      renderScreen('ready', slotInfo);
+      renderScreen('done', slotInfo);
       fireEvent.press(screen.getByText('Slot 2'));
       await act(async () => {
         fireEvent.press(screen.getByText('Unpair'));
@@ -434,6 +515,17 @@ describe('PairingSlotsScreen', () => {
       fireEvent.press(screen.getByText('Dismiss snackbar'));
 
       expect(screen.queryByText('Slot 2 was unpaired')).toBeNull();
+    });
+  });
+
+  // The screen hand-builds its NFCOperation, so cardPresence is threaded explicitly.
+  describe('cardPresence threading', () => {
+    it('passes the check hook presence into the sheet object', () => {
+      renderScreen('nfc');
+      const sheetMock = NFCBottomSheet as unknown as jest.Mock;
+      const lastProps =
+        sheetMock.mock.calls[sheetMock.mock.calls.length - 1][0];
+      expect(lastProps.nfc.cardPresence).toBe('lost');
     });
   });
 });

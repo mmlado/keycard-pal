@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   KeyboardTypeOptions,
@@ -8,6 +9,8 @@ import {
 import { Text } from 'react-native-paper';
 
 import theme from '../../theme';
+
+import { useFieldFocus, type SettingsField } from './fieldFocus';
 
 export default function TextInputSetting({
   label,
@@ -34,12 +37,21 @@ export default function TextInputSetting({
   onRevert?: () => void;
   onSave: () => void;
 }) {
+  const inputRef = useRef<SettingsField>(null);
+  const onFieldFocus = useFieldFocus();
+  const handleFocus = useCallback(
+    () => onFieldFocus(inputRef.current),
+    [onFieldFocus],
+  );
+
   return (
     <>
       <Text variant="bodySmall" style={styles.label}>
         {label}
       </Text>
       <TextInput
+        ref={inputRef}
+        onFocus={handleFocus}
         style={styles.input}
         value={value}
         onChangeText={onChangeText}

@@ -1,0 +1,7 @@
+Menu screens now show icon tiles by default; switch back to a list in Settings.
+
+Settings are read once at startup behind a loading screen, so menus and the PIN pad no longer flicker from a default value.
+
+The offline build no longer ships WalletConnect's native module or NetInfo, and drops two Android permissions.
+
+Fixed: the PIN keypad's 0 key sat behind the Android navigation bar, and SeedQR scanning now asks for camera permission.

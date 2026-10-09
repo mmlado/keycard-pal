@@ -65,23 +65,23 @@ function setupEnsResolved(name: string) {
 // ---------------------------------------------------------------------------
 
 const ETH_ADDRESS = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
-const INDEX = 7;
+const DERIVATION_PATH = "m/44'/60'/0'/0/7";
 
 const navigation = { setOptions: jest.fn() } as any;
 
-function makeRoute(address = ETH_ADDRESS, index = INDEX) {
+function makeRoute(address = ETH_ADDRESS, derivationPath = DERIVATION_PATH) {
   return {
     key: 'AddressDetail',
     name: 'AddressDetail',
-    params: { address, index },
+    params: { address, derivationPath },
   } as any;
 }
 
-function renderScreen(address = ETH_ADDRESS, index = INDEX) {
+function renderScreen(address = ETH_ADDRESS, derivationPath = DERIVATION_PATH) {
   return render(
     <AddressDetailScreen
       navigation={navigation}
-      route={makeRoute(address, index)}
+      route={makeRoute(address, derivationPath)}
     />,
   );
 }
@@ -121,9 +121,9 @@ describe('AddressDetailScreen', () => {
   });
 
   describe('title', () => {
-    it('sets the navigation title to the address index', () => {
-      renderScreen(ETH_ADDRESS, 5);
-      expect(navigation.setOptions).toHaveBeenCalledWith({ title: '5' });
+    it('defaults the navigation title to Address', () => {
+      renderScreen();
+      expect(navigation.setOptions).toHaveBeenCalledWith({ title: 'Address' });
     });
 
     it('uses a custom title when provided', () => {
@@ -136,7 +136,6 @@ describe('AddressDetailScreen', () => {
               name: 'AddressDetail',
               params: {
                 address: ETH_ADDRESS,
-                index: 0,
                 title: 'Ethereum address',
               },
             } as any
@@ -146,6 +145,29 @@ describe('AddressDetailScreen', () => {
       expect(navigation.setOptions).toHaveBeenCalledWith({
         title: 'Ethereum address',
       });
+    });
+  });
+
+  describe('derivation path', () => {
+    it('renders the derivation path under the address', () => {
+      renderScreen();
+      expect(screen.getByText(DERIVATION_PATH)).toBeTruthy();
+    });
+
+    it('renders no path row when derivationPath is absent', () => {
+      render(
+        <AddressDetailScreen
+          navigation={navigation}
+          route={
+            {
+              key: 'AddressDetail',
+              name: 'AddressDetail',
+              params: { address: ETH_ADDRESS, title: 'Ethereum address' },
+            } as any
+          }
+        />,
+      );
+      expect(screen.queryByText(DERIVATION_PATH)).toBeNull();
     });
   });
 

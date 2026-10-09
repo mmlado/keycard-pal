@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Keycard Pal Privacy Policy</title>
+  <meta name="theme-color" content="#121212" />
+  <style>
+    /* Palette matches keycardpal.com. No external requests from this page by design. */
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --surface-2: #2a2a2a;
+      --line: rgba(255, 255, 255, 0.09);
+      --orange: #ff6400;
+      --teal: #1c8a80;
+      --fg: #ffffff;
+      --fg-2: rgba(255, 255, 255, 0.72);
+      --fg-3: rgba(255, 255, 255, 0.52);
+      --mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg-2);
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      font-size: 17px;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap { max-width: 44rem; margin: 0 auto; padding: 0 20px; }
+
+    header { border-bottom: 1px solid var(--line); background: var(--surface); }
+    header .wrap { display: flex; align-items: center; height: 60px; }
+    .brand { color: var(--fg); font-weight: 600; letter-spacing: -0.02em; text-decoration: none; }
+    .brand:hover { text-decoration: underline; }
+
+    main { padding: 48px 0 24px; }
+
+    h1 { font-size: clamp(1.9rem, 5vw, 2.5rem); line-height: 1.15; letter-spacing: -0.025em; margin: 0; color: var(--fg); }
+    h2 {
+      font-size: 1.2rem; line-height: 1.3; letter-spacing: -0.015em;
+      margin: 2.6rem 0 0.7rem; color: var(--fg);
+    }
+    p { margin: 0 0 1rem; }
+    a { color: var(--orange); }
+    a:hover { text-decoration: none; }
+    strong { color: var(--fg); font-weight: 600; }
+
+    .updated {
+      font-family: var(--mono); font-size: 0.78rem;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--fg-3); margin: 0.9rem 0 2.4rem; display: block;
+    }
+
+    code {
+      font-family: var(--mono); font-size: 0.88em;
+      background: var(--surface-2); color: var(--fg);
+      padding: 0.12em 0.36em; border-radius: 4px;
+    }
+
+    ul { padding-left: 1.2rem; margin: 0 0 1rem; }
+    li { margin-bottom: 0.45rem; }
+
+    h2#summary-heading + p {
+      background: var(--surface); border-left: 2px solid var(--teal);
+      border-radius: 0 10px 10px 0; padding: 18px 20px;
+    }
+
+    footer {
+      border-top: 1px solid var(--line); margin-top: 3.5rem;
+      padding: 28px 0 56px; color: var(--fg-3); font-size: 0.9rem;
+    }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+    footer a { color: var(--fg-2); }
+
+    @media (max-width: 620px) {
+      body { font-size: 16px; }
+      main { padding: 36px 0 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap"><a class="brand" href="https://keycardpal.com/">Keycard Pal</a></div>
+  </header>
+
+  <main>
+  <div class="wrap">
+  <h1>Keycard Pal Privacy Policy</h1>
+  <p class="updated">Last updated: 2026-10-05</p>
+
+  <h2 id="summary-heading">Summary</h2>
+  <p>Keycard Pal collects no personal data. It has no accounts, no analytics, no telemetry,
+  no advertising SDKs, no ad networks and no tracking of any kind. Nothing you do in the app
+  is sent to the developer. The Android app does contain links to buy a Keycard, which are
+  affiliate links labelled as advertisements where they appear; the iOS app carries no
+  affiliate link at all. See <a href="#affiliate">Affiliate links</a> below. The websites
+  that serve this policy and the F-Droid repository hold to the same standard; see
+  <a href="#websites">Websites</a>.</p>
+
+  <h2>What the app is</h2>
+  <p>Keycard Pal is a companion app for the Status Keycard NFC smart card. It signs
+  Ethereum and Bitcoin transactions on the card and communicates with wallet software
+  through QR codes. Private keys never leave the Keycard.</p>
+
+  <h2>Data collection</h2>
+  <p>None. The app sends the developer no data: no identifiers, no usage statistics,
+  no addresses, no transaction contents. The app contains no crash reporting. If you
+  opt in to Apple's or Google Play's analytics sharing, those platforms may show the
+  developer aggregated crash data under their own privacy policies.</p>
+  <p>One qualification, for completeness: on Android, tapping a link to where Keycards are
+  sold opens the Keycard shop in your browser with a referral code attached, and the shop
+  reports sales made through it to the developer. That report contains no personal data
+  about you, only the fact that a sale happened. The app itself still sends nothing. The
+  iOS app has no referral code, so there is nothing to report.</p>
+
+  <h2>Data stored on your device</h2>
+  <ul>
+    <li>Keycard pairing data, kept in encrypted storage backed by your device's secure
+    storage (Android Keystore or iOS Keychain)</li>
+    <li>App preferences (settings toggles), stored locally</li>
+  </ul>
+  <p>This data never leaves your device and is deleted when you uninstall the app.</p>
+
+  <h2>Network access</h2>
+  <p>Every network-using feature is <strong>disabled by default</strong> and used only if
+  you turn it on in Settings. When enabled, the app talks directly to the services listed
+  below. None of this traffic passes through, or is visible to, the developer:</p>
+  <ul>
+    <li>ENS name resolution, via a public RPC endpoint (PublicNode by default) that you
+    can change in Settings</li>
+    <li>WalletConnect sessions, via the WalletConnect relay to the dApp you connect</li>
+    <li>Transaction simulation, via Tenderly using your own Tenderly account credentials</li>
+    <li>Token images and clear-signing descriptor downloads, from their public sources</li>
+  </ul>
+  <p>Those services see the requests you send them under their own privacy policies.
+  A separate Android-only variant, Keycard Pal Offline, has no network permission at all.</p>
+
+  <h2 id="websites">Websites</h2>
+  <p><code>keycardpal.com</code> and <code>fdroid.keycardpal.com</code>, which serve this
+  policy and the F-Droid repository, follow the same rule as the app. Viewing a page loads
+  nothing from any third party: fonts, images and styles come from the site itself. There
+  are no analytics, no cookies and no embedded content from elsewhere. The developer has
+  no visitor statistics of any kind. Both sites are hosted on GitHub Pages, so GitHub's
+  servers answer the requests under
+  <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>.</p>
+
+  <h2 id="affiliate">Affiliate links</h2>
+  <p><strong>Android only.</strong> The iOS app points at the Keycard product site,
+  <code>keycard.tech</code>, with no referral code, so nothing is reported back. The
+  paragraphs about opening the link and about no feature depending on it apply on both.</p>
+  <p><strong>Advertisement.</strong> On Android, the links to where Keycards are sold carry
+  a referral code, and the developer earns a commission on purchases made through them.
+  Every one of those links is labelled as an advertisement where it appears.</p>
+  <p>The links open the Keycard shop in your browser, or show the address as a QR code when
+  the phone has no network connection. Once the shop is open you are on their site under
+  their privacy policy, and whatever they set in your browser is theirs, not the app's.
+  The developer learns only that a sale was attributed to the referral code, never who
+  made it.</p>
+  <p>Nothing in the app depends on using those links. Every feature works the same with a
+  Keycard bought anywhere.</p>
+
+  <h2>Donations</h2>
+  <p>The About screen shows cryptocurrency addresses you can copy if you want to send the
+  developer something. They are entirely voluntary, and nothing in the app is unlocked,
+  changed or promised in return.</p>
+  <p>Be aware of what a donation reveals, which is a property of public blockchains rather
+  than of this app: a transfer is visible to anyone and permanent, and because the same
+  address is shown to everyone, donations sent to it can be seen alongside each other. The
+  app collects nothing and sends nothing when you copy an address.</p>
+
+  <h2>Permissions</h2>
+  <ul>
+    <li><strong>Camera</strong>: scanning QR codes. Images are processed on-device and never stored or transmitted</li>
+    <li><strong>NFC</strong>: communicating with the Keycard</li>
+    <li><strong>Internet</strong>: only for the opt-in features listed above</li>
+  </ul>
+
+  <h2>Children</h2>
+  <p>The app is a financial tool intended for adults (18+). It is not directed at children.</p>
+
+  <h2>Changes</h2>
+  <p>Changes to this policy will be posted at this address. The source of the app,
+  and of this page, is public at
+  <a href="https://github.com/mmlado/keycard-pal">github.com/mmlado/keycard-pal</a>.</p>
+
+  <h2>Contact</h2>
+  <p>Questions: open an issue at
+  <a href="https://github.com/mmlado/keycard-pal/issues">github.com/mmlado/keycard-pal/issues</a>.</p>
+  </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <a href="https://keycardpal.com/">keycardpal.com</a>
+      <a href="https://github.com/mmlado/keycard-pal">Source</a>
+      <span>MIT licensed</span>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,7 @@
+Full and pre-hashed EIP-712 requests are now signable, showing the same digest the card signs.
+
+Losing card contact mid-operation no longer fails read-only work: reposition the card and it resumes. Writes still stop safely.
+
+iOS reopens the NFC session after Apple's 60s timeout and shows the operation's progress on the system sheet.
+
+New first-run welcome screen. PIN entry keeps the app's navigation header. Addresses show their full derivation path.

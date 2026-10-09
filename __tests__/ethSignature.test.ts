@@ -106,60 +106,72 @@ describe('buildEthSignatureUR', () => {
   });
 
   it('returns a ur:eth-signature string', () => {
-    const ur = buildEthSignatureUR(tlvHex, HASH, 4, undefined, undefined);
+    const ur = buildEthSignatureUR(
+      tlvHex,
+      HASH,
+      'tx-eip1559',
+      undefined,
+      undefined,
+    );
     expect(ur.toLowerCase()).toMatch(/^ur:eth-signature\//);
   });
 
-  describe('v calculation by dataType', () => {
-    it('EIP-1559 (dataType=4): v equals recId (0 or 1)', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 4, undefined, undefined);
+  describe('v calculation by payload kind', () => {
+    it('tx-eip1559: v equals recId (0 or 1)', () => {
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'tx-eip1559',
+        undefined,
+        undefined,
+      );
       const sig: Buffer = decodeUR(ur)[2];
       expect(sig[sig.length - 1]).toBe(recId);
     });
 
-    it('legacy transaction (dataType=1, chainId=1): v = 37 + recId', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 1, 1, undefined);
+    it('tx-legacy (chainId=1): v = 37 + recId', () => {
+      const ur = buildEthSignatureUR(tlvHex, HASH, 'tx-legacy', 1, undefined);
       const sig: Buffer = decodeUR(ur)[2];
       expect(sig[sig.length - 1]).toBe(37 + recId);
     });
 
     it('encodes multi-byte legacy v values', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 1, 111, undefined);
+      const ur = buildEthSignatureUR(tlvHex, HASH, 'tx-legacy', 111, undefined);
       const sig: Buffer = decodeUR(ur)[2];
       expect(sig.subarray(64)).toEqual(Buffer.from([0x01, 0x01 + recId]));
     });
 
     it('encodes three-byte legacy v values', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 1, 40_000, undefined);
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'tx-legacy',
+        40_000,
+        undefined,
+      );
       const sig: Buffer = decodeUR(ur)[2];
       expect(sig.subarray(64)).toHaveLength(3);
       expect(sig.readUIntBE(64, 3)).toBe(80_035 + recId);
     });
 
     it('encodes four-byte legacy v values', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 1, 9_000_000, undefined);
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'tx-legacy',
+        9_000_000,
+        undefined,
+      );
       const sig: Buffer = decodeUR(ur)[2];
       expect(sig.subarray(64)).toHaveLength(4);
       expect(sig.readUInt32BE(64)).toBe(18_000_035 + recId);
     });
 
-    it('EIP-712 (dataType=2): v = 27 + recId', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 2, undefined, undefined);
-      const sig: Buffer = decodeUR(ur)[2];
-      expect(sig[sig.length - 1]).toBe(27 + recId);
-    });
-
-    it('personal_sign (dataType=3): v = 27 + recId', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 3, undefined, undefined);
-      const sig: Buffer = decodeUR(ur)[2];
-      expect(sig[sig.length - 1]).toBe(27 + recId);
-    });
-
-    it('undefined dataType falls back to v = 27 + recId', () => {
+    it('eip712-json: v = 27 + recId', () => {
       const ur = buildEthSignatureUR(
         tlvHex,
         HASH,
-        undefined,
+        'eip712-json',
         undefined,
         undefined,
       );
@@ -167,31 +179,72 @@ describe('buildEthSignatureUR', () => {
       expect(sig[sig.length - 1]).toBe(27 + recId);
     });
 
-    it('EIP-2930 (txType=0x01, dataType=1): v equals recId, not EIP-155', () => {
-      // Without txType, dataType=1 chainId=1 would give v = 37 + recId
-      const ur = buildEthSignatureUR(tlvHex, HASH, 1, 1, undefined, 0x01);
+    it('personal-message: v = 27 + recId', () => {
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'personal-message',
+        undefined,
+        undefined,
+      );
+      const sig: Buffer = decodeUR(ur)[2];
+      expect(sig[sig.length - 1]).toBe(27 + recId);
+    });
+
+    it('raw-digest: v = 27 + recId', () => {
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'raw-digest',
+        undefined,
+        undefined,
+      );
+      const sig: Buffer = decodeUR(ur)[2];
+      expect(sig[sig.length - 1]).toBe(27 + recId);
+    });
+
+    it('tx-eip2930 (chainId=1): v equals recId, not EIP-155', () => {
+      const ur = buildEthSignatureUR(tlvHex, HASH, 'tx-eip2930', 1, undefined);
       const sig: Buffer = decodeUR(ur)[2];
       expect(sig[sig.length - 1]).toBe(recId);
       expect(sig[sig.length - 1]).not.toBe(37 + recId);
     });
 
-    it('EIP-1559 (txType=0x02, dataType=4): v equals recId', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 4, 1, undefined, 0x02);
+    it('eip712-prehashed: v = 27 + recId', () => {
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'eip712-prehashed',
+        1,
+        undefined,
+      );
       const sig: Buffer = decodeUR(ur)[2];
-      expect(sig[sig.length - 1]).toBe(recId);
+      expect(sig[sig.length - 1]).toBe(27 + recId);
     });
   });
 
   describe('CBOR map structure', () => {
     it('always includes signature (key 2) and origin "Keycard Pal" (key 3)', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 4, undefined, undefined);
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'tx-eip1559',
+        undefined,
+        undefined,
+      );
       const decoded = decodeUR(ur);
       expect(Buffer.isBuffer(decoded[2])).toBe(true);
       expect(decoded[3]).toBe('Keycard Pal');
     });
 
     it('signature is 65 bytes (r || s || v) for single-byte v values', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 4, undefined, undefined);
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'tx-eip1559',
+        undefined,
+        undefined,
+      );
       const sig: Buffer = decodeUR(ur)[2];
       expect(sig.length).toBe(65);
     });
@@ -200,7 +253,7 @@ describe('buildEthSignatureUR', () => {
       const ur = buildEthSignatureUR(
         tlvHex,
         HASH,
-        4,
+        'tx-eip1559',
         undefined,
         '0102030405060708090a0b0c0d0e0f10',
       );
@@ -209,7 +262,13 @@ describe('buildEthSignatureUR', () => {
     });
 
     it('omits requestId (key 1) when not provided', () => {
-      const ur = buildEthSignatureUR(tlvHex, HASH, 4, undefined, undefined);
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'tx-eip1559',
+        undefined,
+        undefined,
+      );
       const decoded = decodeUR(ur);
       expect(decoded[1]).toBeUndefined();
     });
@@ -217,51 +276,50 @@ describe('buildEthSignatureUR', () => {
 
   it('throws on malformed TLV', () => {
     expect(() =>
-      buildEthSignatureUR('deadbeef', HASH, 4, undefined, undefined),
+      buildEthSignatureUR('deadbeef', HASH, 'tx-eip1559', undefined, undefined),
     ).toThrow();
   });
 });
 
 describe('computeEthV', () => {
-  it('EIP-2930 (txType=0x01): returns recId regardless of dataType/chainId', () => {
-    expect(computeEthV(0, 1, 1, 0x01)).toBe(0);
-    expect(computeEthV(1, 1, 1, 0x01)).toBe(1);
+  it('tx-eip2930: returns recId regardless of chainId', () => {
+    expect(computeEthV(0, 'tx-eip2930', 1)).toBe(0);
+    expect(computeEthV(1, 'tx-eip2930', 1)).toBe(1);
   });
 
-  it('EIP-1559 (txType=0x02): returns recId', () => {
-    expect(computeEthV(0, 4, 1, 0x02)).toBe(0);
-    expect(computeEthV(1, 4, 1, 0x02)).toBe(1);
+  it('tx-eip1559: returns recId', () => {
+    expect(computeEthV(0, 'tx-eip1559', 1)).toBe(0);
+    expect(computeEthV(1, 'tx-eip1559', 1)).toBe(1);
   });
 
-  it('legacy EIP-155 tx (dataType=1): v = 35 + 2*chainId + recId', () => {
-    expect(computeEthV(0, 1, 1, undefined)).toBe(37);
-    expect(computeEthV(1, 1, 1, undefined)).toBe(38);
-    expect(computeEthV(0, 1, 137, undefined)).toBe(35 + 274);
+  it('tx-legacy: v = 35 + 2*chainId + recId', () => {
+    expect(computeEthV(0, 'tx-legacy', 1)).toBe(37);
+    expect(computeEthV(1, 'tx-legacy', 1)).toBe(38);
+    expect(computeEthV(0, 'tx-legacy', 137)).toBe(35 + 274);
   });
 
-  it('legacy EIP-155 tx (dataType=1) with no chainId: v = 35 + recId', () => {
-    expect(computeEthV(0, 1, undefined, undefined)).toBe(35);
-    expect(computeEthV(1, 1, undefined, undefined)).toBe(36);
+  it('tx-legacy with no chainId: v = 35 + recId', () => {
+    expect(computeEthV(0, 'tx-legacy', undefined)).toBe(35);
+    expect(computeEthV(1, 'tx-legacy', undefined)).toBe(36);
   });
 
-  it('typed tx without explicit txType (dataType=4): v = recId', () => {
-    expect(computeEthV(0, 4, undefined, undefined)).toBe(0);
-    expect(computeEthV(1, 4, undefined, undefined)).toBe(1);
+  it('personal-message: v = 27 + recId', () => {
+    expect(computeEthV(0, 'personal-message', undefined)).toBe(27);
+    expect(computeEthV(1, 'personal-message', undefined)).toBe(28);
   });
 
-  it('personal_sign (dataType=3): v = 27 + recId', () => {
-    expect(computeEthV(0, 3, undefined, undefined)).toBe(27);
-    expect(computeEthV(1, 3, undefined, undefined)).toBe(28);
+  it('eip712-json and eip712-prehashed: v = 27 + recId', () => {
+    expect(computeEthV(0, 'eip712-json', undefined)).toBe(27);
+    expect(computeEthV(1, 'eip712-prehashed', undefined)).toBe(28);
   });
 
-  it('EIP-712 (dataType=2): v = 27 + recId', () => {
-    expect(computeEthV(0, 2, undefined, undefined)).toBe(27);
-    expect(computeEthV(1, 2, undefined, undefined)).toBe(28);
+  it('raw-digest: v = 27 + recId', () => {
+    expect(computeEthV(0, 'raw-digest', undefined)).toBe(27);
+    expect(computeEthV(1, 'raw-digest', undefined)).toBe(28);
   });
 
-  it('undefined dataType: v = 27 + recId', () => {
-    expect(computeEthV(0, undefined, undefined, undefined)).toBe(27);
-    expect(computeEthV(1, undefined, undefined, undefined)).toBe(28);
+  it('invalid: throws', () => {
+    expect(() => computeEthV(0, 'invalid', undefined)).toThrow();
   });
 });
 
@@ -284,57 +342,52 @@ describe('buildRawEthHexSignature', () => {
   });
 
   it('returns 0x-prefixed hex of length 132 (single-byte v)', () => {
-    const result = buildRawEthHexSignature(tlvBytes, HASH, 4, undefined);
+    const result = buildRawEthHexSignature(
+      tlvBytes,
+      HASH,
+      'tx-eip1559',
+      undefined,
+    );
     expect(result).toMatch(/^0x[0-9a-f]{130}$/);
   });
 
-  it('v = recId for dataType=4', () => {
-    const result = buildRawEthHexSignature(tlvBytes, HASH, 4, undefined);
-    const vHex = result.slice(2 + 128);
-    expect(parseInt(vHex, 16)).toBe(recId);
-  });
-
-  it('v = 27 + recId for dataType=3 (personal_sign)', () => {
-    const result = buildRawEthHexSignature(tlvBytes, HASH, 3, undefined);
-    const vHex = result.slice(2 + 128);
-    expect(parseInt(vHex, 16)).toBe(27 + recId);
-  });
-
-  it('detects EIP-2930 from 0x-prefixed signData first byte 0x01 → v = recId', () => {
-    const result = buildRawEthHexSignature(tlvBytes, HASH, 1, 1, '0x01aabbcc');
-    const vHex = result.slice(2 + 128);
-    expect(parseInt(vHex, 16)).toBe(recId);
-  });
-
-  it('detects EIP-1559 from signData first byte 0x02 → v = recId', () => {
-    const result = buildRawEthHexSignature(tlvBytes, HASH, 4, 1, '02aabbcc');
-    const vHex = result.slice(2 + 128);
-    expect(parseInt(vHex, 16)).toBe(recId);
-  });
-
-  it('falls back to default v when signData is undefined', () => {
+  it('v = recId for tx-eip1559', () => {
     const result = buildRawEthHexSignature(
       tlvBytes,
       HASH,
-      3,
+      'tx-eip1559',
       undefined,
+    );
+    const vHex = result.slice(2 + 128);
+    expect(parseInt(vHex, 16)).toBe(recId);
+  });
+
+  it('v = recId for tx-eip2930 even with a chainId', () => {
+    const result = buildRawEthHexSignature(tlvBytes, HASH, 'tx-eip2930', 1);
+    const vHex = result.slice(2 + 128);
+    expect(parseInt(vHex, 16)).toBe(recId);
+  });
+
+  it('v = 27 + recId for personal-message', () => {
+    const result = buildRawEthHexSignature(
+      tlvBytes,
+      HASH,
+      'personal-message',
       undefined,
     );
     const vHex = result.slice(2 + 128);
     expect(parseInt(vHex, 16)).toBe(27 + recId);
   });
 
-  it('non-typed signData (first byte not 0x01/0x02) does not override dataType v', () => {
-    // 0xde is not a typed tx prefix → detectTxType returns undefined → uses dataType=4 → v = recId
+  it('v = 27 + recId for raw-digest (WC typed-data digest)', () => {
     const result = buildRawEthHexSignature(
       tlvBytes,
       HASH,
-      4,
+      'raw-digest',
       undefined,
-      '0xdeadbeef',
     );
     const vHex = result.slice(2 + 128);
-    expect(parseInt(vHex, 16)).toBe(recId);
+    expect(parseInt(vHex, 16)).toBe(27 + recId);
   });
 });
 
@@ -358,7 +411,7 @@ describe('buildEthSignatureURFromResult', () => {
     const ur = buildEthSignatureURFromResult(
       tlvBytes,
       HASH,
-      4,
+      'tx-eip1559',
       undefined,
       undefined,
     );
@@ -369,7 +422,7 @@ describe('buildEthSignatureURFromResult', () => {
     const ur = buildEthSignatureURFromResult(
       tlvBytes,
       HASH,
-      4,
+      'tx-eip1559',
       undefined,
       '0102030405060708090a0b0c0d0e0f10',
     );
@@ -377,14 +430,13 @@ describe('buildEthSignatureURFromResult', () => {
     expect(decoded[1]).toBeDefined();
   });
 
-  it('detects tx type from signData for correct v encoding', () => {
+  it('tx-eip2930 kind yields v = recId in the UR signature', () => {
     const ur = buildEthSignatureURFromResult(
       tlvBytes,
       HASH,
-      1,
+      'tx-eip2930',
       1,
       undefined,
-      '0x01deadbeef',
     );
     const sig: Buffer = decodeUR(ur)[2];
     // EIP-2930 → v = recId (0 or 1), not 37+

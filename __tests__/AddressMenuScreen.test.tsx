@@ -4,6 +4,8 @@ import AddressMenuScreen, {
   dashboardEntry,
 } from '../src/screens/address/AddressMenuScreen';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -17,16 +19,15 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      chevronRight: Icon,
-      nfcActivate: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+// These assertions describe the list layout's rows, so pin the preference.
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: mockTestPreferences({ dashboardLayout: 'list' }),
+    setPreference: jest.fn(),
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,6 +64,12 @@ describe('AddressMenuScreen', () => {
       renderScreen();
       expect(screen.getByTestId('menu-nfc-indicator-0')).toBeTruthy();
       expect(screen.getByTestId('menu-nfc-indicator-1')).toBeTruthy();
+    });
+
+    it('shows a leading icon on both address entries', () => {
+      renderScreen();
+      expect(screen.getByTestId('menu-icon-0')).toBeTruthy();
+      expect(screen.getByTestId('menu-icon-1')).toBeTruthy();
     });
   });
 

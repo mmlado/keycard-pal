@@ -9,6 +9,10 @@ import NFCBottomSheet from '../src/components/NFCBottomSheet';
 // Mocks
 // ---------------------------------------------------------------------------
 
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: jest.fn(),
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -31,18 +35,20 @@ jest.mock('@scure/bip32', () => ({ HDKey: jest.fn() }));
 // Mock deriveAddresses — returns predictable test addresses
 const mockDeriveAddresses = jest.fn();
 jest.mock('../src/utils/hdAddress', () => ({
+  ...jest.requireActual('../src/utils/hdAddress'),
   parseExtendedKeyFromTLV: jest.fn(),
   deriveAddresses: (...args: any[]) => mockDeriveAddresses(...args),
 }));
 
-// Mock useAddresses
+// Mock the NFC layer beneath useAddressEnumeration — the enumeration hook
+// itself runs for real, so batching and path pairing are covered here.
 const mockStart = jest.fn();
 const mockCancel = jest.fn();
 const mockSubmitPin = jest.fn();
 const mockUseAddresses = jest.fn();
 
-jest.mock('../src/hooks/keycard/useAddresses', () => ({
-  useAddresses: () => mockUseAddresses(),
+jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
+  useKeycardOp: () => mockUseAddresses(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -50,6 +56,7 @@ jest.mock('../src/hooks/keycard/useAddresses', () => ({
 // ---------------------------------------------------------------------------
 
 const navigation = {
+  addListener: jest.fn(() => jest.fn()),
   goBack: jest.fn(),
   navigate: jest.fn(),
   setOptions: jest.fn(),
@@ -201,6 +208,13 @@ describe('AddressListScreen', () => {
       expect(screen.getByText('0xAddr9')).toBeTruthy();
     });
 
+    it('renders the full derivation path under each address', async () => {
+      mockDeriveAddresses.mockReturnValue(makeBatch('0xAddr'));
+      await renderScreen('done', mockAccountKey);
+      expect(screen.getByText("m/44'/60'/0'/0/0")).toBeTruthy();
+      expect(screen.getByText("m/44'/60'/0'/0/9")).toBeTruthy();
+    });
+
     it('loads more addresses starting at the next index on subsequent calls', async () => {
       mockDeriveAddresses.mockReturnValue(makeBatch('0xAddr'));
       await renderScreen('done', mockAccountKey);
@@ -225,7 +239,7 @@ describe('AddressListScreen', () => {
   });
 
   describe('row press', () => {
-    it('navigates to AddressDetail with address and index when a row is pressed', async () => {
+    it('navigates to AddressDetail with address and derivation path when a row is pressed', async () => {
       mockDeriveAddresses.mockReturnValue(makeBatch('0xAddr'));
       await renderScreen('done', mockAccountKey);
 
@@ -235,7 +249,7 @@ describe('AddressListScreen', () => {
 
       expect(navigation.navigate).toHaveBeenCalledWith('AddressDetail', {
         address: '0xAddr0',
-        index: 0,
+        derivationPath: "m/44'/60'/0'/0/0",
       });
     });
   });
@@ -246,6 +260,12 @@ describe('AddressListScreen', () => {
       await renderScreen('done', mockAccountKey, 'btc');
       expect(mockDeriveAddresses).toHaveBeenCalled();
       expect(screen.getByText('bc1q0')).toBeTruthy();
+    });
+
+    it('renders BTC derivation paths', async () => {
+      mockDeriveAddresses.mockReturnValue(makeBatch('bc1q'));
+      await renderScreen('done', mockAccountKey, 'btc');
+      expect(screen.getByText("m/84'/0'/0'/0/0")).toBeTruthy();
     });
   });
 });

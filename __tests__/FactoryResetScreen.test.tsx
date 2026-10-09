@@ -10,6 +10,10 @@ import NFCBottomSheet from '../src/components/NFCBottomSheet';
 // Mocks
 // ---------------------------------------------------------------------------
 
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: jest.fn(),
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -42,6 +46,7 @@ jest.mock('../src/hooks/keycard/useFactoryReset', () => ({
 // ---------------------------------------------------------------------------
 
 const navigation = {
+  addListener: jest.fn(() => jest.fn()),
   goBack: jest.fn(),
   reset: jest.fn(),
   setOptions: jest.fn(),
@@ -106,7 +111,10 @@ describe('FactoryResetScreen', () => {
     it('shows the warning description', () => {
       renderScreen('idle');
       expect(
-        screen.getByText(/Factory reset permanently erases key pair/),
+        screen.getByText(/Factory reset will permanently erase the keypair/),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(/backed up your recovery phrase before proceeding/),
       ).toBeTruthy();
     });
 

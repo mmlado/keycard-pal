@@ -1,49 +1,61 @@
 import { StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DashboardAction, KeycardMenuScreenProps } from '../navigation/types';
-import Menu from '../components/Menu';
-import theme from '../theme';
+import { Icons } from '@/assets/icons';
+import { DashboardAction, KeycardMenuScreenProps } from '@/navigation/types';
+import theme from '@/theme';
+
+import EntryList, { EntryListItem } from '@/components/EntryList';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Keycard',
+  icon: Icons.keycard,
   navigate: nav => nav.navigate('KeycardMenu'),
 };
 
 export default function KeycardMenuScreen({
   navigation,
 }: KeycardMenuScreenProps) {
-  const entries = [
+  const insets = useSafeAreaInsets();
+  const entries: EntryListItem[] = [
     {
       label: 'Initialize',
+      icon: Icons.cardInit,
       requiresNfc: true,
       onPress: () => navigation.navigate('InitCard'),
     },
     {
-      label: 'Keypair',
+      label: 'Key pair',
+      icon: Icons.key,
       onPress: () => navigation.navigate('KeyPairMenu'),
     },
     {
       label: 'Set card name',
+      icon: Icons.cardName,
       onPress: () => navigation.navigate('SetCardName'),
     },
     {
       label: 'Secrets',
+      icon: Icons.secrets,
       onPress: () => navigation.navigate('SecretsMenu'),
     },
     {
       label: 'Manage pairing slots',
+      icon: Icons.pairingSlots,
       requiresNfc: true,
+      generationBoundRoute: 'PairingSlots',
       onPress: () => navigation.navigate('PairingSlots'),
     },
     {
       label: 'Factory reset',
+      icon: Icons.factoryReset,
       onPress: () => navigation.navigate('FactoryReset'),
     },
   ];
 
   return (
-    <View style={styles.container}>
-      <Menu entries={entries} />
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+      <EntryList entries={entries} />
     </View>
   );
 }

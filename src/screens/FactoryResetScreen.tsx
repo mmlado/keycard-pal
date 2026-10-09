@@ -1,17 +1,21 @@
-import { useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { DashboardAction, FactoryResetSreenProps } from '../navigation/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icons } from '../assets/icons';
+import { DashboardAction, FactoryResetSreenProps } from '../navigation/types';
 import theme from '../theme';
+
 import NFCBottomSheet from '../components/NFCBottomSheet';
 import PrimaryButton from '../components/PrimaryButton';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useFactoryReset } from '../hooks/keycard/useFactoryReset';
-import { Icons } from '../assets/icons';
+import { useKeycardScreen } from '../hooks/useKeycardScreen';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Factory reset',
+  icon: Icons.factoryReset,
   navigate: nav => nav.navigate('FactoryReset'),
 };
 
@@ -22,31 +26,18 @@ export default function FactoryResetScreen({
   const [checked, setChecked] = useState(false);
 
   const keycard = useFactoryReset();
-  const { phase, start, cancel } = keycard;
+  const { phase, start } = keycard;
 
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: 'Factory reset' });
-  }, [navigation]);
-
-  useEffect(() => {
-    if (phase !== 'done') {
-      return;
-    }
-
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Dashboard', params: { toast: 'Factory reset done' } }],
-    });
-  }, [phase, navigation]);
+  const { onCancel } = useKeycardScreen({
+    keycard,
+    navigation,
+    title: 'Factory reset',
+    done: { toast: 'Factory reset done' },
+  });
 
   const handleStart = useCallback(() => {
     start();
   }, [start]);
-
-  const handleCancel = useCallback(() => {
-    cancel();
-    navigation.goBack();
-  }, [cancel, navigation]);
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
@@ -54,8 +45,11 @@ export default function FactoryResetScreen({
         <View style={styles.content}>
           <View style={styles.body}>
             <Text style={styles.description}>
-              Factory reset permanently erases key pair on your Keycard. Ensure
-              you back up your seed phrase before proceeding.
+              Factory reset will permanently erase the keypair on your Keycard.
+            </Text>
+            <Text style={styles.description}>
+              Ensure that you have backed up your recovery phrase before
+              proceeding.
             </Text>
           </View>
 
@@ -85,7 +79,7 @@ export default function FactoryResetScreen({
         </View>
       )}
 
-      <NFCBottomSheet nfc={keycard} onCancel={handleCancel} showOnDone />
+      <NFCBottomSheet nfc={keycard} onCancel={onCancel} showOnDone />
     </View>
   );
 }
@@ -103,6 +97,7 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     justifyContent: 'center',
+    gap: 12,
   },
   description: {
     color: theme.colors.onSurfaceMuted,

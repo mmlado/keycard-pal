@@ -1,11 +1,12 @@
 buildscript {
     ext {
-        buildToolsVersion = "36.0.0"
+        buildToolsVersion = "37.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 36
+        compileSdkVersion = 37
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
-        kotlinVersion = "2.1.20"
+        // The Kotlin Gradle plugin AGP 9 applies; async-storage picks its KSP from this.
+        kotlinVersion = "2.2.10"
     }
     repositories {
         google()
@@ -21,11 +22,3 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
-
-allprojects {
-    repositories {
-        maven {
-            url("$rootDir/../node_modules/@react-native-async-storage/async-storage/android/local_repo")
-        }
-    }
-}

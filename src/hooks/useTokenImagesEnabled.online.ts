@@ -1,13 +1,6 @@
-import { useEffect, useState } from 'react';
-
-import { loadTokenImagesEnabled } from '@/storage/preferencesStorage';
+import { usePreferences } from '@/hooks/usePreferences';
 
 export default function useTokenImagesEnabled(): boolean {
-  const [enabled, setEnabled] = useState(false);
-
-  useEffect(() => {
-    loadTokenImagesEnabled().then(setEnabled);
-  }, []);
-
-  return enabled;
+  const { preferences } = usePreferences();
+  return preferences.tokenImagesEnabled;
 }

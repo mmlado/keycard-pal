@@ -2,8 +2,7 @@ import { CryptoMultiAccounts } from '@keystonehq/bc-ur-registry';
 import { URDecoder } from '@ngraveio/bc-ur';
 import {
   buildCryptoMultiAccountsUR,
-  exportKeysForBitget,
-  type BitgetExportResult,
+  type MultiAccountKey,
 } from '../src/utils/cryptoMultiAccounts';
 
 /* eslint-disable no-bitwise */
@@ -69,31 +68,6 @@ function buildExtendedKeyTLV(
   return tlvEncode(0xa1, inner);
 }
 
-function makeMockCmdSet() {
-  let exportKeyCall = 0;
-  let exportExtendedKeyCall = 0;
-
-  return {
-    exportKey: jest.fn().mockImplementation(() => {
-      const seed = ++exportKeyCall;
-      const pub = new Uint8Array(65);
-      pub[0] = 0x04;
-      pub[1] = seed;
-      const data = tlvEncode(0xa1, concat(tlvEncode(0x80, pub)));
-      return Promise.resolve({ checkOK: jest.fn(), data });
-    }),
-    exportExtendedKey: jest.fn().mockImplementation(() => {
-      const seed = ++exportExtendedKeyCall;
-      const pub = new Uint8Array(65);
-      pub[0] = 0x04;
-      pub[1] = seed + 100;
-      const cc = new Uint8Array(32).fill(seed);
-      const data = buildExtendedKeyTLV(pub, cc);
-      return Promise.resolve({ checkOK: jest.fn(), data });
-    }),
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -106,21 +80,22 @@ const DERIVATION_PATHS = [
   "m/44'/60'/0'",
 ];
 
-function buildFixture(): BitgetExportResult {
-  return {
-    masterFingerprint: MASTER_FINGERPRINT,
-    keys: DERIVATION_PATHS.map((derivationPath, i) => {
-      const pub = new Uint8Array(65);
-      pub[0] = 0x04;
-      pub[1] = i + 1; // distinguishable per key
-      const cc = new Uint8Array(32).fill(i + 1);
-      return {
-        derivationPath,
-        exportRespData: buildExtendedKeyTLV(pub, cc),
-        parentFingerprint: 0x11000000 + i,
-      };
-    }),
-  };
+function buildFixture(): MultiAccountKey[] {
+  return DERIVATION_PATHS.map((derivationPath, i) => {
+    const pub = new Uint8Array(65);
+    pub[0] = 0x04;
+    pub[1] = i + 1; // distinguishable per key
+    const cc = new Uint8Array(32).fill(i + 1);
+    return {
+      derivationPath,
+      exportRespData: buildExtendedKeyTLV(pub, cc),
+      parentFingerprint: 0x11000000 + i,
+      // Keys 0-2 are BTC (coin type 0), key 3 is ETH with the EIP-4527 source
+      coinType: i === 3 ? 60 : 0,
+      network: 0,
+      ...(i === 3 ? { source: 'account.standard' } : {}),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -138,50 +113,6 @@ function decodeMultiAccounts(urString: string): CryptoMultiAccounts {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// exportKeysForBitget
-// ---------------------------------------------------------------------------
-
-describe('exportKeysForBitget', () => {
-  it('calls setStatus with progress messages', async () => {
-    const cmdSet = makeMockCmdSet() as any;
-    const setStatus = jest.fn();
-    await exportKeysForBitget(cmdSet, setStatus);
-
-    expect(setStatus).toHaveBeenCalledWith('Reading master key...');
-    expect(setStatus).toHaveBeenCalledWith('Exporting key 1 of 4...');
-    expect(setStatus).toHaveBeenCalledWith('Exporting key 2 of 4...');
-    expect(setStatus).toHaveBeenCalledWith('Exporting key 3 of 4...');
-    expect(setStatus).toHaveBeenCalledWith('Exporting key 4 of 4...');
-  });
-
-  it('returns 4 keys and a masterFingerprint', async () => {
-    const cmdSet = makeMockCmdSet() as any;
-    const result = await exportKeysForBitget(cmdSet, jest.fn());
-    expect(result.keys).toHaveLength(4);
-    expect(typeof result.masterFingerprint).toBe('number');
-  });
-
-  it('each key has a parentFingerprint', async () => {
-    const cmdSet = makeMockCmdSet() as any;
-    const result = await exportKeysForBitget(cmdSet, jest.fn());
-    for (const key of result.keys) {
-      expect(typeof key.parentFingerprint).toBe('number');
-    }
-  });
-
-  it('keys have the correct derivation paths', async () => {
-    const cmdSet = makeMockCmdSet() as any;
-    const result = await exportKeysForBitget(cmdSet, jest.fn());
-    expect(result.keys.map(k => k.derivationPath)).toEqual([
-      "m/84'/0'/0'",
-      "m/49'/0'/0'",
-      "m/44'/0'/0'",
-      "m/44'/60'/0'",
-    ]);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // buildCryptoMultiAccountsUR
 // ---------------------------------------------------------------------------
 
@@ -190,7 +121,7 @@ describe('buildCryptoMultiAccountsUR', () => {
   let multiAccounts: CryptoMultiAccounts;
 
   beforeAll(() => {
-    urString = buildCryptoMultiAccountsUR(buildFixture());
+    urString = buildCryptoMultiAccountsUR(MASTER_FINGERPRINT, buildFixture());
     multiAccounts = decodeMultiAccounts(urString);
   });
 

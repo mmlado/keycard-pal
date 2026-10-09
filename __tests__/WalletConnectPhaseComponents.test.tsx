@@ -89,13 +89,16 @@ import ProposalPhase from '../src/screens/WalletConnectPairingScreen/ProposalPha
 const insets = { top: 0, bottom: 0, left: 0, right: 0 };
 
 describe('AddressSelectionPhase', () => {
-  const addresses = ['0xAAA', '0xBBB', '0xCCC'];
+  const rows = ['0xAAA', '0xBBB', '0xCCC'].map((address, i) => ({
+    address,
+    path: `m/44'/60'/0'/0/${i}`,
+  }));
 
   it('renders address list and action buttons', () => {
     render(
       <AddressSelectionPhase
-        addresses={addresses}
-        selectedAddress={null}
+        rows={rows}
+        selectedRow={null}
         loading={false}
         insets={insets}
         onSelect={jest.fn()}
@@ -114,8 +117,8 @@ describe('AddressSelectionPhase', () => {
     const onSelect = jest.fn();
     render(
       <AddressSelectionPhase
-        addresses={addresses}
-        selectedAddress={null}
+        rows={rows}
+        selectedRow={null}
         loading={false}
         insets={insets}
         onSelect={onSelect}
@@ -125,15 +128,15 @@ describe('AddressSelectionPhase', () => {
       />,
     );
     fireEvent.press(screen.getByText('0xBBB'));
-    expect(onSelect).toHaveBeenCalledWith('0xBBB');
+    expect(onSelect).toHaveBeenCalledWith(rows[1]);
   });
 
   it('calls onConnect when Connect is pressed', async () => {
     const onConnect = jest.fn();
     render(
       <AddressSelectionPhase
-        addresses={addresses}
-        selectedAddress="0xAAA"
+        rows={rows}
+        selectedRow={rows[0]}
         loading={false}
         insets={insets}
         onSelect={jest.fn()}
@@ -150,8 +153,8 @@ describe('AddressSelectionPhase', () => {
     const onCancel = jest.fn();
     render(
       <AddressSelectionPhase
-        addresses={addresses}
-        selectedAddress={null}
+        rows={rows}
+        selectedRow={null}
         loading={false}
         insets={insets}
         onSelect={jest.fn()}
@@ -168,8 +171,8 @@ describe('AddressSelectionPhase', () => {
     const onSelect = jest.fn();
     render(
       <AddressSelectionPhase
-        addresses={addresses}
-        selectedAddress="0xBBB"
+        rows={rows}
+        selectedRow={rows[1]}
         loading={true}
         insets={insets}
         onSelect={onSelect}
@@ -181,15 +184,15 @@ describe('AddressSelectionPhase', () => {
     expect(screen.getByText('Loading addresses')).toBeTruthy();
     expect(screen.getByText('0xBBB')).toBeTruthy();
     fireEvent.press(screen.getByTestId('radio-0xBBB'));
-    expect(onSelect).toHaveBeenCalledWith('0xBBB');
+    expect(onSelect).toHaveBeenCalledWith(rows[1]);
   });
 
   it('calls onLoadMore when the list reaches the end', () => {
     const onLoadMore = jest.fn();
     const { UNSAFE_getByType } = render(
       <AddressSelectionPhase
-        addresses={addresses}
-        selectedAddress={null}
+        rows={rows}
+        selectedRow={null}
         loading={false}
         insets={insets}
         onSelect={jest.fn()}

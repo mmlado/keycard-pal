@@ -67,6 +67,19 @@ export function mergeKeycardNameMetadata(
   return new Uint8Array([...encodedName, ...current.slice(metadataOffset)]);
 }
 
-export function displayKeycardName(name?: string | null): string {
-  return name && name.length > 0 ? name : 'Unnamed card';
+export function formatFingerprint(fingerprint: number): string {
+  return (fingerprint >>> 0).toString(16).padStart(8, '0');
+}
+
+export function displayKeycardName(
+  name?: string | null,
+  fingerprint?: number | null,
+): string {
+  if (name && name.length > 0) {
+    return name;
+  }
+  if (fingerprint != null) {
+    return formatFingerprint(fingerprint);
+  }
+  return 'Unnamed card';
 }

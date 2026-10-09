@@ -14,6 +14,7 @@ let capturedOperation: OperationFn | null = null;
 let capturedOptions: {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
+  successMessage?: string;
 } | null = null;
 
 const mockStart = jest.fn();
@@ -21,7 +22,11 @@ const mockStart = jest.fn();
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
   useKeycardOp: (
     fn: OperationFn,
-    opts: { requiresPin?: boolean; requiresMasterKey?: boolean },
+    opts: {
+      requiresPin?: boolean;
+      requiresMasterKey?: boolean;
+      successMessage?: string;
+    },
   ) => {
     capturedOperation = fn;
     capturedOptions = opts;
@@ -81,6 +86,15 @@ describe('deriveMnemonicKeyPair', () => {
     expect(mockFromBinarySeed).toHaveBeenCalledWith(Buffer.from('seed'));
   });
 
+  it('normalizes Unicode before deriving the seed', () => {
+    deriveMnemonicKeyPair(['あおぞら'], 'ＴＲＥＺＯＲ café');
+
+    expect(mockToBinarySeed).toHaveBeenCalledWith(
+      'あおそ\u3099ら',
+      'TREZOR cafe\u0301',
+    );
+  });
+
   it('passes passphrase to toBinarySeed when provided', () => {
     deriveMnemonicKeyPair(WORDS, 'my passphrase');
 
@@ -114,6 +128,7 @@ describe('useLoadKey', () => {
     expect(capturedOptions).toEqual({
       requiresPin: true,
       requiresMasterKey: false,
+      successMessage: 'Key pair has been added to Keycard',
     });
   });
 

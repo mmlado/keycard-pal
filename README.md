@@ -5,44 +5,48 @@
 </p>
 
 <p align="center">
+  <a href="https://keycardpal.com"><img src="https://img.shields.io/badge/website-keycardpal.com-FF6400" alt="Website" /></a>
   <a href="https://github.com/mmlado/keycard-pal/actions/workflows/ci.yml"><img src="https://github.com/mmlado/keycard-pal/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://github.com/mmlado/keycard-pal/actions/workflows/android-release.yml"><img src="https://github.com/mmlado/keycard-pal/actions/workflows/android-release.yml/badge.svg" alt="Build & Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
   <a href="https://codecov.io/gh/mmlado/keycard-pal"><img src="https://codecov.io/gh/mmlado/keycard-pal/branch/main/graph/badge.svg" alt="Test coverage" /></a>
-  <a href="https://developer.android.com"><img src="https://img.shields.io/badge/platform-Android-green.svg" alt="Platform" /></a>
-  <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/React%20Native-0.83-blue.svg" alt="React Native" /></a>
+  <img src="https://img.shields.io/badge/platform-Android%20%7C%20iOS-green.svg" alt="Platform" />
+  <a href="https://reactnative.dev"><img src="https://img.shields.io/badge/React%20Native-0.87-blue.svg" alt="React Native" /></a>
   <a href="https://github.com/mmlado/keycard-pal/releases/latest"><img src="https://img.shields.io/github/v/release/mmlado/keycard-pal" alt="GitHub release" /></a>
   <img src="https://img.shields.io/github/last-commit/mmlado/keycard-pal.svg" alt="Last commit" />
   <img src="https://img.shields.io/github/stars/mmlado/keycard-pal.svg?style=social" alt="Stars" />
 </p>
 
-Keycard Pal is an air-gapped Android companion app for [Status Keycard](https://keycard.tech). It lets you sign Ethereum and Bitcoin transactions over NFC, so your private keys never touch an internet-connected device.
+Keycard Pal is an air-gapped companion app for [Status Keycard](https://keycard.tech), on Android and iOS. It lets you sign Ethereum and Bitcoin transactions over NFC, so your private keys never touch an internet-connected device.
 
 All communication with your watch-only wallet happens through animated QR codes using the [Blockchain Commons UR](https://github.com/BlockchainCommons/bc-ur) standard. No telemetry.
 
-Keycard Pal comes in two variants:
+On Android, Keycard Pal comes in two variants:
 
 | Variant | Package ID | Internet |
 |---------|-----------|----------|
-| **Keycard Pal** | `com.keycardpal` | Optional — for future opt-in security features (ENS, simulation) |
-| **Keycard Pal Offline** | `com.keycardpal.offline` | Never — `INTERNET` permission is absent from the manifest |
+| **Keycard Pal** | `com.keycardpal` | Optional. WalletConnect, ENS names, Tenderly simulation and token images, each off until you turn it on in Settings |
+| **Keycard Pal Offline** | `com.keycardpal.offline` | Never. The `INTERNET` permission is absent from the manifest |
 
 Both variants are fully functional for signing and key management. Keycard Pal Offline is the right choice if you want a hard, manifest-level guarantee of no network access.
+
+On iOS there is one app, Keycard Pal, with the same opt-in online features; there is no offline variant.
 
 ## Screenshots
 
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_dashboard.png" width="30%" alt="Dashboard" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_connect_software_wallet.png" width="30%" alt="Connect software wallet" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_nfc_scan.png" width="30%" alt="NFC scan" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01_welcome.png" width="30%" alt="Welcome" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02_scan_qr_code.png" width="30%" alt="Scan QR code" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03_eth_transaction.png" width="30%" alt="Ethereum transaction review" />
 </p>
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_show_qr_code.png" width="30%" alt="Show QR code" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05_scan_qr_code.png" width="30%" alt="Scan QR code" />
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/06_transaction.png" width="30%" alt="Transaction review" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04_eip712_permit.png" width="30%" alt="EIP-712 permit review" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05_btc_psbt.png" width="30%" alt="Bitcoin PSBT review" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/06_signature_qr.png" width="30%" alt="Signature QR code" />
 </p>
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/07_keypair.png" width="30%" alt="Key pair" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/07_seed_phrase.png" width="30%" alt="Recovery phrase backup" />
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/08_pin_pad.png" width="30%" alt="PIN entry" />
 </p>
 
 ## Features
@@ -57,16 +61,24 @@ Both variants are fully functional for signing and key management. Keycard Pal O
 - Import a recovery phrase (BIP-39, 12 or 24 words, with optional passphrase)
 - Import SLIP-39 Shamir Secret Sharing shares
 - Genuine Keycard verification before first pairing
-- Two variants: Keycard Pal Offline (no internet, manifest-level guarantee) and Keycard Pal (optional internet for future security features)
+- Two Android variants: Keycard Pal Offline (no internet, manifest-level guarantee) and Keycard Pal (optional, opt-in online features: WalletConnect, ENS names, Tenderly transaction simulation, token images); iOS ships Keycard Pal
 
 ## Requirements
 
-- Android 7.0+ (API 24)
-- A [Status Keycard](https://get.keycard.tech/vuxxnf) NFC smart card (use code **ShellSummer9746** for a discount on orders over $25)
+- Android 7.0+ (API 24) with NFC, or an iPhone 7 or later on iOS 15.1+
+- A [Status Keycard](https://get.keycard.tech/vuxxnf) NFC smart card
+
+> **Advertisement:** the purchase link above and the Buy a Keycard links in the Android app
+> are affiliate links. The developer earns a commission on purchases made through them. No app feature
+> depends on buying through them, and every feature of the app is free. The iOS app carries
+> no affiliate link and points at the product site instead.
 
 ## Getting the app
 
-Download the latest APK from [Releases](../../releases) and sideload it onto your device.
+Both Android variants, including Keycard Pal Offline, are attached to every GitHub release
+and served from the developer's F-Droid repository. Keycard Pal (`com.keycardpal`) is also
+on Google Play, and the iOS app is on the App Store. The same channels, with screenshots,
+are at [keycardpal.com](https://keycardpal.com).
 
 <p>
   <a href="https://github.com/mmlado/keycard-pal/releases/latest">
@@ -78,15 +90,30 @@ Download the latest APK from [Releases](../../releases) and sideload it onto you
   <a href="https://fdroid.keycardpal.com/repo?fingerprint=24EB891A8A617F8BF20892CB0CF9267709BA94056E64242AD9EDF638C2FED3D2">
     <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="70" />
   </a>
+  <a href="https://play.google.com/store/apps/details?id=com.keycardpal">
+    <img src="assets/badges/badge_play.png" alt="Get it on Google Play" height="70" />
+  </a>
+  <a href="https://apps.apple.com/app/keycard-pal/id6777478235">
+    <img src="assets/badges/badge_appstore.svg" alt="Download on the App Store" height="70" />
+  </a>
 </p>
-
-For most users, install the universal APK. ABI-specific split APKs are also attached to releases for smaller downloads on known device architectures.
 
 ### Verification info
 
 - Package ID: `com.keycardpal` (Keycard Pal) / `com.keycardpal.offline` (Keycard Pal Offline)
 - SHA-256 hash of signing certificate: `A8:3C:11:4B:1F:42:01:DA:FB:D0:3E:22:1F:1C:29:28:EC:B5:2B:78:BD:A5:E9:3F:29:6F:ED:F2:29:8E:54:6B`
 - `SHA256SUMS.txt` is attached to each GitHub Release to verify APK file hashes.
+- The certificate above signs the GitHub and F-Droid builds. The Google Play copy is re-signed by Play App Signing and has a different one.
+
+### Install from GitHub
+
+Download an APK from the [latest release](https://github.com/mmlado/keycard-pal/releases/latest)
+and sideload it. For most users, install the universal APK. ABI-specific split APKs are also
+attached to releases for smaller downloads on known device architectures. Each split carries
+its own `versionCode` (the universal ends in 0, `armeabi-v7a` in 1, `arm64-v8a` in 2), and all
+three are signed with the same certificate, so a device can take a split over the universal APK
+at any time, the universal over a split from the next release on, and move between GitHub,
+Obtainium and either F-Droid repository the same way, without reinstalling.
 
 ### Install with Obtainium
 
@@ -109,18 +136,36 @@ https://fdroid.keycardpal.com/repo/
 
 > The APK is built automatically by GitHub Actions on every version tag.
 
+### Install from Google Play
+
+[Keycard Pal on Google Play](https://play.google.com/store/apps/details?id=com.keycardpal)
+carries `com.keycardpal` only; Keycard Pal Offline is not on Play.
+
+Because Play re-signs the app with a Google-managed key, the Play copy and the builds from
+GitHub or F-Droid have different signatures and cannot replace each other on a device.
+Pick one source and stay with it; switching means uninstalling first, which removes the
+pairing data stored on the phone.
+
+### Install from the App Store
+
+[Keycard Pal on the App Store](https://apps.apple.com/app/keycard-pal/id6777478235) is the
+iOS app, with the same opt-in online features as `com.keycardpal` on Android. There is no
+offline variant on iOS. NFC tag reading needs an iPhone 7 or later.
+
 ## Building from source
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.13.0+
 - JDK 17
-- Android SDK with NDK 27.1.12297006
+- Android SDK platform 37 and build-tools 37.0.0, with NDK 27.1.12297006
+- Xcode and CocoaPods, for iOS
 
 ### Setup
 
 ```sh
 npm install
+cd ios && pod install   # iOS only
 ```
 
 ### Run (development)
@@ -128,6 +173,8 @@ npm install
 ```sh
 npm start        # Terminal 1: Metro bundler
 npm run android  # Terminal 2: build and install
+npm run ios      # or on a connected iPhone
+npm run ios:sim  # or on the iOS Simulator
 ```
 
 ### Release build
@@ -144,16 +191,26 @@ npm test      # Jest test suite
 npm run lint  # ESLint
 ```
 
+## How it is built
+
+Keycard Pal is developed with substantial help from AI coding assistants (Claude and
+Codex). I decide what gets built, read and test what goes in, and maintain it myself. What
+keeps that honest is in the repository: a Jest suite of about 2,600 tests that runs on every
+pull request, 16 architecture decision records explaining why things are the way they are,
+a check that the offline build carries no online code, and release APKs that anyone can
+rebuild byte for byte. Fixes that belonged upstream were sent upstream, to `keycard-sdk`
+and to the React Native Keycard bridge. Every release is tested on real Keycards and real
+phones before it ships.
+
 ## Buy me a coffee
 
-If Keycard Pal keeps your funds safe, you can send a coffee my way.
-
-- Ethereum: `0xF665E3D58DABa87d741A347674DCc4C4b794cAc9`
-- Bitcoin: `bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf`
+If Keycard Pal keeps your funds safe, you can send a coffee my way. Addresses are in
+[DONATE.md](DONATE.md), and on the app's About screen. Donations are voluntary and nothing
+is unlocked, changed or promised in return.
 
 ## Security
 
-- Pairing data is stored in encrypted storage backed by the Android Keystore
+- Pairing data is stored in encrypted storage backed by the Android Keystore or the iOS Keychain
 - Private keys never leave the Keycard; only the signature result is returned to the app
 - QR codes use [Blockchain Commons UR](https://github.com/BlockchainCommons/bc-ur) for structured binary encoding
 - Keycard Pal Offline (`com.keycardpal.offline`) has no `INTERNET` permission at the manifest level — no runtime flag can enable networking

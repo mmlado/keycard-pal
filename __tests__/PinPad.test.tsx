@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import PinPad from '../src/components/PinPad';
 
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -12,9 +14,13 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-jest.mock('../src/storage/preferencesStorage', () => ({
-  loadPinPadScramble: jest.fn().mockResolvedValue(false),
-  savePinPadScramble: jest.fn().mockResolvedValue(undefined),
+// The scramble preference arrives from context, already resolved at mount.
+let mockScramble = false;
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: mockTestPreferences({ pinPadScramble: mockScramble }),
+    setPreference: jest.fn(),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -28,15 +34,10 @@ beforeEach(() => {
   onComplete.mockClear();
   onType.mockClear();
   jest.clearAllMocks();
-  jest
-    .requireMock('../src/storage/preferencesStorage')
-    .loadPinPadScramble.mockResolvedValue(false);
+  mockScramble = false;
 });
 
-/** Walk the toJSON tree and collect Pressable nodes.
- * In the RN test environment, Pressable renders as View with onClick (not onPress).
- * We identify them by the focusable prop which Pressable always sets.
- */
+/** Collects Pressables: in tests they render as a View with `focusable`. */
 function getPressableNodesFromJSON(json: any): any[] {
   const nodes: any[] = [];
   function walk(node: any) {
@@ -257,9 +258,7 @@ describe('PinPad', () => {
     });
 
     it('shows scrambled layout when preference is true', async () => {
-      jest
-        .requireMock('../src/storage/preferencesStorage')
-        .loadPinPadScramble.mockResolvedValue(true);
+      mockScramble = true;
       render(<PinPad onComplete={onComplete} />);
       await act(async () => {});
       const { toJSON } = screen;
@@ -270,10 +269,32 @@ describe('PinPad', () => {
       expect(digits).not.toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
     });
 
+    // Known at mount; a change while mounted still switches the keys.
+    it('follows a scramble change while mounted', async () => {
+      mockScramble = true;
+      const { rerender, toJSON } = render(<PinPad onComplete={onComplete} />);
+      await act(async () => {});
+
+      mockScramble = false;
+      await act(async () => {
+        rerender(<PinPad onComplete={onComplete} />);
+      });
+      expect(getDigitOrder(toJSON())).toEqual([
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        '8',
+        '9',
+        '0',
+      ]);
+    });
+
     it('reshuffles when a new error arrives only when scramble is enabled', async () => {
-      jest
-        .requireMock('../src/storage/preferencesStorage')
-        .loadPinPadScramble.mockResolvedValue(true);
+      mockScramble = true;
       const { rerender, toJSON } = render(<PinPad onComplete={onComplete} />);
       await act(async () => {});
       const before = JSON.stringify(toJSON());
@@ -314,9 +335,7 @@ describe('PinPad', () => {
     });
 
     it('does not reshuffle when error is unchanged', async () => {
-      jest
-        .requireMock('../src/storage/preferencesStorage')
-        .loadPinPadScramble.mockResolvedValue(true);
+      mockScramble = true;
       const { rerender, toJSON } = render(
         <PinPad onComplete={onComplete} error="Wrong PIN" />,
       );
@@ -365,8 +384,7 @@ describe('PinPad', () => {
     });
 
     it('renders the same number of nodes whether error is present or absent', async () => {
-      // The error element is always in the tree (opacity:0 hides it, not
-      // conditional rendering). Verifies no layout shift occurs.
+      // The error element is always mounted, hidden by opacity: no layout shift.
       const { toJSON: withErrorJSON } = render(
         <PinPad onComplete={onComplete} error="Something wrong" />,
       );
@@ -385,8 +403,7 @@ describe('PinPad', () => {
 
       const withCount = countNodes(withErrorJSON());
       const withoutCount = countNodes(withoutErrorJSON());
-      // Both renders should produce the same or very similar node count
-      // (the error text node is always in the tree, just hidden via opacity)
+      // Same node count with and without an error.
       expect(Math.abs(withCount - withoutCount)).toBeLessThanOrEqual(1);
     });
   });

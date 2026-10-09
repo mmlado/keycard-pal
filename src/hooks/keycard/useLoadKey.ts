@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { BIP32KeyPair } from 'keycard-sdk/dist/bip32key';
-import { Mnemonic } from 'keycard-sdk/dist/mnemonic';
+import { deriveMnemonicSeed } from '../../utils/mnemonic';
 
 import { useKeycardOp } from './useKeycardOperation';
 
@@ -29,7 +29,12 @@ export function useLoadKey() {
         keyPairRef.current = null;
       }
     }, []),
-    { requiresPin: true, requiresMasterKey: false },
+    {
+      requiresPin: true,
+      requiresMasterKey: false,
+      // Mirrors ConfirmKeyScreen's done toast.
+      successMessage: 'Key pair has been added to Keycard',
+    },
   );
 
   const start = useCallback(
@@ -57,7 +62,6 @@ export function deriveMnemonicKeyPair(
   words: string[],
   passphrase?: string,
 ): BIP32KeyPair {
-  const phrase = words.join(' ');
-  const seed = Mnemonic.toBinarySeed(phrase, passphrase);
+  const seed = deriveMnemonicSeed(words, passphrase);
   return BIP32KeyPair.fromBinarySeed(seed);
 }

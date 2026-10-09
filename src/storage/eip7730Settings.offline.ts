@@ -1,4 +1,5 @@
 import { DEFAULT_EIP7730_REGISTRY_URL } from '@/constants/eip7730';
+import type { SatisfiesOnline } from '@/utils/onlineParity';
 
 export type Eip7730DescriptorSource = 'auto' | 'manual';
 
@@ -51,3 +52,9 @@ export async function saveLastModified(_lastModified: string): Promise<void> {
 export async function clearLastModified(): Promise<void> {
   // offline build: no-op
 }
+
+// tsc drift guard: this stub must stay interface-compatible with its online twin.
+export type _OnlineParity = SatisfiesOnline<
+  typeof import('./eip7730Settings.online'),
+  typeof import('./eip7730Settings.offline')
+>;

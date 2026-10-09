@@ -1,12 +1,11 @@
+/** Digits in a PUK, fixed by the applet. The PIN pad asks for exactly this many. */
+export const PUK_LENGTH = 12;
+
 export const PAIRING_PASSWORD = new Uint8Array([
   0x67, 0x5d, 0xea, 0xbb, 0x0d, 0x7c, 0x72, 0x4b, 0x4a, 0x36, 0xca, 0xad, 0x0e,
   0x28, 0x08, 0x26, 0x15, 0x9e, 0x89, 0x88, 0x6f, 0x70, 0x82, 0x53, 0x5d, 0x43,
   0x1e, 0x92, 0x48, 0x48, 0xbc, 0xf1,
 ]);
-
-export const KEYCARD_PURCHASE_URL = 'https://get.keycard.tech/vuxxnf';
-export const KEYCARD_PURCHASE_COUPON_CODE = 'ShellSummer9746';
-export const KEYCARD_PURCHASE_COUPON_MINIMUM = '$25';
 
 // Keycard CA public key — compressed secp256k1
 // Source: https://github.com/keycard-tech/keycard-shell/blob/master/app/storage/keys.c (_KEYCARD_CA_PUB)

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import NFCError from '../src/components/NFCBottomSheet/NFCError';
+import { NO_CARD_EXIT_LABEL } from '../src/constants/purchaseLink';
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -118,6 +119,98 @@ describe('NFCError', () => {
       render(<NFCError status="err" retry={onRetry} onCancel={onCancel} />);
       fireEvent.press(screen.getByText('Try again'));
       expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
+
+  // A blocked PIN would fail a retry the same way, so the unblock flow takes
+  // the primary button's place.
+  describe('Unblock PIN button', () => {
+    it('shows Unblock PIN instead of Try again when onUnblockPin is provided', () => {
+      render(
+        <NFCError
+          status="blocked"
+          retry={onRetry}
+          onUnblockPin={jest.fn()}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('Unblock PIN')).toBeTruthy();
+      expect(screen.queryByText('Try again')).toBeNull();
+    });
+
+    it('calls onUnblockPin alone when pressed', () => {
+      const onUnblockPin = jest.fn();
+      render(
+        <NFCError
+          status="blocked"
+          retry={onRetry}
+          onUnblockPin={onUnblockPin}
+          onCancel={onCancel}
+        />,
+      );
+      fireEvent.press(screen.getByText('Unblock PIN'));
+      expect(onUnblockPin).toHaveBeenCalledTimes(1);
+      expect(onRetry).not.toHaveBeenCalled();
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('yields to Open NFC Settings', () => {
+      render(
+        <NFCError
+          status="NFC off"
+          openNFCSettings={jest.fn()}
+          onUnblockPin={jest.fn()}
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('Open NFC Settings')).toBeTruthy();
+      expect(screen.queryByText('Unblock PIN')).toBeNull();
+    });
+
+    it('is absent when onUnblockPin is not provided', () => {
+      render(<NFCError status="err" retry={onRetry} onCancel={onCancel} />);
+      expect(screen.queryByText('Unblock PIN')).toBeNull();
+    });
+  });
+
+  // #258: on iOS the system sheet times out into this overlay, so it is where
+  // a user without a card lands. The link is quiet and never competes with
+  // Try again.
+  describe('buy-a-Keycard link', () => {
+    const link = NO_CARD_EXIT_LABEL;
+
+    it('shows the link when onBuyKeycard is provided', () => {
+      render(
+        <NFCError
+          status="err"
+          retry={onRetry}
+          onCancel={onCancel}
+          onBuyKeycard={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(link)).toBeTruthy();
+      expect(screen.getByText('Try again')).toBeTruthy();
+    });
+
+    it('hides the link when onBuyKeycard is not provided', () => {
+      render(<NFCError status="err" onCancel={onCancel} />);
+      expect(screen.queryByText(link)).toBeNull();
+    });
+
+    it('calls onBuyKeycard only when pressed', () => {
+      const onBuyKeycard = jest.fn();
+      render(
+        <NFCError
+          status="err"
+          retry={onRetry}
+          onCancel={onCancel}
+          onBuyKeycard={onBuyKeycard}
+        />,
+      );
+      fireEvent.press(screen.getByText(link));
+      expect(onBuyKeycard).toHaveBeenCalledTimes(1);
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(onRetry).not.toHaveBeenCalled();
     });
   });
 

@@ -1,3 +1,14 @@
+AntiFeatures:
+  Ads:
+    en-US: Buy a Keycard entries open an affiliate link to the Keycard shop, and the
+      developer earns a commission on purchases made through it.
+  NonFreeNet:
+    en-US: Optional features, all disabled by default, connect to network services that
+      are not free software. WalletConnect uses the Reown relay with a project ID you
+      provide yourself, transaction simulation uses Tenderly with an API key you provide
+      yourself, ENS names are looked up through a public Ethereum RPC endpoint you can
+      change, and token images are downloaded from CoinGecko, GitHub and CoinMarketCap.
+      Signing by QR code works without any of them.
 Categories:
   - Money
   - Security
@@ -6,17 +17,25 @@ License: MIT
 
 SourceCode: https://github.com/mmlado/keycard-pal
 IssueTracker: https://github.com/mmlado/keycard-pal/issues
+Donate: https://github.com/mmlado/keycard-pal/blob/HEAD/DONATE.md
+Bitcoin: bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf
 
-Summary: Air-gapped Ethereum and Bitcoin signing with a Keycard NFC smart card.
+Summary: Sign Ethereum and Bitcoin by QR code with a Keycard NFC smart card
 Description: |
-  Keycard Pal is an air-gapped Android companion app for Status Keycard NFC smart
-  cards. Signs Ethereum and Bitcoin requests without exposing private keys to a
-  networked device. Communication with watch-only wallets happens through
-  animated QR codes (Blockchain Commons UR format); communication with the
-  Keycard happens over NFC.
+  Keycard Pal is an Android companion app for Status Keycard NFC smart cards.
+  Signs Ethereum and Bitcoin requests without exposing private keys to a
+  networked device: the keys never leave the card. Communication with watch-only
+  wallets happens through animated QR codes (Blockchain Commons UR format);
+  communication with the Keycard happens over NFC.
 
-  This flavor declares the INTERNET permission but makes no network connections
-  in the current release. The permission is reserved for future opt-in security
-  features (such as certificate transparency checks). All signing and key
-  operations are identical to Keycard Pal Offline. If you require a build with no
-  INTERNET permission declared, use Keycard Pal Offline (com.keycardpal.offline).
+  This flavor declares the INTERNET permission for optional features:
+  WalletConnect, ENS names, transaction simulation with Tenderly, and token
+  images. Each one is off until you turn it on in Settings. WalletConnect needs
+  your own Reown Project ID and simulation needs your own Tenderly API key.
+  Signing by QR code is identical to Keycard Pal Offline and needs no network.
+  If you require a build with no INTERNET permission declared, use Keycard Pal
+  Offline (com.keycardpal.offline).
+
+  Advertisement: the Buy a Keycard links in this app are affiliate links. The
+  developer earns a commission on purchases made through them. No app feature
+  depends on buying through them, and every feature of the app is free.

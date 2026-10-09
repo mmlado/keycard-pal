@@ -1,27 +1,22 @@
-import { HDKey } from '@scure/bip32';
-import Keycard from 'keycard-sdk';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { WalletConnectPairingScreenProps } from '@/navigation/types';
 import {
-  SUPPORTED_WC_EIP155_CHAIN_IDS,
-  SUPPORTED_WC_METHODS,
-} from '@/constants/walletConnect';
-import { useKeycardOp } from '@/hooks/keycard/useKeycardOperation';
+  useAddressEnumeration,
+  type AddressRow,
+} from '@/hooks/keycard/useAddressEnumeration';
 import { useWalletConnectSession } from '@/hooks/useWalletConnectSession.online';
 import type { SessionProposalEvent } from '@/providers/walletConnect/context';
 import { getChainName } from '@/utils/chainMetadata';
 import { pubKeyToEthAddress } from '@/utils/ethereumAddress';
-import { deriveAddresses } from '@/utils/hdAddress';
+import { validateProposal } from '@/utils/walletConnect/proposalPolicy';
 
 import AddressSelectionPhase from './AddressSelectionPhase';
 import ApprovingPhase from './ApprovingPhase';
 import ErrorPhase from './ErrorPhase';
 import PairingPhase from './PairingPhase';
 import ProposalPhase from './ProposalPhase';
-
-const BATCH = 20;
 
 type PathOption = {
   label: string;
@@ -66,11 +61,7 @@ export default function WalletConnectPairingScreen({
 
   const [localPhase, setLocalPhase] = useState<LocalPhase>('pairing');
   const [selectedPathIdx, setSelectedPathIdx] = useState(0);
-  const [addresses, setAddresses] = useState<string[]>([]);
-  const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
-  const [accountKey, setAccountKey] = useState<HDKey | null>(null);
-  const [loading, setLoading] = useState(false);
-  const nextIndexRef = useRef(0);
+  const [selectedRow, setSelectedRow] = useState<AddressRow | null>(null);
 
   const proposal = useMemo(() => {
     if (typeof wcPhase === 'object' && wcPhase.kind === 'proposal') {
@@ -107,42 +98,18 @@ export default function WalletConnectPairingScreen({
   }, [wcPhase, navigation, localPhase]);
 
   const selectedOpt = PATH_OPTIONS[selectedPathIdx];
-  const accountKeyOp = useKeycardOp<HDKey>(
-    useCallback(
-      async cmdSet => {
-        const resp = await cmdSet.exportExtendedKey(
-          0,
-          selectedOpt.accountPath,
-          false,
-        );
-        resp.checkOK();
-        return Keycard.BIP32KeyPair.extendedKey(resp.data);
-      },
-      [selectedOpt.accountPath],
-    ),
-    { requiresPin: true },
+  const { rows, loading, loadMore, nfc } = useAddressEnumeration(
+    selectedOpt.accountPath,
+    pubKeyToEthAddress,
+    { hasExternalChain: selectedOpt.hasExternalChain },
   );
-
-  const { phase: nfcPhase, start: startNfc, cancel: cancelNfc } = accountKeyOp;
+  const { phase: nfcPhase, start: startNfc, cancel: cancelNfc } = nfc;
 
   useEffect(() => {
-    if (nfcPhase === 'done' && accountKeyOp.result) {
-      const key = accountKeyOp.result;
-      const enumerationKey = selectedOpt.hasExternalChain
-        ? key.deriveChild(0)
-        : key;
-      setAccountKey(enumerationKey);
-      const batch = deriveAddresses(
-        enumerationKey,
-        BATCH,
-        pubKeyToEthAddress,
-        0,
-      );
-      nextIndexRef.current = BATCH;
-      setAddresses(batch);
+    if (nfcPhase === 'done') {
       setLocalPhase('address_selection');
     }
-  }, [nfcPhase, accountKeyOp.result, selectedOpt.hasExternalChain]);
+  }, [nfcPhase]);
 
   const handleConfirm = useCallback(() => {
     setLocalPhase('approving');
@@ -165,13 +132,11 @@ export default function WalletConnectPairingScreen({
   }, [cancelNfc, proposal, rejectSession, navigation]);
 
   const handleConnect = useCallback(async () => {
-    if (!selectedAddress) return;
-    const idx = addresses.indexOf(selectedAddress);
-    const fullPath = selectedOpt.hasExternalChain
-      ? `${selectedOpt.accountPath}/0/${idx}`
-      : `${selectedOpt.accountPath}/${idx}`;
-    await approveSession(selectedAddress, fullPath);
-  }, [selectedAddress, addresses, selectedOpt, approveSession]);
+    if (!selectedRow) return;
+    // Address and path travel together in the row — approveSession stores
+    // exactly the pair the enumeration derived from one child key.
+    await approveSession(selectedRow.address, selectedRow.path);
+  }, [selectedRow, approveSession]);
 
   const handleCancelAddressSelection = useCallback(async () => {
     if (proposal) {
@@ -179,20 +144,6 @@ export default function WalletConnectPairingScreen({
     }
     navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
   }, [proposal, rejectSession, navigation]);
-
-  const loadMore = useCallback(() => {
-    if (!accountKey || loading) return;
-    setLoading(true);
-    const batch = deriveAddresses(
-      accountKey,
-      BATCH,
-      pubKeyToEthAddress,
-      nextIndexRef.current,
-    );
-    nextIndexRef.current += BATCH;
-    setAddresses(prev => [...prev, ...batch]);
-    setLoading(false);
-  }, [accountKey, loading]);
 
   const requestedChains = useMemo(() => {
     const required = proposal?.params.requiredNamespaces.eip155?.chains ?? [];
@@ -206,34 +157,10 @@ export default function WalletConnectPairingScreen({
 
   const proposalError = useMemo(() => {
     if (!proposal) return null;
-    const requiredNamespaces = proposal.params.requiredNamespaces ?? {};
-    const unsupportedNamespaces = Object.keys(requiredNamespaces).filter(
-      ns => ns !== 'eip155',
-    );
-    if (unsupportedNamespaces.length > 0) {
-      return `Required namespaces not supported: ${unsupportedNamespaces.join(
-        ', ',
-      )}`;
-    }
-
-    const supported = SUPPORTED_WC_EIP155_CHAIN_IDS.map(id => `eip155:${id}`);
-    const requiredChains = requiredNamespaces.eip155?.chains ?? [];
-    const unsupportedChains = requiredChains.filter(
-      c => !supported.includes(c),
-    );
-    if (unsupportedChains.length > 0) {
-      return `Required chains not supported: ${unsupportedChains
-        .map(c => c.replace('eip155:', ''))
-        .join(', ')}`;
-    }
-    const requiredMethods = requiredNamespaces.eip155?.methods ?? [];
-    const unsupported = requiredMethods.filter(
-      m => !(SUPPORTED_WC_METHODS as readonly string[]).includes(m),
-    );
-    if (unsupported.length > 0) {
-      return `Required methods not supported: ${unsupported.join(', ')}`;
-    }
-    return null;
+    // Same policy the provider rejects with — banner and rejection reason
+    // are composed from one verdict and cannot drift.
+    const verdict = validateProposal(proposal);
+    return verdict.ok ? null : verdict.reason;
   }, [proposal]);
 
   if (localPhase === 'pairing') {
@@ -259,7 +186,7 @@ export default function WalletConnectPairingScreen({
   if (localPhase === 'approving') {
     return (
       <ApprovingPhase
-        accountKeyOp={accountKeyOp}
+        accountKeyOp={nfc}
         insets={insets}
         onCancel={handleNfcCancel}
       />
@@ -269,11 +196,11 @@ export default function WalletConnectPairingScreen({
   if (localPhase === 'address_selection') {
     return (
       <AddressSelectionPhase
-        addresses={addresses}
-        selectedAddress={selectedAddress}
+        rows={rows}
+        selectedRow={selectedRow}
         loading={loading}
         insets={insets}
-        onSelect={setSelectedAddress}
+        onSelect={setSelectedRow}
         onLoadMore={loadMore}
         onConnect={handleConnect}
         onCancel={handleCancelAddressSelection}

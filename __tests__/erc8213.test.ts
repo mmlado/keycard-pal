@@ -2,6 +2,7 @@ import {
   computeCalldataDigest,
   computeEip712DigestFromJson,
   computeEip712DigestFromPrehashed,
+  computeErc191Digest,
 } from '../src/utils/erc8213';
 
 const HEX_HASH = /^0x[0-9a-f]{64}$/;
@@ -110,5 +111,38 @@ describe('computeEip712DigestFromPrehashed', () => {
     expect(computeEip712DigestFromPrehashed(ZERO_HASH, ZERO_HASH)).toEqual(
       expected,
     );
+  });
+});
+
+describe('computeErc191Digest', () => {
+  it('matches the known personal_sign digest of "hello world"', () => {
+    expect(computeErc191Digest(Buffer.from('hello world', 'utf8'))).toBe(
+      '0xd9eba16ed0ecae432b71fe008c98cc872bb4cc214d3220a36f365326cf807d68',
+    );
+  });
+
+  it('hashes the bytes, not a decoded string', () => {
+    const invalidUtf8 = new Uint8Array([0xff, 0xfe, 0x80]);
+    const { keccak256, concat, stringToBytes } = require('viem');
+    const expected = keccak256(
+      concat([stringToBytes('\x19Ethereum Signed Message:\n3'), invalidUtf8]),
+    );
+    expect(computeErc191Digest(invalidUtf8)).toBe(expected);
+  });
+
+  it('prefixes the byte length, not the character count', () => {
+    const twoBytesOneChar = Buffer.from('é', 'utf8');
+    const { keccak256, concat, stringToBytes } = require('viem');
+    const expected = keccak256(
+      concat([
+        stringToBytes('\x19Ethereum Signed Message:\n2'),
+        twoBytesOneChar,
+      ]),
+    );
+    expect(computeErc191Digest(twoBytesOneChar)).toBe(expected);
+  });
+
+  it('handles the empty message', () => {
+    expect(computeErc191Digest(new Uint8Array(0))).toMatch(HEX_HASH);
   });
 });

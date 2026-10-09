@@ -14,7 +14,7 @@ export default function SignRequestDetail({ result }: { result: ScanResult }) {
   }
 
   if (result.kind === 'crypto-psbt') {
-    return <PsbtDetail psbtHex={result.request.psbtHex} />;
+    return <PsbtDetail summary={result.summary} />;
   }
 
   if (result.kind === 'btc-sign-request') {

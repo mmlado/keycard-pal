@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +13,7 @@ import {
   deriveMnemonicKeyPair,
   useLoadKey,
 } from '../../hooks/keycard/useLoadKey';
+import { useKeycardScreen } from '../../hooks/useKeycardScreen';
 
 export default function ConfirmKeyScreen({
   navigation,
@@ -32,26 +27,14 @@ export default function ConfirmKeyScreen({
   );
 
   const keycard = useLoadKey();
-  const { phase, start, cancel } = keycard;
+  const { start } = keycard;
 
-  const handleCancel = useCallback(() => {
-    cancel();
-    navigation.goBack();
-  }, [cancel, navigation]);
-
-  useEffect(() => {
-    if (phase === 'done') {
-      navigation.navigate('Dashboard', {
-        toast: 'Key pair has been added to Keycard',
-      });
-    }
-  }, [phase, navigation]);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: phase === 'pin_entry' ? 'Enter Keycard PIN' : 'Check your backup',
-    });
-  }, [navigation, phase]);
+  const { onCancel } = useKeycardScreen({
+    keycard,
+    navigation,
+    title: 'Check your backup',
+    done: { toast: 'Key pair has been added to Keycard' },
+  });
 
   const [attemptKey, setAttemptKey] = useState(0);
 
@@ -61,18 +44,10 @@ export default function ConfirmKeyScreen({
     }, []),
   );
 
-  const handleFailure = useCallback(() => {
-    cancel();
-    navigation.goBack();
-  }, [cancel, navigation]);
+  const handleFailure = onCancel;
 
   return (
-    <View
-      style={[
-        styles.container,
-        { paddingTop: insets.top, paddingBottom: insets.bottom },
-      ]}
-    >
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <MnemonicBackupCheck
         key={attemptKey}
         words={words}
@@ -81,7 +56,7 @@ export default function ConfirmKeyScreen({
         onFailure={handleFailure}
       />
 
-      <NFCBottomSheet nfc={keycard} onCancel={handleCancel} />
+      <NFCBottomSheet nfc={keycard} onCancel={onCancel} />
     </View>
   );
 }

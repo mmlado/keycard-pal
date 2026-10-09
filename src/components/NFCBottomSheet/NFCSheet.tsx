@@ -2,17 +2,28 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { Icons } from '../../assets/icons';
-import theme from '../../theme';
-import { displayKeycardName } from '../../utils/keycardName';
+import { Icons } from '@/assets/icons';
+import { NO_CARD_EXIT_LABEL } from '@/constants/purchaseLink';
+import theme from '@/theme';
+
+import AffiliateDisclosure from '@/components/AffiliateDisclosure';
+
+import { displayKeycardName } from '@/utils/keycardName';
 import type { NFCVariant } from './index';
 
 type Props = {
   variant: NFCVariant;
   status: string;
   cardName?: string | null;
+  cardFingerprint?: number | null;
   onCancel: () => void;
+  /** Restarts the operation. After an error the bridge stops listening, so a re-tap emits nothing. */
+  retry?: () => void;
   openNFCSettings?: () => void;
+  /** Takes the place of Try again, which could only fail the same way. */
+  onUnblockPin?: () => void;
+  /** Exit for someone without a card. Shown only while the app is asking for one. */
+  onBuyKeycard?: () => void;
 };
 
 function PulseRing({ delay, size }: { delay: number; size: number }) {
@@ -64,9 +75,18 @@ export default function NFCSheet({
   variant,
   status,
   cardName,
+  cardFingerprint,
   onCancel,
+  retry,
   openNFCSettings,
+  onUnblockPin,
+  onBuyKeycard,
 }: Props) {
+  const showBuyKeycard =
+    onBuyKeycard !== undefined &&
+    (variant === 'scanning' || variant === 'error');
+
+  // A card that moved is recoverable, so 'disconnected' keeps the default icon.
   const NfcIcon =
     variant === 'success'
       ? Icons.nfc.success
@@ -90,15 +110,45 @@ export default function NFCSheet({
       <Text variant="titleLarge" style={styles.title}>
         {cardName === undefined || cardName === null
           ? 'Tap your Keycard'
-          : displayKeycardName(cardName)}
+          : displayKeycardName(cardName, cardFingerprint)}
       </Text>
       <Text variant="bodyMedium" style={styles.status}>
         {status}
       </Text>
 
-      {variant === 'error' && !openNFCSettings && (
+      {variant === 'error' && !openNFCSettings && onUnblockPin && (
+        <Pressable
+          style={styles.settingsButton}
+          android_ripple={{ color: theme.colors.secondaryRipple }}
+          onPress={onUnblockPin}
+        >
+          <Text variant="labelLarge" style={styles.settingsText}>
+            Unblock PIN
+          </Text>
+        </Pressable>
+      )}
+
+      {variant === 'error' && !openNFCSettings && !onUnblockPin && retry && (
+        <Pressable
+          style={styles.settingsButton}
+          android_ripple={{ color: theme.colors.secondaryRipple }}
+          onPress={retry}
+        >
+          <Text variant="labelLarge" style={styles.settingsText}>
+            Try again
+          </Text>
+        </Pressable>
+      )}
+
+      {variant === 'error' && !openNFCSettings && !onUnblockPin && !retry && (
         <Text variant="bodyMedium" style={styles.retryHint}>
           Tap your card to try again
+        </Text>
+      )}
+
+      {variant === 'disconnected' && (
+        <Text variant="bodyMedium" style={styles.retryHint}>
+          Hold your Keycard against the phone again
         </Text>
       )}
 
@@ -124,6 +174,22 @@ export default function NFCSheet({
             Cancel
           </Text>
         </Pressable>
+      )}
+
+      {showBuyKeycard && (
+        <>
+          <Pressable
+            style={styles.buyKeycardLink}
+            hitSlop={8}
+            accessibilityRole="link"
+            onPress={onBuyKeycard}
+          >
+            <Text variant="bodySmall" style={styles.buyKeycardText}>
+              {NO_CARD_EXIT_LABEL}
+            </Text>
+          </Pressable>
+          <AffiliateDisclosure short style={styles.buyKeycardDisclosure} />
+        </>
       )}
     </>
   );
@@ -175,5 +241,17 @@ const styles = StyleSheet.create({
   },
   settingsText: {
     color: theme.colors.onSurface,
+  },
+  buyKeycardLink: {
+    marginTop: 16,
+  },
+  buyKeycardText: {
+    color: theme.colors.onSurfaceMuted,
+    textDecorationLine: 'underline',
+  },
+  buyKeycardDisclosure: {
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
 });

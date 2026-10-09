@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import theme from '../../theme';
 
-import { usePinPadScramble } from '../../hooks/usePinPadScramble';
+import { usePreferences } from '../../hooks/usePreferences';
 import Keypad from './Keypad';
 import PinInput from './PinInput';
 
@@ -54,10 +54,16 @@ export default function PinPad({
   onType,
   length = PIN_LENGTH,
 }: PinPadProps) {
-  const scramble = usePinPadScramble();
+  const { preferences } = usePreferences();
+  const scramble = preferences.pinPadScramble;
   const normalizedLength = normalizePinLength(length);
   const [pin, setPin] = useState('');
-  const [padKeys, setPadKeys] = useState(fixedKeys);
+  // The preference is known at mount, so the first paint is already the
+  // right layout; the effect below only follows a later change.
+  const [padKeys, setPadKeys] = useState(() =>
+    scramble ? shuffleKeys() : fixedKeys(),
+  );
+  const prevScramble = useRef(scramble);
   const prevError = useRef(error);
   const pinRef = useRef('');
   const lengthRef = useRef(length);
@@ -65,10 +71,9 @@ export default function PinPad({
   const onTypeRef = useRef(onType);
 
   useEffect(() => {
-    if (scramble) {
-      setPadKeys(shuffleKeys());
-    } else {
-      setPadKeys(fixedKeys());
+    if (scramble !== prevScramble.current) {
+      prevScramble.current = scramble;
+      setPadKeys(scramble ? shuffleKeys() : fixedKeys());
     }
   }, [scramble]);
 

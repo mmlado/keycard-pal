@@ -35,7 +35,6 @@ jest.mock('../src/utils/cryptoHdKey', () => ({
 
 jest.mock('../src/utils/cryptoMultiAccounts', () => ({
   buildCryptoMultiAccountsUR: jest.fn(() => 'ur:crypto-multi-accounts/mock'),
-  exportKeysForBitget: jest.fn(),
 }));
 
 jest.mock('../src/utils/btcPsbt', () => ({
@@ -64,8 +63,7 @@ jest.mock('../src/utils/keycardExport', () => {
   const actual = jest.requireActual('../src/utils/keycardExport');
   return {
     ...actual,
-    exportKeyForWallet: jest.fn(),
-    prepareSignHash: jest.fn(() => new Uint8Array(32)),
+    exportKeysForTarget: jest.fn(),
   };
 });
 
@@ -90,6 +88,8 @@ jest.mock('../src/hooks/useWalletConnectSession.online', () => ({
 
 const navigation = {
   goBack: jest.fn(),
+  // The session is torn down on beforeRemove.
+  addListener: jest.fn(() => jest.fn()),
   reset: jest.fn(),
   setOptions: jest.fn(),
 } as any;
@@ -98,7 +98,8 @@ const signRoute = {
   params: {
     operation: 'sign',
     signMode: 'eth',
-    signData: 'deadbeef',
+    // 32-byte digest → classifies as raw-digest (dataType=2)
+    signData: 'ab'.repeat(32),
     derivationPath: "m/44'/60'/0'/0",
     dataType: 2,
     chainId: 1,
@@ -135,7 +136,7 @@ const btcMessageSignRoute = {
 const btcExportRoute = {
   params: {
     operation: 'export_key',
-    derivationPath: "m/84'/0'/0'",
+    target: 'bitcoin',
   },
   key: 'Keycard',
   name: 'Keycard',
@@ -144,8 +145,7 @@ const btcExportRoute = {
 const ethExportRoute = {
   params: {
     operation: 'export_key',
-    derivationPath: "m/44'/60'/0'",
-    source: 'account.standard',
+    target: 'ethereum',
   },
   key: 'Keycard',
   name: 'Keycard',
@@ -154,7 +154,7 @@ const ethExportRoute = {
 const bitgetExportRoute = {
   params: {
     operation: 'export_key',
-    derivationPath: 'bitget',
+    target: 'bitget',
   },
   key: 'Keycard',
   name: 'Keycard',
@@ -293,7 +293,7 @@ describe('KeycardScreen', () => {
 
       mockUseKeycardOperation.mockReturnValue({
         ...hookMock('done'),
-        result: { masterFingerprint: 1, descriptors: [] },
+        result: { masterFingerprint: 1, keys: [] },
       });
       await renderWithMockedHook(btcExportRoute);
       await act(async () => {
@@ -316,9 +316,17 @@ describe('KeycardScreen', () => {
       mockUseKeycardOperation.mockReturnValue({
         ...hookMock('done'),
         result: {
-          exportRespData: new Uint8Array([1, 2, 3]),
-          sourceFingerprint: 0xdeadbeef,
-          parentFingerprint: 0xaabbccdd,
+          masterFingerprint: 0xdeadbeef,
+          keys: [
+            {
+              entry: {
+                derivationPath: "m/44'/60'/0'",
+                parentPath: "m/44'/60'",
+              },
+              exportRespData: new Uint8Array([1, 2, 3]),
+              parentFingerprint: 0xaabbccdd,
+            },
+          ],
         },
       });
       await renderWithMockedHook(ethExportRoute);
@@ -403,18 +411,6 @@ describe('KeycardScreen', () => {
       expect(resetCall.routes[1].name).toBe('QRResult');
       expect(resetCall.routes[1].params.urString).toMatch(/^ur:crypto-psbt\//i);
     });
-
-    it('does not navigate if result is missing psbtHex', async () => {
-      mockUseKeycardOperation.mockReturnValue({
-        ...hookMock('done'),
-        result: { psbtHex: undefined },
-      });
-      await renderWithMockedHook(btcSignRoute);
-      await act(async () => {
-        jest.advanceTimersByTime(800);
-      });
-      expect(navigation.reset).not.toHaveBeenCalled();
-    });
   });
 
   describe('BTC message sign navigation', () => {
@@ -434,7 +430,10 @@ describe('KeycardScreen', () => {
 
       expect(mockExecute).toHaveBeenCalledTimes(1);
       const signOperation = mockExecute.mock.calls[0][0];
-      const result = await signOperation({ signWithPath });
+      const result = await signOperation(
+        { signWithPath },
+        { setStatus: jest.fn() },
+      );
 
       expect(hashBitcoinMessage).toHaveBeenCalledWith(
         btcMessageSignRoute.params.signDataHex,
@@ -462,18 +461,6 @@ describe('KeycardScreen', () => {
       expect(resetCall.routes[1].name).toBe('QRResult');
       expect(resetCall.routes[1].params.urString).toBe('ur:btc-signature/mock');
     });
-
-    it('does not navigate when result is not a Uint8Array (handleBtcMessageSignDone guard)', async () => {
-      mockUseKeycardOperation.mockReturnValue({
-        ...hookMock('done'),
-        result: { psbtHex: 'unexpected' },
-      });
-      await renderWithMockedHook(btcMessageSignRoute);
-      await act(async () => {
-        jest.advanceTimersByTime(800);
-      });
-      expect(navigation.reset).not.toHaveBeenCalled();
-    });
   });
 
   describe('handleCancel', () => {
@@ -481,6 +468,18 @@ describe('KeycardScreen', () => {
       const calls = MockNFCBottomSheet.mock.calls;
       return calls[calls.length - 1][0].onCancel as () => Promise<void>;
     }
+
+    // Back can leave mid-session: the reader is torn down without handleCancel's reset.
+    it('cancels the session when the screen is removed', async () => {
+      await renderScreen('nfc');
+      const beforeRemove = navigation.addListener.mock.calls.find(
+        (c: unknown[]) => c[0] === 'beforeRemove',
+      );
+      expect(beforeRemove).toBeTruthy();
+      (beforeRemove?.[1] as () => void)();
+      expect(mockCancel).toHaveBeenCalledTimes(1);
+      expect(navigation.reset).not.toHaveBeenCalled();
+    });
 
     it('calls cancel and resets to Dashboard', async () => {
       await renderScreen('nfc');
@@ -526,13 +525,7 @@ describe('KeycardScreen', () => {
   });
 
   describe('eth sign execute callback', () => {
-    it('calls signWithPath with the prepared hash and derivation path', async () => {
-      const { prepareSignHash } = require('../src/utils/keycardExport') as {
-        prepareSignHash: jest.Mock;
-      };
-      const hash = new Uint8Array(32).fill(0xcc);
-      (prepareSignHash as jest.Mock).mockReturnValue(hash);
-
+    it('calls signWithPath with the signing digest and derivation path', async () => {
       const checkOK = jest.fn();
       const signWithPath = jest.fn().mockResolvedValue({
         checkOK,
@@ -542,10 +535,11 @@ describe('KeycardScreen', () => {
       await renderScreen('pin_entry', signRoute);
 
       const signOp = mockExecute.mock.calls[0][0];
-      const result = await signOp({ signWithPath });
+      const result = await signOp({ signWithPath }, { setStatus: jest.fn() });
 
+      // A raw 32-byte digest is signed as it is.
       expect(signWithPath).toHaveBeenCalledWith(
-        hash,
+        new Uint8Array(Buffer.from(signRoute.params.signData, 'hex')),
         signRoute.params.derivationPath,
         false,
       );
@@ -579,13 +573,14 @@ describe('KeycardScreen', () => {
   });
 
   describe('export execute callback', () => {
-    it('calls exportKeyForWallet with derivationPath and setStatus', async () => {
-      const { exportKeyForWallet } = require('../src/utils/keycardExport') as {
-        exportKeyForWallet: jest.Mock;
+    it("calls exportKeysForTarget with the target's plan and setStatus", async () => {
+      const { exportKeysForTarget } = require('../src/utils/keycardExport') as {
+        exportKeysForTarget: jest.Mock;
       };
-      exportKeyForWallet.mockResolvedValue({
-        exportRespData: new Uint8Array([1]),
-      });
+      exportKeysForTarget.mockResolvedValue({ masterFingerprint: 1, keys: [] });
+      const { getExportTarget } = jest.requireActual(
+        '../src/utils/exportTargets',
+      );
 
       await renderScreen('pin_entry', ethExportRoute);
 
@@ -594,23 +589,13 @@ describe('KeycardScreen', () => {
       const setStatus = jest.fn();
       await exportOp(cmdSet, { setStatus });
 
-      expect(exportKeyForWallet).toHaveBeenCalledWith(
+      expect(exportKeysForTarget).toHaveBeenCalledWith(
         cmdSet,
-        ethExportRoute.params.derivationPath,
+        getExportTarget('ethereum').keys,
         setStatus,
+        // The flow's resume cache (reconnect resume, see keycardExport.ts).
+        expect.objectContaining({ keyUid: null }),
       );
-    });
-
-    it('does not navigate when export result is a Uint8Array (ArrayBuffer guard)', async () => {
-      mockUseKeycardOperation.mockReturnValue({
-        ...hookMock('done'),
-        result: new Uint8Array([1, 2, 3]),
-      });
-      await renderWithMockedHook(ethExportRoute);
-      await act(async () => {
-        jest.advanceTimersByTime(800);
-      });
-      expect(navigation.reset).not.toHaveBeenCalled();
     });
   });
 
@@ -657,22 +642,8 @@ describe('KeycardScreen', () => {
     });
   });
 
-  describe('handleEthSignDone guard', () => {
-    it('does not navigate when result is not a Uint8Array', async () => {
-      mockUseKeycardOperation.mockReturnValue({
-        ...hookMock('done'),
-        result: { unexpected: true },
-      });
-      await renderWithMockedHook(signRoute);
-      await act(async () => {
-        jest.advanceTimersByTime(800);
-      });
-      expect(navigation.reset).not.toHaveBeenCalled();
-    });
-  });
-
   describe('UR build error handling', () => {
-    it('logs console.error when UR building throws inside the 800ms timer', async () => {
+    it('shows a visible error state when UR building throws inside the 800ms timer', async () => {
       const { buildEthSignatureURFromResult } =
         require('../src/utils/ethSignature') as {
           buildEthSignatureURFromResult: jest.Mock;
@@ -681,24 +652,76 @@ describe('KeycardScreen', () => {
         throw new Error('encode failed');
       });
 
-      const consoleSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-
       mockUseKeycardOperation.mockReturnValue({
         ...hookMock('done'),
         result: new Uint8Array(65).fill(0x01),
       });
-      await renderWithMockedHook(signRoute);
+      const view = await renderWithMockedHook(signRoute);
       await act(async () => {
         jest.advanceTimersByTime(800);
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[KeycardScreen] Failed to build UR:',
-        'encode failed',
+      expect(navigation.reset).not.toHaveBeenCalled();
+      expect(
+        view.getByText(/Failed to build the result: encode failed/),
+      ).toBeTruthy();
+    });
+  });
+
+  describe('prepare failure', () => {
+    it('shows the error state and never starts NFC when the PSBT cannot be prepared', async () => {
+      const { BtcSigningSession } = require('../src/utils/btcPsbt') as {
+        BtcSigningSession: jest.Mock;
+      };
+      BtcSigningSession.mockImplementationOnce(() => {
+        throw new Error('Invalid PSBT payload');
+      });
+
+      mockUseKeycardOperation.mockReturnValue(hookMock('idle'));
+      const view = render(
+        <KeycardScreen route={btcSignRoute} navigation={navigation} />,
       );
-      consoleSpy.mockRestore();
+      await act(async () => {});
+
+      expect(mockExecute).not.toHaveBeenCalled();
+      expect(view.getByText('Unable to prepare')).toBeTruthy();
+      expect(view.getByText('Invalid PSBT payload')).toBeTruthy();
+    });
+
+    it('falls back to a generic message when the prepare error has none', async () => {
+      const { BtcSigningSession } = require('../src/utils/btcPsbt') as {
+        BtcSigningSession: jest.Mock;
+      };
+      BtcSigningSession.mockImplementationOnce(() => {
+        throw Object.assign(new Error(), { message: undefined });
+      });
+
+      mockUseKeycardOperation.mockReturnValue(hookMock('idle'));
+      const view = render(
+        <KeycardScreen route={btcSignRoute} navigation={navigation} />,
+      );
+      await act(async () => {});
+
+      expect(view.getByText('Failed to prepare the operation.')).toBeTruthy();
+    });
+
+    it('Go back returns to the previous screen', async () => {
+      const { BtcSigningSession } = require('../src/utils/btcPsbt') as {
+        BtcSigningSession: jest.Mock;
+      };
+      BtcSigningSession.mockImplementationOnce(() => {
+        throw new Error('Invalid PSBT payload');
+      });
+
+      mockUseKeycardOperation.mockReturnValue(hookMock('idle'));
+      const view = render(
+        <KeycardScreen route={btcSignRoute} navigation={navigation} />,
+      );
+      await act(async () => {});
+
+      const { fireEvent } = require('@testing-library/react-native');
+      fireEvent.press(view.getByText('Go back'));
+      expect(navigation.goBack).toHaveBeenCalled();
     });
   });
 });

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
 
@@ -5,11 +6,15 @@ import theme from '@/theme';
 import type { EthSignRequest } from '@/types';
 
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
-import EthDataTabPanel from './DataTabPanel';
+import Eip712JsonPanel from './DataTabPanel/Eip712JsonPanel';
+import Eip712PrehashedPanel from './DataTabPanel/Eip712PrehashedPanel';
 import InfoRow from '@/components/InfoRow';
+import PersonalMessagePanel from './DataTabPanel/PersonalMessagePanel';
+import TxDataPanel from './DataTabPanel/TxDataPanel';
 
 import { getChainName, getNativeCurrencySymbol } from '@/utils/chainMetadata';
 import { parseEip712Prehashed, parseEip712Summary } from '@/utils/eip712';
+import { classifyEthPayload } from '@/utils/ethPayload';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
 import { getTxLabel, parseTx } from '@/utils/txParser';
 
@@ -22,15 +27,22 @@ export default function SignRequestDetail({
     request.chainId !== undefined
       ? getNativeCurrencySymbol(request.chainId)
       : 'ETH';
-  // WC EIP-712 requests carry original JSON in reviewData (dataType=0 + digest in signData)
-  const eip712Source =
-    request.reviewData ?? (request.dataType === 2 ? request.signData : null);
-  const eip712 = eip712Source ? parseEip712Summary(eip712Source) : null;
-  const eip712Prehashed =
-    eip712Source && !eip712 ? parseEip712Prehashed(eip712Source) : null;
+  // Parse the request once per request, not once per render.
+  const { payload, eip712, eip712Prehashed, tx } = useMemo(() => {
+    // WC EIP-712 requests carry original JSON in reviewData (dataType=0 + digest in signData)
+    const eip712Source =
+      request.reviewData ?? (request.dataType === 2 ? request.signData : null);
+    const summary = eip712Source ? parseEip712Summary(eip712Source) : null;
+    return {
+      payload: classifyEthPayload(request.signData, request.dataType),
+      eip712: summary,
+      eip712Prehashed:
+        eip712Source && !summary ? parseEip712Prehashed(eip712Source) : null,
+      tx: parseTx(request.signData, request.dataType, nativeSymbol),
+    };
+  }, [request.reviewData, request.signData, request.dataType, nativeSymbol]);
   const typeLabel =
     eip712?.primaryType ?? getTxLabel(request.signData, request.dataType);
-  const tx = parseTx(request.signData, request.dataType, nativeSymbol);
   const signer = request.address
     ? checksumEthAddress(request.address)
     : request.derivationPath;
@@ -43,6 +55,14 @@ export default function SignRequestDetail({
           {typeLabel}
         </Text>
       </View>
+
+      {payload.kind === 'invalid' && (
+        <View style={styles.invalidBanner}>
+          <Text variant="bodyMedium" style={styles.invalidText}>
+            This request cannot be signed. {payload.reason}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.row}>
         <AddressInfoRow label="Signer" value={signer} />
@@ -94,13 +114,27 @@ export default function SignRequestDetail({
         </View>
       )}
 
-      <EthDataTabPanel
-        request={request}
-        tx={tx}
-        eip712={eip712}
-        eip712Prehashed={eip712Prehashed}
-        chainId={request.chainId}
-      />
+      {eip712 ? (
+        <Eip712JsonPanel
+          request={request}
+          eip712={eip712}
+          chainId={request.chainId}
+        />
+      ) : eip712Prehashed ? (
+        <Eip712PrehashedPanel
+          eip712Prehashed={eip712Prehashed}
+          request={request}
+        />
+      ) : tx ? (
+        <TxDataPanel tx={tx} request={request} chainId={request.chainId} />
+      ) : payload.kind === 'personal-message' ? (
+        <PersonalMessagePanel message={payload} request={request} />
+      ) : (
+        // Pure ETH transfer, unknown/invalid types
+        <View style={styles.row}>
+          <InfoRow label="Data" value={request.signData} />
+        </View>
+      )}
 
       {request.origin && (
         <View style={styles.row}>
@@ -124,6 +158,15 @@ const styles = StyleSheet.create({
   },
   typeChipText: {
     color: theme.colors.primary,
+  },
+  invalidBanner: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: theme.colors.surfaceVariant,
+  },
+  invalidText: {
+    color: theme.colors.error,
   },
   row: {
     paddingVertical: 8,

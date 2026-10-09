@@ -244,13 +244,51 @@ describe('handleUR – crypto-psbt', () => {
     return new CryptoPSBT(psbtBytes).toCBOR();
   }
 
-  it('parses a valid crypto-psbt', () => {
+  it('parses a valid crypto-psbt and attaches the summary', () => {
     const cbor = buildPsbtCbor();
     const result = handleUR('crypto-psbt', cbor);
     expect(result.kind).toBe('crypto-psbt');
     if (result.kind === 'crypto-psbt') {
       expect(typeof result.request.psbtHex).toBe('string');
       expect(result.request.psbtHex.length).toBeGreaterThan(0);
+      expect(result.summary.requestType).toBe('transaction');
+      expect(result.summary.inputCount).toBe(0);
+    }
+  });
+
+  it('rejects a malformed PSBT at scan with kind error', () => {
+    // Valid CBOR envelope wrapping bytes that are not a PSBT.
+    const cbor = new CryptoPSBT(Buffer.from('deadbeef', 'hex')).toCBOR();
+    const result = handleUR('crypto-psbt', cbor);
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.message).toContain('Failed to parse PSBT');
+    }
+  });
+
+  it('refuses a PSBT input that asks for a sighash type other than SIGHASH_ALL', () => {
+    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const pubkey = Buffer.alloc(33, 0x02);
+    const { output } = payments.p2wpkh({
+      pubkey,
+      network: networks.testnet,
+    });
+    const psbt = new Psbt({ network: networks.testnet });
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xa0),
+      index: 0,
+      witnessUtxo: { script: output!, value: 100_000 },
+      sighashType: 0x02,
+    });
+    psbt.addOutput({ script: output!, value: 90_000 });
+
+    const cbor = new CryptoPSBT(psbt.toBuffer()).toCBOR();
+    const result = handleUR('crypto-psbt', cbor);
+
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.message).not.toContain('Failed to parse PSBT');
+      expect(result.message).toContain('SIGHASH_NONE');
     }
   });
 

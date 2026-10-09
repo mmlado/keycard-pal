@@ -26,7 +26,12 @@ export function useSetCardName() {
         );
       }
     }, []),
-    { requiresPin: true, requiresMasterKey: false },
+    {
+      requiresPin: true,
+      requiresMasterKey: false,
+      // Mirrors SetCardNameScreen's done toast.
+      successMessage: 'Card name updated',
+    },
   );
 
   const start = useCallback(

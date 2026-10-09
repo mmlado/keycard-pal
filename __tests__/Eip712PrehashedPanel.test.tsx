@@ -78,6 +78,7 @@ describe('Eip712PrehashedPanel', () => {
     expect(screen.getByText(/EIP-712 Digest/)).toBeTruthy();
     expect(screen.getByText(/Domain Hash/)).toBeTruthy();
     expect(screen.getByText(/Message Hash/)).toBeTruthy();
+    expect(screen.getByTestId('digest-explainer')).toBeTruthy();
   });
 
   it('switches to Raw tab and shows signData', () => {

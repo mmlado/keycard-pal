@@ -1,5 +1,5 @@
 import React, { act } from 'react';
-import { Keyboard, TextInput } from 'react-native';
+import { Keyboard, StyleSheet, TextInput } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
@@ -9,8 +9,14 @@ import MnemonicScreen from '../src/screens/keypair/MnemonicScreen';
 // Mocks
 // ---------------------------------------------------------------------------
 
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: jest.fn(),
+}));
+
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -61,7 +67,11 @@ const VALID_12 =
 const VALID_24 =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art';
 
-const VALID_12_HEX = '00000000000000000000000000000000';
+// Standard SeedQR for VALID_12: eleven "abandon" (index 0) then "about" (index 3).
+const VALID_12_SEEDQR = `${'0000'.repeat(11)}0003`;
+
+// Same stream with the last index moved off "about", so the checksum fails.
+const BAD_CHECKSUM_SEEDQR = `${'0000'.repeat(11)}0004`;
 
 const navigation = {
   navigate: jest.fn(),
@@ -135,10 +145,23 @@ function setInput(text: string) {
   });
 }
 
-function triggerScan(hex: string) {
+function triggerScan(payload: string) {
   act(() => {
     screen.getByTestId('camera').props.onReadCode({
-      nativeEvent: { codeStringValue: hex },
+      nativeEvent: { codeStringValue: payload },
+    });
+  });
+}
+
+// A CompactSeedQR is byte mode, so the string side is empty on iOS and
+// charset-mangled on Android; the bytes are the only readable form.
+function triggerByteScan(hex: string, codeStringValue = '') {
+  act(() => {
+    screen.getByTestId('camera').props.onReadCode({
+      nativeEvent: {
+        codeStringValue,
+        codeBytesBase64: Buffer.from(hex, 'hex').toString('base64'),
+      },
     });
   });
 }
@@ -183,9 +206,23 @@ describe('MnemonicScreen', () => {
       expect(screen.getByText('Continue')).toBeTruthy();
     });
 
-    it('renders Scan SeedQR button', async () => {
+    it('renders SeedQR scan icon inside the seed-phrase input', async () => {
       renderScreen();
-      expect(screen.getByText('Scan SeedQR')).toBeTruthy();
+      expect(screen.getByTestId('scan-seedqr-button')).toBeTruthy();
+    });
+
+    it('gives the scan icon the whole strip the input reserves for it', async () => {
+      // The glyph is small but the input reserves 48 of padding for it. If the
+      // button only covers the glyph, a tap lower in that strip lands on the text
+      // and opens the keyboard instead of the scanner.
+      renderScreen();
+      const style = StyleSheet.flatten(
+        screen.getByTestId('scan-seedqr-button').props.style,
+      );
+      expect(style.position).toBe('absolute');
+      expect(style.width).toBe(48);
+      expect(style.top).toBe(0);
+      expect(style.bottom).toBe(0);
     });
   });
 
@@ -316,17 +353,66 @@ describe('MnemonicScreen', () => {
     it('shows camera overlay when Scan SeedQR is pressed', async () => {
       renderScreen();
       await act(async () => {
-        fireEvent.press(screen.getByText('Scan SeedQR'));
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
       expect(screen.getByTestId('camera')).toBeTruthy();
+    });
+
+    it('fills the screen under the header without a top inset of its own', async () => {
+      mockInsets.top = 48;
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      // The camera mock's nearest host ancestor is CameraView's container.
+      let overlay = screen.getByTestId('camera').parent;
+      while (overlay && overlay.type !== 'View') {
+        overlay = overlay.parent;
+      }
+      const style = StyleSheet.flatten(overlay!.props.style);
+      expect(style.position).toBe('absolute');
+      expect(style.paddingTop).toBeUndefined();
+      mockInsets.top = 0;
+    });
+
+    it('makes the word input non-editable while the camera is open', async () => {
+      // Keyboard.dismiss() leaves the input focused, so Android can re-show the
+      // keyboard over the viewfinder. Dropping editable blurs it for good.
+      renderScreen();
+      expect(getWordInput().props.editable).toBe(true);
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      expect(getWordInput().props.editable).toBe(false);
+    });
+
+    it('re-enables the word input once the scanner closes', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan(VALID_12_SEEDQR);
+      expect(getWordInput().props.editable).toBe(true);
+    });
+
+    it('dismisses the keyboard so it does not cover the viewfinder', async () => {
+      // The scanner is an overlay on this screen, so the word input keeps
+      // focus and the keyboard stays up over the camera unless dismissed.
+      const dismiss = jest.spyOn(Keyboard, 'dismiss');
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      expect(dismiss).toHaveBeenCalled();
+      dismiss.mockRestore();
     });
 
     it('fills word input and dismisses overlay after valid scan', async () => {
       renderScreen();
       await act(async () => {
-        fireEvent.press(screen.getByText('Scan SeedQR'));
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan(VALID_12_HEX);
+      triggerScan(VALID_12_SEEDQR);
       expect(screen.queryByTestId('camera')).toBeNull();
       expect(getWordInput().props.value).toBe(VALID_12);
     });
@@ -334,39 +420,140 @@ describe('MnemonicScreen', () => {
     it('shows error message for invalid QR payload', async () => {
       renderScreen();
       await act(async () => {
-        fireEvent.press(screen.getByText('Scan SeedQR'));
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan('notahex!!!');
+      triggerScan('not a seedqr');
       expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
       expect(screen.getByTestId('camera')).toBeTruthy();
     });
 
-    it('shows error when decodeSeedQr fails on valid-length hex', async () => {
+    it('shows the decoder error when a well-formed SeedQR fails its checksum', async () => {
       renderScreen();
       await act(async () => {
-        fireEvent.press(screen.getByText('Scan SeedQR'));
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      const bip39 = require('@scure/bip39');
-      jest.spyOn(bip39, 'entropyToMnemonic').mockImplementationOnce(() => {
-        throw new Error('decode failure');
-      });
-      triggerScan(VALID_12_HEX);
-      expect(screen.getByText(/decode failure/)).toBeTruthy();
+      triggerScan(BAD_CHECKSUM_SEEDQR);
+      expect(screen.getByText(/failed its checksum/)).toBeTruthy();
       expect(screen.getByTestId('camera')).toBeTruthy();
-      jest.restoreAllMocks();
     });
 
-    it('clears error when Tap to retry is pressed', async () => {
+    it('fills word input from a CompactSeedQR carried as bytes', async () => {
       renderScreen();
       await act(async () => {
-        fireEvent.press(screen.getByText('Scan SeedQR'));
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan('notahex!!!');
+      triggerByteScan('00000000000000000000000000000000');
+      expect(screen.queryByTestId('camera')).toBeNull();
+      expect(getWordInput().props.value).toBe(VALID_12);
+    });
+
+    it('prefers the bytes over a mangled string for a byte-mode payload', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      // What ZXing hands over when it guesses a charset for binary.
+      triggerByteScan('00000000000000000000000000000000', '\u0000\uFFFD\uFFFD');
+      expect(getWordInput().props.value).toBe(VALID_12);
+    });
+
+    it('rejects a byte payload that is not 16 or 32 bytes', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerByteScan('deadbeef');
+      expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
+      expect(screen.getByTestId('camera')).toBeTruthy();
+    });
+
+    it('still reads a Standard SeedQR when the payload also arrives as bytes', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      // Some encoders put digits in byte mode; 48 bytes is neither 16 nor 32,
+      // so the digit path has to pick it up.
+      const digits = VALID_12_SEEDQR;
+      act(() => {
+        screen.getByTestId('camera').props.onReadCode({
+          nativeEvent: {
+            codeStringValue: digits,
+            codeBytesBase64: Buffer.from(digits, 'ascii').toString('base64'),
+          },
+        });
+      });
+      expect(getWordInput().props.value).toBe(VALID_12);
+    });
+
+    it('does not accept hex entropy', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan('00000000000000000000000000000000');
+      expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
+      expect(screen.getByTestId('camera')).toBeTruthy();
+    });
+
+    it('clears the error once the camera stops reporting it', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan('not a seedqr');
       expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
       await act(async () => {
-        fireEvent.press(screen.getByText('Tap to retry'));
+        jest.advanceTimersByTime(2000);
       });
       expect(screen.queryByText(/Not a valid SeedQR/)).toBeNull();
+    });
+
+    it('holds the error while the bad code stays in view', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan('not a seedqr');
+      // Each frame re-arms the timer and discards the previous one, so the
+      // notice must never lapse underneath a code the camera is still seeing.
+      // Asserting between frames is what catches a stale timer firing late.
+      for (let i = 0; i < 3; i++) {
+        await act(async () => {
+          jest.advanceTimersByTime(1500);
+        });
+        expect(screen.getByText(/Not a valid SeedQR/)).toBeTruthy();
+        triggerScan('not a seedqr');
+      }
+    });
+
+    it('drops the pending timer when a later frame scans clean', async () => {
+      renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      triggerScan('not a seedqr');
+      triggerScan(VALID_12_SEEDQR);
+      expect(screen.queryByText(/Not a valid SeedQR/)).toBeNull();
+      // The rejection's timer is still armed at this point. If it survived the
+      // success it would fire into a screen that has already moved on.
+      await act(async () => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect(getWordInput().props.value).toBe(VALID_12);
+      expect(screen.queryByText(/Not a valid SeedQR/)).toBeNull();
+    });
+
+    it('clears a pending timer when the screen unmounts', async () => {
+      const view = renderScreen();
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
+      });
+      const idle = jest.getTimerCount();
+      triggerScan('not a seedqr');
+      expect(jest.getTimerCount()).toBe(idle + 1);
+      view.unmount();
+      expect(jest.getTimerCount()).toBe(idle);
     });
 
     it('dismisses overlay when beforeRemove fires while scanning', async () => {
@@ -379,7 +566,7 @@ describe('MnemonicScreen', () => {
       );
       renderScreen();
       await act(async () => {
-        fireEvent.press(screen.getByText('Scan SeedQR'));
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
       expect(screen.getByTestId('camera')).toBeTruthy();
       await act(async () => {
@@ -391,9 +578,9 @@ describe('MnemonicScreen', () => {
     it('does not navigate anywhere on scan', async () => {
       renderScreen();
       await act(async () => {
-        fireEvent.press(screen.getByText('Scan SeedQR'));
+        fireEvent.press(screen.getByTestId('scan-seedqr-button'));
       });
-      triggerScan(VALID_12_HEX);
+      triggerScan(VALID_12_SEEDQR);
       expect(navigation.navigate).not.toHaveBeenCalled();
     });
   });
@@ -401,8 +588,14 @@ describe('MnemonicScreen', () => {
   describe('navigation', () => {
     it('navigates to Dashboard with toast when phase is done (import mode)', async () => {
       renderScreen('done');
-      expect(navigation.navigate).toHaveBeenCalledWith('Dashboard', {
-        toast: 'Key pair has been added to Keycard',
+      expect(navigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [
+          {
+            name: 'Dashboard',
+            params: { toast: 'Key pair has been added to Keycard' },
+          },
+        ],
       });
     });
 

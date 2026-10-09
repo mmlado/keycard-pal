@@ -18,12 +18,18 @@ const mockRespondError = jest.fn().mockResolvedValue(undefined);
 const mockDisconnect = jest.fn().mockResolvedValue(undefined);
 const mockPair = jest.fn().mockResolvedValue(undefined);
 const mockGetClient = jest.fn();
+let mockClientDetach: (() => void) | undefined;
 let mockNavigationReady = true;
 const mockNavigate = jest.fn();
 let capturedAppStateHandler: ((next: any) => void) | null = null;
 
 jest.mock('../src/utils/walletConnect/client.online', () => ({
   wcClient: {
+    // Stands in for a client that already exists when the provider subscribes.
+    onClient: (listener: (client: unknown) => (() => void) | void) => {
+      mockClientDetach = listener(mockMakeFakeClient()) || undefined;
+      return () => mockClientDetach?.();
+    },
     getClient: (...args: unknown[]) => mockGetClient(...args),
     pair: (...args: unknown[]) => mockPair(...args),
     respondSuccess: (...args: unknown[]) => mockRespondSuccess(...args),
@@ -46,7 +52,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <WalletConnectProvider>{children}</WalletConnectProvider>;
 }
 
-function makeFakeClient() {
+function mockMakeFakeClient() {
   return {
     on: mockOn,
     off: mockOff,
@@ -54,6 +60,7 @@ function makeFakeClient() {
     rejectSession: mockRejectSession,
   };
 }
+const makeFakeClient = mockMakeFakeClient;
 
 async function waitForClientInit() {
   await act(async () => {
@@ -120,6 +127,33 @@ beforeEach(() => {
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('WalletConnectProvider — no network before pairing', () => {
+  it('does not create the client when it mounts', async () => {
+    renderHook(() => useWalletConnectSession(), { wrapper });
+    await waitForClientInit();
+    expect(mockGetClient).not.toHaveBeenCalled();
+    expect(mockPair).not.toHaveBeenCalled();
+  });
+
+  it('drops the session when the client is replaced', async () => {
+    const { result } = renderHook(() => useWalletConnectSession(), { wrapper });
+    await waitForClientInit();
+    await approveTestSession(result);
+    expect(result.current.activeSession).not.toBeNull();
+
+    await act(async () => {
+      mockClientDetach?.();
+    });
+
+    expect(mockOff).toHaveBeenCalledWith(
+      'session_delete',
+      expect.any(Function),
+    );
+    expect(result.current.activeSession).toBeNull();
+    expect(result.current.phase).toBe('idle');
+  });
+});
 
 describe('WalletConnectProvider — initial state', () => {
   it('starts in idle phase', async () => {

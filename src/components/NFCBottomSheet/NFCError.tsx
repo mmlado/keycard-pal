@@ -3,13 +3,21 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import { Icons } from '../../assets/icons';
+import { NO_CARD_EXIT_LABEL } from '../../constants/purchaseLink';
 import theme from '../../theme';
+
+import AffiliateDisclosure from '../AffiliateDisclosure';
 
 type Props = {
   status: string;
   retry?: () => void;
   openNFCSettings?: () => void;
+  /** Takes the place of Try again, which could only fail the same way. */
+  onUnblockPin?: () => void;
   onCancel: () => void;
+  /** Quiet exit for someone who reached the tap prompt without owning a
+   *  card (on iOS the system sheet times out into this overlay). */
+  onBuyKeycard?: () => void;
   paddingBottom?: number;
 };
 
@@ -17,7 +25,9 @@ export default function NFCError({
   status,
   retry,
   openNFCSettings,
+  onUnblockPin,
   onCancel,
+  onBuyKeycard,
   paddingBottom = 24,
 }: Props) {
   return (
@@ -36,7 +46,14 @@ export default function NFCError({
           </Text>
         </Pressable>
       )}
-      {!openNFCSettings && retry && (
+      {!openNFCSettings && onUnblockPin && (
+        <Pressable style={styles.retryButton} onPress={onUnblockPin}>
+          <Text variant="labelLarge" style={styles.retryLabel}>
+            Unblock PIN
+          </Text>
+        </Pressable>
+      )}
+      {!openNFCSettings && !onUnblockPin && retry && (
         <Pressable style={styles.retryButton} onPress={retry}>
           <Text variant="labelLarge" style={styles.retryLabel}>
             Try again
@@ -48,6 +65,20 @@ export default function NFCError({
           Cancel
         </Text>
       </Pressable>
+      {onBuyKeycard && (
+        <>
+          <Pressable
+            hitSlop={8}
+            accessibilityRole="link"
+            onPress={onBuyKeycard}
+          >
+            <Text variant="bodySmall" style={styles.buyKeycardText}>
+              {NO_CARD_EXIT_LABEL}
+            </Text>
+          </Pressable>
+          <AffiliateDisclosure short style={styles.buyKeycardDisclosure} />
+        </>
+      )}
     </View>
   );
 }
@@ -91,5 +122,13 @@ const styles = StyleSheet.create({
   },
   cancelLabel: {
     color: theme.colors.onSurfaceMuted,
+  },
+  buyKeycardText: {
+    color: theme.colors.onSurfaceMuted,
+    textDecorationLine: 'underline',
+  },
+  buyKeycardDisclosure: {
+    marginTop: -8,
+    textAlign: 'center',
   },
 });

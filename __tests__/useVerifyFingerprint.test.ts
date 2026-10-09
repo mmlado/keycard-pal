@@ -52,7 +52,10 @@ describe('useVerifyFingerprint', () => {
       result.current.start(expectedFingerprint);
     });
 
-    expect(capturedOptions).toEqual({ requiresPin: true });
+    expect(capturedOptions).toEqual({
+      requiresPin: true,
+      retryOnTagLoss: true,
+    });
   });
 
   it('returns match when fingerprints match', async () => {

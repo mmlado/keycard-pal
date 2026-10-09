@@ -1,17 +1,40 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
 
 import AboutScreen from '../src/screens/AboutScreen';
+import {
+  DONATION_STANDING_LINE,
+  DONATION_TITLE,
+} from '../src/components/about/Donation/copy';
 import { PROJECT_GITHUB_URL } from '../src/constants/app';
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 const mockUseNavigationNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockUseNavigationNavigate }),
+}));
+
+// The purchase card routes through useBuyKeycard, which reaches the
+// container ref rather than the screen's own navigation object.
+let mockConnected = true;
+jest.mock('../src/utils/connectivity.online', () => ({
+  getNetworkConnected: () => mockConnected,
+  subscribeNetworkConnected: () => () => {},
+  isNetworkConnected: () => Promise.resolve(mockConnected),
+}));
+
+const mockRefNavigate = jest.fn();
+jest.mock('../src/navigation/navigationRef', () => ({
+  navigationRef: {
+    isReady: () => true,
+    navigate: (...args: any[]) => mockRefNavigate(...args),
+  },
 }));
 
 jest.mock('react-native-paper', () => {
@@ -30,20 +53,7 @@ jest.mock('@react-native-clipboard/clipboard', () => ({
   },
 }));
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      checkmark: Icon,
-      chevronRight: Icon,
-      close: Icon,
-      copy: Icon,
-      openInBrowser: Icon,
-      qr: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 const bitcoinAddress = 'bc1qpncfjnresszndse506zmvjya05xcs6493cm8xf';
 const ethereumAddress = '0xF665E3D58DABa87d741A347674DCc4C4b794cAc9';
@@ -69,6 +79,19 @@ describe('AboutScreen', () => {
     act(() => jest.runAllTimers());
     jest.useRealTimers();
     jest.restoreAllMocks();
+    mockInsets.top = 0;
+    mockInsets.bottom = 0;
+  });
+
+  it('reserves the bottom inset and leaves the top to the header', () => {
+    mockInsets.top = 48;
+    mockInsets.bottom = 34;
+    const { toJSON } = renderScreen();
+    const root = toJSON() as any;
+    expect(StyleSheet.flatten(root.props.style).paddingTop).toBeUndefined();
+    expect(
+      StyleSheet.flatten(root.props.contentContainerStyle).paddingBottom,
+    ).toBe(34 + 24);
   });
 
   it('renders the app, icon, project link, Keycard, support, contributors, and license sections', () => {
@@ -77,7 +100,11 @@ describe('AboutScreen', () => {
     expect(screen.getByLabelText('Keycard Pal app icon')).toBeTruthy();
     expect(screen.getByText('GitHub project')).toBeTruthy();
     expect(screen.getByText(/Keycard required/)).toBeTruthy();
-    expect(screen.getByText('Buy me a coffee')).toBeTruthy();
+    expect(screen.getByText(DONATION_TITLE)).toBeTruthy();
+    // The line is rendered inside a longer sentence, so match it as a substring.
+    expect(
+      screen.getByText(DONATION_STANDING_LINE, { exact: false }),
+    ).toBeTruthy();
     expect(screen.getByText(bitcoinAddress)).toBeTruthy();
     expect(screen.getByText(ethereumAddress)).toBeTruthy();
     const labels = screen
@@ -86,6 +113,12 @@ describe('AboutScreen', () => {
       .filter(text => text === 'Ethereum' || text === 'Bitcoin');
     expect(labels).toEqual(['Ethereum', 'Bitcoin']);
     expect(screen.getByText('Open-source licenses')).toBeTruthy();
+  });
+
+  it('shows a coin icon on each donation address', () => {
+    renderScreen();
+    expect(screen.getByTestId('donation-icon-Ethereum')).toBeTruthy();
+    expect(screen.getByTestId('donation-icon-Bitcoin')).toBeTruthy();
   });
 
   it('opens the project GitHub page', () => {
@@ -116,14 +149,12 @@ describe('AboutScreen', () => {
     fireEvent.press(screen.getByLabelText('Show Bitcoin QR code'));
     expect(navigation.navigate).toHaveBeenCalledWith('AddressDetail', {
       address: bitcoinAddress,
-      index: 0,
       title: 'Bitcoin address',
     });
 
     fireEvent.press(screen.getByLabelText('Show Ethereum QR code'));
     expect(navigation.navigate).toHaveBeenCalledWith('AddressDetail', {
       address: ethereumAddress,
-      index: 0,
       title: 'Ethereum address',
     });
   });
@@ -148,7 +179,7 @@ describe('AboutScreen', () => {
 
   it('shows QR for a contributor profile', () => {
     renderScreen();
-    fireEvent.press(screen.getByLabelText(/Show QR code for .+/));
+    fireEvent.press(screen.getAllByLabelText(/Show QR code for .+/)[0]);
     expect(mockUseNavigationNavigate).toHaveBeenCalledWith('UrlQR', {
       url: expect.stringContaining('github.com'),
       title: expect.any(String),
@@ -157,7 +188,7 @@ describe('AboutScreen', () => {
 
   it('opens a contributor profile in the browser', () => {
     renderScreen();
-    fireEvent.press(screen.getByLabelText(/Open .* GitHub profile/));
+    fireEvent.press(screen.getAllByLabelText(/Open .* GitHub profile/)[0]);
     expect(Linking.openURL).toHaveBeenCalledWith(
       expect.stringContaining('github.com'),
     );

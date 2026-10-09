@@ -1,33 +1,44 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Icons } from '../assets/icons';
-import theme from '../theme';
+import { IconComponent, Icons } from '@/assets/icons';
+import theme from '@/theme';
 
-type Entry = {
+export type Entry = {
   label: string;
   onPress: () => void;
+  icon?: IconComponent;
   requiresNfc?: boolean;
   detail?: string;
 };
 
-type Props = {
+type ListProps = {
   entries: Entry[];
+  /** Offsets the icon and NFC testIDs, so several lists on one screen do not collide. */
+  indexOffset?: number;
 };
 
-export default function Menu({ entries }: Props) {
+/** The rows themselves, with no scroll container of their own. */
+export function MenuList({ entries, indexOffset = 0 }: ListProps) {
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-    >
-      <View style={styles.list}>
-        {entries.map((action, i) => (
+    <View style={styles.list}>
+      {entries.map((action, i) => {
+        const Icon = action.icon;
+        const id = indexOffset + i;
+        return (
           <Pressable
             style={[styles.item, i < entries.length - 1 && styles.itemBorder]}
             key={i}
             onPress={action.onPress}
           >
             <View style={styles.labelRow}>
+              {Icon ? (
+                <Icon
+                  testID={`menu-icon-${id}`}
+                  width={24}
+                  height={24}
+                  color={theme.colors.onSurfaceVariant}
+                />
+              ) : null}
               <Text
                 style={styles.itemLabel}
                 numberOfLines={1}
@@ -48,17 +59,30 @@ export default function Menu({ entries }: Props) {
             <View style={styles.trailingIcons}>
               {action.requiresNfc ? (
                 <Icons.nfcActivate
-                  testID={`menu-nfc-indicator-${i}`}
+                  testID={`menu-nfc-indicator-${id}`}
                   width={20}
                   height={20}
                   color={theme.colors.primary}
+                  opacity={0.5}
                 />
               ) : null}
               <Icons.chevronRight width={24} height={24} />
             </View>
           </Pressable>
-        ))}
-      </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** A self-scrolling list, for screens that are not navigation menus. Menus use EntryList. */
+export default function Menu({ entries }: { entries: Entry[] }) {
+  return (
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+    >
+      <MenuList entries={entries} />
     </ScrollView>
   );
 }
@@ -76,13 +100,8 @@ const styles = StyleSheet.create({
   list: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF0D',
+    backgroundColor: theme.colors.surfaceList,
     width: '100%',
-  },
-  actions: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    backgroundColor: theme.colors.background,
   },
   item: {
     flexDirection: 'row',

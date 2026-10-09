@@ -17,39 +17,28 @@ jest.mock('../src/hooks/useTenderlyConfig.online', () => ({
 }));
 
 const mockStart = jest.fn();
-const mockCancel = jest.fn();
 let mockPhase = 'idle';
 let mockResult: string | null = null;
 
-jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
-  useKeycardOp: () => ({
-    phase: mockPhase,
-    status: '',
-    cardName: null,
-    pinError: null,
-    result: mockResult,
-    start: mockStart,
-    cancel: mockCancel,
-    submitPin: jest.fn(),
-    reset: jest.fn(),
-    retry: jest.fn(),
-    proceedWithNonGenuine: jest.fn(),
+// The address op is owned by SimulationAddressProvider; the hook only reads it.
+jest.mock(
+  '../src/components/SignRequestDetail/SimulationAddressProvider',
+  () => ({
+    useSimulationAddressOp: () => ({
+      phase: mockPhase,
+      status: '',
+      cardName: null,
+      pinError: null,
+      result: mockResult,
+      start: mockStart,
+      cancel: jest.fn(),
+      submitPin: jest.fn(),
+      reset: jest.fn(),
+      retry: jest.fn(),
+      proceedWithNonGenuine: jest.fn(),
+    }),
   }),
-}));
-
-jest.mock('../src/utils/ethereumAddress', () => ({
-  pubKeyToEthAddress: (_key: Uint8Array) => '0xDerived',
-}));
-
-// useSimulation imports keycard-sdk transitively via the op fn; mock it
-jest.mock('keycard-sdk', () => ({
-  __esModule: true,
-  default: {
-    BIP32KeyPair: {
-      extendedKey: () => ({ publicKey: new Uint8Array(33) }),
-    },
-  },
-}));
+);
 
 // --- import after mocks ---
 import { useSimulation } from '../src/components/SignRequestDetail/eth/DataTabPanel/useSimulation';
@@ -196,16 +185,6 @@ describe('useSimulation', () => {
       });
       expect(mockStart).toHaveBeenCalledTimes(1);
       expect(mockSimulate).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('handleCancelNfc', () => {
-    it('calls cancelAddress', () => {
-      const { result } = renderSim();
-      act(() => {
-        result.current.handleCancelNfc();
-      });
-      expect(mockCancel).toHaveBeenCalledTimes(1);
     });
   });
 

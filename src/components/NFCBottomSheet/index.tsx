@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   BackHandler,
+  Dimensions,
+  Keyboard,
   Modal,
   Platform,
   StyleSheet,
@@ -9,22 +11,42 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { navigationRef } from '@/navigation/navigationRef';
 import theme from '@/theme';
 
 import PinPad from '@/components/PinPad';
+
+import type {
+  CardPresence,
+  KeycardPhase,
+} from '@/hooks/keycard/useKeycardOperation';
+import { useBuyKeycard } from '@/hooks/useBuyKeycard';
 
 import GenuineWarning from './GenuineWarning';
 import NFCError from './NFCError';
 import NFCSheet from './NFCSheet';
 import PairingPasswordEntry from './PairingPasswordEntry';
 
-export type NFCVariant = 'scanning' | 'success' | 'error' | 'genuine_warning';
+/** Slide distance for the PIN pad, matching the Modal's old slide-up. */
+const PIN_SLIDE_DISTANCE = Dimensions.get('window').height;
+
+export type NFCVariant =
+  | 'scanning'
+  | 'connected'
+  | 'disconnected'
+  | 'success'
+  | 'error'
+  | 'genuine_warning';
 
 export type NFCOperation = {
-  phase: string;
+  phase: KeycardPhase;
   status: string;
+  cardPresence?: CardPresence;
   cardName?: string | null;
+  cardFingerprint?: number | null;
   pinError?: string | null;
+  /** The error is a blocked PIN, so it offers the unblock flow instead of a retry. */
+  pinBlocked?: boolean;
   submitPin?: (pin: string) => void;
   pairingPasswordError?: string | null;
   submitPairingPassword?: (password: string) => void;
@@ -38,14 +60,24 @@ type Props = {
   onCancel: () => void;
   /** Show success variant when phase is 'done' (e.g. for screens that navigate away after a delay) */
   showOnDone?: boolean;
+  /** Leaves out the "Don't have a Keycard?" link, for a screen that already carries it (Settings). */
+  hideNoCardExit?: boolean;
 };
 
-export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
+export default function NFCBottomSheet({
+  nfc,
+  onCancel,
+  showOnDone,
+  hideNoCardExit,
+}: Props) {
   const {
     phase,
     status,
+    cardPresence,
     cardName,
+    cardFingerprint,
     pinError,
+    pinBlocked,
     submitPin,
     pairingPasswordError,
     submitPairingPassword,
@@ -56,11 +88,37 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(400)).current;
   const [modalVisible, setModalVisible] = useState(false);
+  // Kept mounted through the outgoing animation, so the pad does not vanish at once.
+  const pinSlide = useRef(new Animated.Value(PIN_SLIDE_DISTANCE)).current;
+  const [pinMounted, setPinMounted] = useState(false);
+
+  // End the session as Cancel does before opening the shop, so the sheet never sits over it.
+  const { buyKeycard } = useBuyKeycard();
+  const handleBuyKeycard = useCallback(() => {
+    onCancel();
+    buyKeycard();
+  }, [onCancel, buyKeycard]);
+  // A card that was on the antenna proves ownership, so the shop link is left out then.
+  const onBuyKeycard =
+    !hideNoCardExit &&
+    (cardPresence === undefined || cardPresence === 'waiting')
+      ? handleBuyKeycard
+      : undefined;
+
+  // Leaves the way Cancel does, then opens the flow the error points at.
+  const handleUnblockPin = useCallback(() => {
+    onCancel();
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('UnblockPin');
+    }
+  }, [onCancel]);
+  const onUnblockPin = pinBlocked ? handleUnblockPin : undefined;
 
   const showPinPad = phase === 'pin_entry';
   const showGenuineWarning = phase === 'genuine_warning';
   const showPairingPassword = phase === 'pairing_password';
   const showIOSError = Platform.OS === 'ios' && phase === 'error';
+  // Presence variants are Android-only: on iOS Apple's sheet owns that feedback.
   const showSheet =
     Platform.OS === 'android' &&
     (phase === 'nfc' ||
@@ -77,6 +135,30 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
   }, [showPinPad, onCancel]);
 
   useEffect(() => {
+    if (showPinPad) {
+      // The pad is an overlay in the screen's own view tree, not a Modal, so a
+      // text field under it keeps focus and iOS keeps the keyboard up over the pad.
+      Keyboard.dismiss();
+      setPinMounted(true);
+      Animated.timing(pinSlide, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+    Animated.timing(pinSlide, {
+      toValue: PIN_SLIDE_DISTANCE,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setPinMounted(false);
+      }
+    });
+  }, [showPinPad, pinSlide]);
+
+  useEffect(() => {
     if (showIOSError) {
       setModalVisible(false);
       return;
@@ -90,12 +172,24 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
       tension: 60,
       friction: 12,
     }).start(({ finished }) => {
-      if (finished && !showSheet && !showGenuineWarning && !showPairingPassword) {
+      if (
+        finished &&
+        !showSheet &&
+        !showGenuineWarning &&
+        !showPairingPassword
+      ) {
         setModalVisible(false);
       }
     });
-  }, [showSheet, showGenuineWarning, showPairingPassword, showIOSError, slideAnim]);
+  }, [
+    showSheet,
+    showGenuineWarning,
+    showPairingPassword,
+    showIOSError,
+    slideAnim,
+  ]);
 
+  // Phase wins over presence: an error renders as an error.
   const variant: NFCVariant =
     phase === 'genuine_warning'
       ? 'genuine_warning'
@@ -103,28 +197,42 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
       ? 'success'
       : phase === 'error'
       ? 'error'
+      : cardPresence === 'lost'
+      ? 'disconnected'
+      : cardPresence === 'connected'
+      ? 'connected'
       : 'scanning';
 
   return (
     <>
-      <Modal
-        visible={showPinPad}
-        transparent={false}
-        statusBarTranslucent
-        animationType="slide"
-        onRequestClose={onCancel}
-      >
-        <View style={[styles.pinModal, { paddingBottom: insets.bottom }]}>
+      {/* Deliberately not a Modal: a Modal covers the navigator's own header,
+          which is why this used to paint a fake one with a fake back arrow.
+          Filling the screen's content area instead leaves the real header —
+          and with it the real back button, its iOS swipe-back gesture, and the
+          'Enter Keycard PIN' title useKeycardScreen already sets — in place. */}
+      {pinMounted && (
+        <Animated.View
+          testID="pin-overlay"
+          style={[
+            styles.pinOverlay,
+            {
+              paddingBottom: insets.bottom,
+              transform: [{ translateY: pinSlide }],
+            },
+          ]}
+        >
           <PinPad onComplete={submitPin!} error={pinError ?? undefined} />
-        </View>
-      </Modal>
+        </Animated.View>
+      )}
 
       {showIOSError && (
         <NFCError
           status={status}
           retry={retry}
           openNFCSettings={openNFCSettings}
+          onUnblockPin={onUnblockPin}
           onCancel={onCancel}
+          onBuyKeycard={onBuyKeycard}
           paddingBottom={insets.bottom + 24}
         />
       )}
@@ -163,8 +271,12 @@ export default function NFCBottomSheet({ nfc, onCancel, showOnDone }: Props) {
                 variant={variant}
                 status={status}
                 cardName={cardName}
+                cardFingerprint={cardFingerprint}
                 onCancel={onCancel}
+                retry={retry}
                 openNFCSettings={openNFCSettings}
+                onUnblockPin={onUnblockPin}
+                onBuyKeycard={onBuyKeycard}
               />
             </Animated.View>
           </View>
@@ -195,8 +307,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginBottom: 24,
   },
-  pinModal: {
-    flex: 1,
+  /** Yoga anchors an absolute child to the padding box, so the overlay pads for the navigation bar itself (#282). */
+  pinOverlay: {
+    ...StyleSheet.absoluteFill,
     backgroundColor: theme.colors.background,
   },
 });

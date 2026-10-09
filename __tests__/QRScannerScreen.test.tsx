@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 
 import QRScannerScreen from '../src/screens/QRScannerScreen';
@@ -7,8 +8,10 @@ import QRScannerScreen from '../src/screens/QRScannerScreen';
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -68,7 +71,9 @@ jest.mock('../src/utils/ur', () => ({
 }));
 
 const mockDetectWcUri = jest.fn();
+const mockRefreshWcDetection = jest.fn().mockResolvedValue(undefined);
 jest.mock('../src/utils/walletConnect/qrDetector.online', () => ({
+  refreshWcDetection: () => mockRefreshWcDetection(),
   detectWcUri: (...args: any[]) => mockDetectWcUri(...args),
 }));
 
@@ -162,6 +167,53 @@ describe('QRScannerScreen', () => {
       // Progress > 0 renders the progress bar (identified by its fill colour)
       expect(JSON.stringify(renderer.toJSON())).toContain('#1C8A80');
     });
+
+    it('feeds every frame of a multi-part UR to the decoder', async () => {
+      // Pins the JS half of #307: the screen has to keep feeding the decoder.
+      // The latch that broke it lived in CameraView.m, which Jest never
+      // compiles, so nothing here fails if it comes back.
+      mockEstimatedPercent.mockReturnValueOnce(0.25).mockReturnValueOnce(0.5);
+      await renderScreen();
+      await act(async () => {
+        scan('ur:eth-sign-request/1-2/part1');
+        scan('ur:eth-sign-request/2-2/part2');
+      });
+      expect(mockReceivedPart).toHaveBeenNthCalledWith(
+        1,
+        'ur:eth-sign-request/1-2/part1',
+      );
+      expect(mockReceivedPart).toHaveBeenNthCalledWith(
+        2,
+        'ur:eth-sign-request/2-2/part2',
+      );
+    });
+
+    it('advances progress across successive frames', async () => {
+      mockEstimatedPercent.mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
+      const renderer = await renderScreen();
+      await act(async () => {
+        scan('ur:eth-sign-request/1-2/part1');
+      });
+      expect(JSON.stringify(renderer.toJSON())).toContain('25%');
+      await act(async () => {
+        scan('ur:eth-sign-request/2-2/part2');
+      });
+      expect(JSON.stringify(renderer.toJSON())).toContain('75%');
+    });
+
+    it('keeps the progress bar above the bottom inset', async () => {
+      mockInsets.bottom = 34;
+      mockEstimatedPercent.mockReturnValue(0.5);
+      const renderer = await renderScreen();
+      await act(async () => {
+        scan('ur:eth-sign-request/part1');
+      });
+      const style = StyleSheet.flatten(
+        renderer.getByTestId('scan-progress').props.style,
+      );
+      expect(style.bottom).toBe(34 + 27);
+      mockInsets.bottom = 0;
+    });
   });
 
   describe('onCodeScanned — complete UR', () => {
@@ -219,6 +271,21 @@ describe('QRScannerScreen', () => {
   });
 
   describe('onCodeScanned — WalletConnect URI', () => {
+    it('refreshes WalletConnect detection when the screen gains focus', async () => {
+      await renderScreen();
+      expect(mockRefreshWcDetection).toHaveBeenCalled();
+    });
+
+    it('treats a wc: code like any unknown code when detection declines it', async () => {
+      mockDetectWcUri.mockReturnValue(false);
+      await renderScreen();
+      await act(async () => {
+        scan('wc:abc123@2?relay-protocol=irn');
+      });
+      expect(navigation.navigate).not.toHaveBeenCalled();
+      expect(mockReceivedPart).not.toHaveBeenCalled();
+    });
+
     it('sets scannedRef and returns early when detectWcUri returns true', async () => {
       mockDetectWcUri.mockReturnValue(true);
       await renderScreen();

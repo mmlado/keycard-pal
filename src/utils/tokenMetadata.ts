@@ -1,8 +1,7 @@
 import { formatUnits } from 'viem';
 
-import localLogosIndex from '../data/token-logos-index.json';
-import tokensData from '../data/tokens.json';
-import { INTERNET_ENABLED } from './buildConfig';
+import { tokenLogosIndex } from '@/data/tokenLogosIndex.online';
+import tokensData from '@/data/tokens.json';
 
 export type TokenMetadata = {
   symbol: string;
@@ -18,13 +17,11 @@ type RawToken = {
   logoURI?: string;
 };
 
-const localIndex = localLogosIndex as Record<string, string>;
-
 const tokenMap = new Map<string, TokenMetadata>();
 
 for (const token of (tokensData as { tokens: RawToken[] }).tokens) {
   const key = `${token.chainId}:${token.address}`;
-  const ext = !INTERNET_ENABLED ? localIndex[key] : undefined;
+  const ext = tokenLogosIndex[key];
   const localLogoURI = ext
     ? `asset:/token-logos/${token.chainId}-${token.address}.${ext}`
     : undefined;

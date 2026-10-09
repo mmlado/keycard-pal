@@ -9,14 +9,25 @@ const { createResolveRequest } = require('./metro.resolveRequest');
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const defaultConfig = getDefaultConfig(__dirname);
-const { assetExts, sourceExts } = defaultConfig.resolver;
+const { assetExts, blockList, sourceExts } = defaultConfig.resolver;
 const nodeLibs = require('node-libs-react-native');
+
+// Gradle output. Metro's file map crawls and, without watchman, fs.watch()es
+// every directory it is not told to ignore; a Gradle build deletes and
+// recreates these while Metro runs, and the watcher dies on the vanished one
+// (ENOENT from the FallbackWatcher). Nothing the bundle needs lives here.
+const gradleOutput = [
+  /\/android\/build\//,
+  /\/android\/app\/build\//,
+  /\/node_modules\/.*\/android\/build\//,
+];
 
 const config = {
   transformer: {
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
   },
   resolver: {
+    blockList: [blockList, ...gradleOutput],
     unstable_enablePackageExports: true,
     assetExts: assetExts.filter(ext => ext !== 'svg'),
     sourceExts: [...sourceExts, 'svg'],

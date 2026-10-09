@@ -1,31 +1,24 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { KeycardScreenProps } from '../navigation/types';
 import theme from '../theme';
 
 import NFCBottomSheet from '../components/NFCBottomSheet';
+import PrimaryButton from '../components/PrimaryButton';
 
 import { useKeycardOperation } from '../hooks/keycard/useKeycardOperation';
 import { useWalletConnectSession } from '../hooks/useWalletConnectSession.online';
 
-import {
-  buildBtcSignatureUR,
-  hashBitcoinMessage,
-  parseKeycardBtcMessageSignature,
-} from '../utils/btcMessage';
-import { BtcSigningSession, buildCryptoPsbtUR } from '../utils/btcPsbt';
-import {
-  buildEthSignatureURFromResult,
-  buildRawEthHexSignature,
-} from '../utils/ethSignature';
-import {
-  buildExportUr,
-  exportKeyForWallet,
-  prepareSignHash,
-  type ExportKeyResult,
-} from '../utils/keycardExport';
+import { prepareKeycardFlow, type KeycardFlowRun } from '../utils/keycardFlows';
 
 export default function KeycardScreen({
   route,
@@ -33,10 +26,11 @@ export default function KeycardScreen({
 }: KeycardScreenProps) {
   const params = route.params;
   const insets = useSafeAreaInsets();
-  const hashRef = useRef<Uint8Array | null>(null);
-  const btcSessionRef = useRef<BtcSigningSession | null>(null);
-  const respondedRef = useRef(false);
+  const flowRef = useRef<KeycardFlowRun | null>(null);
+  const [flowError, setFlowError] = useState<string | null>(null);
 
+  // respondSuccess/respondError are idempotent behind the provider's
+  // interface — a second call for the same request is a no-op.
   const { respondSuccess, respondError } = useWalletConnectSession();
 
   const wcContext =
@@ -44,258 +38,106 @@ export default function KeycardScreen({
       ? params.wcContext
       : undefined;
 
-  const keycard = useKeycardOperation<
-    ExportKeyResult | { psbtHex: string } | Uint8Array
-  >();
+  const keycard = useKeycardOperation<unknown>();
   const { phase, result, execute, cancel } = keycard;
 
   const resetToDashboard = useCallback(() => {
     navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
   }, [navigation]);
 
-  const handleSign = useCallback(() => {
-    if (params.operation !== 'sign') {
-      return;
-    }
-
-    if (params.signMode === 'eth') {
-      const hash = prepareSignHash(params.signData, params.dataType);
-      hashRef.current = hash;
-
-      execute(async cmdSet => {
-        const signResp = await cmdSet.signWithPath(
-          hash,
-          params.derivationPath,
-          false,
-        );
-        signResp.checkOK();
-        return signResp.data;
+  // Prepare the flow (all heavy local work, before NFC) and start the card
+  // operation. A prepare failure — e.g. an unparseable PSBT — becomes a
+  // visible error state instead of opening the PIN pad.
+  useEffect(() => {
+    try {
+      const flowRun = prepareKeycardFlow(params);
+      flowRef.current = flowRun;
+      // Signing and key export do not mutate card state: safe to re-run the
+      // flow from SELECT when the card is re-tapped after a mid-operation loss.
+      execute((cmdSet, { setStatus }) => flowRun.cardOp(cmdSet, setStatus), {
+        retryOnTagLoss: true,
       });
-      return;
+    } catch (e: any) {
+      setFlowError(e?.message ?? 'Failed to prepare the operation.');
     }
-
-    if (params.signMode === 'btc-message') {
-      const hash = hashBitcoinMessage(params.signDataHex);
-      hashRef.current = hash;
-
-      execute(async cmdSet => {
-        const signResp = await cmdSet.signWithPath(
-          hash,
-          params.derivationPath,
-          false,
-        );
-        signResp.checkOK();
-        return signResp.data;
-      });
-      return;
-    }
-
-    if (!btcSessionRef.current) {
-      btcSessionRef.current = new BtcSigningSession(params.psbtHex);
-    }
-
-    execute(async (cmdSet, { setStatus }) => {
-      const signed = await btcSessionRef.current!.signWithKeycard(
-        cmdSet,
-        setStatus,
-      );
-      return { psbtHex: signed.psbtHex };
-    });
-  }, [execute, params]);
-
-  const handleExportKey = useCallback(() => {
-    if (params.operation !== 'export_key') {
-      return;
-    }
-
-    execute(
-      (cmdSet, { setStatus }) =>
-        exportKeyForWallet(cmdSet, params.derivationPath, setStatus),
-      { requiresPin: true },
-    );
   }, [execute, params]);
 
   useEffect(() => {
-    if (params.operation === 'sign') {
-      handleSign();
-    } else if (params.operation === 'export_key') {
-      handleExportKey();
+    if (phase !== 'done' || result == null || !flowRef.current) {
+      return;
     }
-  }, [handleExportKey, handleSign, params.operation]);
+    const flowRun = flowRef.current;
 
-  const navigateToSignResult = useCallback(
-    (urString: string) => {
+    const timer = setTimeout(() => {
+      let outcome;
+      try {
+        outcome = flowRun.buildOutput(result);
+      } catch (e: any) {
+        setFlowError(
+          `Failed to build the result: ${e?.message ?? 'unknown error'}`,
+        );
+        return;
+      }
+
+      if (outcome.kind === 'wc-signature') {
+        respondSuccess(wcContext!, outcome.rawSig).finally(() =>
+          resetToDashboard(),
+        );
+        return;
+      }
+
+      if (outcome.doneNavigation === 'export') {
+        navigation.reset({
+          index: 2,
+          routes: [
+            { name: 'Dashboard' },
+            { name: 'ExportKey' },
+            {
+              name: 'QRResult',
+              params: {
+                urString: outcome.urString,
+                title: outcome.title,
+                description: outcome.description,
+              },
+            },
+          ],
+        });
+        return;
+      }
+
       navigation.reset({
         index: 1,
         routes: [
           { name: 'QRScanner' },
           {
             name: 'QRResult',
-            params: { urString, title: 'Show signature to the wallet' },
+            params: { urString: outcome.urString, title: outcome.title },
           },
         ],
       });
-    },
-    [navigation],
-  );
-
-  const navigateToExportResult = useCallback(
-    (urString: string) => {
-      navigation.reset({
-        index: 2,
-        routes: [
-          { name: 'Dashboard' },
-          { name: 'ExportKey' },
-          {
-            name: 'QRResult',
-            params: { urString, title: 'Show key to the wallet' },
-          },
-        ],
-      });
-    },
-    [navigation],
-  );
-
-  const handleEthSignDone = useCallback(() => {
-    if (!hashRef.current || !(result instanceof Uint8Array)) {
-      return;
-    }
-
-    const p = params as {
-      dataType?: number;
-      chainId?: number;
-      requestId?: string;
-      signData?: string;
-    };
-
-    if (wcContext && !respondedRef.current) {
-      respondedRef.current = true;
-      const rawSig = buildRawEthHexSignature(
-        result,
-        hashRef.current,
-        p.dataType,
-        p.chainId,
-        p.signData,
-      );
-      respondSuccess(wcContext, rawSig).finally(() => resetToDashboard());
-      return;
-    }
-
-    navigateToSignResult(
-      buildEthSignatureURFromResult(
-        result,
-        hashRef.current,
-        p.dataType,
-        p.chainId,
-        p.requestId,
-        p.signData,
-      ),
-    );
-  }, [
-    result,
-    params,
-    wcContext,
-    respondSuccess,
-    resetToDashboard,
-    navigateToSignResult,
-  ]);
-
-  const handleBtcSignDone = useCallback(() => {
-    if (
-      !result ||
-      !('psbtHex' in result) ||
-      typeof result.psbtHex !== 'string' ||
-      result.psbtHex.length === 0
-    ) {
-      return;
-    }
-    navigateToSignResult(buildCryptoPsbtUR(result.psbtHex));
-  }, [result, navigateToSignResult]);
-
-  const handleBtcMessageSignDone = useCallback(() => {
-    if (
-      params.operation !== 'sign' ||
-      params.signMode !== 'btc-message' ||
-      !hashRef.current ||
-      !(result instanceof Uint8Array)
-    ) {
-      return;
-    }
-
-    const parsed = parseKeycardBtcMessageSignature(hashRef.current, result);
-    navigateToSignResult(
-      buildBtcSignatureUR({
-        requestId: params.requestId,
-        signature: parsed.signature,
-        publicKey: parsed.publicKey,
-      }),
-    );
-  }, [result, params, navigateToSignResult]);
-
-  const handleExportKeyDone = useCallback(() => {
-    if (
-      !result ||
-      ArrayBuffer.isView(result) ||
-      !(
-        'exportRespData' in result ||
-        'descriptors' in result ||
-        'keys' in result
-      )
-    ) {
-      return;
-    }
-    navigateToExportResult(
-      buildExportUr(
-        result,
-        (params as { derivationPath: string; source?: string }).derivationPath,
-        (params as { derivationPath: string; source?: string }).source,
-      ),
-    );
-  }, [result, params, navigateToExportResult]);
-
-  useEffect(() => {
-    if (phase !== 'done' || !result) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      try {
-        if (params.operation === 'sign' && params.signMode === 'eth') {
-          handleEthSignDone();
-        } else if (params.operation === 'sign' && params.signMode === 'btc') {
-          handleBtcSignDone();
-        } else if (
-          params.operation === 'sign' &&
-          params.signMode === 'btc-message'
-        ) {
-          handleBtcMessageSignDone();
-        } else if (params.operation === 'export_key') {
-          handleExportKeyDone();
-        }
-      } catch (e: any) {
-        console.error('[KeycardScreen] Failed to build UR:', e.message);
-      }
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [
-    phase,
-    result,
-    params,
-    handleEthSignDone,
-    handleBtcSignDone,
-    handleBtcMessageSignDone,
-    handleExportKeyDone,
-  ]);
+  }, [phase, result, navigation, wcContext, respondSuccess, resetToDashboard]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: 'Enter Keycard PIN' });
   }, [navigation]);
 
+  // The PIN pad no longer covers the navigator header, so the real back button
+  // and the iOS swipe-back gesture can leave this screen mid-session. Tear the
+  // NFC session down on the way out; navigation itself is already happening, so
+  // this deliberately does not call handleCancel's reset.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      cancel();
+    });
+    return unsubscribe;
+  }, [navigation, cancel]);
+
   const handleCancel = useCallback(async () => {
     cancel();
-    if (wcContext && !respondedRef.current) {
-      respondedRef.current = true;
+    if (wcContext) {
       try {
         await respondError(wcContext, 4001, 'User rejected');
       } catch {
@@ -307,7 +149,24 @@ export default function KeycardScreen({
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
-      <NFCBottomSheet nfc={keycard} onCancel={handleCancel} showOnDone />
+      {flowError !== null ? (
+        <View style={styles.errorContainer}>
+          <Text variant="titleMedium" style={styles.errorTitle}>
+            Unable to prepare
+          </Text>
+          <Text variant="bodyMedium" style={styles.errorMessage}>
+            {flowError}
+          </Text>
+          <View style={styles.errorAction}>
+            <PrimaryButton
+              label="Go back"
+              onPress={() => navigation.goBack()}
+            />
+          </View>
+        </View>
+      ) : (
+        <NFCBottomSheet nfc={keycard} onCancel={handleCancel} showOnDone />
+      )}
     </View>
   );
 }
@@ -316,5 +175,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  errorTitle: {
+    color: theme.colors.error,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    color: theme.colors.onSurfaceVariant,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  errorAction: {
+    marginTop: 24,
   },
 });

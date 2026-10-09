@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import AnimatedURQRCode from 'react-native-animated-ur-qr';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,7 +15,7 @@ export default function QRResultScreen({
 }: QRResultScreenProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { urString, title } = route.params;
+  const { urString, title, description } = route.params;
 
   useEffect(() => {
     navigation.setOptions({ title });
@@ -29,6 +29,9 @@ export default function QRResultScreen({
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
+      {description ? (
+        <Text style={styles.description}>{description}</Text>
+      ) : null}
       <View style={styles.qrArea}>
         <AnimatedURQRCode urString={urString} size={qrSize} />
       </View>
@@ -44,6 +47,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  description: {
+    color: theme.colors.onSurfaceMuted,
+    fontSize: 13,
+    lineHeight: 13 * 1.45,
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
   qrArea: {
     flex: 1,

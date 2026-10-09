@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,12 +15,12 @@ export default function AddressDetailScreen({
   route,
   navigation,
 }: AddressDetailScreenProps) {
-  const { address, index, title } = route.params;
+  const { address, derivationPath, title } = route.params;
   const insets = useSafeAreaInsets();
 
   useLayoutEffect(() => {
-    navigation.setOptions({ title: title ?? String(index) });
-  }, [navigation, index, title]);
+    navigation.setOptions({ title: title ?? 'Address' });
+  }, [navigation, title]);
 
   const handleCopy = useCallback(() => {
     Clipboard.setString(address);
@@ -38,6 +38,9 @@ export default function AddressDetailScreen({
           />
         </View>
         <EnsAddressLabel address={address} />
+        {derivationPath ? (
+          <Text style={styles.path}>{derivationPath}</Text>
+        ) : null}
       </View>
       <PrimaryButton
         label="Copy Address"
@@ -66,5 +69,10 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#ffffff',
     borderRadius: 8,
+  },
+  path: {
+    color: theme.colors.onSurfaceVariant,
+    fontFamily: 'monospace',
+    fontSize: 12,
   },
 });

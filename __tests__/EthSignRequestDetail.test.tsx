@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { RLP } from '@ethereumjs/rlp';
 
+import SimulationAddressProvider from '../src/components/SignRequestDetail/SimulationAddressProvider';
 import EthSignRequestDetail from '../src/components/SignRequestDetail/eth/SignRequestDetail';
 import type { EthSignRequest } from '../src/types';
 
@@ -144,7 +145,11 @@ function eip2930TxHex(value: bigint = 500_000_000_000_000_000n): string {
 }
 
 function renderDetail(request: EthSignRequest) {
-  return render(<EthSignRequestDetail request={request} />);
+  return render(
+    <SimulationAddressProvider derivationPath={request.derivationPath}>
+      <EthSignRequestDetail request={request} />
+    </SimulationAddressProvider>,
+  );
 }
 
 function typedDataHex(payload: unknown): string {
@@ -650,5 +655,76 @@ describe('EthSignRequestDetail — pre-hashed EIP-712', () => {
     });
     expect(screen.getByText(/Domain separator/)).toBeTruthy();
     expect(screen.getByText(/Message hash/)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// personal_sign (dataType=3 → PersonalMessagePanel)
+// ---------------------------------------------------------------------------
+
+describe('EthSignRequestDetail — personal_sign', () => {
+  const messageHex = Buffer.from('hello world', 'utf8').toString('hex');
+
+  it('shows the decoded message instead of the raw hex', () => {
+    renderDetail({
+      signData: messageHex,
+      dataType: 3,
+      derivationPath: "m/44'/60'/0'/0",
+    });
+    expect(screen.getByText('Personal Message')).toBeTruthy();
+    expect(screen.getByText('hello world')).toBeTruthy();
+    expect(screen.queryByText(messageHex)).toBeNull();
+  });
+
+  it('shows the ERC-191 Digest on the Digests tab', () => {
+    renderDetail({
+      signData: messageHex,
+      dataType: 3,
+      derivationPath: "m/44'/60'/0'/0",
+    });
+    fireEvent.press(screen.getByText('Digests'));
+    expect(screen.getByText('ERC-191 Digest')).toBeTruthy();
+    expect(
+      screen.getByText(
+        '0xd9eba16ed0ecae432b71fe008c98cc872bb4cc214d3220a36f365326cf807d68',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('shows the digest for a message that is not UTF-8', () => {
+    renderDetail({
+      signData: 'fffe80',
+      dataType: 3,
+      derivationPath: "m/44'/60'/0'/0",
+    });
+    expect(screen.getByText(/not UTF-8 text/)).toBeTruthy();
+    fireEvent.press(screen.getByText('Digests'));
+    expect(screen.getByText('ERC-191 Digest')).toBeTruthy();
+    expect(screen.getByText(/^0x[0-9a-f]{64}$/)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Invalid payload banner (classifyEthPayload → kind 'invalid')
+// ---------------------------------------------------------------------------
+
+describe('EthSignRequestDetail — invalid payload banner', () => {
+  it('shows the cannot-sign banner with the classification reason', () => {
+    renderDetail({
+      signData: 'ab'.repeat(31), // 31 bytes — not a valid 32-byte digest
+      dataType: 0,
+      derivationPath: "m/44'/60'/0'/0",
+    });
+    expect(screen.getByText(/This request cannot be signed/)).toBeTruthy();
+    expect(screen.getByText(/31 bytes/)).toBeTruthy();
+  });
+
+  it('does not show the banner for a signable payload', () => {
+    renderDetail({
+      signData: 'ab'.repeat(32),
+      dataType: 0,
+      derivationPath: "m/44'/60'/0'/0",
+    });
+    expect(screen.queryByText(/This request cannot be signed/)).toBeNull();
   });
 });

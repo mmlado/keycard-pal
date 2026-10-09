@@ -54,6 +54,15 @@ describe('ensSettings.online', () => {
     });
 
     it('returns enabled=true and stored URL', async () => {
+      mockAsyncGetItem.mockResolvedValue('1');
+      mockSecureGetItem.mockResolvedValue('https://custom.rpc');
+      expect(await loadEnsSettings()).toEqual({
+        enabled: true,
+        rpcUrl: 'https://custom.rpc',
+      });
+    });
+
+    it("accepts the legacy 'true' value persisted before the '1'/'0' convention", async () => {
       mockAsyncGetItem.mockResolvedValue('true');
       mockSecureGetItem.mockResolvedValue('https://custom.rpc');
       expect(await loadEnsSettings()).toEqual({
@@ -79,17 +88,17 @@ describe('ensSettings.online', () => {
   });
 
   describe('saveEnsEnabled', () => {
-    it('stores "true" in AsyncStorage when enabled', async () => {
+    it('stores 1 in AsyncStorage when enabled', async () => {
       mockAsyncSetItem.mockResolvedValue(undefined);
       await saveEnsEnabled(true);
-      expect(mockAsyncSetItem).toHaveBeenCalledWith('ens_enabled', 'true');
+      expect(mockAsyncSetItem).toHaveBeenCalledWith('ens_enabled', '1');
       expect(mockSecureSetItem).not.toHaveBeenCalled();
     });
 
-    it('stores "false" in AsyncStorage when disabled', async () => {
+    it('stores 0 in AsyncStorage when disabled', async () => {
       mockAsyncSetItem.mockResolvedValue(undefined);
       await saveEnsEnabled(false);
-      expect(mockAsyncSetItem).toHaveBeenCalledWith('ens_enabled', 'false');
+      expect(mockAsyncSetItem).toHaveBeenCalledWith('ens_enabled', '0');
       expect(mockSecureSetItem).not.toHaveBeenCalled();
     });
   });

@@ -18,7 +18,9 @@ export async function loadEnsSettings(): Promise<EnsSettings> {
       EncryptedStorage.getItem(ENS_RPC_URL_KEY),
     ]);
     return {
-      enabled: enabled === 'true',
+      // '1' is the loadBoolean convention (preferencesStorage); 'true' is
+      // accepted for values persisted before this module adopted it.
+      enabled: enabled === '1' || enabled === 'true',
       rpcUrl: url?.trim() ?? '',
     };
   } catch {
@@ -27,7 +29,7 @@ export async function loadEnsSettings(): Promise<EnsSettings> {
 }
 
 export async function saveEnsEnabled(enabled: boolean): Promise<void> {
-  await AsyncStorage.setItem(ENS_ENABLED_KEY, enabled ? 'true' : 'false');
+  await AsyncStorage.setItem(ENS_ENABLED_KEY, enabled ? '1' : '0');
 }
 
 export async function saveEnsRpcUrl(url: string): Promise<void> {

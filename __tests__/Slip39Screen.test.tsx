@@ -30,6 +30,10 @@ const mockUseLoadKey = jest.fn();
 const mockUseVerifyFingerprint = jest.fn();
 const mockGenerateSlip39SharesFromKeycardEntropy = jest.fn();
 
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: jest.fn(),
+}));
+
 jest.mock('../src/hooks/useSeedReviewTimer', () => ({
   useSeedReviewTimer: () => ({ timeLeft: 0, done: true, start: jest.fn() }),
 }));
@@ -71,6 +75,7 @@ jest.mock('../src/utils/slip39', () => {
 });
 
 const navigation = {
+  addListener: jest.fn(() => jest.fn()),
   navigate: jest.fn(),
   reset: jest.fn(),
   setOptions: jest.fn(),

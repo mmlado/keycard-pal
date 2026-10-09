@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../assets/icons';
 import { APP_NAME, PROJECT_GITHUB_URL } from '@/constants/app';
-import { KEYCARD_PURCHASE_URL } from '../constants/keycard';
 import type { LicenseEntry } from '../data/licenses';
 import type { AboutScreenProps, DashboardAction } from '../navigation/types';
 import theme from '../theme';
@@ -24,6 +23,7 @@ import LicenseList from '../components/about/LicenseList';
 
 export const dashboardEntry: DashboardAction = {
   label: 'About',
+  icon: Icons.info,
   navigate: nav => nav.navigate('About'),
 };
 
@@ -41,7 +41,7 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
 
   return (
     <ScrollView
-      style={[styles.scroll, { paddingTop: insets.top }]}
+      style={styles.scroll}
       contentContainerStyle={[
         styles.content,
         { paddingBottom: insets.bottom + 24 },
@@ -50,7 +50,11 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
       <AppIdentityHeader />
 
       <Text style={styles.description}>
-        {`${APP_NAME} is an open-source air-gapped hardware wallet companion for Android and iOS. It communicates with a Keycard via NFC, scans and produces animated QR codes in UR format, and supports Ethereum and Bitcoin signing — keeping your private keys offline at all times.`}
+        {/* No other mobile platform may be named here: this string ships
+            inside the iOS binary, and App Store guideline 2.3.10 forbids it
+            in the app and its metadata alike. Neutral wording rather than a
+            build-flavour string, because the sentence needs neither. */}
+        {`${APP_NAME} is an open-source air-gapped hardware wallet companion. It communicates with a Keycard via NFC, scans and produces animated QR codes in UR format, and supports Ethereum and Bitcoin signing — keeping your private keys offline at all times.`}
       </Text>
 
       <View style={styles.projectLinkRow}>
@@ -83,20 +87,12 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
         </Pressable>
       </View>
 
-      <KeycardPurchaseCard
-        onShowQR={() =>
-          navigation.navigate('UrlQR', {
-            url: KEYCARD_PURCHASE_URL,
-            title: 'Buy a Keycard',
-          })
-        }
-      />
+      <KeycardPurchaseCard />
 
       <DonationSection
         onShowQR={(label, address) =>
           navigation.navigate('AddressDetail', {
             address,
-            index: 0,
             title: `${label} address`,
           })
         }

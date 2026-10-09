@@ -5,30 +5,48 @@ import theme from '@/theme';
 
 import InfoRow from '@/components/InfoRow';
 
-import { inspectBtcPsbt } from '@/utils/btcPsbt';
+import type { BtcPsbtFee, BtcPsbtSummary } from '@/utils/btcPsbt';
 
 function formatSats(value: number): string {
   return `${value.toLocaleString()} sats`;
 }
 
-export default function PsbtDetail({ psbtHex }: { psbtHex: string }) {
-  let summary;
-  try {
-    summary = inspectBtcPsbt(psbtHex);
-  } catch (e: any) {
+function describeInputs(indexes: number[]): string {
+  const positions = indexes.map(index => String(index + 1));
+  if (positions.length === 1) {
+    return `input ${positions[0]}`;
+  }
+
+  return `inputs ${positions.slice(0, -1).join(', ')} and ${
+    positions[positions.length - 1]
+  }`;
+}
+
+function FeeRow({ fee }: { fee: BtcPsbtFee }) {
+  if (fee.kind === 'known') {
     return (
-      <View style={styles.errorContainer}>
-        <Icon source="alert-circle" size={48} color={theme.colors.negative} />
-        <Text variant="titleMedium" style={styles.errorTitleRed}>
-          Invalid PSBT
-        </Text>
-        <Text variant="bodyMedium" style={styles.errorMessage} selectable>
-          {e.message}
-        </Text>
+      <View style={styles.row}>
+        <InfoRow label="Fee" value={formatSats(fee.sats)} />
       </View>
     );
   }
 
+  return (
+    <View style={styles.row}>
+      <InfoRow label="Fee" value="Unknown" />
+      <View style={styles.warningRow}>
+        <Icon source="alert" size={16} color={theme.colors.negative} />
+        <Text variant="labelSmall" style={styles.warningText}>
+          The PSBT does not say how much {describeInputs(fee.inputsWithoutUtxo)}{' '}
+          {fee.inputsWithoutUtxo.length === 1 ? 'holds' : 'hold'}, so the fee
+          cannot be worked out here and could be any amount.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+export default function PsbtDetail({ summary }: { summary: BtcPsbtSummary }) {
   return (
     <>
       <View style={styles.typeChip}>
@@ -72,17 +90,13 @@ export default function PsbtDetail({ psbtHex }: { psbtHex: string }) {
             <InfoRow label="Outputs" value={String(summary.outputCount)} />
           </View>
 
-          {summary.feeSats !== undefined && (
-            <View style={styles.row}>
-              <InfoRow label="Fee" value={formatSats(summary.feeSats)} />
-            </View>
-          )}
+          <FeeRow fee={summary.fee} />
 
           {summary.outputs.map((output, index) => (
             <View key={`${output.address}-${index}`} style={styles.row}>
               <InfoRow
                 label={`Output ${index + 1}${
-                  output.isChange ? ' (Change)' : ''
+                  output.claimsChange ? ' (marked as change by the wallet)' : ''
                 }`}
                 value={`${output.address}\n${formatSats(output.valueSats)}`}
               />
@@ -111,17 +125,15 @@ const styles = StyleSheet.create({
   row: {
     paddingVertical: 8,
   },
-  errorContainer: {
+  warningRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 32,
+    gap: 6,
+    paddingTop: 6,
+    paddingHorizontal: 4,
   },
-  errorTitleRed: {
+  warningText: {
     color: theme.colors.negative,
-  },
-  errorMessage: {
-    color: theme.colors.onSurface,
-    textAlign: 'center',
-    fontFamily: 'monospace',
+    flexShrink: 1,
   },
 });

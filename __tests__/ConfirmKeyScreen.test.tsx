@@ -1,4 +1,5 @@
 import React, { act } from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import ConfirmKeyScreen from '../src/screens/keypair/ConfirmKeyScreen';
@@ -15,8 +16,10 @@ jest.mock('@react-navigation/native', () => ({
   },
 }));
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -85,8 +88,9 @@ const CORRECT_WORDS = CHALLENGE_POSITIONS.map(i => WORDS[i]);
 const WRONG_WORD_FOR_SLOT_0 = 'charlie';
 
 const navigation = {
+  addListener: jest.fn(() => jest.fn()),
   goBack: jest.fn(),
-  navigate: jest.fn(),
+  reset: jest.fn(),
   setOptions: jest.fn(),
 } as any;
 
@@ -125,6 +129,22 @@ async function completeChallenge() {
   }
 }
 
+describe('ConfirmKeyScreen insets', () => {
+  afterEach(() => {
+    mockInsets.top = 0;
+    mockInsets.bottom = 0;
+  });
+
+  it('reserves the bottom inset and leaves the top to the header', () => {
+    mockInsets.top = 48;
+    mockInsets.bottom = 34;
+    const { toJSON } = renderScreen();
+    const style = StyleSheet.flatten((toJSON() as any).props.style);
+    expect(style.paddingBottom).toBe(34);
+    expect(style.paddingTop).toBeUndefined();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -138,7 +158,7 @@ describe('ConfirmKeyScreen', () => {
     MockNFCBottomSheet.mockClear();
     MockPinPad.mockClear();
     navigation.goBack.mockClear();
-    navigation.navigate.mockClear();
+    navigation.reset.mockClear();
     navigation.setOptions.mockClear();
   });
 
@@ -292,16 +312,22 @@ describe('ConfirmKeyScreen', () => {
   // -------------------------------------------------------------------------
 
   describe('navigation', () => {
-    it('navigates to Dashboard with toast when phase is done', async () => {
+    it('resets to Dashboard with toast when phase is done', async () => {
       await renderScreen('done');
-      expect(navigation.navigate).toHaveBeenCalledWith('Dashboard', {
-        toast: 'Key pair has been added to Keycard',
+      expect(navigation.reset).toHaveBeenCalledWith({
+        index: 0,
+        routes: [
+          {
+            name: 'Dashboard',
+            params: { toast: 'Key pair has been added to Keycard' },
+          },
+        ],
       });
     });
 
     it('does not navigate when phase is not done', async () => {
       await renderScreen('idle');
-      expect(navigation.navigate).not.toHaveBeenCalled();
+      expect(navigation.reset).not.toHaveBeenCalled();
     });
 
     it('calls cancel() and navigation.goBack() when NFCBottomSheet cancel is pressed', async () => {

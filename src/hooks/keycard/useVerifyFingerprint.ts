@@ -18,7 +18,8 @@ export function useVerifyFingerprint() {
       );
       return expectedRef.current === cardFingerprint ? 'match' : 'mismatch';
     }, []),
-    { requiresPin: true },
+    // Read-only master-key export: safe to re-run from SELECT on a re-tap.
+    { requiresPin: true, retryOnTagLoss: true },
   );
 
   const start = useCallback(

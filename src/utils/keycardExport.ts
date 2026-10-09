@@ -1,214 +1,119 @@
-/* eslint-disable no-bitwise */
-import { keccak_256 } from '@noble/hashes/sha3.js';
 import Keycard from 'keycard-sdk';
 import type { Commandset } from 'keycard-sdk/dist/commandset';
 
-import {
-  buildCryptoAccountUR,
-  pubKeyFingerprint,
-  type BitcoinCryptoAccount,
-} from './cryptoAccount';
-import { buildCryptoHdKeyUR } from './cryptoHdKey';
-import {
-  buildCryptoMultiAccountsUR,
-  exportKeysForBitget,
-  type BitgetExportResult,
-} from './cryptoMultiAccounts';
+import { getKeyUid } from './cardIdentity';
+import { pubKeyFingerprint } from './cryptoAccount';
 
-export type ExportKeyResult =
-  | {
-      exportRespData: Uint8Array;
-      sourceFingerprint: number;
-      parentFingerprint: number;
-    }
-  | BitcoinCryptoAccount
-  | BitgetExportResult;
-
-type BitcoinDescriptorPlan = {
+/** One key an export target wants: the path to export and the parent path its fingerprint comes from. */
+export type ExportPlanEntry = {
   derivationPath: string;
   parentPath: string;
-  scriptType: BitcoinCryptoAccount['descriptors'][number]['scriptType'];
 };
 
-export function prepareSignHash(
-  signData: string,
-  dataType: number | undefined,
-): Uint8Array {
-  const raw = new Uint8Array(Buffer.from(signData.replace(/^0x/i, ''), 'hex'));
-  if (dataType === 1 || dataType === 4) {
-    return keccak_256(raw);
-  }
-  if (dataType === 3) {
-    // EIP-191 personal_sign: keccak256("\x19Ethereum Signed Message:\n{len}{message}")
-    const prefix = `\x19Ethereum Signed Message:\n${raw.length}`;
-    const prefixBytes = new TextEncoder().encode(prefix);
-    const combined = new Uint8Array(prefixBytes.length + raw.length);
-    combined.set(prefixBytes);
-    combined.set(raw, prefixBytes.length);
-    return keccak_256(combined);
-  }
-  return raw;
-}
+/** An exported key carrying the plan entry it was exported for, so per-key metadata travels with the key. */
+export type ExportedKey<E extends ExportPlanEntry = ExportPlanEntry> = {
+  entry: E;
+  exportRespData: Uint8Array;
+  parentFingerprint: number;
+};
 
-export function buildExportUr(
-  result: ExportKeyResult,
-  derivationPath: string,
-  source?: string,
-): string {
-  if ('exportRespData' in result) {
-    return buildCryptoHdKeyUR(
-      result.exportRespData,
-      derivationPath,
-      result.sourceFingerprint,
-      result.parentFingerprint,
-      source,
-    );
-  }
-  if ('keys' in result) {
-    return buildCryptoMultiAccountsUR(result);
-  }
-  return buildCryptoAccountUR(result);
-}
+export type ExportKeysResult<E extends ExportPlanEntry = ExportPlanEntry> = {
+  masterFingerprint: number;
+  keys: ExportedKey<E>[];
+};
 
-export async function exportKeyForWallet(
-  cmdSet: Commandset,
-  derivationPath: string,
-  setStatus: (s: string) => void = () => {},
-): Promise<ExportKeyResult> {
-  if (derivationPath === 'bitget') {
-    return exportKeysForBitget(cmdSet, setStatus);
-  }
+/**
+ * Keys already exported, for resuming after a tag loss. Bound to the key UID, not the card: the
+ * re-tap may be another card or a new seed, and keys of two seeds must never mix. One per
+ * prepared flow; never shared or persisted.
+ */
+export type ExportResumeCache = {
+  keyUid: string | null;
+  masterFingerprint: number | null;
+  parentFingerprints: Map<string, number>;
+  keys: Map<string, ExportedKey>;
+};
 
-  if (!isBitcoinPath(derivationPath)) {
-    const masterResp = await cmdSet.exportKey(0, true, 'm', false);
-    masterResp.checkOK();
-
-    const parentPath = derivationPath.split('/').slice(0, -1).join('/') || 'm';
-    const parentResp = await cmdSet.exportKey(0, true, parentPath, false);
-    parentResp.checkOK();
-
-    const resp = await cmdSet.exportExtendedKey(0, derivationPath, false);
-    resp.checkOK();
-    return {
-      exportRespData: resp.data,
-      sourceFingerprint: pubKeyFingerprint(
-        Keycard.BIP32KeyPair.fromTLV(masterResp.data).publicKey,
-      ),
-      parentFingerprint: pubKeyFingerprint(
-        Keycard.BIP32KeyPair.fromTLV(parentResp.data).publicKey,
-      ),
-    };
-  }
-
-  const rootResp = await cmdSet.exportKey(0, true, 'm', false);
-  rootResp.checkOK();
-  const masterFingerprint = pubKeyFingerprint(
-    Keycard.BIP32KeyPair.fromTLV(rootResp.data).publicKey,
-  );
-
-  const descriptors: BitcoinCryptoAccount['descriptors'] = [];
-  for (const descriptor of bitcoinDescriptorPlan(derivationPath)) {
-    const keyResp = await cmdSet.exportExtendedKey(
-      0,
-      descriptor.derivationPath,
-      false,
-    );
-    keyResp.checkOK();
-
-    const parentResp = await cmdSet.exportKey(
-      0,
-      true,
-      descriptor.parentPath,
-      false,
-    );
-    parentResp.checkOK();
-
-    descriptors.push({
-      derivationPath: descriptor.derivationPath,
-      exportRespData: keyResp.data,
-      parentFingerprint: pubKeyFingerprint(
-        Keycard.BIP32KeyPair.fromTLV(parentResp.data).publicKey,
-      ),
-      scriptType: descriptor.scriptType,
-    });
-  }
-
+export function makeExportResumeCache(): ExportResumeCache {
   return {
-    masterFingerprint,
-    descriptors,
+    keyUid: null,
+    masterFingerprint: null,
+    parentFingerprints: new Map(),
+    keys: new Map(),
   };
 }
 
-function isBitcoinMultisigPath(path: string) {
-  return /^m\/48'\/0'\/\d+'\/2'$/.test(path);
+function fingerprintFromExportResponse(data: Uint8Array): number {
+  return pubKeyFingerprint(Keycard.BIP32KeyPair.fromTLV(data).publicKey);
 }
 
-function isBitcoinPath(path: string) {
-  return /^m\/(44'|49'|84'|48')\/(0'|1')\//.test(path);
-}
-
-function parsePath(path: string): number[] {
-  const parts = path.split('/').slice(1);
-  return parts.map(part => {
-    const hardened = part.endsWith("'");
-    const value = parseInt(hardened ? part.slice(0, -1) : part, 10);
-    return hardened ? value | 0x80000000 : value;
-  });
-}
-
-function formatPath(parts: number[]): string {
-  return (
-    'm/' +
-    parts
-      .map(part => {
-        const hardened = (part & 0x80000000) !== 0;
-        const value = part & 0x7fffffff;
-        return `${value}${hardened ? "'" : ''}`;
-      })
-      .join('/')
-  );
-}
-
-function bitcoinDescriptorPlan(path: string): BitcoinDescriptorPlan[] {
-  const parts = parsePath(path);
-
-  if (isBitcoinMultisigPath(path)) {
-    const [purpose, coin, account] = parts;
-    return [
-      {
-        derivationPath: formatPath([purpose, coin, account, 0x80000002]),
-        parentPath: formatPath([purpose, coin, account]),
-        scriptType: 'wsh',
-      },
-      {
-        derivationPath: formatPath([purpose, coin, account, 0x80000001]),
-        parentPath: formatPath([purpose, coin, account]),
-        scriptType: 'sh-wsh',
-      },
-      {
-        derivationPath: "m/45'",
-        parentPath: 'm',
-        scriptType: 'sh',
-      },
-    ];
+/** Reads the master fingerprint once and each parent once, then every planned key. A cache skips what was already fetched. */
+export async function exportKeysForTarget<E extends ExportPlanEntry>(
+  cmdSet: Commandset,
+  entries: readonly E[],
+  setStatus: (s: string) => void = () => {},
+  cache?: ExportResumeCache,
+): Promise<ExportKeysResult<E>> {
+  if (cache) {
+    const appInfo = cmdSet.applicationInfo;
+    const keyUid = appInfo ? getKeyUid(appInfo) : null;
+    if (keyUid === null || cache.keyUid !== keyUid) {
+      cache.keyUid = keyUid;
+      cache.masterFingerprint = null;
+      cache.parentFingerprints.clear();
+      cache.keys.clear();
+    }
   }
 
-  const [, coin, account] = parts;
-  return [
-    {
-      derivationPath: formatPath([0x80000054, coin, account]),
-      parentPath: formatPath([0x80000054, coin]),
-      scriptType: 'wpkh',
-    },
-    {
-      derivationPath: formatPath([0x80000031, coin, account]),
-      parentPath: formatPath([0x80000031, coin]),
-      scriptType: 'sh-wpkh',
-    },
-    {
-      derivationPath: formatPath([0x8000002c, coin, account]),
-      parentPath: formatPath([0x8000002c, coin]),
-      scriptType: 'pkh',
-    },
-  ];
+  let masterFingerprint = cache?.masterFingerprint ?? null;
+  if (masterFingerprint === null) {
+    setStatus('Reading master key...');
+    const masterResp = await cmdSet.exportKey(0, true, 'm', false);
+    masterResp.checkOK();
+    masterFingerprint = fingerprintFromExportResponse(masterResp.data);
+    if (cache) {
+      cache.masterFingerprint = masterFingerprint;
+    }
+  }
+
+  const parentFingerprints =
+    cache?.parentFingerprints ?? new Map<string, number>();
+  parentFingerprints.set('m', masterFingerprint);
+
+  const keys: ExportedKey<E>[] = [];
+  for (const [index, entry] of entries.entries()) {
+    // Paths are unique within a target and the entry is the same constant, so narrowing to E is safe.
+    const cached = cache?.keys.get(entry.derivationPath);
+    if (cached) {
+      keys.push(cached as ExportedKey<E>);
+      continue;
+    }
+
+    setStatus(`Exporting key ${index + 1} of ${entries.length}...`);
+
+    let parentFingerprint = parentFingerprints.get(entry.parentPath);
+    if (parentFingerprint === undefined) {
+      const parentResp = await cmdSet.exportKey(
+        0,
+        true,
+        entry.parentPath,
+        false,
+      );
+      parentResp.checkOK();
+      parentFingerprint = fingerprintFromExportResponse(parentResp.data);
+      parentFingerprints.set(entry.parentPath, parentFingerprint);
+    }
+
+    const resp = await cmdSet.exportExtendedKey(0, entry.derivationPath, false);
+    resp.checkOK();
+    const key: ExportedKey<E> = {
+      entry,
+      exportRespData: resp.data,
+      parentFingerprint,
+    };
+    keys.push(key);
+    cache?.keys.set(entry.derivationPath, key);
+  }
+
+  return { masterFingerprint, keys };
 }

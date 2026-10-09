@@ -1,0 +1,1 @@
+Nothing changes in how the app works. This is a packaging release: builds no longer include Google's encrypted list of the app's dependencies, which clears the way for publishing on F-Droid.

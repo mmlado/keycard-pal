@@ -17,9 +17,13 @@ export default function GenuineWarning({ onCancel, onProceed }: Props) {
 
   return (
     <View
+      testID="genuine-warning"
       style={[
         styles.container,
-        { paddingBottom: Math.max(insets.bottom, 16) + 8 },
+        {
+          paddingTop: Math.max(insets.top, 24),
+          paddingBottom: Math.max(insets.bottom, 16) + 8,
+        },
       ]}
     >
       <View style={styles.content}>
@@ -60,7 +64,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
     paddingHorizontal: 24,
-    paddingTop: 24,
   },
   content: {
     flex: 1,

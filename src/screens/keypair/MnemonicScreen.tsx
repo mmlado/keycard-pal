@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -29,7 +28,16 @@ import {
 } from '../../hooks/keycard/useLoadKey';
 import { useVerifyFingerprint } from '../../hooks/keycard/useVerifyFingerprint';
 import { deriveMnemonicFingerprint } from '../../hooks/keycard/useVerifyMnemonic';
-import { decodeSeedQr, isSeedQrPayload } from '../../utils/seedQr';
+import { useKeycardScreen } from '../../hooks/useKeycardScreen';
+import {
+  decodeCompactSeedQr,
+  decodeSeedQr,
+  isCompactSeedQrBytes,
+  isSeedQrPayload,
+  type SeedQrDecodeResult,
+} from '../../utils/seedQr';
+
+const SCAN_ERROR_LINGER_MS = 2000;
 
 export default function MnemonicScreen({
   navigation,
@@ -45,6 +53,39 @@ export default function MnemonicScreen({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const scanErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearScanError = useCallback(() => {
+    if (scanErrorTimer.current) {
+      clearTimeout(scanErrorTimer.current);
+      scanErrorTimer.current = null;
+    }
+    setScanError(null);
+  }, []);
+
+  // The scanner re-reports a rejection on every frame the offending code stays
+  // in view, so the notice expires on a timer rather than by hand: a dismiss
+  // control would be undone by the next frame. It holds while the code is on
+  // screen and clears once the camera moves off it.
+  const rejectScan = useCallback((message: string) => {
+    setScanError(message);
+    if (scanErrorTimer.current) {
+      clearTimeout(scanErrorTimer.current);
+    }
+    scanErrorTimer.current = setTimeout(
+      () => setScanError(null),
+      SCAN_ERROR_LINGER_MS,
+    );
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (scanErrorTimer.current) {
+        clearTimeout(scanErrorTimer.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const show = Keyboard.addListener(
@@ -64,7 +105,6 @@ export default function MnemonicScreen({
   const loadKey = useLoadKey();
   const verifyFingerprint = useVerifyFingerprint();
   const keycard = mode === 'verify' ? verifyFingerprint : loadKey;
-  const { phase, result, cancel } = keycard;
 
   const handleTextChange = useCallback((text: string) => {
     setInput(text);
@@ -85,78 +125,72 @@ export default function MnemonicScreen({
     loadKey.start(deriveMnemonicKeyPair(words, passphrase || undefined));
   }, [loadKey, mode, passphrase, verifyFingerprint, words]);
 
-  const handleCancel = useCallback(() => {
-    cancel();
-  }, [cancel]);
+  const handleScanPress = useCallback(() => {
+    // The scanner is an overlay on this screen, so the word input keeps focus
+    // and the keyboard would otherwise stay up covering the viewfinder.
+    Keyboard.dismiss();
+    clearScanError();
+    setScanning(true);
+  }, [clearScanError]);
 
-  useEffect(() => {
-    if (phase !== 'done') {
-      return;
-    }
-    if (mode === 'verify') {
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'Dashboard',
-            params: {
-              toast:
-                result === 'match'
-                  ? 'Recovery phrase matches'
-                  : 'Recovery phrase does not match',
-            },
-          },
-        ],
-      });
-    } else {
-      navigation.navigate('Dashboard', {
-        toast: 'Key pair has been added to Keycard',
-      });
-    }
-  }, [phase, result, mode, navigation]);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: scanning
-        ? 'Scan SeedQR'
-        : phase === 'pin_entry'
-        ? 'Enter Keycard PIN'
-        : mode === 'verify'
-        ? 'Verify recovery phrase'
-        : 'Import recovery phrase',
-    });
-  }, [navigation, phase, mode, scanning]);
+  const { onCancel } = useKeycardScreen({
+    keycard,
+    navigation,
+    title: scanning
+      ? 'Scan SeedQR'
+      : mode === 'verify'
+      ? 'Verify recovery phrase'
+      : 'Import recovery phrase',
+    done: {
+      toast: doneResult =>
+        mode === 'verify'
+          ? doneResult === 'match'
+            ? 'Recovery phrase matches'
+            : 'Recovery phrase does not match'
+          : 'Key pair has been added to Keycard',
+    },
+    stayOnCancel: true,
+  });
 
   useEffect(() => {
     if (!scanning) return;
     return navigation.addListener('beforeRemove', e => {
       e.preventDefault();
       setScanning(false);
-      setScanError(null);
+      clearScanError();
     });
-  }, [navigation, scanning]);
+  }, [clearScanError, navigation, scanning]);
 
-  const handleCodeScanned = useCallback((event: ReadCodeEvent) => {
-    const value = event.nativeEvent.codeStringValue;
-    if (!value) return;
+  const handleCodeScanned = useCallback(
+    (event: ReadCodeEvent) => {
+      const { codeStringValue, codeBytesBase64 } = event.nativeEvent;
+      const bytes = codeBytesBase64
+        ? new Uint8Array(Buffer.from(codeBytesBase64, 'base64'))
+        : null;
+      if (!codeStringValue && !bytes) return;
 
-    const cleaned = value.trim().toLowerCase();
-    if (!isSeedQrPayload(cleaned)) {
-      setScanError('Not a valid SeedQR. Scan a hex-encoded BIP39 entropy QR.');
-      return;
-    }
+      let decoded: SeedQrDecodeResult;
+      if (bytes && isCompactSeedQrBytes(bytes)) {
+        decoded = decodeCompactSeedQr(bytes);
+      } else if (codeStringValue && isSeedQrPayload(codeStringValue)) {
+        decoded = decodeSeedQr(codeStringValue);
+      } else {
+        rejectScan('Not a valid SeedQR. Scan a 12 or 24 word SeedQR.');
+        return;
+      }
 
-    const decoded = decodeSeedQr(cleaned);
-    if (decoded.kind === 'error') {
-      setScanError(decoded.message);
-      return;
-    }
+      if (decoded.kind === 'error') {
+        rejectScan(decoded.message);
+        return;
+      }
 
-    setInput(decoded.words.join(' '));
-    setWordCount(decoded.words.length === 24 ? 24 : 12);
-    setScanning(false);
-    setScanError(null);
-  }, []);
+      setInput(decoded.words.join(' '));
+      setWordCount(decoded.words.length === 24 ? 24 : 12);
+      setScanning(false);
+      clearScanError();
+    },
+    [clearScanError, rejectScan],
+  );
 
   const isComplete = words.length === wordCount;
 
@@ -178,6 +212,11 @@ export default function MnemonicScreen({
           placeholder="Enter your recovery phrase"
           errors={[phraseError]}
           onWordsChange={setWords}
+          onScanPress={handleScanPress}
+          scanTestID="scan-seedqr-button"
+          // Keyboard.dismiss() alone leaves the input focused, so Android can put
+          // the keyboard straight back up under the camera overlay.
+          editable={!scanning}
         />
 
         <TextInput
@@ -188,16 +227,6 @@ export default function MnemonicScreen({
           placeholderTextColor={theme.colors.onSurfacePlaceholder}
           autoCapitalize="none"
           autoCorrect={false}
-        />
-
-        <PrimaryButton
-          label="Scan SeedQR"
-          icon={Icons.qr}
-          onPress={() => {
-            setScanError(null);
-            setScanning(true);
-          }}
-          testID="scan-seedqr-button"
         />
       </ScrollView>
 
@@ -215,19 +244,16 @@ export default function MnemonicScreen({
         />
       </View>
 
-      <NFCBottomSheet nfc={keycard} onCancel={handleCancel} />
+      <NFCBottomSheet nfc={keycard} onCancel={onCancel} />
 
       {scanning && (
         <CameraView
-          style={[StyleSheet.absoluteFill, { paddingTop: insets.top }]}
+          style={StyleSheet.absoluteFill}
           onReadCode={handleCodeScanned}
         >
           {scanError && (
             <View style={styles.scanErrorContainer}>
               <Text style={styles.scanErrorText}>{scanError}</Text>
-              <Pressable onPress={() => setScanError(null)}>
-                <Text style={styles.scanRetryText}>Tap to retry</Text>
-              </Pressable>
             </View>
           )}
         </CameraView>
@@ -273,15 +299,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 24,
     borderRadius: 8,
-    gap: 8,
   },
   scanErrorText: {
     color: theme.colors.error,
     fontSize: 14,
     textAlign: 'center',
-  },
-  scanRetryText: {
-    color: theme.colors.primary,
-    fontSize: 14,
   },
 });

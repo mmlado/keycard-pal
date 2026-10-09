@@ -78,7 +78,9 @@ export default function GenerateKeyScreen({
                 <View style={styles.column}>
                   {words.slice(0, half).map((word, i) => (
                     <View key={i} style={styles.wordCell}>
-                      <Text style={styles.wordIndex}>{i + 1}.</Text>
+                      <Text style={styles.wordIndex} numberOfLines={1}>
+                        {i + 1}.
+                      </Text>
                       <Text style={styles.wordText}>{word}</Text>
                     </View>
                   ))}
@@ -86,7 +88,9 @@ export default function GenerateKeyScreen({
                 <View style={styles.column}>
                   {words.slice(half).map((word, i) => (
                     <View key={i} style={styles.wordCell}>
-                      <Text style={styles.wordIndex}>{half + i + 1}.</Text>
+                      <Text style={styles.wordIndex} numberOfLines={1}>
+                        {half + i + 1}.
+                      </Text>
                       <Text style={styles.wordText}>{word}</Text>
                     </View>
                   ))}
@@ -184,13 +188,15 @@ const styles = StyleSheet.create({
   wordIndex: {
     color: theme.colors.onSurfaceDisabled,
     fontSize: 13,
-    width: 22,
+    minWidth: 22,
+    flexShrink: 0,
     textAlign: 'right',
   },
   wordText: {
     color: theme.colors.onSurface,
     fontSize: 15,
     fontWeight: '500',
+    flex: 1,
   },
   buttonArea: {
     paddingHorizontal: 24,

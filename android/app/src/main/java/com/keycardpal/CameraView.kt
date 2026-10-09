@@ -2,6 +2,7 @@ package com.keycardpal
 
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Base64
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -18,6 +19,8 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.NotFoundException
 import com.google.zxing.PlanarYUVLuminanceSource
+import com.google.zxing.Result
+import com.google.zxing.ResultMetadataType
 import com.google.zxing.common.HybridBinarizer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -115,7 +118,7 @@ class CameraView
                     )
 
                 val result = reader.decodeWithState(BinaryBitmap(HybridBinarizer(source)))
-                dispatchCodeEvent(result.text)
+                dispatchCodeEvent(result.text, byteSegmentsBase64(result))
             } catch (_: NotFoundException) {
                 // no QR in frame — expected
             } finally {
@@ -145,11 +148,33 @@ class CameraView
             return data
         }
 
-        private fun dispatchCodeEvent(value: String) {
+        // ZXing decodes byte-mode segments into `result.text` with a guessed charset, which
+        // is lossy for arbitrary bytes. BYTE_SEGMENTS is the segment content itself, already
+        // without the mode and length header and without padding.
+        private fun byteSegmentsBase64(result: Result): String? {
+            @Suppress("UNCHECKED_CAST")
+            val segments =
+                result.resultMetadata?.get(ResultMetadataType.BYTE_SEGMENTS) as? List<ByteArray>
+                    ?: return null
+            if (segments.isEmpty()) return null
+
+            val joined = ByteArray(segments.sumOf { it.size })
+            var offset = 0
+            for (segment in segments) {
+                segment.copyInto(joined, offset)
+                offset += segment.size
+            }
+            return Base64.encodeToString(joined, Base64.NO_WRAP)
+        }
+
+        private fun dispatchCodeEvent(
+            value: String,
+            bytesBase64: String?,
+        ) {
             val reactContext = context as? ReactContext ?: return
             val surfaceId = UIManagerHelper.getSurfaceId(reactContext)
             val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
-            dispatcher?.dispatchEvent(ReadCodeEvent(surfaceId, id, value))
+            dispatcher?.dispatchEvent(ReadCodeEvent(surfaceId, id, value, bytesBase64))
         }
 
         override fun onDetachedFromWindow() {

@@ -1,40 +1,28 @@
-# ADR 0005: Two-tap retry for custom pairing password
+# 0005. Two-tap retry for a custom pairing password
 
-**Date:** 2026-06-07
-**Status:** Accepted
+Date: 2026-06-07
 
-## Context
+Status: Superseded by [0012](0012-dual-generation-keycard-support.md)
 
-When `autoPair` is called with the default pairing secret and the card was paired with a custom pairing password, the SDK throws `APDUException("Error: Invalid card cryptogram")` mid-session. The user needs to supply their custom pairing password and retry.
+> Superseded 2026-09-16. The two-tap flow below still describes what happens on a
+> Secure Channel V1 card, and the constraint it records (the NFC layer cannot keep
+> a session alive across input) still holds. ADR-0012 generalises it: pairing does
+> not exist on applet 4.0, and "identify on the first tap, operate on the second"
+> became the pattern for every operation a card's generation does not support,
+> rather than a one-off for the pairing password.
 
-The alternative — retrying `autoPair` in the same NFC session immediately after the error — is not viable: the error propagates up through `handleCardConnected`, which ends the NFC session via `useNFCSession`. There is no "keep session alive for more input" path in the React Native NFC layer.
-
-## Decision
-
-Custom pairing password entry follows the same two-tap pattern as `genuine_warning`:
-
-1. First tap: detect the cryptogram mismatch, return `null` from `handleCardConnected`, set `phase = 'pairing_password'`.
-2. Show a full-screen `PairingPasswordEntry` modal — same structure as PIN entry.
-3. User submits password → stored in a ref → `startNFC()` called.
-4. Second tap: `autoPair` called with the custom password string (SDK derives the pairing secret via PBKDF2-HMAC-SHA256 internally).
-5. On success: pairing saved to AsyncStorage as normal; custom password ref cleared.
-6. On failure: `pairingPasswordError` set, stay in `pairing_password` phase, user can retry.
-
-Detection: `e instanceof APDUException && e.message.includes('Invalid card cryptogram')`. The SW code is not usable here — the cryptogram mismatch is verified client-side by the SDK before step 2, so the exception has `sw === 0`.
-
-## Rationale
-
-- Mirrors the `genuine_warning` pattern already in the codebase — same state machine shape, same NFC restart.
-- Custom pairing password is only needed once. After successful `autoPair`, the pairing is stored in AsyncStorage; future sessions load it and bypass `autoPair` entirely. The password is never persisted.
-- The two-tap UX is acceptable: the first tap informs the user their card uses a custom password; the second tap completes pairing.
+A card paired with a custom pairing password makes `autoPair` throw
+`APDUException("Error: Invalid card cryptogram")` mid-session, and the React
+Native NFC layer has no way to hold the session open while the user types the
+password. So the flow is two taps, like `genuine_warning`: the first tap detects
+the mismatch, sets phase `pairing_password` and ends by throwing; the password is
+entered in the bottom sheet's Modal; the second tap pairs with it, and the stored
+pairing bypasses `autoPair` from then on. Detection is by message, because the
+SDK verifies the cryptogram client-side and the exception carries `sw === 0`.
 
 ## Consequences
 
-- `Phase` gains a `'pairing_password'` value.
-- `UseKeycardOperation` gains `pairingPasswordError: string | null` and `submitPairingPassword: (password: string) => void`.
-- `NFCBottomSheet` gains a `PairingPasswordEntry` component rendered inside the existing bottom sheet Modal (same pattern as `genuine_warning`, not `pin_entry`). On iOS, `showSheet` is always false — only the bottom sheet Modal is used for post-tap interrupts, so `pairing_password` must follow `genuine_warning`'s modal path to work on both platforms.
-- "Pairing slots full" error (`autoPair` step 2 failure) is caught separately and surfaced as a human-readable message rather than a raw APDU error string.
-
-## Revisit if
-
-- The React Native NFC layer gains support for keeping a session alive across async UI interactions — at that point in-session retry becomes viable and eliminates the second tap.
+- The prompt takes the Modal path, not the PIN overlay: on iOS the app draws no
+  sheet during a tap, so only the Modal reaches both platforms after an
+  interrupted tap.
+- Pairing slots full is caught separately and shown in plain words.

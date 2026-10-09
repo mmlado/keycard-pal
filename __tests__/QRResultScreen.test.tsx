@@ -32,12 +32,13 @@ function renderScreen(
   urString: string,
   title = 'Show signature to the wallet',
   navigation?: object,
+  description?: string,
 ) {
   return render(
     <QRResultScreen
       route={
         {
-          params: { urString, title },
+          params: { urString, title, description },
           key: 'QRResult',
           name: 'QRResult',
         } as any
@@ -75,6 +76,23 @@ describe('QRResultScreen', () => {
     expect(setOptions).toHaveBeenCalledWith({
       title: 'Show key to the wallet',
     });
+  });
+
+  it('renders the description above the QR code when provided', () => {
+    renderScreen(
+      SAMPLE_UR,
+      'Show key to the wallet',
+      undefined,
+      'An xpub lets the wallet watch your balance.',
+    );
+    expect(
+      screen.getByText('An xpub lets the wallet watch your balance.'),
+    ).toBeTruthy();
+  });
+
+  it('renders no description when none is provided', () => {
+    renderScreen(SAMPLE_UR);
+    expect(screen.queryByText(/xpub/)).toBeNull();
   });
 
   it('"Done" resets navigation to Dashboard', () => {

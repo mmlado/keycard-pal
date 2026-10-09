@@ -182,7 +182,8 @@ export function recoverSlip39Secret(
   const secret = new Uint8Array(
     Slip39.recoverSecret(
       progress.acceptedShares.slice(0, progress.requiredShares),
-      passphrase,
+      // SLIP-0039 requires NFKD; the slip39 package encodes the string as given.
+      passphrase.normalize('NFKD'),
     ),
   );
 

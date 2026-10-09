@@ -3,13 +3,17 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import TransactionDetailScreen from '../src/screens/TransactionDetailScreen';
 import type { EthSignRequest } from '../src/types';
+import { inspectBtcPsbt } from '../src/utils/btcPsbt';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(), setItem: jest.fn() },
 }));
 
-jest.mock('../src/components/NFCBottomSheet', () => () => null);
+jest.mock('../src/components/NFCBottomSheet', () => {
+  const { View } = require('react-native');
+  return () => <View testID="nfc-sheet" />;
+});
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
   useKeycardOp: () => ({
     phase: 'idle',
@@ -218,7 +222,8 @@ function renderScreenWithWc(result: any) {
 }
 
 const fullRequest: EthSignRequest = {
-  signData: 'aabbccdd',
+  // First byte >= 0xc0 → classifies as tx-legacy (signable)
+  signData: 'e8aabbccdd',
   dataType: 1,
   derivationPath: "m/44'/60'/0'/0",
   chainId: 1,
@@ -230,6 +235,22 @@ const fullRequest: EthSignRequest = {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('TransactionDetailScreen – simulation NFC sheet', () => {
+  it('mounts the sheet on the screen root, outside the scrolling content', () => {
+    renderScreen({ kind: 'eth-sign-request', request: fullRequest });
+    const root = screen.toJSON() as any;
+    const rootChildren = (root.children as any[]).filter(
+      child => typeof child === 'object',
+    );
+    expect(
+      rootChildren.some(child => child.props?.testID === 'nfc-sheet'),
+    ).toBe(true);
+    // Nothing inside the ScrollView carries it.
+    const scroll = rootChildren.find(child => child.type === 'RCTScrollView');
+    expect(JSON.stringify(scroll)).not.toContain('nfc-sheet');
+  });
+});
 
 describe('TransactionDetailScreen – error result', () => {
   it('renders without crashing', async () => {
@@ -288,7 +309,7 @@ describe('TransactionDetailScreen – eth-sign-request result', () => {
       kind: 'eth-sign-request',
       request: fullRequest,
     });
-    expect(screen.getByText('aabbccdd')).toBeTruthy();
+    expect(screen.getByText('e8aabbccdd')).toBeTruthy();
   });
 
   it('displays the derivation path', async () => {
@@ -402,29 +423,26 @@ describe('TransactionDetailScreen – eth-sign-request result', () => {
   });
 });
 
+function psbtResult(hex: string) {
+  return {
+    kind: 'crypto-psbt' as const,
+    request: { psbtHex: hex },
+    summary: inspectBtcPsbt(hex),
+  };
+}
+
 describe('TransactionDetailScreen – crypto-psbt result', () => {
   it('renders without crashing', async () => {
-    expect(
-      renderScreen({
-        kind: 'crypto-psbt',
-        request: { psbtHex: VALID_PSBT_HEX },
-      }),
-    ).toBeDefined();
+    expect(renderScreen(psbtResult(VALID_PSBT_HEX))).toBeDefined();
   });
 
   it('shows the Sign transaction button', async () => {
-    renderScreen({
-      kind: 'crypto-psbt',
-      request: { psbtHex: VALID_PSBT_HEX },
-    });
+    renderScreen(psbtResult(VALID_PSBT_HEX));
     expect(screen.getByText('Sign transaction')).toBeTruthy();
   });
 
   it('navigates to Keycard with PSBT signing params', async () => {
-    const { navigation } = renderScreen({
-      kind: 'crypto-psbt',
-      request: { psbtHex: VALID_PSBT_HEX },
-    });
+    const { navigation } = renderScreen(psbtResult(VALID_PSBT_HEX));
     fireEvent.press(screen.getByText('Sign transaction'));
     expect(navigation.navigate).toHaveBeenCalledWith('Keycard', {
       operation: 'sign',
@@ -434,34 +452,68 @@ describe('TransactionDetailScreen – crypto-psbt result', () => {
   });
 
   it('shows Bitcoin PSBT label', async () => {
-    renderScreen({
-      kind: 'crypto-psbt',
-      request: { psbtHex: VALID_PSBT_HEX },
-    });
+    renderScreen(psbtResult(VALID_PSBT_HEX));
     expect(screen.getByText('Bitcoin PSBT')).toBeTruthy();
   });
 
-  it('shows Invalid PSBT error for malformed hex', async () => {
-    renderScreen({
-      kind: 'crypto-psbt',
-      request: { psbtHex: 'deadbeef' },
+  it('shows the fee of a PSBT whose input carries its UTXO', async () => {
+    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const psbt = new Psbt({ network: networks.testnet });
+    const { output } = payments.p2wpkh({
+      pubkey: Buffer.alloc(33, 0x02),
+      network: networks.testnet,
     });
-    expect(screen.getByText(/Invalid PSBT/)).toBeTruthy();
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xaa),
+      index: 0,
+      witnessUtxo: { script: output!, value: 100_000 },
+    });
+    psbt.addOutput({ script: output!, value: 99_577 });
+
+    renderScreen(psbtResult(psbt.toBuffer().toString('hex')));
+    expect(screen.getByText('Fee')).toBeTruthy();
+    expect(screen.getByText('423 sats')).toBeTruthy();
   });
 
-  it('shows Sign transaction button even on invalid PSBT (screen-level decision)', async () => {
-    renderScreen({
-      kind: 'crypto-psbt',
-      request: { psbtHex: 'deadbeef' },
+  it('says the fee is unknown when an input carries no UTXO', async () => {
+    renderScreen(psbtResult(VALID_PSBT_HEX));
+    expect(screen.getByText('Fee')).toBeTruthy();
+    expect(screen.getByText('Unknown')).toBeTruthy();
+    expect(
+      screen.getByText(/does not say how much input 1 holds/),
+    ).toBeTruthy();
+  });
+
+  it('names every input whose value is missing', async () => {
+    const { Psbt, payments, networks } = require('bitcoinjs-lib');
+    const psbt = new Psbt({ network: networks.testnet });
+    const pubkey = Buffer.alloc(33, 0x02);
+    const { output } = payments.p2wpkh({ pubkey, network: networks.testnet });
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xaa),
+      index: 0,
+      witnessUtxo: { script: output!, value: 100_000 },
+      bip32Derivation: [
+        {
+          masterFingerprint: Buffer.from([0xde, 0xad, 0xbe, 0xef]),
+          path: "m/84'/1'/0'/0/0",
+          pubkey,
+        },
+      ],
     });
-    expect(screen.getByText('Sign transaction')).toBeTruthy();
+    psbt.addInput({ hash: Buffer.alloc(32, 0xab), index: 0 });
+    psbt.addInput({ hash: Buffer.alloc(32, 0xac), index: 0 });
+    psbt.addOutput({ script: output!, value: 90_000 });
+
+    renderScreen(psbtResult(psbt.toBuffer().toString('hex')));
+    expect(screen.getByText('Unknown')).toBeTruthy();
+    expect(
+      screen.getByText(/does not say how much inputs 2 and 3 hold,/),
+    ).toBeTruthy();
   });
 
   it('shows BIP-322 requests as message signing', async () => {
-    renderScreen({
-      kind: 'crypto-psbt',
-      request: { psbtHex: BIP322_PSBT_HEX },
-    });
+    renderScreen(psbtResult(BIP322_PSBT_HEX));
     expect(screen.getByText('Bitcoin Message')).toBeTruthy();
     expect(screen.getByText('BIP-322 Message')).toBeTruthy();
     expect(screen.getByText('Sign message')).toBeTruthy();

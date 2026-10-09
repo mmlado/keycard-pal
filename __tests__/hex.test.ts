@@ -1,4 +1,4 @@
-import { ensureHexPrefix, toHex } from '../src/utils/hex';
+import { ensureHexPrefix, fromHex, toHex } from '../src/utils/hex';
 
 describe('ensureHexPrefix', () => {
   it('adds 0x prefix when missing', () => {
@@ -21,5 +21,20 @@ describe('toHex', () => {
 
   it('handles empty array', () => {
     expect(toHex(new Uint8Array([]))).toBe('');
+  });
+});
+
+describe('fromHex', () => {
+  it('reads an unprefixed hex string', () => {
+    expect(fromHex('00ff10')).toEqual(new Uint8Array([0x00, 0xff, 0x10]));
+  });
+
+  it('is the inverse of toHex', () => {
+    const bytes = new Uint8Array([0x02, 0x9a, 0xb9, 0x00, 0x7f]);
+    expect(fromHex(toHex(bytes))).toEqual(bytes);
+  });
+
+  it('reads an empty string as no bytes', () => {
+    expect(fromHex('')).toEqual(new Uint8Array(0));
   });
 });

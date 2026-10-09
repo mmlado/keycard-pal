@@ -2,18 +2,13 @@ import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
+import type { IconComponent } from '../assets/icons';
 import theme from '../theme';
-
-type ButtonIconProps = {
-  width?: number;
-  height?: number;
-  color?: string;
-};
 
 type Props = {
   label: string;
   onPress: () => void;
-  icon?: React.ComponentType<ButtonIconProps>;
+  icon?: IconComponent;
   disabled?: boolean;
   testID?: string;
 };

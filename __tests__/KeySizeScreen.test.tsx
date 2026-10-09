@@ -1,14 +1,19 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import KeySizeScreen from '../src/screens/keypair/KeySizeScreen';
+
+import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockInsets,
 }));
 
 jest.mock('react-native-paper', () => {
@@ -16,16 +21,15 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      chevronRight: Icon,
-      nfcActivate: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+// These assertions describe the list layout's rows, so pin the preference.
+jest.mock('../src/hooks/usePreferences', () => ({
+  usePreferences: () => ({
+    preferences: mockTestPreferences({ dashboardLayout: 'list' }),
+    setPreference: jest.fn(),
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +49,14 @@ function renderScreen() {
 describe('KeySizeScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
+    mockInsets.bottom = 0;
+  });
+
+  it('keeps the last entry above the bottom inset', () => {
+    mockInsets.bottom = 34;
+    const { toJSON } = renderScreen();
+    const root = toJSON() as any;
+    expect(StyleSheet.flatten(root.props.style).paddingBottom).toBe(34);
   });
 
   describe('layout', () => {
@@ -66,6 +78,13 @@ describe('KeySizeScreen', () => {
     it('renders the "24 word + passphrase" option', () => {
       renderScreen();
       expect(screen.getByText('24 word + passphrase')).toBeTruthy();
+    });
+
+    it('shows a leading icon on every option', () => {
+      renderScreen();
+      for (const index of [0, 1, 2, 3]) {
+        expect(screen.getByTestId(`menu-icon-${index}`)).toBeTruthy();
+      }
     });
   });
 

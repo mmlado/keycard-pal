@@ -6,6 +6,7 @@ import { useNFCOperation } from '../src/hooks/keycard/useNFCOperation';
 // RNKeycard mock — captures event callbacks so tests can trigger them
 // ---------------------------------------------------------------------------
 
+let capturedOnConnected: (() => Promise<void>) | null = null;
 let capturedOnDisconnected: (() => void) | null = null;
 let capturedOnCancelled: (() => void) | null = null;
 let capturedOnTimeout: (() => void) | null = null;
@@ -18,7 +19,10 @@ jest.mock('react-native-keycard', () => ({
   __esModule: true,
   default: {
     Core: {
-      onKeycardConnected: (_cb: () => Promise<void>) => ({ remove: jest.fn() }),
+      onKeycardConnected: (cb: () => Promise<void>) => {
+        capturedOnConnected = cb;
+        return { remove: jest.fn() };
+      },
       onKeycardDisconnected: (cb: () => void) => {
         capturedOnDisconnected = cb;
         return { remove: jest.fn() };
@@ -32,10 +36,11 @@ jest.mock('react-native-keycard', () => ({
         return { remove: jest.fn() };
       },
       startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: () => mockStopNFC(),
-      stopNFCWithError: (msg: string) => mockStopNFCWithError(msg),
+      stopNFC: (message?: string, isError?: boolean) =>
+        isError ? mockStopNFCWithError(message) : mockStopNFC(),
       isNFCEnabled: () => Promise.resolve(true),
       openNFCSettings: () => Promise.resolve(true),
+      setNFCMessage: () => Promise.resolve(true),
     },
     NFCCardChannel: class {},
   },
@@ -43,7 +48,11 @@ jest.mock('react-native-keycard', () => ({
 
 jest.mock('keycard-sdk', () => ({
   __esModule: true,
-  default: { Commandset: class {} },
+  default: {
+    Commandset: class {
+      select = jest.fn().mockResolvedValue({ sw: 0x9000 });
+    },
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -58,6 +67,7 @@ describe('useNFCOperation', () => {
     mockStartNFC.mockClear();
     mockStopNFC.mockClear();
     mockStopNFCWithError.mockClear();
+    capturedOnConnected = null;
     capturedOnDisconnected = null;
     capturedOnCancelled = null;
     capturedOnTimeout = null;
@@ -178,8 +188,9 @@ describe('useNFCOperation', () => {
         capturedOnDisconnected?.();
       });
       expect(result.current.phase).toBe('nfc');
+      expect(result.current.cardPresence).toBe('lost');
       expect(result.current.status).toBe(
-        'Connection lost - adjust Keycard position',
+        'Connection lost — hold your Keycard against the phone again',
       );
     });
 
@@ -192,6 +203,134 @@ describe('useNFCOperation', () => {
       });
       expect(result.current.phase).toBe('idle');
       expect(result.current.status).toBe('');
+    });
+  });
+
+  describe('successful operation', () => {
+    it('stores the operation result and finishes', async () => {
+      const { result } = renderHook(() =>
+        useNFCOperation(useCallback(async () => 'ok', [])),
+      );
+      await act(async () => {
+        result.current.start();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(result.current.result).toBe('ok');
+    });
+  });
+
+  // After an error the reader is off; the sheet offers "Try again" only when given this.
+  describe('retry', () => {
+    it('opens the reader again after an error and runs the operation', async () => {
+      const operation = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Invalid MAC'))
+        .mockResolvedValue('ok');
+      const { result } = renderHook(() =>
+        useNFCOperation(useCallback(() => operation(), [])),
+      );
+      await act(async () => {
+        result.current.start();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+      mockStartNFC.mockClear();
+
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(mockStartNFC).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('done');
+      expect(result.current.result).toBe('ok');
+    });
+  });
+
+  describe('cancellation mid-operation', () => {
+    it('does not set result when cancelled while the operation is in flight', async () => {
+      let resolveOp: ((v: string) => void) | null = null;
+      const { result } = renderHook(() =>
+        useNFCOperation(
+          useCallback(
+            () =>
+              new Promise<string>(resolve => {
+                resolveOp = resolve;
+              }),
+            [],
+          ),
+        ),
+      );
+      await act(async () => {
+        result.current.start();
+      });
+      let connectPromise: Promise<void> | undefined;
+      act(() => {
+        connectPromise = capturedOnConnected?.();
+      });
+      // Let SELECT resolve, so the operation is entered before the cancel arrives.
+      await act(async () => {});
+      expect(resolveOp).not.toBeNull();
+      await act(async () => {
+        result.current.cancel();
+      });
+      await act(async () => {
+        resolveOp?.('late');
+        await connectPromise;
+      });
+      expect(result.current.result).toBeNull();
+    });
+  });
+
+  // retryOnTagLoss defaults to false.
+  describe('retryOnTagLoss option', () => {
+    const TAG_LOST = 'CardIO Error: Error: Tag was lost.';
+
+    it('defaults to false when omitted: tag loss is an error', async () => {
+      const { result } = renderHook(() =>
+        useNFCOperation(
+          useCallback(async () => {
+            throw new Error(TAG_LOST);
+          }, []),
+        ),
+      );
+      await act(async () => {
+        result.current.start();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(
+        'Connection lost mid-operation. Check the card state before retrying.',
+      );
+    });
+
+    it('opted in: tag loss keeps the session waiting', async () => {
+      const { result } = renderHook(() =>
+        useNFCOperation(
+          useCallback(async () => {
+            throw new Error(TAG_LOST);
+          }, []),
+          { retryOnTagLoss: true },
+        ),
+      );
+      await act(async () => {
+        result.current.start();
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(result.current.phase).toBe('nfc');
+      expect(result.current.cardPresence).toBe('lost');
     });
   });
 });

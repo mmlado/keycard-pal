@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import PinPadSettingsSection from '../src/components/settings/PinPadSettingsSection';
+import { PreferencesProvider } from '../src/providers/preferences/Provider';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -12,22 +13,44 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-const mockLoadPreference = jest.fn().mockResolvedValue(false);
-const mockSavePreference = jest.fn().mockResolvedValue(undefined);
+// The section reads and writes through the real provider; only storage is
+// mocked, so a failed write exercises the provider's rollback.
+const mockLoadPreferences = jest.fn();
+const mockSavePreference = jest.fn();
 
 jest.mock('../src/storage/preferencesStorage', () => ({
-  loadPinPadScramble: () => mockLoadPreference(),
-  savePinPadScramble: (v: boolean) => mockSavePreference(v),
+  loadPreferences: () => mockLoadPreferences(),
+  savePreference: (...args: unknown[]) => mockSavePreference(...args),
 }));
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+function storedScramble(pinPadScramble: boolean) {
+  mockLoadPreferences.mockResolvedValue({
+    dashboardLayout: 'tiles',
+    pinPadScramble,
+    tokenImagesEnabled: false,
+    welcomeSeen: true,
+    xpubNoticeDismissed: false,
+  });
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
-  mockLoadPreference.mockResolvedValue(false);
+  storedScramble(false);
+  mockSavePreference.mockResolvedValue(undefined);
 });
+
+async function renderSection() {
+  render(
+    <PreferencesProvider>
+      <PinPadSettingsSection />
+    </PreferencesProvider>,
+  );
+  await act(async () => {});
+}
 
 function getSwitch() {
   return screen.getByRole('switch');
@@ -38,55 +61,47 @@ function getSwitch() {
 // ---------------------------------------------------------------------------
 
 describe('PinPadSettingsSection', () => {
-  it('renders toggle label', () => {
-    render(<PinPadSettingsSection />);
+  it('renders toggle label', async () => {
+    await renderSection();
     expect(screen.getByText('Scramble PIN pad')).toBeTruthy();
   });
 
   it('renders toggle off by default', async () => {
-    render(<PinPadSettingsSection />);
-    await act(async () => {});
-    const switchComponent = getSwitch();
-    expect(switchComponent.props.value).toBe(false);
+    await renderSection();
+    expect(getSwitch().props.value).toBe(false);
   });
 
-  it('calls savePinPadScramble with true when toggled on', async () => {
-    render(<PinPadSettingsSection />);
-    await act(async () => {});
-    const switchComponent = getSwitch();
+  it('saves true when toggled on', async () => {
+    await renderSection();
     await act(async () => {
-      fireEvent(switchComponent, 'valueChange', true);
+      fireEvent(getSwitch(), 'valueChange', true);
     });
-    expect(mockSavePreference).toHaveBeenCalledWith(true);
+    expect(mockSavePreference).toHaveBeenCalledWith('pinPadScramble', true);
+    expect(getSwitch().props.value).toBe(true);
   });
 
-  it('calls savePinPadScramble with false when toggled off', async () => {
-    render(<PinPadSettingsSection />);
-    await act(async () => {});
-    const switchComponent = getSwitch();
+  it('saves false when toggled off', async () => {
+    storedScramble(true);
+    await renderSection();
     await act(async () => {
-      fireEvent(switchComponent, 'valueChange', false);
+      fireEvent(getSwitch(), 'valueChange', false);
     });
-    expect(mockSavePreference).toHaveBeenCalledWith(false);
+    expect(mockSavePreference).toHaveBeenCalledWith('pinPadScramble', false);
+    expect(getSwitch().props.value).toBe(false);
   });
 
   it('reverts toggle state when save fails', async () => {
     mockSavePreference.mockRejectedValue(new Error('storage full'));
-    render(<PinPadSettingsSection />);
-    await act(async () => {});
-    const switchComponent = getSwitch();
+    await renderSection();
     await act(async () => {
-      fireEvent(switchComponent, 'valueChange', true);
+      fireEvent(getSwitch(), 'valueChange', true);
     });
     expect(getSwitch().props.value).toBe(false);
   });
 
-  it('loads persisted value on mount', async () => {
-    mockLoadPreference.mockResolvedValue(true);
-    render(<PinPadSettingsSection />);
-    await act(async () => {});
-    const switchComponent = getSwitch();
-    expect(switchComponent.props.value).toBe(true);
-    expect(mockLoadPreference).toHaveBeenCalled();
+  it('shows the persisted value on mount', async () => {
+    storedScramble(true);
+    await renderSection();
+    expect(getSwitch().props.value).toBe(true);
   });
 });

@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -31,6 +25,7 @@ import { useGenerateSlip39Shares } from '../../hooks/keycard/useGenerateSlip39Sh
 import { useLoadKey } from '../../hooks/keycard/useLoadKey';
 import { useSeedReviewTimer } from '../../hooks/useSeedReviewTimer';
 import { useVerifyFingerprint } from '../../hooks/keycard/useVerifyFingerprint';
+import { useKeycardScreen } from '../../hooks/useKeycardScreen';
 import { pubKeyFingerprint } from '../../utils/cryptoAccount';
 import {
   SLIP39_MAX_SHARES,
@@ -112,8 +107,6 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     mode === 'generate' && generatedShares.length === 0
       ? generateSlip39
       : keycard;
-  const { phase, result } = keycard;
-  const activePhase = activeKeycard.phase;
 
   const progress = useMemo(() => {
     if (operationShares.length === 0) {
@@ -254,10 +247,6 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     }
   }, [generateSlip39]);
 
-  const handleCancel = useCallback(() => {
-    activeKeycard.cancel();
-  }, [activeKeycard]);
-
   useEffect(() => {
     if (
       mode !== 'generate' ||
@@ -292,50 +281,33 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     return () => clearTimeout(timeout);
   }, [mode, generateSlip39, parsedShareCount, parsedThreshold]);
 
-  useEffect(() => {
-    if (phase !== 'done') {
-      return;
-    }
-
-    if (mode === 'verify') {
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'Dashboard',
-            params: {
-              toast:
-                result === 'match'
-                  ? 'SLIP39 shares match'
-                  : 'SLIP39 shares do not match',
-            },
-          },
-        ],
-      });
-      return;
-    }
-
-    navigation.navigate('Dashboard', {
-      toast: 'Key pair has been added to Keycard',
-    });
-  }, [phase, result, mode, navigation]);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title:
-        activePhase === 'pin_entry'
-          ? 'Enter Keycard PIN'
-          : mode === 'generate' && backupStep === 'confirm'
-          ? 'Check SLIP39 share'
-          : mode === 'generate' && generatedSharesReady
-          ? 'Backup SLIP39 share'
-          : mode === 'generate'
-          ? 'Generate SLIP39 shares'
-          : mode === 'verify'
-          ? 'Verify SLIP39 shares'
-          : 'Import SLIP39 shares',
-    });
-  }, [navigation, activePhase, backupStep, generatedSharesReady, mode]);
+  // Done-navigation keys on the load/verify hook (`keycard`); the back guard,
+  // PIN-entry title, and cancel key on whichever hook is running the tap
+  // (`activeKeycard`, which is the generate hook during share generation).
+  const { onCancel } = useKeycardScreen({
+    keycard,
+    navigation,
+    title:
+      mode === 'generate' && backupStep === 'confirm'
+        ? 'Check SLIP39 share'
+        : mode === 'generate' && generatedSharesReady
+        ? 'Backup SLIP39 share'
+        : mode === 'generate'
+        ? 'Generate SLIP39 shares'
+        : mode === 'verify'
+        ? 'Verify SLIP39 shares'
+        : 'Import SLIP39 shares',
+    done: {
+      toast: doneResult =>
+        mode === 'verify'
+          ? doneResult === 'match'
+            ? 'SLIP39 shares match'
+            : 'SLIP39 shares do not match'
+          : 'Key pair has been added to Keycard',
+    },
+    activeKeycard,
+    stayOnCancel: true,
+  });
 
   const isReady =
     mode === 'generate' ? generatedBackupComplete : progress?.complete ?? false;
@@ -377,7 +349,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
           />
         </View>
 
-        <NFCBottomSheet nfc={activeKeycard} onCancel={handleCancel} />
+        <NFCBottomSheet nfc={activeKeycard} onCancel={onCancel} />
       </View>
     );
   }
@@ -396,7 +368,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
           </View>
         </View>
 
-        <NFCBottomSheet nfc={activeKeycard} onCancel={handleCancel} />
+        <NFCBottomSheet nfc={activeKeycard} onCancel={onCancel} />
       </View>
     );
   }
@@ -609,7 +581,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
         ) : null}
       </View>
 
-      <NFCBottomSheet nfc={activeKeycard} onCancel={handleCancel} />
+      <NFCBottomSheet nfc={activeKeycard} onCancel={onCancel} />
     </View>
   );
 }

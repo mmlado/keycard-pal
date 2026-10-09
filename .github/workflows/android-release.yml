@@ -43,16 +43,8 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Merge GitHub contributors
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/merge-github-contributors.js
-
-      - name: Download token logos
-        run: node scripts/generate-logos.js
-
-      - name: Install NDK
-        run: echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006"
+      - name: Install SDK components
+        run: echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;27.1.12297006"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -78,11 +70,18 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: cd android && ./gradlew clean assembleFullRelease assembleOfflineRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
 
+      # Autolinking is not flavor-aware; the offline APK must not carry the
+      # online-only native modules the full flavor links by hand (#270).
+      - name: Check offline APK for online-only native code
+        run: node scripts/check-offline-apk.js --apk android/app/build/outputs/apk/offline/release/keycard-pal-offline-release-universal.apk
+
       - name: Generate APK checksums
         run: |
           mkdir -p android/app/build/outputs/apk/release
           find android/app/build/outputs/apk -name "keycard-pal-*-release-*.apk" \
-            | sort | xargs sha256sum > android/app/build/outputs/apk/release/SHA256SUMS.txt
+            | sort | while read -r apk; do
+              echo "$(sha256sum "$apk" | cut -d' ' -f1)  $(basename "$apk")"
+            done > android/app/build/outputs/apk/release/SHA256SUMS.txt
 
       - name: Generate release notes
         env:
@@ -126,6 +125,103 @@ jobs:
             android/app/build/outputs/apk/offline/release/keycard-pal-*-release-*.apk
             android/app/build/outputs/apk/release/SHA256SUMS.txt
 
+  play:
+    name: Upload draft to Google Play
+    runs-on: ubuntu-latest
+    needs: build
+    # Builds its own bundle rather than reusing the APK job's workspace (#338).
+    # The secret gate is per step because `secrets` is unavailable in a job `if`.
+    permissions:
+      contents: read
+    env:
+      HAS_PLAY_SA: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+
+    steps:
+      - name: Checkout code
+        if: env.HAS_PLAY_SA == 'true'
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        if: env.HAS_PLAY_SA == 'true'
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Node.js
+        if: env.HAS_PLAY_SA == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        if: env.HAS_PLAY_SA == 'true'
+        run: npm ci
+
+      - name: Install SDK components
+        if: env.HAS_PLAY_SA == 'true'
+        run: echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "ndk;27.1.12297006"
+
+      - name: Cache Gradle
+        if: env.HAS_PLAY_SA == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make gradlew executable
+        if: env.HAS_PLAY_SA == 'true'
+        run: chmod +x android/gradlew
+
+      # Signed with the dedicated Play *upload* keystore, not the release
+      # keystore: Play App Signing re-signs com.keycardpal with a Google-managed
+      # key, so this signature only authenticates the upload. No build carries a
+      # WalletConnect Project ID: users enter their own in Settings (#328).
+      - name: Decode Play upload keystore
+        if: env.HAS_PLAY_SA == 'true'
+        run: |
+          echo "${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}" | base64 --decode > android/app/play-upload.keystore
+
+      - name: Build Play bundle
+        if: env.HAS_PLAY_SA == 'true'
+        env:
+          ANDROID_KEYSTORE_PATH: play-upload.keystore
+          ANDROID_KEY_ALIAS: upload
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+        run: cd android && ./gradlew bundleFullRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
+
+      - name: Stage Play artifacts
+        if: env.HAS_PLAY_SA == 'true'
+        run: |
+          VERSION_CODE=$(grep -oP 'versionCode\s+\K[0-9]+' android/app/build.gradle | head -1)
+          mkdir -p play/whatsnew
+          cp android/app/build/outputs/bundle/fullRelease/*.aab play/
+          CHANGELOG="fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt"
+          if [ -f "$CHANGELOG" ]; then
+            cp "$CHANGELOG" play/whatsnew/whatsnew-en-US
+          else
+            echo "::warning::No changelog at $CHANGELOG — using generic release notes"
+            echo "Bug fixes and improvements." > play/whatsnew/whatsnew-en-US
+          fi
+
+      - name: Upload draft to Google Play
+        if: env.HAS_PLAY_SA == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.keycardpal
+          releaseFiles: play/*.aab
+          # Draft: uploaded and visible in the Console, never rolled out by CI.
+          status: draft
+          # 'beta' is Play's name for open testing.
+          track: ${{ vars.PLAY_TRACK || 'beta' }}
+          whatsNewDirectory: play/whatsnew
+
   fdroid:
     name: Publish F-Droid Repository
     runs-on: ubuntu-latest
@@ -147,38 +243,32 @@ jobs:
       - name: Restore keystore
         run: echo "${{ secrets.FDROID_KEYSTORE_B64 }}" | base64 -d > fdroid/keystore.p12
 
-      - name: Restore APKs from all previous releases
+      - name: Download APKs from all releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
         run: |
+          # The release assets share one name across releases, so each tag's APKs
+          # get the tag appended; otherwise every download overwrites the last.
           mkdir -p fdroid/repo
           gh release list --limit 100 --json tagName --jq '.[].tagName' \
-            | grep -v "^${RELEASE_TAG}$" \
             | while read tag; do
+                rm -rf release-apks && mkdir release-apks
                 gh release download "$tag" \
-                  --pattern "keycard-pal-offline-*-release-*.apk" \
-                  --pattern "keycard-pal-full-*-release-*.apk" \
-                  --dir fdroid/repo/ \
-                  --clobber 2>/dev/null || true
+                  --pattern "keycard-pal-offline-release-*.apk" \
+                  --pattern "keycard-pal-full-release-*.apk" \
+                  --dir release-apks/ 2>/dev/null || true
+                for apk in release-apks/*.apk; do
+                  [ -e "$apk" ] || continue
+                  mv "$apk" "fdroid/repo/$(basename "$apk" .apk)-$tag.apk"
+                done
               done
-
-      - name: Download current release APKs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
-        run: |
-          mkdir -p new-apks/
-          gh release download "$RELEASE_TAG" \
-            --pattern "keycard-pal-offline-*-release-*.apk" \
-            --pattern "keycard-pal-full-*-release-*.apk" \
-            --dir new-apks/
-          count=$(find new-apks -maxdepth 1 -name "*.apk" | wc -l)
+          rm -rf release-apks
+          count=$(find fdroid/repo -maxdepth 1 -name "*-${RELEASE_TAG}.apk" | wc -l)
           if [ "$count" -eq 0 ]; then
-            echo "No APKs downloaded for $RELEASE_TAG — check release asset names."
+            echo "No APKs downloaded for $RELEASE_TAG, check release asset names."
             exit 1
           fi
-          cp new-apks/*.apk fdroid/repo/
 
       - name: Copy repo icon
         run: cp fastlane/metadata/android/en-US/images/icon.png fdroid/icon.png
@@ -190,11 +280,17 @@ jobs:
           FDROID_KEYSTORE_PASS: ${{ secrets.FDROID_KEYSTORE_PASS }}
           FDROID_KEY_PASS: ${{ secrets.FDROID_KEY_PASS }}
 
+      - name: Check the index carries this release
+        env:
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        run: node scripts/check-fdroid-index.js --index fdroid/repo/index-v2.json --tag "$RELEASE_TAG"
+
       - name: Prepare Pages artifact
         run: |
           mkdir -p pages
           cp -r fdroid/repo pages/repo
           cp -r fdroid/archive pages/archive 2>/dev/null || true
+          cp docs/privacy.html pages/privacy.html
           echo "fdroid.keycardpal.com" > pages/CNAME
 
       - name: Clean up credentials

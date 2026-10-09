@@ -3,6 +3,7 @@
 import {
   displayKeycardName,
   encodeKeycardName,
+  formatFingerprint,
   mergeKeycardNameMetadata,
   parseKeycardName,
   validateKeycardName,
@@ -106,5 +107,20 @@ describe('keycardName', () => {
     expect(displayKeycardName('Main card')).toBe('Main card');
     expect(displayKeycardName('')).toBe('Unnamed card');
     expect(displayKeycardName(null)).toBe('Unnamed card');
+  });
+
+  it('formats a master fingerprint as 8 lowercase hex chars', () => {
+    expect(formatFingerprint(0x1a2b3c4d)).toBe('1a2b3c4d');
+    expect(formatFingerprint(0x000000ff)).toBe('000000ff');
+    expect(formatFingerprint(0)).toBe('00000000');
+    // Sign-bit-set values must stay unsigned (>>> 0).
+    expect(formatFingerprint(0xfeed1234)).toBe('feed1234');
+  });
+
+  it('falls back to the fingerprint when the card name is blank', () => {
+    expect(displayKeycardName('Main card', 0x1a2b3c4d)).toBe('Main card');
+    expect(displayKeycardName('', 0x1a2b3c4d)).toBe('1a2b3c4d');
+    expect(displayKeycardName(null, 0x1a2b3c4d)).toBe('1a2b3c4d');
+    expect(displayKeycardName('', null)).toBe('Unnamed card');
   });
 });

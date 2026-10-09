@@ -1,3 +1,5 @@
+import type { BtcPsbtSummary } from './utils/btcPsbt';
+
 export type EthSignRequest = {
   requestId?: string;
   signData: string;
@@ -24,7 +26,7 @@ export type BtcSignRequest = {
 
 export type ScanResult =
   | { kind: 'eth-sign-request'; request: EthSignRequest }
-  | { kind: 'crypto-psbt'; request: BtcPsbtRequest }
+  | { kind: 'crypto-psbt'; request: BtcPsbtRequest; summary: BtcPsbtSummary }
   | { kind: 'btc-sign-request'; request: BtcSignRequest }
   | { kind: 'unsupported'; type: string }
   | { kind: 'error'; message: string };

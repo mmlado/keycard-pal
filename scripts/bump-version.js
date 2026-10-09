@@ -39,11 +39,49 @@ if (arg === 'major') {
 }
 
 const [MAJOR, MINOR, PATCH] = newVersion.split('.').map(Number);
-const versionCode = MAJOR * 10000 + MINOR * 100 + PATCH;
+// Ends in 0: the ABI splits take the last digit (#432).
+const versionCode = (MAJOR * 10000 + MINOR * 100 + PATCH) * 10;
+const ABI_VERSION_CODES = [versionCode + 1, versionCode + 2];
 const today = new Date().toISOString().slice(0, 10);
 const repo = 'https://github.com/mmlado/keycard-pal';
 
 console.log(`Bumping ${pkg.version} → ${newVersion} (code: ${versionCode})`);
+
+// ---------------------------------------------------------------------------
+// Bundled data the release ships
+// ---------------------------------------------------------------------------
+// The tag has to contain what the APK contains, or a build from source is not
+// the build we publish. These ran in the release workflow until 1.11.0, which
+// rewrote the tree after the tag: the published APK carried 1,414 token logos
+// that no checkout had.
+
+const GENERATED = [
+  'src/data/contributors.json',
+  'src/data/token-logos-index.json',
+  'android/app/src/offline/assets/token-logos',
+];
+
+execSync('node scripts/generate-contributors.js', {
+  stdio: 'inherit',
+  cwd: ROOT,
+});
+execSync('node scripts/generate-logos.js', { stdio: 'inherit', cwd: ROOT });
+
+// ---------------------------------------------------------------------------
+// src/constants/app.ts
+// ---------------------------------------------------------------------------
+
+const appConstantsPath = path.join(ROOT, 'src/constants/app.ts');
+const appConstants = fs.readFileSync(appConstantsPath, 'utf8');
+const bumpedAppConstants = appConstants.replace(
+  /APP_VERSION = '\d+\.\d+\.\d+'/,
+  `APP_VERSION = '${newVersion}'`,
+);
+if (bumpedAppConstants === appConstants) {
+  console.error('APP_VERSION not found in src/constants/app.ts');
+  process.exit(1);
+}
+fs.writeFileSync(appConstantsPath, bumpedAppConstants);
 
 // ---------------------------------------------------------------------------
 // package.json
@@ -132,27 +170,49 @@ fs.writeFileSync(changelogPath, changelog);
 // F-Droid metadata and Fastlane changelog
 // ---------------------------------------------------------------------------
 
-const fdroidMetadataPath = path.join(ROOT, 'fdroiddata-com.keycardpal.yml');
-if (fs.existsSync(fdroidMetadataPath)) {
-  let fdroidMetadata = fs.readFileSync(fdroidMetadataPath, 'utf8');
-  fdroidMetadata = fdroidMetadata
-    .replace(/versionName: \d+\.\d+\.\d+/, `versionName: ${newVersion}`)
-    .replace(/versionCode: \d+/, `versionCode: ${versionCode}`)
-    .replace(/commit: v\d+\.\d+\.\d+/, `commit: v${newVersion}`)
-    .replace(/CurrentVersion: \d+\.\d+\.\d+/, `CurrentVersion: ${newVersion}`)
-    .replace(/CurrentVersionCode: \d+/, `CurrentVersionCode: ${versionCode}`);
-  fs.writeFileSync(fdroidMetadataPath, fdroidMetadata);
-}
+const FDROID_RECIPES = [
+  'fdroiddata-com.keycardpal.yml',
+  'fdroiddata-com.keycardpal.offline.yml',
+];
+FDROID_RECIPES.map(file => path.join(ROOT, file))
+  .filter(recipePath => fs.existsSync(recipePath))
+  .forEach(recipePath => {
+    // checkupdates assigns codes in entry order, so armeabi-v7a comes first.
+    let entry = 0;
+    const recipe = fs
+      .readFileSync(recipePath, 'utf8')
+      .replace(/versionName: \d+\.\d+\.\d+/g, `versionName: ${newVersion}`)
+      .replace(
+        /^(\s+)versionCode: \d+$/gm,
+        (_, indent) => `${indent}versionCode: ${ABI_VERSION_CODES[entry++]}`,
+      )
+      .replace(/commit: v\d+\.\d+\.\d+/g, `commit: v${newVersion}`)
+      .replace(/CurrentVersion: \d+\.\d+\.\d+/, `CurrentVersion: ${newVersion}`)
+      .replace(
+        /CurrentVersionCode: \d+/,
+        `CurrentVersionCode: ${ABI_VERSION_CODES[ABI_VERSION_CODES.length - 1]}`,
+      );
+    if (entry !== ABI_VERSION_CODES.length) {
+      console.error(
+        `${recipePath}: expected ${ABI_VERSION_CODES.length} build entries, found ${entry}`,
+      );
+      process.exit(1);
+    }
+    fs.writeFileSync(recipePath, recipe);
+  });
 
+// fdroidserver reads the file per build code, Play per the base.
 const fastlaneChangelogDir = path.join(
   ROOT,
   'fastlane/metadata/android/en-US/changelogs',
 );
 fs.mkdirSync(fastlaneChangelogDir, { recursive: true });
-fs.writeFileSync(
-  path.join(fastlaneChangelogDir, `${versionCode}.txt`),
-  `${releaseNotes}\n`,
-);
+[versionCode, ...ABI_VERSION_CODES].forEach(code => {
+  fs.writeFileSync(
+    path.join(fastlaneChangelogDir, `${code}.txt`),
+    `${releaseNotes}\n`,
+  );
+});
 
 // ---------------------------------------------------------------------------
 // Commit and push branch
@@ -161,7 +221,9 @@ fs.writeFileSync(
 const branch = `release/v${newVersion}`;
 execSync(`git checkout -b ${branch}`, { stdio: 'inherit' });
 execSync(
-  'git add package.json package-lock.json android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md fdroiddata-com.keycardpal.yml fastlane/metadata/android/en-US/changelogs',
+  `git add package.json package-lock.json src/constants/app.ts android/app/build.gradle ios/KeycardPal.xcodeproj/project.pbxproj CHANGELOG.md ${FDROID_RECIPES.join(
+    ' ',
+  )} ${GENERATED.join(' ')} fastlane/metadata/android/en-US/changelogs`,
   { stdio: 'inherit' },
 );
 execSync(`git commit -m "chore: bump version to ${newVersion}"`, {

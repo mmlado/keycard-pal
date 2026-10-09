@@ -27,7 +27,7 @@ react {
     //   The list of variants to that are debuggable. For those we're going to
     //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    debuggableVariants = ["fullDebug", "offlineDebug"]
+    debuggableVariants = ["fullDebug", "fullDebugOptimized", "offlineDebug", "offlineDebugOptimized"]
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -87,6 +87,17 @@ def releaseKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
 def releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
 def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias
 
+// Online-only native modules (listed in settings.gradle, excluded from
+// autolinking by react-native.config.js) link into the full flavor only: their
+// Gradle projects as fullImplementation below, their ReactPackages via
+// src/full/java/com/keycardpal/OnlineNativePackages.kt, and their codegen'd
+// TurboModule specs through src/main/jni/CMakeLists.txt, which receives the
+// codegen directories as a CMake argument on the full flavor.
+def onlineOnlyNativeModules = gradle.ext.has("onlineOnlyNativeModules") ? gradle.ext.onlineOnlyNativeModules : []
+def onlineCodegenDirs = onlineOnlyNativeModules.collect { name ->
+    "${project(":${name}").projectDir}/build/generated/source/codegen/jni"
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -97,8 +108,9 @@ android {
         applicationId "com.keycardpal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10700
-        versionName "1.7.0"
+        // Ends in 0: the ABI splits take the last digit (#432).
+        versionCode 114000
+        versionName "1.14.0"
     }
     flavorDimensions "distribution"
     productFlavors {
@@ -110,6 +122,12 @@ android {
             // Usage in JS: expose via a NativeModule when the first internet feature lands
             buildConfigField "boolean", "INTERNET_ENABLED", "true"
             buildConfigField "String", "WC_PROJECT_ID", "\"${wcProjectId}\""
+            externalNativeBuild {
+                cmake {
+                    // Consumed by src/main/jni/CMakeLists.txt; absent on offline.
+                    arguments "-DKEYCARDPAL_ONLINE_CODEGEN_DIRS=${onlineCodegenDirs.join('|')}"
+                }
+            }
         }
         offline {
             dimension "distribution"
@@ -121,6 +139,13 @@ android {
     }
     buildFeatures {
         buildConfig true
+    }
+    externalNativeBuild {
+        cmake {
+            // React Native's default app CMake plus the full flavor's online-only
+            // TurboModule specs; the RN Gradle plugin only sets a path when none is given.
+            path "src/main/jni/CMakeLists.txt"
+        }
     }
     signingConfigs {
         debug {
@@ -140,11 +165,28 @@ android {
     }
     splits {
         abi {
-            enable true
+            // AGP rejects bundle builds while ABI splits are enabled
+            // (https://issuetracker.google.com/402800800), and splits only shape APK
+            // outputs anyway — the AAB carries per-ABI delivery itself. So disable
+            // splits whenever a bundle task was requested; run assemble and bundle
+            // in separate Gradle invocations (as CI does) to get split APKs.
+            def bundleRequested = gradle.startParameter.taskNames.any {
+                it.toLowerCase(Locale.ROOT).contains("bundle")
+            }
+            enable !bundleRequested
             reset()
             include "arm64-v8a", "armeabi-v7a"
             universalApk true
         }
+    }
+
+    // AGP puts a Google-encrypted description of the dependency tree in the APK's
+    // signing block, which F-Droid's scanner rejects (#316). The Play bundle keeps
+    // it: Google reads it to warn about known-vulnerable SDKs, and F-Droid never
+    // sees an AAB.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = true
     }
 
     buildTypes {
@@ -160,15 +202,18 @@ android {
             ndk {
                 abiFilters "arm64-v8a", "armeabi-v7a"
             }
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             crunchPngs false
         }
     }
 }
 
-// AGP 8.x finalizes outputFileName before afterEvaluate runs; onVariants is the correct hook.
 androidComponents {
     onVariants(selector().all()) { variant ->
+        // outputFileName is finalized before afterEvaluate runs; this is the hook for it.
+        // An F-Droid build entry names one split APK, so each split needs its own code.
+        def abiVersionCodeOffsets = ["armeabi-v7a": 1, "arm64-v8a": 2]
+        def baseVersionCode = android.defaultConfig.versionCode
         variant.outputs.forEach { output ->
             def abi = output.filters.find {
                 it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
@@ -176,6 +221,22 @@ androidComponents {
             output.outputFileName.set(
                 "keycard-pal-${variant.flavorName}-${variant.buildType}-${abi}.apk"
             )
+            output.versionCode.set(baseVersionCode + (abiVersionCodeOffsets[abi] ?: 0))
+        }
+
+        // The Metro bundle task gets a --require script that sets ONLINE_BUILD,
+        // which is what swaps `.online` modules for `.offline` stubs (metro.config.js).
+        def isFull = variant.flavorName == "full"
+        def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
+        tasks.matching { it.name == taskName }.configureEach {
+            def envScript = layout.buildDirectory.file("metro-env-${variant.name}.js").get().asFile
+            // Set --require at configuration time; write the file in doFirst so
+            // it survives a preceding `clean` task that would delete build/.
+            nodeExecutableAndArgs.set(nodeExecutableAndArgs.get().toList() + ["--require", envScript.absolutePath])
+            doFirst {
+                envScript.parentFile.mkdirs()
+                envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
+            }
         }
     }
 }
@@ -186,21 +247,6 @@ afterEvaluate {
         checkTask.setDependsOn(checkTask.dependsOn.findAll { dep ->
             !(dep instanceof TaskProvider && dep.name.startsWith("ktlint"))
         })
-    }
-
-    android.applicationVariants.all { variant ->
-        def isFull = variant.productFlavors.any { it.name == "full" }
-        def taskName = "createBundle${variant.name.capitalize()}JsAndAssets"
-        tasks.matching { it.name == taskName }.configureEach {
-            def envScript = file("${buildDir}/metro-env-${variant.name}.js")
-            // Set --require at configuration time; write the file in doFirst so
-            // it survives a preceding `clean` task that would delete build/.
-            nodeExecutableAndArgs.set(nodeExecutableAndArgs.get().toList() + ["--require", envScript.absolutePath])
-            doFirst {
-                envScript.parentFile.mkdirs()
-                envScript.text = "process.env.ONLINE_BUILD = '${isFull ? 'true' : 'false'}';\n"
-            }
-        }
     }
 }
 
@@ -217,10 +263,20 @@ dependencies {
     // ZXing barcode scanner — Apache 2.0, zero network dependencies
     implementation("com.google.zxing:core:3.5.3")
 
+    // Splash screen: the system API on Android 12+, a backport below it
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     // CameraX (previously transitive via react-native-camera-kit, now declared explicitly)
     def camerax_version = "1.4.1"
     implementation("androidx.camera:camera-core:${camerax_version}")
     implementation("androidx.camera:camera-camera2:${camerax_version}")
     implementation("androidx.camera:camera-lifecycle:${camerax_version}")
     implementation("androidx.camera:camera-view:${camerax_version}")
+
+    // Online-only native modules: full flavor only (see settings.gradle)
+    onlineOnlyNativeModules.each { name ->
+        add("fullImplementation", project(":${name}"))
+    }
 }
+
+apply from: "../reproducible-builds.gradle"

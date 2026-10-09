@@ -1,12 +1,31 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render as rtlRender,
+  screen,
+} from '@testing-library/react-native';
 import React from 'react';
 
 import { useTenderlyConfig } from '../src/hooks/useTenderlyConfig.online';
 
+import SimulationAddressProvider from '../src/components/SignRequestDetail/SimulationAddressProvider';
 import TxDataPanel from '../src/components/SignRequestDetail/eth/DataTabPanel/TxDataPanel';
 import type { ParsedTx } from '../src/utils/txParser';
 import type { EthSignRequest } from '../src/types';
 import type { SimulationResult } from '../src/utils/tenderly/client.online';
+
+// The panel reads the address op from the provider, so every render sits inside one.
+function Wrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <SimulationAddressProvider derivationPath="m/44'/60'/0'/0">
+      {children}
+    </SimulationAddressProvider>
+  );
+}
+
+function render(ui: React.ReactElement) {
+  return rtlRender(ui, { wrapper: Wrapper });
+}
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -165,6 +184,7 @@ describe('TxDataPanel', () => {
       render(<TxDataPanel tx={txNoData} request={request} chainId={1} />);
       expect(screen.getByText('Digests')).toBeTruthy();
       expect(screen.queryByText(/Calldata Digest:/)).toBeNull();
+      expect(screen.queryByTestId('digest-explainer')).toBeNull();
     });
   });
 
@@ -181,6 +201,7 @@ describe('TxDataPanel', () => {
       render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Digests'));
       expect(screen.getByText(/Calldata Digest: 0x[0-9a-f]{64}/)).toBeTruthy();
+      expect(screen.getByTestId('digest-explainer')).toBeTruthy();
     });
 
     it('switches to Raw tab and shows signData', () => {

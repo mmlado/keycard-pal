@@ -36,3 +36,11 @@ export async function simulateTransaction(
 ): Promise<SimulationResult> {
   throw new Error('offline');
 }
+
+import type { SatisfiesOnline } from '@/utils/onlineParity';
+
+// tsc drift guard: this stub must stay interface-compatible with its online twin.
+export type _OnlineParity = SatisfiesOnline<
+  typeof import('./client.online'),
+  typeof import('./client.offline')
+>;

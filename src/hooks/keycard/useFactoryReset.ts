@@ -6,7 +6,7 @@ import { useNFCOperation, UseNFCOperation } from './useNFCOperation';
 export type UseFactoryResetOperation = UseNFCOperation<string>;
 
 export function useFactoryReset(): UseFactoryResetOperation {
-  const { phase, status, result, start, cancel, reset } = useNFCOperation(
+  return useNFCOperation(
     useCallback(async (cmdSet: Commandset) => {
       if (!cmdSet.applicationInfo?.initializedCard) {
         throw new Error('This card is already empty.');
@@ -14,7 +14,8 @@ export function useFactoryReset(): UseFactoryResetOperation {
       await cmdSet.factoryReset();
       return '';
     }, []),
+    // Reads on Apple's sheet the moment the session ends, ahead of the toast
+    // the Dashboard shows once that sheet clears.
+    { successMessage: 'Factory reset done' },
   );
-
-  return { phase, status, result, start, cancel, reset };
 }

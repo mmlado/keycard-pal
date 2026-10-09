@@ -4,6 +4,7 @@ import Keycard from 'keycard-sdk';
 import { hexToBytes } from 'viem';
 
 import { APP_NAME } from '@/constants/app';
+import type { EthPayloadKind } from './ethPayload';
 import { ensureHexPrefix } from './hex';
 
 // ── secp256k1 / Ethereum ─────────────────────────────────────────────────────
@@ -46,31 +47,21 @@ function bytesToHex(bytes: Uint8Array): string {
     .join('');
 }
 
-// Detects EIP-2718 tx type from first byte of signData (0x01=EIP-2930, 0x02=EIP-1559).
-function detectTxType(signData?: string): number | undefined {
-  if (!signData) return undefined;
-  const hex = signData.startsWith('0x') ? signData.slice(2) : signData;
-  const firstByte = parseInt(hex.slice(0, 2), 16);
-  return firstByte === 0x01 || firstByte === 0x02 ? firstByte : undefined;
-}
-
 export function computeEthV(
   recId: number,
-  dataType: number | undefined,
+  kind: EthPayloadKind,
   chainId: number | undefined,
-  txType?: number,
 ): number {
-  if (txType === 0x01 || txType === 0x02) {
+  if (kind === 'invalid') {
+    throw new Error('Cannot compute v for an invalid payload');
+  }
+  if (kind === 'tx-eip2930' || kind === 'tx-eip1559') {
     return recId;
   }
-  switch (dataType) {
-    case 1:
-      return V_BASE_EIP155 + 2 * (chainId ?? 0) + recId;
-    case 4:
-      return recId;
-    default:
-      return V_BASE_LEGACY + recId;
+  if (kind === 'tx-legacy') {
+    return V_BASE_EIP155 + 2 * (chainId ?? 0) + recId;
   }
+  return V_BASE_LEGACY + recId;
 }
 
 export function buildRawHexSignature(
@@ -93,43 +84,39 @@ export function buildRawHexSignature(
 export function buildRawEthHexSignature(
   result: Uint8Array,
   hash: Uint8Array,
-  dataType: number | undefined,
+  kind: EthPayloadKind,
   chainId: number | undefined,
-  signData?: string,
 ): string {
   const sig = new Keycard.RecoverableSignature({
     hash,
     tlvData: hexToBytes(ensureHexPrefix(bytesToHex(result))),
   });
-  const v = computeEthV(sig.recId!, dataType, chainId, detectTxType(signData));
+  const v = computeEthV(sig.recId!, kind, chainId);
   return buildRawHexSignature(sig.r!, sig.s!, v);
 }
 
 export function buildEthSignatureURFromResult(
   result: Uint8Array,
   hash: Uint8Array,
-  dataType: number | undefined,
+  kind: EthPayloadKind,
   chainId: number | undefined,
   requestId: string | undefined,
-  signData?: string,
 ): string {
   return buildEthSignatureUR(
     bytesToHex(result),
     hash,
-    dataType,
+    kind,
     chainId,
     requestId,
-    detectTxType(signData),
   );
 }
 
 export function buildEthSignatureUR(
   signRespDataHex: string,
   hash: Uint8Array,
-  dataType: number | undefined,
+  kind: EthPayloadKind,
   chainId: number | undefined,
   requestId: string | undefined,
-  txType?: number,
 ): string {
   const sig = new Keycard.RecoverableSignature({
     hash,
@@ -139,7 +126,7 @@ export function buildEthSignatureUR(
   const recId = sig.recId!;
   const r = pad32(sig.r!);
   const s = pad32(sig.s!);
-  const v = computeEthV(recId, dataType, chainId, txType);
+  const v = computeEthV(recId, kind, chainId);
 
   const sigBytes = new Uint8Array(r.length + s.length + encodeV(v).length);
   sigBytes.set(r, 0);

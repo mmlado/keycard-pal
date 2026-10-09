@@ -8,13 +8,202 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- EIP-7730 clear signing: render human-readable intent and formatted fields (raw, tokenAmount, date, enum, addressName) for calldata and EIP-712 messages when a Ledger clear-signing descriptor matches the contract; bundled descriptor index regenerated via `npm run generate:eip7730`; user can import a Ledger registry zip via the system file picker on both builds; online build adds an auto-download mode in Settings with configurable URL, Wi-Fi-only option, ETag-conditional fetch, and a dashboard progress indicator
+
+## [1.14.0] - 2026-10-07
+
+### Added
+
+- A personal_sign request shows its message as text on a Message tab, or as hex when the bytes are not UTF-8, and its ERC-191 Digest on a Digests tab with the same explanation and ERC-8213 link as the other digests
+- Unblock PIN, under Keycard > Secrets and offered on the blocked-PIN error in place of Try again: set a new PIN, enter the card's PUK and tap
+
+### Changed
+
+- The privacy policy now covers the websites: keycardpal.com and fdroid.keycardpal.com load nothing from third parties, set no cookies and run no analytics
+- Each ABI split APK carries its own `versionCode`: the universal APK and the Play bundle end in 0, `armeabi-v7a` in 1, `arm64-v8a` in 2, so an F-Droid repository can serve the split that fits the device and a universal install can still take a split as an update
+
+### Fixed
+
+- On iOS the keyboard closes when the PIN pad comes up, instead of staying open over the digits after typing a recovery phrase or SLIP39 share
+- iOS builds work with Xcode 27, which rejected two CocoaPods resource bundles still set to their pods' own deployment targets below iOS 15
+- The Bitcoin PSBT review shows the fee, which it never managed to before; when the PSBT leaves out how much an input holds, the review says the fee is unknown instead of leaving the row out
+- The F-Droid repository at fdroid.keycardpal.com keeps the last three releases and refuses to publish an index that lacks the latest one; a rebuild between releases used to leave it serving 1.8.0
+- Initializing a card now shows its PUK once the card is set up, behind a reveal, and still offers it when the tap is lost before the card confirms; earlier versions discarded it and left the card impossible to unblock after three wrong PINs
+- The blocked-PIN error no longer names an "Unblock Card option" the app did not have
+- "1 attempt left" is no longer written as "1 attempts left"
+
+## [1.13.0] - 2026-09-28
+
+### Added
+
+- The Digests tab of an Ethereum sign request explains what the digest is and links to the ERC-8213 specification, opened in the browser or shown as a QR code when there is no network
+
+### Changed
+
+- Android release builds use R8's optimized resource shrinking, which drops resources the old name-matching heuristic kept
+- Android release builds run R8's code optimization pass, which the default ProGuard file had switched off
+- The offline build's bundled token logos are stored at 128 px instead of full size, and the token row decodes them at the size it draws
+- On Android the app draws behind the system bars on every version, the way Android 15 and later already forced it to, and its bar icons stay light whatever the phone's light or dark setting
+- React Native 0.87 with Android Gradle Plugin 9; building needs Node 22 and the Android 37 SDK platform
+- The SeedQR scanner's rejection notice clears itself a moment after the camera moves off the offending code, replacing the "Tap to retry" control it needed back when a bad scan stopped the scanner
+- The recovery phrase scanner reads Standard SeedQR and CompactSeedQR, and no longer reads hex-encoded entropy
+
+### Fixed
+
+- Recovery phrase and SLIP39 passphrases are normalized to NFKD, as BIP39 and SLIP-0039 require; a passphrase holding characters NFKD changes now derives a different key than earlier versions did
+- The Inter font is now bundled in the Android app; the About, Welcome, loading, menu and license screens fell back to the system font. Its license is listed on the About screen
+- The Keycard, Key pair, Key size and Secrets menus, the scan progress bar, the unverified-card warning and the pairing-password prompt now keep clear of the home indicator, the navigation bar and the status bar
+- The recovery phrase check, the About screen and the SeedQR scanner no longer start a status-bar height below the header
+- Simulating a transaction whose request carries no address now shows the PIN pad over the whole screen instead of inside the data panel
+- On iOS the scanner reads every frame it decodes, so animated multi-part requests now complete and a rejected SeedQR can be scanned again without leaving the screen
+- Tapping near the SeedQR icon no longer puts the cursor in the recovery phrase box instead of opening the scanner, and the keyboard can no longer reappear over the viewfinder
+- The custom pairing password prompt keeps Continue and Cancel above the keyboard
+- The Save button on Set card name stays above the keyboard in three-button navigation, where it sat partly behind it
+- Tapping a text field in Settings scrolls it above the keyboard instead of leaving it hidden behind one, and the headings and helper text around it stay reachable by scrolling while the keyboard is up. This affected the WalletConnect Project ID, the ENS RPC URL and the three Tenderly fields
+
+## [1.12.0] - 2026-09-24
+
+### Changed
+
+- Google Play releases now go to open testing first and are promoted to production by hand, so Play trails the GitHub and F-Droid builds by a few days
+- The iOS build ships without the affiliate link and the Advertisement labels, pointing at the product site instead; a new check on the built bundle proves it carries neither. Android and the GitHub APKs are unchanged
+- The About screen no longer names other mobile platforms, which an iOS app may not do
+- The donation section is titled Donations and states that donations are voluntary and that nothing in the app is unlocked, changed or promised in return; the same words are in DONATE.md
+- Updated vulnerable dependencies flagged by Dependabot (js-yaml, svgo, metro, @react-navigation/core); the `decode-uri-component` and `elliptic` alerts remain open because no patched release can be taken
+- The online build no longer bundles the offline build's token logo index, which it never read
+- The Google Play bundle keeps the dependency list Google reads to warn about vulnerable SDKs; the APKs still leave it out
+
+### Fixed
+
+- On iOS, tapping Cancel on Apple's NFC sheet now leaves the operation screen and clears the cached PIN, instead of leaving an empty screen with only the back arrow to get out of
+
+## [1.11.1] - 2026-09-21
+
+### Changed
+
+- Release APKs no longer carry Google's encrypted description of the app's dependency tree, which Android's build tools add to the signature by default
+
+## [1.11.0] - 2026-09-20
+
+### Added
+
+- Support for Keycards with applet 4.0, alongside 3.x cards; a new "Keycards in use" setting leaves out the menu entries and extra taps that only one kind of card needs
+
+### Changed
+
+- A Keycard with an applet older than 3.1 is now refused with a message that names both versions
+- WalletConnect moved back to its last Apache-2.0 releases (`@reown/walletkit` 1.2.10); newer ones ship under a non-free license
+- WalletConnect needs your own Project ID, entered in Settings, on every build including Google Play; without one a `wc:` code is ignored
+- The offline build's JavaScript is now checked for online-only code on every pull request and in every release APK
+- Release APKs now build byte-identically on any machine, so anyone can rebuild one and compare it with the published file
+- The store description now covers both builds, and the F-Droid repository labels the affiliate links as `Ads` and the online build's optional services as `NonFreeNet`
+
+### Fixed
+
+- A PSBT whose input asks for a sighash type other than SIGHASH_ALL is now turned away when it is scanned, with a message naming the type and what it leaves free to change; such an input used to be signed with whatever type it asked for, so an approved signature could end up covering none of the outputs on the review
+- A PSBT output is called change only once the tapped Keycard confirms it pays a key the card holds; the label used to be taken from the PSBT, which a hostile wallet could put on an output paying itself
+- Release APKs no longer carry the IP address that the machine building them had on its network; React Native's Gradle plugin put it in every build, release included
+- WalletConnect now uses the Project ID entered in Settings; builds without a built-in ID could not pair at all
+- WalletConnect no longer connects to its relay when the app starts, only after a `wc:` code is scanned
+- The About screen's license list now names the WalletConnect, NetInfo and text-encoding packages of the online build
+- The success sheet now shows the outcome ("Card initialized") under its check mark instead of the last progress text ("Initializing...")
+- Initializing a Keycard, or changing its PIN, PUK or pairing secret, no longer leaves the app on the finished screen under the success sheet instead of returning to the dashboard
+- A Keycard that slips off the phone before the app has read it is now waited for in every operation, instead of ending card initialization or a factory reset with a connection-lost error
+- The error sheet of card initialization and factory reset now has a working Try again button; it used to say "Tap your card to try again" while nothing was listening
+- On iOS, a tap that stops to ask for a pairing password or to warn about a Keycard that may not be genuine no longer closes the NFC sheet with the operation's success message
+
+## [1.10.0] - 2026-09-15
+
+### Added
+
+- Launch now paints the app background from the first frame until the loading screen takes over, on both platforms; iOS no longer shows a white launch screen
+- Layout setting: choose tiles or a list for every menu screen with a two-icon control in Settings. Tiles is the default
+- Buy-a-Keycard link in Settings and on the tap-your-Keycard prompt; opens the browser when the phone has a network connection, otherwise shows the link as a QR code (always a QR code in the offline build)
+- Advertisement label next to every Buy a Keycard link, in the app, the README and the store listing
+
+### Changed
+
+- Stored preferences are read once at startup behind a loading screen showing the Keycard, the app name and the version, which fades into the first screen; menus, the PIN pad and the export-key notice no longer flicker from a default to the stored value
+- Menu screens now show icon tiles by default, with a full-width tile leading when the count is odd; Scan stays the button at the bottom of the dashboard
+- Menu rows and the About donation addresses now show a leading icon; coins use their currency symbol
+- Key pair is split into BIP39 and SLIP39 groups under their own headings, and the entries drop the format from their labels
+- The welcome screen's buy button now shows the QR code instead of opening the browser when the phone has no network connection
+- The offline build no longer includes WalletConnect's native module, JNA, the Yttrium bindings, or NetInfo, and no longer declares `ACCESS_NETWORK_STATE` and `ACCESS_WIFI_STATE`
+
+### Removed
+
+- Discount code from the Keycard purchase card on the About and welcome screens; the buy link stays
+
+### Fixed
+
+- Scanning a SeedQR while importing a recovery phrase now asks for camera permission instead of opening a blank viewfinder, and the keyboard no longer covers the viewfinder
+- The PIN keypad's bottom row (the 0 key) was hidden behind the Android navigation. The keypad now sits above it in both 3-button and gesture navigation
+- Buy a Keycard on the About screen opened a browser even in the offline build; it now shows the link as a QR code like every other buy link
+
+## [1.9.3] - 2026-09-04
+
+## [1.9.2] - 2026-09-04
+
+### Fixed
+
+- The online build crashed on launch in 1.9.0 and 1.9.1, on every install source. The offline build was unaffected
+
+## [1.9.1] - 2026-09-04
+
+### Added
+
+- Privacy policy page, served at fdroid.keycardpal.com/privacy.html alongside the F-Droid repo
+- Releases now upload a `com.keycardpal` app bundle to Google Play as a draft; rollout stays manual. The Play copy is re-signed by Play App Signing, so it and the self-signed GitHub/F-Droid builds cannot replace each other — pick one install source
+
+## [1.9.0] - 2026-09-04
+
+### Added
+
+- Full and pre-hashed EIP-712 sign requests (`dataType=2`) are now signable: the card signs the computed EIP-712 digest — the same digest shown in the review — instead of failing on raw bytes after PIN entry. Unclassifiable payloads now show a "cannot be signed" explanation in the review instead of a Sign button
+- PIN entry now keeps the app's real navigation header instead of covering it with a full-screen dialog, so it has the same back button as every other screen, the iOS swipe-back gesture works, and leaving mid-entry cancels the card session
+- Explainer on the Connect-software-wallet screen and above the exported-key QR code
+- View Addresses now shows the full BIP32 derivation path (e.g. `m/44'/60'/0'/0/0`) under each address in the list and on the address detail screen, replacing the bare index column
+- First-run welcome screen with a Keycard product photo explaining what the app does (hardware-held keys, air-gapped QR flow, NFC signing), plus a buy-Keycard button (browser link in the online build, QR code in the offline build); shown once, then remembered via a `welcome_seen` preference
+
+### Changed
+
+- Losing card contact during a read-only operation (signing, key export, address checks) no longer fails it: the app asks you to reposition the card and resumes on the next tap. Operations that write to the card still stop safely instead of retrying
+- iOS now automatically reopens the NFC session after Apple's 60-second timeout (up to 2 restarts while the app is in the foreground) instead of failing immediately
+- The dismissible buy-Keycard notice is gone from the dashboard; the purchase link now lives on the welcome screen and remains available on the About screen
+- iOS now shows the operation's progress on Apple's NFC sheet — including the prompt to reposition the card after a connection loss — instead of leaving it on "Connected. Don't move your card." for the whole operation
+- Importing a key pair (recovery phrase or backup check) now returns to a fresh Dashboard like every other completed Keycard operation, clearing the seed-entry screens from the navigation stack
+- SeedQR scanning now opens from a QR icon inside the seed-phrase input instead of a separate "Scan SeedQR" button
+- iOS back button now shows only the arrow instead of the previous screen's title text
+- Renamed "Keypair" to "Key pair" across the menu and screen titles
+- Dimmed the NFC indicator icon in menu lists
+- New app icon: the orange Keycard "K" mark on a black background (iOS and Android)
+- Updated vulnerable dependencies flagged by Dependabot (nanoid, js-yaml, brace-expansion, shell-quote, svgo, joi, ws, uuid, concurrent-ruby); `image-size` and `elliptic` alerts remain open because no patched releases exist
+
+### Fixed
+
+- Completing a Keycard operation on iOS now confirms what actually happened: Apple's NFC sheet names the operation — "Card name updated", "PIN changed", "Factory reset done" — instead of a bare "Success", and the app's own toast outlasts that sheet instead of counting down behind it, so it is readable once the sheet clears
+- A PIN whose verification was interrupted by NFC connection loss is no longer silently resubmitted on the next tap: the cached PIN is discarded and the PIN pad is shown again, so every attempt against the card's 3-attempt counter is one the user explicitly made
+- Ethereum signature `v` is now derived from the classified payload kind instead of sniffing the first byte of the payload: a personal-sign message or EIP-712 digest that happened to start with `0x01`/`0x02` no longer produces an invalid signature (`v = recId` instead of `27 + recId`)
+- Malformed PSBTs are now rejected at scan time with a clear error instead of opening a review whose Sign button crashed; a failure while encoding the result QR after signing shows an error screen instead of doing nothing
+- Navigating back during an active Keycard tap now cancels the NFC session on every Keycard screen; previously only Initialize Card and Change PIN/PUK did this, leaving the session running elsewhere
+- The WalletConnect pairing screen's unsupported-proposal banner and the rejection reason sent to the dApp now come from one shared check with identical wording; previously the two could disagree about the same proposal
+- Generated recovery-phrase list: two-digit word numbers (`10.`, `11.`, `12.`) no longer wrap onto a second line on iOS; the number column is now auto-width
+
+## [1.8.0] - 2026-06-30
+
+### Added
+
 - Handle NFC availability
 - Prompt for custom pairing password when default pairing fails; loop on wrong password with error feedback; show friendly message when pairing slots are full
-- EIP-7730 clear signing: render human-readable intent and formatted fields (raw, tokenAmount, date, enum, addressName) for calldata and EIP-712 messages when a Ledger clear-signing descriptor matches the contract; bundled descriptor index regenerated via `npm run generate:eip7730`; user can import a Ledger registry zip via the system file picker on both builds; online build adds an auto-download mode in Settings with configurable URL, Wi-Fi-only option, ETag-conditional fetch, and a dashboard progress indicator
+- Show the master fingerprint (8 hex chars) as the active card's name when the card has no stored name, matching keycard-shell; display only, never written to the card
 
 ### Changed
 
 - Release APKs are now named `keycard-pal-<flavor>-<buildType>-<abi>.apk` instead of `app-<flavor>-<buildType>-<abi>.apk`
+
+### Fixed
+
+- iOS archives were bundling the offline flavor because Metro's online/offline resolver requires the `ONLINE_BUILD=true` env var; export it from `ios/.xcode.env` so all iOS builds (dev and Archive) resolve to `.online` settings sections
 
 ## [1.7.0] - 2026-06-06
 
@@ -262,7 +451,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.14.0...HEAD
+[1.14.0]: https://github.com/mmlado/keycard-pal/compare/v1.13.0...v1.14.0
+[1.13.0]: https://github.com/mmlado/keycard-pal/compare/v1.12.0...v1.13.0
+[1.12.0]: https://github.com/mmlado/keycard-pal/compare/v1.11.1...v1.12.0
+[1.11.1]: https://github.com/mmlado/keycard-pal/compare/v1.11.0...v1.11.1
+[1.11.0]: https://github.com/mmlado/keycard-pal/compare/v1.10.0...v1.11.0
+[1.10.0]: https://github.com/mmlado/keycard-pal/compare/v1.9.3...v1.10.0
+[1.9.3]: https://github.com/mmlado/keycard-pal/compare/v1.9.2...v1.9.3
+[1.9.2]: https://github.com/mmlado/keycard-pal/compare/v1.9.1...v1.9.2
+[1.9.1]: https://github.com/mmlado/keycard-pal/compare/v1.9.0...v1.9.1
+[1.9.0]: https://github.com/mmlado/keycard-pal/compare/v1.8.0...v1.9.0
+[1.8.0]: https://github.com/mmlado/keycard-pal/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/mmlado/keycard-pal/compare/v1.6.2...v1.7.0
 [1.6.2]: https://github.com/mmlado/keycard-pal/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/mmlado/keycard-pal/compare/v1.6.0...v1.6.1
