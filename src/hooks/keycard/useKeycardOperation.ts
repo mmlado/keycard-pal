@@ -56,7 +56,7 @@ export interface ExecuteOptions {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
   /**
-   * The route this operation belongs to, when newer cards lack it. Checked right after SELECT.
+   * The route this operation belongs to, when only some cards have it. Checked right after SELECT.
    */
   requiresRoute?: GenerationBoundRoute;
   /** Wait for a re-tap when the card leaves mid-operation. Read-only operations only. */

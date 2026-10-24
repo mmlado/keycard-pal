@@ -720,6 +720,20 @@ describe('useKeycardOperation', () => {
       expect(result.current.phase).toBe('done');
     });
 
+    // BIP85 came with 4.0, so here the older card is the one refused.
+    it('refuses an older card an operation newer cards added', async () => {
+      const cmdSet = useCard(v3Select(0x0302));
+      const { result, op } = await tapWithPin({ requiresRoute: 'Bip85' });
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(routeAbsence('Bip85').sheetError);
+      expect(cmdSet.getData).not.toHaveBeenCalled();
+      expect(mockCheckGenuine).not.toHaveBeenCalled();
+      expect(cmdSet.autoPair).not.toHaveBeenCalled();
+      expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+      expect(cmdSet.verifyPIN).not.toHaveBeenCalled();
+      expect(op).not.toHaveBeenCalled();
+    });
+
     // An operation every card has must not be held to this check.
     it('is not applied to an operation that names no route', async () => {
       useCard(v4Select(0x0400, { certificate: CERTIFICATE }));

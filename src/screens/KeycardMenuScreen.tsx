@@ -30,6 +30,12 @@ export default function KeycardMenuScreen({
       onPress: () => navigation.navigate('KeyPairMenu'),
     },
     {
+      label: 'Derive with BIP85',
+      icon: Icons.bip85,
+      generationBoundRoute: 'Bip85',
+      onPress: () => navigation.navigate('Bip85Menu'),
+    },
+    {
       label: 'Set card name',
       icon: Icons.cardName,
       onPress: () => navigation.navigate('SetCardName'),

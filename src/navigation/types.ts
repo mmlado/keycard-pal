@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { IconComponent } from '../assets/icons';
 import type { WCContext } from '../constants/walletConnect';
 import type { ScanResult } from '../types';
+import type { Bip85Format } from '../utils/bip85';
 import type { ExportTargetId } from '../utils/exportTargets';
 
 export type KeycardParams =
@@ -59,6 +60,8 @@ export type RootStackParamList = {
   ConfirmKey: { words: string[]; passphrase?: string };
   Mnemonic: { mode?: 'import' | 'verify' } | undefined;
   Slip39: { mode: 'generate' | 'import' | 'verify' };
+  Bip85Menu: undefined;
+  Bip85: { format: Bip85Format };
   FactoryReset: undefined;
   PairingSlots: undefined;
   AddressMenu: undefined;
@@ -188,6 +191,16 @@ export type AddressListScreenProps = NativeStackScreenProps<
 export type AddressDetailScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'AddressDetail'
+>;
+
+export type Bip85MenuScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'Bip85Menu'
+>;
+
+export type Bip85ScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'Bip85'
 >;
 
 export type SecretsMenuScreenProps = NativeStackScreenProps<
