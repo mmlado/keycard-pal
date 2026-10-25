@@ -16,6 +16,7 @@ import {
   computeEip712DigestFromPrehashed,
   computeErc191Digest,
 } from './erc8213';
+import { isWholeBytes } from './hex';
 
 /**
  * The one classification of an Ethereum sign request: the digest a variant carries is the
@@ -107,10 +108,10 @@ export function classifyEthPayload(
   dataType: number | undefined,
   requestChainId?: number,
 ): EthPayload {
-  const hex = stripHexPrefix(signData);
-  if (!/^([0-9a-fA-F]{2})*$/.test(hex)) {
+  if (!isWholeBytes(signData)) {
     return invalid('Payload is not valid hex data.');
   }
+  const hex = stripHexPrefix(signData);
   const raw = hexToBytes(hex);
 
   if (dataType === 1 || dataType === 4) {

@@ -7,19 +7,15 @@ import React from 'react';
 import { parseTransaction } from 'viem';
 
 import Eip7730CallSection from '../../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection/Eip7730CallSection';
+import { describeCall } from '../../src/utils/callDescription';
 import { eip712DomainChainId, encodeEip712Type } from '../../src/utils/eip712';
 import {
   interpolateIntent,
   type Eip7730FieldContext,
 } from '../../src/utils/eip7730/format';
-import { lookupCalldata, lookupEip712 } from '../../src/utils/eip7730/lookup';
+import { lookupEip712 } from '../../src/utils/eip7730/lookup';
 import { classifyEthPayload } from '../../src/utils/ethPayload';
-import {
-  buildArgsEachResolver,
-  buildArgsPathResolver,
-  buildEip712Resolvers,
-  decodeArgsBySignature,
-} from '../../src/utils/eip7730/paths';
+import { buildEip712Resolvers } from '../../src/utils/eip7730/paths';
 import { fitsRequest } from '../../src/utils/eip7730/visibility';
 import type { Eip7730DisplayFormat } from '../../src/utils/eip7730/zip';
 
@@ -150,37 +146,30 @@ function prepare(vector: Vector): {
       return { format: null, ctx: null, why: 'rawTx did not parse' };
     }
     const to = tx.to ?? undefined;
-    const data = tx.data ?? '0x';
     const chainId = tx.chainId ?? 1;
-    if (!to || data.length < 10)
-      return { format: null, ctx: null, why: 'no destination or selector' };
-    const found = lookupCalldata(chainId, to, data.slice(0, 10));
-    if (found instanceof Promise) throw new Error('unexpected promise');
-    if (!found?.signature)
-      return { format: null, ctx: null, why: 'no entry for the call' };
-    const args = decodeArgsBySignature(found.signature, data);
-    if (!args)
-      return { format: null, ctx: null, why: 'signature did not decode' };
-    const container = {
+    // The review's own answer for the transaction, the lookup and fitsRequest included.
+    const described = describeCall({
+      chainId,
+      contract: to,
+      data: tx.data ?? '0x',
       from: vector.from,
-      to,
       value: (tx.value ?? 0n).toString(),
-      chainId,
-    };
-    const ctx = {
-      chainId,
-      contractAddress: to,
-      resolvePath: buildArgsPathResolver(args, container),
-      resolveEach: buildArgsEachResolver(args, container),
       depth: 0,
-    };
-    if (!fitsRequest(found, ctx))
+    });
+    if (described instanceof Promise) throw new Error('unexpected promise');
+    if (!described.descriptor)
       return {
         format: null,
         ctx: null,
-        why: 'entry rejected (mustMatch or lengths)',
+        why: described.rejected
+          ? 'entry rejected (mustMatch or lengths)'
+          : 'no entry for the call, or its signature did not decode',
       };
-    return { format: found, ctx };
+    const { format, resolvePath, resolveEach } = described.descriptor;
+    return {
+      format,
+      ctx: { chainId, contractAddress: to, resolvePath, resolveEach, depth: 0 },
+    };
   }
   const typed = vector.data;
   // A message the review refuses to sign is no pass, however it would render.

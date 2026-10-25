@@ -8,6 +8,7 @@ import {
 
 import bundled from '../src/data/eip7730.json';
 import { UNLIMITED_APPROVAL_WARNING } from '../src/constants/approval';
+import { describeCall } from '../src/utils/callDescription';
 import { encodeEip712Type } from '../src/utils/eip712';
 import {
   formatEip7730Field,
@@ -18,7 +19,6 @@ import {
   buildArgsPathResolver,
   decodeArgsBySignature,
   resolveEip712FieldValue,
-  type Eip7730Container,
 } from '../src/utils/eip7730/paths';
 import { shownFields } from '../src/utils/eip7730/visibility';
 import type {
@@ -49,23 +49,24 @@ const word = (v: string | bigint) =>
     ? v.slice(2).padStart(64, '0')
     : v.toString(16).padStart(64, '0');
 
-// As the review does it: the entry's own signature decodes the calldata its paths refer to.
+// The review's own answer for the call: the entry matched, decoded and fitted to the request.
 function renderCalldata(
   to: string,
   data: string,
   chainId = 1,
 ): Record<string, string> {
-  const descriptor = lookupCalldata(chainId, to, data.slice(0, 10));
-  expect(descriptor?.signature).toBeDefined();
-  const args = decodeArgsBySignature(descriptor!.signature!, data);
-  expect(args).not.toBeNull();
-  const container: Eip7730Container = { to, value: '0', chainId };
-  const ctx = {
+  const described = describeCall({
     chainId,
-    contractAddress: to,
-    resolvePath: buildArgsPathResolver(args!, container),
-  };
-  return rows(descriptor!, ctx);
+    contract: to,
+    data,
+    value: '0',
+    depth: 0,
+  });
+  if (described instanceof Promise)
+    throw new Error('bundled lookup returned a promise');
+  expect(described.view).toBe('descriptor');
+  const { format, resolvePath } = described.descriptor!;
+  return rows(format, { chainId, contractAddress: to, resolvePath });
 }
 
 function rows(

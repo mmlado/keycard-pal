@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { DESCRIPTOR_CHECK_FAILED_WARNING } from '@/constants/eip7730';
@@ -6,19 +5,14 @@ import { DESCRIPTOR_CHECK_FAILED_WARNING } from '@/constants/eip7730';
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
 import InfoRow from '@/components/InfoRow';
 
-import { useCalldataDescriptor } from '@/hooks/useCalldataDescriptor';
+import { useCallDescription } from '@/hooks/useCallDescription';
 
 import { checksumEthAddress } from '@/utils/ethereumAddress';
 import type { Eip7730FieldContext } from '@/utils/eip7730/format';
-import { WHOLE_BYTES_RE } from '@/utils/eip7730/paths';
 import type { Eip7730Field } from '@/utils/eip7730/zip';
-import { decodeCalldata } from '@/utils/txParser';
 
-import DecodedCallSection, { isTokenCall } from './DecodedCallSection';
+import CallSection from './CallSection';
 import { ElementBlock, SectionHeader, WarningRow } from './shared';
-
-// Deeper than this a crafted registry or calldata could nest without end.
-const MAX_DEPTH = 3;
 
 type InnerCallProps = {
   data: string;
@@ -37,66 +31,49 @@ function InnerCall({
   spender,
   depth,
 }: InnerCallProps) {
-  const tooDeep = depth > MAX_DEPTH;
-  // Data that is not whole bytes decodes shifted, so it is only ever shown as written.
-  const wholeBytes = WHOLE_BYTES_RE.test(data);
-  const decodable = !tooDeep && wholeBytes;
-  const container = useMemo(
-    () => ({ to: callee, value: amount, from: spender, chainId }),
-    [callee, amount, spender, chainId],
-  );
-  const { descriptor, rejected, loading } = useCalldataDescriptor({
+  const { description } = useCallDescription({
     chainId,
     contract: callee,
     data,
-    container,
-    enabled: decodable,
+    from: spender,
+    value: amount,
+    depth,
   });
-  if (loading) return null;
+  if (!description) return null;
 
-  const call = decodable ? decodeCalldata(data) : null;
-  const warning = rejected && (
-    <WarningRow text={DESCRIPTOR_CHECK_FAILED_WARNING} />
-  );
-  const contractRow = (
-    <View style={styles.row}>
-      <AddressInfoRow
-        label="Contract"
-        value={callee ? checksumEthAddress(callee) : '—'}
-      />
-    </View>
-  );
-
-  if (descriptor || (call && call.kind !== 'unknown-call')) {
-    return (
-      <>
-        {warning}
-        {/* A token call's own section names the contract as "Token contract". */}
-        {!(call && isTokenCall(call)) && contractRow}
-        <DecodedCallSection
-          call={call ?? { kind: 'unknown-call', selector: data.slice(0, 10) }}
-          tokenContract={callee}
-          chainId={chainId}
-          descriptor={descriptor}
-          depth={depth}
-        />
-      </>
-    );
-  }
-  // A call with no data only moves value, so it has no function to name.
-  const hasSelector = wholeBytes && data.length >= 10;
   return (
     <>
-      {warning}
-      {contractRow}
-      {hasSelector && (
+      {description.rejected && (
+        <WarningRow text={DESCRIPTOR_CHECK_FAILED_WARNING} />
+      )}
+      {description.contractRow === 'contract' && (
         <View style={styles.row}>
-          <InfoRow label="Contract call" value={data.slice(0, 10)} />
+          <AddressInfoRow
+            label="Contract"
+            value={callee ? checksumEthAddress(callee) : '—'}
+          />
         </View>
       )}
-      <View style={styles.row}>
-        <InfoRow label="Data" value={data.length > 2 ? data : '—'} />
-      </View>
+      {description.view === 'raw' ? (
+        <>
+          {/* A call with no data only moves value, so it has no function to name. */}
+          {description.selector && (
+            <View style={styles.row}>
+              <InfoRow label="Contract call" value={description.selector} />
+            </View>
+          )}
+          <View style={styles.row}>
+            <InfoRow label="Data" value={data.length > 2 ? data : '—'} />
+          </View>
+        </>
+      ) : (
+        <CallSection
+          description={description}
+          contract={callee}
+          chainId={chainId}
+          depth={depth}
+        />
+      )}
     </>
   );
 }

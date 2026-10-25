@@ -3,10 +3,6 @@ import React from 'react';
 
 import DecodedCallSection from '../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection';
 
-import {
-  buildArgsEachResolver,
-  buildArgsPathResolver,
-} from '../src/utils/eip7730/paths';
 import { checksumEthAddress } from '../src/utils/ethereumAddress';
 import type { DecodedCall } from '../src/utils/txParser';
 
@@ -409,113 +405,6 @@ describe('DecodedCallSection', () => {
         />,
       );
       expect(screen.getByText('Amount (raw units): 999')).toBeTruthy();
-    });
-  });
-
-  describe('with a matched registry entry', () => {
-    const USDT_ADDRESS = '0xdac17f958d2ee523a2206206994597c13d831ec7';
-
-    it('keeps the token contract row and renders the entry', () => {
-      const call: DecodedCall = {
-        kind: 'erc20-transfer',
-        to: ADDR_A,
-        amount: 1_500_000n,
-      };
-      render(
-        <DecodedCallSection
-          call={call}
-          tokenContract={USDT_ADDRESS}
-          chainId={MAINNET}
-          descriptor={{
-            format: {
-              intent: 'Send',
-              fields: [
-                {
-                  path: 'amount',
-                  label: 'Amount',
-                  format: 'tokenAmount',
-                  params: { tokenPath: '@.to' },
-                },
-              ],
-            },
-            resolvePath: buildArgsPathResolver(
-              { to: ADDR_A, amount: 1_500_000n },
-              { to: USDT_ADDRESS, chainId: MAINNET },
-            ),
-            resolveEach: buildArgsEachResolver({}),
-          }}
-        />,
-      );
-      expect(screen.getByText('Send')).toBeTruthy();
-      expect(
-        screen.getByText(`Token contract: ${checksumEthAddress(USDT_ADDRESS)}`),
-      ).toBeTruthy();
-      expect(screen.getByText('Amount: 1.5 USDT')).toBeTruthy();
-      expect(screen.queryByText('ERC-20 Transfer')).toBeNull();
-    });
-
-    describe('when the token is unknown', () => {
-      const UNKNOWN = '0x000000000000000000000000000000000000dEaD';
-      const amountAtTo = (call: DecodedCall) => (
-        <DecodedCallSection
-          call={call}
-          tokenContract={UNKNOWN}
-          chainId={MAINNET}
-          descriptor={{
-            format: {
-              intent: 'Approve',
-              fields: [
-                {
-                  path: 'amount',
-                  label: 'Amount',
-                  format: 'tokenAmount',
-                  params: { tokenPath: '@.to' },
-                },
-              ],
-            },
-            resolvePath: buildArgsPathResolver(
-              { amount: 7n },
-              { to: UNKNOWN, chainId: MAINNET },
-            ),
-            resolveEach: buildArgsEachResolver({}),
-          }}
-        />
-      );
-
-      it('names the contract once on a token call', () => {
-        render(
-          amountAtTo({ kind: 'erc20-approve', spender: ADDR_A, amount: 7n }),
-        );
-        expect(screen.getByText('Unknown token')).toBeTruthy();
-        expect(
-          screen.getAllByText(`Token contract: ${checksumEthAddress(UNKNOWN)}`),
-        ).toHaveLength(1);
-      });
-
-      it('keeps the row on any other call, which shows no token contract', () => {
-        render(amountAtTo({ kind: 'unknown-call', selector: '0x12345678' }));
-        expect(
-          screen.getByText(`Token contract: ${checksumEthAddress(UNKNOWN)}`),
-        ).toBeTruthy();
-      });
-    });
-
-    it('leaves the contract row to the header for other calls, unknown ones included', () => {
-      render(
-        <DecodedCallSection
-          call={{ kind: 'unknown-call', selector: '0x9994dd15' }}
-          tokenContract="0x1111111254fb6c44bac0bed2854e76f90643097d"
-          chainId={MAINNET}
-          descriptor={{
-            format: { intent: 'Swap', fields: [] },
-            resolvePath: buildArgsPathResolver({}),
-            resolveEach: buildArgsEachResolver({}),
-          }}
-        />,
-      );
-      expect(screen.getByText('Swap')).toBeTruthy();
-      expect(screen.queryByText(/Token contract/)).toBeNull();
-      expect(screen.queryByText(/Contract call/)).toBeNull();
     });
   });
 });

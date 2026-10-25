@@ -11,6 +11,7 @@ import {
   type Eip712RawTypedData,
 } from '@/utils/eip712';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
+import { isWholeBytes } from '@/utils/hex';
 
 export type Eip7730Container = {
   from?: string;
@@ -229,15 +230,12 @@ export function resolveEip712FieldValue(
   return valueAt(rest, message);
 }
 
-export const WHOLE_BYTES_RE = /^0x(?:[0-9a-f]{2})*$/i;
-
 /** Arguments named as the descriptor's own signature names them, or null when it does not fit. */
 export function decodeArgsBySignature(
   signature: string,
   data: string,
 ): Record<string, unknown> | null {
-  // viem pads odd-length hex at the front, which would shift every argument.
-  if (!WHOLE_BYTES_RE.test(data)) return null;
+  if (!isWholeBytes(data)) return null;
   try {
     const item = parseAbiItem(`function ${signature}`) as AbiFunction;
     if (toFunctionSelector(item) !== data.slice(0, 10).toLowerCase()) {

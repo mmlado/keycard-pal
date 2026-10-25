@@ -12,6 +12,7 @@ import selectorsData from '../data/selectors.json';
 import { DATA_TYPE_LABELS } from '../types';
 
 import { checksumEthAddress } from './ethereumAddress';
+import { isWholeBytes } from './hex';
 
 type SelectorArg = AbiParameter & { name: string };
 
@@ -273,8 +274,7 @@ export function decodeCalldata(dataHex: string): DecodedCall | null {
   if (!dataHex || dataHex === '0x' || dataHex.replace('0x', '').length < 8) {
     return null;
   }
-  // viem pads odd-length hex at the front, which would shift every argument.
-  if (!/^(0x)?([0-9a-fA-F]{2})*$/.test(dataHex)) return null;
+  if (!isWholeBytes(dataHex)) return null;
 
   const selector = dataHex.slice(0, 10).toLowerCase();
   const entries = selectors[selector];
@@ -317,7 +317,6 @@ export type ParsedTx = {
   value?: string; // in ETH, e.g. "0.01"
   valueWei?: string; // raw value in Wei as decimal string, for simulation
   data?: string; // hex calldata
-  decodedCall?: DecodedCall;
   nonce?: number;
   fees: ParsedFees;
 };
@@ -409,7 +408,6 @@ function parseLegacy(bytes: Buffer, symbol: string): ParsedTx {
     value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
     valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
     data: dataHex,
-    decodedCall: dataHex ? decodeCalldata(dataHex) ?? undefined : undefined,
     fees: {
       kind: 'legacy',
       gasPrice: weiToGwei(bufToBigInt(assertBytes(gasPrice, 'gasPrice'))),
@@ -454,9 +452,6 @@ function parseEIP1559(bytes: Buffer, symbol: string): ParsedTx {
     value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
     valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
     data: dataHexEip1559,
-    decodedCall: dataHexEip1559
-      ? decodeCalldata(dataHexEip1559) ?? undefined
-      : undefined,
     fees: {
       kind: 'eip1559',
       maxFeePerGas: weiToGwei(
@@ -494,9 +489,6 @@ function parseEIP2930(bytes: Buffer, symbol: string): ParsedTx {
     value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
     valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
     data: dataHexEip2930,
-    decodedCall: dataHexEip2930
-      ? decodeCalldata(dataHexEip2930) ?? undefined
-      : undefined,
     fees: {
       kind: 'legacy',
       gasPrice: weiToGwei(bufToBigInt(assertBytes(gasPrice, 'gasPrice'))),

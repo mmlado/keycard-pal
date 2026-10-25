@@ -1,4 +1,9 @@
-import { ensureHexPrefix, fromHex, toHex } from '../src/utils/hex';
+import {
+  ensureHexPrefix,
+  fromHex,
+  isWholeBytes,
+  toHex,
+} from '../src/utils/hex';
 
 describe('ensureHexPrefix', () => {
   it('adds 0x prefix when missing', () => {
@@ -37,4 +42,15 @@ describe('fromHex', () => {
   it('reads an empty string as no bytes', () => {
     expect(fromHex('')).toEqual(new Uint8Array(0));
   });
+});
+
+describe('isWholeBytes', () => {
+  it.each(['', '0x', 'a9059cbb', '0xa9059cbb', '0XA9059CBB', '0xAbCd'])(
+    'takes %p',
+    hex => expect(isWholeBytes(hex)).toBe(true),
+  );
+
+  it.each(['0xabc', 'abc', '0xzz', '0x0x12', ' 0x12'])('refuses %p', hex =>
+    expect(isWholeBytes(hex)).toBe(false),
+  );
 });
