@@ -1,12 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SegmentedButtons, Text } from 'react-native-paper';
+import { SegmentedButtons } from 'react-native-paper';
 
 import { MISCASED_ADDRESS_WARNING } from '@/constants/eip712';
 import { DESCRIPTOR_CHECK_FAILED_WARNING } from '@/constants/eip7730';
 import { EIP712_DIGEST_EXPLAINER } from '@/constants/erc8213';
 import type { EthSignRequest } from '@/types';
-import theme from '@/theme';
 
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
 import InfoRow from '@/components/InfoRow';
@@ -19,19 +18,15 @@ import {
   parseEip712RawTypedData,
   type Eip712Summary,
 } from '@/utils/eip712';
-import {
-  interpolateIntent,
-  type Eip7730FieldContext,
-} from '@/utils/eip7730/format';
+import { displayMessage } from '@/utils/eip7730/display';
 import { lookupEip712 } from '@/utils/eip7730/lookup';
 import { buildEip712Resolvers } from '@/utils/eip7730/paths';
 import { reviewerNames } from '@/utils/eip7730/source';
-import { fitsRequest, shownFields } from '@/utils/eip7730/visibility';
+import { fitsRequest } from '@/utils/eip7730/visibility';
 import type { EthPayload } from '@/utils/ethPayload';
 
-import Eip7730FieldList from './Eip7730FieldList';
+import Eip7730Display from './Eip7730Display';
 import {
-  DescriptorSourceLine,
   DigestExplainer,
   DigestRow,
   SectionHeader,
@@ -83,42 +78,37 @@ export default function Eip712JsonPanel({
   }, [domainChainId, verifyingContract, rawTypedData]);
   const { answer: matchedFormat, loading } = useRegistryAnswer(lookup);
 
-  const fieldContext = useMemo<Eip7730FieldContext>(() => {
-    const container = {
-      from: request.address,
-      to: verifyingContract,
-      value: '0',
-      chainId: domainChainId,
-    };
-    return {
-      chainId: domainChainId,
-      contractAddress: verifyingContract,
-      ...buildEip712Resolvers(
+  const resolvers = useMemo(
+    () =>
+      buildEip712Resolvers(
         rawTypedData ?? { types: {}, primaryType: '', message: {} },
-        container,
+        {
+          from: request.address,
+          to: verifyingContract,
+          value: '0',
+          chainId: domainChainId,
+        },
       ),
-      depth: 0,
-      // The Domain section above names it.
-      shownContract: verifyingContract,
-    };
-  }, [domainChainId, verifyingContract, rawTypedData, request.address]);
+    [domainChainId, verifyingContract, rawTypedData, request.address],
+  );
 
-  const rejected =
-    matchedFormat !== null && !fitsRequest(matchedFormat, fieldContext);
-  const fitting = rejected ? null : matchedFormat;
+  const matched = matchedFormat && { format: matchedFormat, ...resolvers };
+  const rejected = matched !== null && !fitsRequest(matched.format, matched);
   // The app's Permit and SafeTx reviews are reviewed code; an unreviewed descriptor is not.
-  const eip7730Descriptor =
-    fitting && (!specialEip712 || reviewerNames(fitting.reviewedBy).length > 0)
-      ? fitting
+  const descriptor =
+    matched &&
+    !rejected &&
+    (!specialEip712 || reviewerNames(matched.format.reviewedBy).length > 0)
+      ? matched
       : null;
-  const eip7730Fields = eip7730Descriptor
-    ? shownFields(eip7730Descriptor, fieldContext)
-    : [];
-
-  const eip7730Title = eip7730Descriptor
-    ? interpolateIntent(eip7730Descriptor, fieldContext) ??
-      eip7730Descriptor.intent
-    : undefined;
+  // Only the Details tab shows it, and a long message formats every row.
+  const display =
+    tab === 'details' && descriptor
+      ? displayMessage(descriptor, {
+          chainId: domainChainId,
+          verifyingContract,
+        })
+      : null;
 
   // The classification's digest is the one the card signs.
   const eip712Digest = payload.kind === 'eip712-json' ? payload.digest : null;
@@ -156,25 +146,8 @@ export default function Eip712JsonPanel({
                 ))}
               </>
             )}
-            {loading ? null : eip7730Descriptor ? (
-              <>
-                {eip7730Title && (
-                  <View style={styles.row}>
-                    <Text variant="titleSmall" style={styles.intent}>
-                      {eip7730Title}
-                    </Text>
-                  </View>
-                )}
-                <DescriptorSourceLine
-                  reviewedBy={eip7730Descriptor.reviewedBy}
-                />
-                {eip7730Fields.length > 0 && <SectionHeader title="Message" />}
-                <Eip7730FieldList
-                  fields={eip7730Descriptor.fields}
-                  format={eip7730Descriptor}
-                  ctx={fieldContext}
-                />
-              </>
+            {loading ? null : display ? (
+              <Eip7730Display display={display} />
             ) : (
               <>
                 {specialEip712 && (
@@ -225,9 +198,5 @@ const styles = StyleSheet.create({
   },
   row: {
     paddingVertical: 8,
-  },
-  intent: {
-    color: theme.colors.primary,
-    fontWeight: '600',
   },
 });

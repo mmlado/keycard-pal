@@ -9,7 +9,7 @@ module.exports = {
   testEnvironmentOptions: {
     customExportConditions: ['require', 'node', 'node-addons'],
   },
-  testMatch: ['<rootDir>/scripts/eip7730-vectors/vectors.harness.tsx'],
+  testMatch: ['<rootDir>/scripts/eip7730-vectors/vectors.harness.ts'],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation|@noble/(secp256k1|hashes|curves)|@scure/(bip32|bip39|base)|keycard-sdk)/)',
   ],

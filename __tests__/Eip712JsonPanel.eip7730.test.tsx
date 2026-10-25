@@ -2,6 +2,7 @@ import React from 'react';
 import { act, render, screen } from '@testing-library/react-native';
 
 import Eip712JsonPanel from '../src/components/SignRequestDetail/eth/DataTabPanel/Eip712JsonPanel';
+import { MISCASED_ADDRESS_WARNING } from '../src/constants/eip712';
 import { DESCRIPTOR_CHECK_FAILED_WARNING } from '../src/constants/eip7730';
 
 import type { Eip712Summary } from '../src/utils/eip712';
@@ -485,6 +486,27 @@ describe('Eip712JsonPanel EIP-7730 integration', () => {
       screen.getByText(`ADDR verifyingContract: ${VERIFYING}`),
     ).toBeTruthy();
     expect(screen.queryByText(/Token contract/)).toBeNull();
+  });
+
+  it('warns under a descriptor field holding an address the request wrote with a wrong checksum', () => {
+    mockLookupEip712.mockReturnValue({
+      intent: 'Permit',
+      fields: [{ path: 'spender', label: 'Spender', format: 'addressName' }],
+    });
+    // Mixed case, not the EIP-55 form.
+    const spender = '0xd3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef';
+    const message = { spender, sigDeadline: '5' };
+    render(
+      <Panel
+        request={buildRequest(buildPayload(message))}
+        eip712={buildSummary(message)}
+        chainId={1}
+      />,
+    );
+    expect(
+      screen.getByText(`ADDR Spender: ${checksumEthAddress(spender)}`),
+    ).toBeTruthy();
+    expect(screen.getByText(MISCASED_ADDRESS_WARNING)).toBeTruthy();
   });
 
   it('drops an entry whose bundled lists differ in length, and says so', () => {

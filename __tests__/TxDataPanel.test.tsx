@@ -164,19 +164,24 @@ jest.mock('../src/components/InfoRow', () => {
 });
 
 jest.mock(
-  '../src/components/SignRequestDetail/eth/DataTabPanel/CallSection',
+  '../src/components/SignRequestDetail/eth/DataTabPanel/Eip7730Display',
   () => {
     const { Text, View } = require('react-native');
-    return ({ description: { descriptor } }: { description: any }) => (
-      <View>
-        <Text>CallSection</Text>
-        {descriptor && (
-          <Text>{`descriptor: ${
-            descriptor.format.intent
-          }, recipient ${descriptor.resolvePath('recipient')}`}</Text>
-        )}
-      </View>
-    );
+    return {
+      DisplayNodes: ({ nodes }: { nodes: any[] }) => (
+        <View>
+          <Text>CallSection</Text>
+          {nodes
+            .filter(node => node.kind === 'entry')
+            .map(({ display }) => [
+              <Text key="heading">{`descriptor: ${display.heading}`}</Text>,
+              ...display.nodes.map((row: any, i: number) => (
+                <Text key={i}>{`${row.label}: ${row.value}`}</Text>
+              )),
+            ])}
+        </View>
+      ),
+    };
   },
 );
 
@@ -321,9 +326,8 @@ describe('TxDataPanel', () => {
         />,
       );
       expect(screen.getByText('Decoded')).toBeTruthy();
-      expect(
-        screen.getByText(`descriptor: Swap, recipient ${RECIPIENT}`),
-      ).toBeTruthy();
+      expect(screen.getByText('descriptor: Swap')).toBeTruthy();
+      expect(screen.getByText(`Beneficiary: ${RECIPIENT}`)).toBeTruthy();
     });
 
     it('drops an entry whose signature does not fit the bytes', () => {

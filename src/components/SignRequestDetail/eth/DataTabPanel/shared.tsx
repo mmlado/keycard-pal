@@ -12,10 +12,7 @@ import theme from '@/theme';
 
 import InfoRow from '@/components/InfoRow';
 
-import { useDescriptorSource } from '@/hooks/useDescriptorSource';
 import { useExternalLink } from '@/hooks/useExternalLink';
-
-import { descriptorReview } from '@/utils/eip7730/source';
 
 export function SectionHeader({ title }: { title: string }) {
   return (
@@ -57,38 +54,6 @@ export function ElementBlock({
   );
 }
 
-export function DescriptorSourceLine({
-  reviewedBy,
-}: {
-  reviewedBy: readonly string[] | undefined;
-}) {
-  const text = useDescriptorSource();
-  return (
-    <>
-      <Text
-        variant="labelSmall"
-        style={styles.source}
-        testID="descriptor-source"
-      >
-        {text}
-      </Text>
-      <DescriptorReviewLine reviewedBy={reviewedBy} />
-    </>
-  );
-}
-
-export function DescriptorReviewLine({
-  reviewedBy,
-}: {
-  reviewedBy: readonly string[] | undefined;
-}) {
-  return (
-    <Text variant="labelSmall" style={styles.source} testID="descriptor-review">
-      {descriptorReview(reviewedBy)}
-    </Text>
-  );
-}
-
 export function DigestRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.row}>
@@ -127,10 +92,6 @@ export function DigestExplainer({ text }: { text: string }) {
 const styles = StyleSheet.create({
   row: {
     paddingVertical: 8,
-  },
-  source: {
-    color: theme.colors.onSurfaceVariant,
-    paddingBottom: 4,
   },
   warningRow: {
     flexDirection: 'row',

@@ -1,23 +1,23 @@
 // Every v2 test vector of the clear-signing registry, through the app's own lookup,
-// decoding and rendering. scripts/check-eip7730-vectors.js runs it and reads the report.
-import { render } from '@testing-library/react-native';
+// decoding and display. scripts/check-eip7730-vectors.js runs it and reads the report.
 import fs from 'fs';
 import path from 'path';
-import React from 'react';
 import { parseTransaction } from 'viem';
 
-import Eip7730CallSection from '../../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection/Eip7730CallSection';
 import { describeCall } from '../../src/utils/callDescription';
 import { eip712DomainChainId, encodeEip712Type } from '../../src/utils/eip712';
 import {
-  interpolateIntent,
-  type Eip7730FieldContext,
-} from '../../src/utils/eip7730/format';
+  displayCallSection,
+  displayInnerCall,
+  displayMessage,
+  type DescriptorDisplay,
+  type DisplayNode,
+} from '../../src/utils/eip7730/display';
 import { lookupEip712 } from '../../src/utils/eip7730/lookup';
-import { classifyEthPayload } from '../../src/utils/ethPayload';
 import { buildEip712Resolvers } from '../../src/utils/eip7730/paths';
 import { fitsRequest } from '../../src/utils/eip7730/visibility';
 import type { Eip7730DisplayFormat } from '../../src/utils/eip7730/zip';
+import { classifyEthPayload } from '../../src/utils/ethPayload';
 
 const REGISTRY = process.env.VECTORS_DIR ?? '';
 const OUT = process.env.VECTORS_REPORT ?? '';
@@ -43,48 +43,6 @@ jest.mock('../../src/utils/tokenMetadata', () => ({
   },
 }));
 
-jest.mock('../../src/theme', () => ({
-  __esModule: true,
-  default: {
-    colors: new Proxy({}, { get: () => '#888' }),
-  },
-}));
-
-jest.mock('react-native-paper', () => {
-  const { Text, View } = require('react-native');
-  return {
-    Text: ({ children, ...props }: any) => <Text {...props}>{children}</Text>,
-    Icon: () => <View />,
-  };
-});
-
-// Every row the review shows comes out as `F|label|value`.
-jest.mock('../../src/components/InfoRow', () => {
-  const { Text } = require('react-native');
-  return ({ label, value, name }: any) => (
-    <>
-      {name}
-      <Text>{`F|${label}|${value}`}</Text>
-    </>
-  );
-});
-jest.mock('../../src/components/ens/AddressInfoRow.online', () => {
-  const { Text } = require('react-native');
-  return ({ label, value, name }: any) => (
-    <>
-      {name}
-      <Text>{`F|${label}|${value}`}</Text>
-    </>
-  );
-});
-jest.mock(
-  '../../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection/TokenSymbolRow',
-  () => {
-    const { Text } = require('react-native');
-    return ({ token }: any) => <Text>{`T|${token.symbol}`}</Text>;
-  },
-);
-
 type Expected = {
   intent: string;
   interpolatedIntent?: string;
@@ -98,6 +56,18 @@ type Vector = {
   from?: string;
   expected: Expected;
 };
+type Shown = {
+  rows: [string, string][];
+  tickers: string[];
+  warnings: string[];
+};
+type Prepared =
+  | {
+      format: Eip7730DisplayFormat;
+      display: DescriptorDisplay;
+      nodes: DisplayNode[];
+    }
+  | { why: string };
 
 function testFiles(dir: string): string[] {
   const out: string[] = [];
@@ -118,32 +88,49 @@ function flatten(fields: Expected['fields']): [string, string][] {
   );
 }
 
-function rows(tree: any): string[] {
-  const out: string[] = [];
-  const walk = (node: any) => {
-    if (node == null) return;
-    if (typeof node === 'string') {
-      if (node.startsWith('F|') || node.startsWith('T|')) out.push(node);
-      return;
+// Inner calls are described the way the review describes them; the bundled index never waits.
+function walk(nodes: DisplayNode[], shown: Shown): void {
+  for (const node of nodes) {
+    switch (node.kind) {
+      case 'text':
+      case 'address':
+        shown.rows.push([node.label, node.value]);
+        if (node.token) shown.tickers.push(node.token.symbol);
+        shown.warnings.push(...node.warnings.map(w => `${node.label}: ${w}`));
+        break;
+      case 'warning':
+        shown.warnings.push(node.text);
+        break;
+      case 'token':
+        shown.tickers.push(node.token.symbol);
+        break;
+      case 'item':
+        walk(node.nodes, shown);
+        break;
+      case 'group':
+        walk(node.rows, shown);
+        break;
+      case 'entry':
+        walk(node.display.nodes, shown);
+        break;
+      case 'call': {
+        const description = describeCall(node.request);
+        if (description instanceof Promise)
+          throw new Error('unexpected promise');
+        walk(displayInnerCall(node.request, description), shown);
+        break;
+      }
     }
-    if (Array.isArray(node)) return node.forEach(walk);
-    walk(node.children);
-  };
-  walk(tree);
-  return out;
+  }
 }
 
-function prepare(vector: Vector): {
-  format: Eip7730DisplayFormat | null;
-  ctx: Eip7730FieldContext | null;
-  why?: string;
-} {
+function prepare(vector: Vector): Prepared {
   if (vector.rawTx) {
     let tx;
     try {
       tx = parseTransaction(vector.rawTx as `0x${string}`);
     } catch {
-      return { format: null, ctx: null, why: 'rawTx did not parse' };
+      return { why: 'rawTx did not parse' };
     }
     const to = tx.to ?? undefined;
     const chainId = tx.chainId ?? 1;
@@ -159,16 +146,24 @@ function prepare(vector: Vector): {
     if (described instanceof Promise) throw new Error('unexpected promise');
     if (!described.descriptor)
       return {
-        format: null,
-        ctx: null,
         why: described.rejected
           ? 'entry rejected (mustMatch or lengths)'
           : 'no entry for the call, or its signature did not decode',
       };
-    const { format, resolvePath, resolveEach } = described.descriptor;
+    const nodes = displayCallSection(described, {
+      chainId,
+      contract: to,
+      depth: 0,
+    });
+    const entry = nodes.find(
+      (node): node is Extract<DisplayNode, { kind: 'entry' }> =>
+        node.kind === 'entry',
+    );
+    if (!entry) throw new Error('a matched call shows no entry');
     return {
-      format,
-      ctx: { chainId, contractAddress: to, resolvePath, resolveEach, depth: 0 },
+      format: described.descriptor.format,
+      display: entry.display,
+      nodes,
     };
   }
   const typed = vector.data;
@@ -177,33 +172,31 @@ function prepare(vector: Vector): {
     Buffer.from(JSON.stringify(typed), 'utf8').toString('hex'),
     2,
   );
-  if (payload.kind === 'invalid') {
-    return { format: null, ctx: null, why: `refused: ${payload.reason}` };
-  }
+  if (payload.kind === 'invalid') return { why: `refused: ${payload.reason}` };
   const chainId = eip712DomainChainId(typed.domain);
   const verifying = typed.domain?.verifyingContract;
   const encoded = encodeEip712Type(typed.primaryType, typed.types);
   if (chainId === undefined || !verifying || !encoded)
-    return { format: null, ctx: null, why: 'domain lacks chain or contract' };
+    return { why: 'domain lacks chain or contract' };
   const found = lookupEip712(chainId, verifying, encoded, typed.domain);
   if (found instanceof Promise) throw new Error('unexpected promise');
-  if (!found)
-    return { format: null, ctx: null, why: 'no entry for the message' };
-  const container = { from: vector.from, to: verifying, value: '0', chainId };
-  const ctx = {
-    chainId,
-    contractAddress: verifying,
-    ...buildEip712Resolvers(typed, container),
-    depth: 0,
-    shownContract: verifying,
+  if (!found) return { why: 'no entry for the message' };
+  const descriptor = {
+    format: found,
+    ...buildEip712Resolvers(typed, {
+      from: vector.from,
+      to: verifying,
+      value: '0',
+      chainId,
+    }),
   };
-  if (!fitsRequest(found, ctx))
-    return {
-      format: null,
-      ctx: null,
-      why: 'entry rejected (mustMatch or lengths)',
-    };
-  return { format: found, ctx };
+  if (!fitsRequest(found, descriptor))
+    return { why: 'entry rejected (mustMatch or lengths)' };
+  const display = displayMessage(descriptor, {
+    chainId,
+    verifyingContract: verifying,
+  });
+  return { format: found, display, nodes: [{ kind: 'entry', display }] };
 }
 
 test('registry test vectors', () => {
@@ -225,56 +218,38 @@ test('registry test vectors', () => {
         kind: vector.rawTx ? 'calldata' : 'eip712',
         providers: Object.keys(suite.dataProvider ?? {}),
       };
-      let prepared;
+      const shown: Shown = {
+        rows: [],
+        tickers: [],
+        warnings: [],
+      };
+      let prepared: Prepared;
       try {
         prepared = prepare(vector);
+        if ('nodes' in prepared) walk(prepared.nodes, shown);
       } catch (e) {
         results.push({ ...base, status: 'error', why: String(e) });
         continue;
       }
-      const { format, ctx, why } = prepared;
-      if (!format || !ctx) {
-        const refused = why?.startsWith('refused');
+      if (!('nodes' in prepared)) {
+        const refused = prepared.why.startsWith('refused');
         results.push({
           ...base,
           status: refused ? 'refused' : 'unmatched',
-          why,
+          why: prepared.why,
         });
         continue;
       }
-      let rendered: string[] = [];
-      try {
-        const view = render(
-          <Eip7730CallSection
-            format={format}
-            resolvePath={ctx.resolvePath}
-            resolveEach={ctx.resolveEach}
-            contractAddress={ctx.contractAddress}
-            chainId={ctx.chainId}
-            shownContract={(ctx as any).shownContract}
-          />,
-        );
-        rendered = rows(view.toJSON());
-        view.unmount();
-      } catch (e) {
-        results.push({ ...base, status: 'error', why: `render: ${String(e)}` });
-        continue;
-      }
-      const shown = rendered
-        .filter(r => r.startsWith('F|'))
-        .map(r => {
-          const [, label, ...rest] = r.split('|');
-          return [label, rest.join('|')] as [string, string];
-        });
+      const { format, display } = prepared;
       const expected = flatten(vector.expected.fields ?? []);
-      const pool = [...shown];
+      const pool = [...shown.rows];
       const missing: [string, string][] = [];
       for (const pair of expected) {
         const at = pool.findIndex(([l, v]) => l === pair[0] && v === pair[1]);
         if (at >= 0) pool.splice(at, 1);
         else missing.push(pair);
       }
-      const sentence = interpolateIntent(format, ctx);
+      const sentence = display.interpolated ? display.heading : null;
       const intentOk = (format.intent ?? '') === vector.expected.intent;
       const sentenceOk =
         vector.expected.interpolatedIntent === undefined ||
@@ -293,7 +268,8 @@ test('registry test vectors', () => {
         missing,
         // What the app showed that the vector did not name: candidates for the missing pairs.
         extra: pool,
-        tickers: rendered.filter(r => r.startsWith('T|')),
+        tickers: shown.tickers,
+        warnings: shown.warnings,
       });
     }
   }

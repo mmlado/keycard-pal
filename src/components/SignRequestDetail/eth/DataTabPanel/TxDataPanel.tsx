@@ -9,10 +9,11 @@ import type { EthSignRequest } from '@/types';
 import InfoRow from '@/components/InfoRow';
 
 import type { CallDescription } from '@/utils/callDescription';
+import { displayCallSection } from '@/utils/eip7730/display';
 import { computeCalldataDigest } from '@/utils/erc8213';
 import type { ParsedTx } from '@/utils/txParser';
 
-import CallSection from './CallSection';
+import { DisplayNodes } from './Eip7730Display';
 import { DigestExplainer, DigestRow, WarningRow } from './shared';
 import SimulationPanel from './SimulationPanel';
 import { useSimulation } from './useSimulation';
@@ -77,10 +78,12 @@ export default function TxDataPanel({
       />
       <View style={styles.tabContent}>
         {tab === 'decoded' && (
-          <CallSection
-            description={description}
-            contract={tx.to}
-            chainId={chainId}
+          <DisplayNodes
+            nodes={displayCallSection(description, {
+              chainId,
+              contract: tx.to,
+              depth: 0,
+            })}
           />
         )}
         {tab === 'digests' && calldataDigest && (
