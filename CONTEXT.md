@@ -97,8 +97,13 @@ _Avoid_: Auditor list, signer
 An EIP-7730 descriptor covered by a valid, unrevoked attestation from a trusted attester. Every other descriptor is unreviewed.
 _Avoid_: Audited descriptor, verified descriptor, trusted descriptor
 
+**Call description**:
+What the review shows for one contract call: the descriptor index entry that describes it, the app's own decoding, or the call as written, and which row names its contract.
+_Avoid_: Call match, call view
+
 ## EIP-7730 relationships
 
+- Each contract call in a review, the transaction and every call inside it, has one **Call description**.
 - A **descriptor index** entry takes priority over `ContractCallSection` rendering when a match is found, and over `SpecialEip712Section` only when it comes from a **reviewed descriptor**.
 - When no **EIP-7730 descriptor** matches, the app falls back to existing ABI-based decoding and special renderers unchanged.
 - EIP-712 messages with no `verifyingContract` in the domain are excluded from **descriptor index** lookup and fall back to existing rendering.

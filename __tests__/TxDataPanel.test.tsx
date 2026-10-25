@@ -7,6 +7,7 @@ import {
 import React from 'react';
 import { encodeFunctionData, parseAbiItem, type AbiFunction } from 'viem';
 
+import { useCallDescription } from '../src/hooks/useCallDescription';
 import { useTenderlyConfig } from '../src/hooks/useTenderlyConfig.online';
 
 import SimulationAddressProvider from '../src/components/SignRequestDetail/SimulationAddressProvider';
@@ -29,6 +30,34 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 
 function render(ui: React.ReactElement) {
   return rtlRender(ui, { wrapper: Wrapper });
+}
+
+// Hands the panel the call description SignRequestDetail does.
+function Panel({
+  tx,
+  request: req,
+  chainId,
+}: {
+  tx: ParsedTx;
+  request: EthSignRequest;
+  chainId: number | undefined;
+}) {
+  const { description } = useCallDescription({
+    chainId,
+    contract: tx.to,
+    data: tx.data ?? '',
+    from: req.address,
+    value: tx.valueWei,
+    depth: 0,
+  });
+  return (
+    <TxDataPanel
+      tx={tx}
+      request={req}
+      chainId={chainId}
+      description={description}
+    />
+  );
 }
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -135,12 +164,12 @@ jest.mock('../src/components/InfoRow', () => {
 });
 
 jest.mock(
-  '../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection',
+  '../src/components/SignRequestDetail/eth/DataTabPanel/CallSection',
   () => {
     const { Text, View } = require('react-native');
-    return ({ descriptor }: { descriptor?: any }) => (
+    return ({ description: { descriptor } }: { description: any }) => (
       <View>
-        <Text>DecodedCallSection</Text>
+        <Text>CallSection</Text>
         {descriptor && (
           <Text>{`descriptor: ${
             descriptor.format.intent
@@ -162,6 +191,9 @@ jest.mock('../src/components/PrimaryButton', () => {
 
 const CALLDATA =
   '0xa9059cbb000000000000000000000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000000000000000000000000000000000000000000000000de0b6b3a7640000';
+// A selector selectors.json does not know.
+const UNKNOWN_CALLDATA =
+  '0xdeadbeef0000000000000000000000000000000000000000000000000000000000000001';
 
 const request: EthSignRequest = {
   signData: CALLDATA,
@@ -174,20 +206,19 @@ const txWithDecoded: ParsedTx = {
   to: '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   data: CALLDATA,
   valueWei: '0',
-  decodedCall: {
-    kind: 'erc20-transfer',
-    to: '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-    amount: 1000000000000000000n,
-  },
   fees: { kind: 'unknown' },
 };
 
 const txWithoutDecoded: ParsedTx = {
   to: '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
-  data: CALLDATA,
+  data: UNKNOWN_CALLDATA,
   valueWei: '0',
-  decodedCall: { kind: 'unknown-call', selector: '0xa9059cbb' },
   fees: { kind: 'unknown' },
+};
+
+const unknownRequest: EthSignRequest = {
+  ...request,
+  signData: UNKNOWN_CALLDATA,
 };
 
 const txNoData: ParsedTx = {
@@ -219,7 +250,6 @@ const txUnknownWithDescriptor: ParsedTx = {
   to: ONEINCH_V4,
   data: swapData,
   valueWei: '0',
-  decodedCall: { kind: 'unknown-call', selector: '0x9994dd15' },
   fees: { kind: 'unknown' },
 };
 
@@ -231,7 +261,7 @@ describe('TxDataPanel', () => {
 
   describe('with no tx.data', () => {
     it('shows Digests tab with null digest (no calldata)', () => {
-      render(<TxDataPanel tx={txNoData} request={request} chainId={1} />);
+      render(<Panel tx={txNoData} request={request} chainId={1} />);
       expect(screen.getByText('Digests')).toBeTruthy();
       expect(screen.queryByText(/Calldata Digest:/)).toBeNull();
       expect(screen.queryByTestId('digest-explainer')).toBeNull();
@@ -240,22 +270,22 @@ describe('TxDataPanel', () => {
 
   describe('with decoded call', () => {
     it('shows Decoded tab by default and renders decoded section', () => {
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       expect(screen.getByText('Decoded')).toBeTruthy();
       expect(screen.getByText('Digests')).toBeTruthy();
       expect(screen.getByText('Raw')).toBeTruthy();
-      expect(screen.getByText('DecodedCallSection')).toBeTruthy();
+      expect(screen.getByText('CallSection')).toBeTruthy();
     });
 
     it('switches to Digests tab and shows calldata digest', () => {
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Digests'));
       expect(screen.getByText(/Calldata Digest: 0x[0-9a-f]{64}/)).toBeTruthy();
       expect(screen.getByTestId('digest-explainer')).toBeTruthy();
     });
 
     it('switches to Raw tab and shows signData', () => {
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Raw'));
       expect(screen.getByText(new RegExp(CALLDATA))).toBeTruthy();
     });
@@ -264,7 +294,7 @@ describe('TxDataPanel', () => {
   describe('without decoded call (unknown-call)', () => {
     it('shows Digests and Raw tabs only, defaults to Digests', () => {
       render(
-        <TxDataPanel tx={txWithoutDecoded} request={request} chainId={1} />,
+        <Panel tx={txWithoutDecoded} request={unknownRequest} chainId={1} />,
       );
       expect(screen.queryByText('Decoded')).toBeNull();
       expect(screen.getByText('Digests')).toBeTruthy();
@@ -274,17 +304,17 @@ describe('TxDataPanel', () => {
 
     it('switches to Raw tab', () => {
       render(
-        <TxDataPanel tx={txWithoutDecoded} request={request} chainId={1} />,
+        <Panel tx={txWithoutDecoded} request={unknownRequest} chainId={1} />,
       );
       fireEvent.press(screen.getByText('Raw'));
-      expect(screen.getByText(new RegExp(CALLDATA))).toBeTruthy();
+      expect(screen.getByText(new RegExp(UNKNOWN_CALLDATA))).toBeTruthy();
     });
   });
 
   describe('with a registry entry', () => {
     it("shows an unknown call through the entry's own signature", () => {
       render(
-        <TxDataPanel
+        <Panel
           tx={txUnknownWithDescriptor}
           request={{ ...request, signData: swapData }}
           chainId={1}
@@ -299,7 +329,7 @@ describe('TxDataPanel', () => {
     it('drops an entry whose signature does not fit the bytes', () => {
       const cut = swapData.slice(0, 74);
       render(
-        <TxDataPanel
+        <Panel
           tx={{ ...txUnknownWithDescriptor, data: cut }}
           request={{ ...request, signData: cut }}
           chainId={1}
@@ -310,16 +340,18 @@ describe('TxDataPanel', () => {
     });
 
     it('falls back to the app view of a known call when the entry does not fit', () => {
-      const usdt = '0xdac17f958d2ee523a2206206994597c13d831ec7';
-      render(
-        <TxDataPanel
-          tx={{ ...txWithDecoded, to: usdt, data: '0xa9059cbb1234' }}
-          request={request}
-          chainId={1}
-        />,
-      );
-      expect(screen.getByText('DecodedCallSection')).toBeTruthy();
-      expect(screen.queryByText(/descriptor:/)).toBeNull();
+      jest.spyOn(eip7730Lookup, 'lookupCalldata').mockReturnValue({
+        intent: 'Send',
+        signature: 'transfer(address to, uint256 amount, bytes memo)',
+        fields: [],
+      });
+      try {
+        render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
+        expect(screen.getByText('CallSection')).toBeTruthy();
+        expect(screen.queryByText(/descriptor:/)).toBeNull();
+      } finally {
+        jest.restoreAllMocks();
+      }
     });
 
     describe('with a mustMatch check', () => {
@@ -342,9 +374,7 @@ describe('TxDataPanel', () => {
         jest
           .spyOn(eip7730Lookup, 'lookupCalldata')
           .mockReturnValue(transferEntry([`0x${'aa'.repeat(20)}`]));
-        render(
-          <TxDataPanel tx={txWithDecoded} request={request} chainId={1} />,
-        );
+        render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
         expect(screen.getByText(/^descriptor: Send/)).toBeTruthy();
         expect(screen.queryByText(DESCRIPTOR_CHECK_FAILED_WARNING)).toBeNull();
       });
@@ -353,11 +383,9 @@ describe('TxDataPanel', () => {
         jest
           .spyOn(eip7730Lookup, 'lookupCalldata')
           .mockReturnValue(transferEntry([`0x${'bb'.repeat(20)}`]));
-        render(
-          <TxDataPanel tx={txWithDecoded} request={request} chainId={1} />,
-        );
+        render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
         expect(screen.getByText(DESCRIPTOR_CHECK_FAILED_WARNING)).toBeTruthy();
-        expect(screen.getByText('DecodedCallSection')).toBeTruthy();
+        expect(screen.getByText('CallSection')).toBeTruthy();
         expect(screen.queryByText(/descriptor:/)).toBeNull();
         fireEvent.press(screen.getByText('Raw'));
         expect(screen.getByText(DESCRIPTOR_CHECK_FAILED_WARNING)).toBeTruthy();
@@ -367,15 +395,29 @@ describe('TxDataPanel', () => {
     it('shows nothing while a saved slice is read, then decides its tabs', async () => {
       setSavedIndex({ generatedAt: '2026-10-12T00:00:00.000Z' });
       try {
-        render(
-          <TxDataPanel tx={txWithDecoded} request={request} chainId={1} />,
-        );
+        render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
         expect(screen.queryByText('Digests')).toBeNull();
 
         // No slice file here, so no entry: the app's own view follows.
         await act(async () => {});
-        expect(screen.getByText('DecodedCallSection')).toBeTruthy();
+        expect(screen.getByText('CallSection')).toBeTruthy();
         expect(screen.queryByText(/descriptor:/)).toBeNull();
+      } finally {
+        act(() => setSavedIndex(null));
+      }
+    });
+
+    it('keeps its tab when the source changes under it', async () => {
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
+      fireEvent.press(screen.getByText('Raw'));
+      expect(screen.getByText(new RegExp(CALLDATA))).toBeTruthy();
+      try {
+        act(() => setSavedIndex({ generatedAt: '2026-10-12T00:00:00.000Z' }));
+        expect(screen.queryByText('Digests')).toBeNull();
+
+        await act(async () => {});
+        expect(screen.getByText(new RegExp(CALLDATA))).toBeTruthy();
+        expect(screen.queryByText('CallSection')).toBeNull();
       } finally {
         act(() => setSavedIndex(null));
       }
@@ -385,7 +427,7 @@ describe('TxDataPanel', () => {
   describe('Simulation tab', () => {
     it('absent when credentials null', () => {
       (useTenderlyConfig as jest.Mock).mockReturnValue({ credentials: null });
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       expect(screen.queryByText('Simulation')).toBeNull();
     });
 
@@ -393,7 +435,7 @@ describe('TxDataPanel', () => {
       (useTenderlyConfig as jest.Mock).mockReturnValue({
         credentials: mockCredentials,
       });
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       expect(screen.getByText('Simulation')).toBeTruthy();
     });
 
@@ -401,7 +443,7 @@ describe('TxDataPanel', () => {
       (useTenderlyConfig as jest.Mock).mockReturnValue({
         credentials: mockCredentials,
       });
-      render(<TxDataPanel tx={txNoTo} request={request} chainId={1} />);
+      render(<Panel tx={txNoTo} request={request} chainId={1} />);
       expect(screen.queryByText('Simulation')).toBeNull();
     });
 
@@ -409,7 +451,7 @@ describe('TxDataPanel', () => {
       (useTenderlyConfig as jest.Mock).mockReturnValue({
         credentials: mockCredentials,
       });
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Simulation'));
       expect(screen.getByText('Simulate')).toBeTruthy();
     });
@@ -425,7 +467,7 @@ describe('TxDataPanel', () => {
       };
       mockSimulate.mockResolvedValue(result);
 
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Simulation'));
       fireEvent.press(screen.getByText('Simulate'));
 
@@ -443,7 +485,7 @@ describe('TxDataPanel', () => {
       });
       mockSimulate.mockRejectedValue(new Error('API error 401: Unauthorized'));
 
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Simulation'));
       fireEvent.press(screen.getByText('Simulate'));
 
@@ -465,7 +507,7 @@ describe('TxDataPanel', () => {
       };
       mockSimulate.mockResolvedValue(result);
 
-      render(<TxDataPanel tx={txWithDecoded} request={request} chainId={1} />);
+      render(<Panel tx={txWithDecoded} request={request} chainId={1} />);
       fireEvent.press(screen.getByText('Simulation'));
       fireEvent.press(screen.getByText('Simulate'));
 

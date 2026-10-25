@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { RLP } from '@ethereumjs/rlp';
 import {
   encodeFunctionData,
@@ -12,6 +12,7 @@ import SimulationAddressProvider from '../src/components/SignRequestDetail/Simul
 import EthSignRequestDetail from '../src/components/SignRequestDetail/eth/SignRequestDetail';
 import { MISCASED_ADDRESS_WARNING } from '../src/constants/eip712';
 import type { EthSignRequest } from '../src/types';
+import { setSavedIndex } from '../src/utils/eip7730/lookup';
 import { wcRequestToScanResult } from '../src/utils/walletConnect/requestAdapter';
 
 const mockNavigation = {
@@ -1352,5 +1353,54 @@ describe('EthSignRequestDetail — destination', () => {
     renderDetail(callTx(data));
     expect(screen.queryByText('To')).toBeNull();
     expect(screen.getAllByText('Token contract')).toHaveLength(1);
+  });
+});
+
+describe('EthSignRequestDetail — a saved descriptor index', () => {
+  const hex = Buffer.from(
+    RLP.encode([
+      bn(1n),
+      bn(20_000_000_000n),
+      bn(100_000n),
+      addr('0x000000000000000000000000000000000000c0d3'),
+      bn(1_000_000_000_000_000n),
+      Buffer.from(`deadbeef${'00'.repeat(32)}`, 'hex'),
+    ]),
+  ).toString('hex');
+  const request: EthSignRequest = {
+    signData: hex,
+    dataType: 1,
+    derivationPath: "m/44'/60'/0'/0",
+    chainId: 1,
+  };
+
+  it('shows the To and Amount rows together with the panel once the slice is read', async () => {
+    setSavedIndex({ generatedAt: '2026-10-12T00:00:00.000Z' });
+    try {
+      renderDetail(request);
+      expect(screen.queryByText('To')).toBeNull();
+      expect(screen.queryByText('0.001 ETH')).toBeNull();
+      expect(screen.queryByText('Digests')).toBeNull();
+
+      await act(async () => {});
+      expect(screen.getByText('To')).toBeTruthy();
+      expect(screen.getByText('0.001 ETH')).toBeTruthy();
+      expect(screen.getByText('Digests')).toBeTruthy();
+    } finally {
+      act(() => setSavedIndex(null));
+    }
+  });
+
+  it('keeps the chosen tab when the source changes under the review', async () => {
+    renderDetail(request);
+    fireEvent.press(screen.getByText('Raw'));
+    expect(screen.getByText(hex)).toBeTruthy();
+    try {
+      act(() => setSavedIndex({ generatedAt: '2026-10-12T00:00:00.000Z' }));
+      await act(async () => {});
+      expect(screen.getByText(hex)).toBeTruthy();
+    } finally {
+      act(() => setSavedIndex(null));
+    }
   });
 });

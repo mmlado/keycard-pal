@@ -702,7 +702,7 @@ describe('decodeCalldata', () => {
     });
   });
 
-  it('parseTx includes decodedCall for ERC-20 transfer in legacy tx', () => {
+  it('parseTx carries the calldata of an ERC-20 transfer in a legacy tx', () => {
     // Build a legacy tx with ERC-20 transfer calldata
     const toContract = Buffer.from(
       'a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
@@ -718,7 +718,8 @@ describe('decodeCalldata', () => {
       calldata,
     ]);
     const tx = parseTx(Buffer.from(encoded).toString('hex'), 1);
-    expect(tx?.decodedCall).toEqual({
+    expect(tx?.data).toBe(TRANSFER_HEX.toLowerCase());
+    expect(decodeCalldata(tx!.data!)).toEqual({
       kind: 'erc20-transfer',
       to: RECIPIENT,
       amount: 1000000n,

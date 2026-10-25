@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native';
 
-import { useEip7730Format } from '../src/hooks/useEip7730Format';
+import { useRegistryAnswer } from '../src/hooks/useRegistryAnswer';
 import { setSavedIndex } from '../src/utils/eip7730/lookup';
 import type { Eip7730DisplayFormat } from '../src/utils/eip7730/zip';
 
@@ -17,31 +17,31 @@ function deferred() {
 
 afterEach(() => setSavedIndex(null));
 
-describe('useEip7730Format', () => {
+describe('useRegistryAnswer', () => {
   it('uses an answer that is there at once, without a loading state', () => {
     const lookup = jest.fn(() => SEND);
-    const { result } = renderHook(() => useEip7730Format(lookup));
-    expect(result.current).toEqual({ format: SEND, loading: false });
+    const { result } = renderHook(() => useRegistryAnswer(lookup));
+    expect(result.current).toEqual({ answer: SEND, loading: false });
   });
 
   it('reports none at once when there is no descriptor', () => {
-    const { result } = renderHook(() => useEip7730Format(() => null));
-    expect(result.current).toEqual({ format: null, loading: false });
+    const { result } = renderHook(() => useRegistryAnswer(() => null));
+    expect(result.current).toEqual({ answer: null, loading: false });
   });
 
   it('is loading while a slice is read, then shows what it found', async () => {
     const read = deferred();
     const lookup = () => read.promise;
-    const { result } = renderHook(() => useEip7730Format(lookup));
-    expect(result.current).toEqual({ format: null, loading: true });
+    const { result } = renderHook(() => useRegistryAnswer(lookup));
+    expect(result.current).toEqual({ answer: null, loading: true });
 
     await act(async () => read.resolve(SEND));
-    expect(result.current).toEqual({ format: SEND, loading: false });
+    expect(result.current).toEqual({ answer: SEND, loading: false });
   });
 
   it('asks again when the source changes', () => {
     const lookup = jest.fn(() => SEND);
-    renderHook(() => useEip7730Format(lookup));
+    renderHook(() => useRegistryAnswer(lookup));
     expect(lookup).toHaveBeenCalledTimes(1);
 
     act(() => setSavedIndex({ generatedAt: '2026-10-12T00:00:00.000Z' }));
@@ -54,16 +54,16 @@ describe('useEip7730Format', () => {
     let current = first.promise;
     const { result, rerender } = renderHook(
       ({ lookup }: { lookup: () => Promise<Eip7730DisplayFormat | null> }) =>
-        useEip7730Format(lookup),
+        useRegistryAnswer(lookup),
       { initialProps: { lookup: () => current } },
     );
     current = second.promise;
     rerender({ lookup: () => current });
 
     await act(async () => first.resolve(OTHER));
-    expect(result.current).toEqual({ format: null, loading: true });
+    expect(result.current).toEqual({ answer: null, loading: true });
 
     await act(async () => second.resolve(SEND));
-    expect(result.current).toEqual({ format: SEND, loading: false });
+    expect(result.current).toEqual({ answer: SEND, loading: false });
   });
 });

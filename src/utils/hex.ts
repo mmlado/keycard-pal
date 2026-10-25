@@ -4,6 +4,11 @@ export function ensureHexPrefix(value: string): HexString {
   return (value.startsWith('0x') ? value : `0x${value}`) as HexString;
 }
 
+/** Hex that is whole bytes, with or without `0x`; viem pads anything else at the front. */
+export function isWholeBytes(hex: string): boolean {
+  return /^(?:0x)?(?:[0-9a-f]{2})*$/i.test(hex);
+}
+
 /** The bytes of an unprefixed hex string. The inverse of `toHex`. */
 export function fromHex(hex: string): Uint8Array {
   const bytes = new Uint8Array(hex.length / 2);

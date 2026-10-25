@@ -11,7 +11,7 @@ import theme from '@/theme';
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
 import InfoRow from '@/components/InfoRow';
 
-import { useEip7730Format } from '@/hooks/useEip7730Format';
+import { useRegistryAnswer } from '@/hooks/useRegistryAnswer';
 
 import {
   eip712DomainChainId,
@@ -81,7 +81,7 @@ export default function Eip712JsonPanel({
       rawTypedData.domain,
     );
   }, [domainChainId, verifyingContract, rawTypedData]);
-  const { format: matchedFormat, loading } = useEip7730Format(lookup);
+  const { answer: matchedFormat, loading } = useRegistryAnswer(lookup);
 
   const fieldContext = useMemo<Eip7730FieldContext>(() => {
     const container = {

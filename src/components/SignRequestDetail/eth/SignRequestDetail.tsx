@@ -12,20 +12,13 @@ import InfoRow from '@/components/InfoRow';
 import PersonalMessagePanel from './DataTabPanel/PersonalMessagePanel';
 import TxDataPanel from './DataTabPanel/TxDataPanel';
 
+import { useCallDescription } from '@/hooks/useCallDescription';
+
 import { getChainName, getNativeCurrencySymbol } from '@/utils/chainMetadata';
 import { parseEip712Summary } from '@/utils/eip712';
 import { classifyEthPayload, payloadChainId } from '@/utils/ethPayload';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
-import { getTxLabel, parseTx, type DecodedCall } from '@/utils/txParser';
-
-// The ERC-20 sections name the contract themselves, as "Token contract".
-function sectionShowsContract(call: DecodedCall | undefined): boolean {
-  return (
-    call?.kind === 'erc20-transfer' ||
-    call?.kind === 'erc20-transferFrom' ||
-    call?.kind === 'erc20-approve'
-  );
-}
+import { getTxLabel, parseTx } from '@/utils/txParser';
 
 export default function SignRequestDetail({
   request,
@@ -49,6 +42,15 @@ export default function SignRequestDetail({
     }),
     [request.signData, request.dataType, nativeSymbol],
   );
+  // Null while the entry's saved slice is read; the rows that depend on it wait with the panel.
+  const { description } = useCallDescription({
+    chainId,
+    contract: tx?.to,
+    data: tx?.data ?? '',
+    from: request.address,
+    value: tx?.valueWei,
+    depth: 0,
+  });
   const typeLabel =
     eip712?.primaryType ?? getTxLabel(request.signData, request.dataType);
   const signer = request.address
@@ -88,7 +90,7 @@ export default function SignRequestDetail({
         </View>
       )}
 
-      {tx?.to && !sectionShowsContract(tx.decodedCall) && (
+      {tx?.to && description?.contractRow === 'to' && (
         <View style={styles.row}>
           <AddressInfoRow label="To" value={tx.to} />
         </View>
@@ -100,11 +102,13 @@ export default function SignRequestDetail({
         </View>
       )}
 
-      {tx?.value !== undefined && (tx.value !== '0' || !tx.decodedCall) && (
-        <View style={styles.row}>
-          <InfoRow label="Amount" value={tx.value} />
-        </View>
-      )}
+      {tx?.value !== undefined &&
+        description &&
+        (tx.value !== '0' || description.selector === null) && (
+          <View style={styles.row}>
+            <InfoRow label="Amount" value={tx.value} />
+          </View>
+        )}
 
       {tx?.fees.kind === 'legacy' && (
         <View style={styles.row}>
@@ -131,7 +135,12 @@ export default function SignRequestDetail({
       ) : payload.kind === 'eip712-prehashed' ? (
         <Eip712PrehashedPanel payload={payload} request={request} />
       ) : tx ? (
-        <TxDataPanel tx={tx} request={request} chainId={chainId} />
+        <TxDataPanel
+          tx={tx}
+          request={request}
+          chainId={chainId}
+          description={description}
+        />
       ) : payload.kind === 'personal-message' ? (
         <PersonalMessagePanel message={payload} request={request} />
       ) : (
