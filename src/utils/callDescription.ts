@@ -24,11 +24,12 @@ export type CallRequest = {
   depth: number;
 };
 
-/** A registry entry that matched a call, with its arguments decoded by its own signature. */
+/** A registry entry that matched a call or a message, with the values it reads. */
 export type MatchedDescriptor = {
   format: Eip7730DisplayFormat;
   resolvePath: (path: string) => string | null;
   resolveEach: (path: string) => string[];
+  miscasedAt: (path: string) => boolean;
 };
 
 export type CallDescription = {
@@ -73,6 +74,8 @@ function matchEntry(
     format,
     resolvePath: buildArgsPathResolver(args, container),
     resolveEach: buildArgsEachResolver(args, container),
+    // Calldata holds an address as 20 bytes, with no case to get wrong.
+    miscasedAt: () => false,
   };
   return fitsRequest(format, descriptor)
     ? { descriptor, rejected: false }

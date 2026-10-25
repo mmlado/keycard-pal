@@ -5,6 +5,7 @@ import { join } from 'path';
 import { strToU8, zipSync } from 'fflate';
 
 import bundled from '../src/data/eip7730.json';
+import { displayDescriptor } from '../src/utils/eip7730/display';
 import {
   formatEip7730Field,
   interpolateIntent,
@@ -121,6 +122,17 @@ function renderAll(index: Eip7730Index, rand: () => number): number {
       resolvePath: () => value,
     });
     expect(sentence === null || typeof sentence === 'string').toBe(true);
+    // Every array empty, single or double, so blocks and inner calls get built too.
+    const display = displayDescriptor(
+      {
+        format,
+        resolvePath: () => value,
+        resolveEach: () => Array(rendered % 3).fill(value),
+        miscasedAt: () => rand() < 0.5,
+      },
+      { chainId: 1, contract: ADDRESS, depth: 0 },
+    );
+    expect(Array.isArray(display.nodes)).toBe(true);
   }
   return rendered;
 }

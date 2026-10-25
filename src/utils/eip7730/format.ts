@@ -20,14 +20,8 @@ export type Eip7730FieldContext = {
   chainId?: number;
   contractAddress?: string;
   resolvePath: (path: string) => string | null;
-  /** Every value a path selects, for inner-call fields over arrays. */
+  /** Every value a path selects, for fields over arrays. */
   resolveEach?: (path: string) => string[];
-  /** How many inner calls deep this field sits; the top-level call is 0. */
-  depth?: number;
-  /** A contract the review already shows, so an unknown token row would repeat it. */
-  shownContract?: string;
-  /** Whether the request wrote an address at this path with a wrong checksum. */
-  miscasedAt?: (path: string) => boolean;
 };
 
 export type Eip7730FieldDisplay = {
@@ -478,6 +472,32 @@ export function formatEip7730Field(
   }
 }
 
+export type FieldValue =
+  | ({ kind: 'address'; name?: string } & AddressNameDisplay)
+  | ({ kind: 'text' } & Eip7730FieldDisplay);
+
+export function describeFieldValue(
+  field: Eip7730Field,
+  raw: string | null,
+  format: Eip7730DisplayFormat,
+  ctx: Eip7730FieldContext,
+): FieldValue {
+  // An encrypted value is a ciphertext handle, never an address.
+  const named =
+    raw === null || field.encryption
+      ? null
+      : field.format === 'addressName'
+      ? describeAddress(field, raw, format, ctx)
+      : field.format === 'tokenTicker'
+      ? describeTokenTicker(field, raw, format, ctx)
+      : field.format === 'interoperableAddressName'
+      ? describeInteroperable(field, raw, format, ctx)
+      : null;
+  return named
+    ? { kind: 'address', ...named }
+    : { kind: 'text', ...formatEip7730Field(field, raw, format, ctx) };
+}
+
 // The spec's injection rule: a value that could fake, hide or crowd out text sends the review back to `intent`.
 const UNSAFE_TEXT_RE =
   // eslint-disable-next-line no-control-regex
@@ -538,32 +558,11 @@ function fieldTexts(
   }
   const raw = field.value ?? ctx.resolvePath(field.path);
   if (raw === null) return null;
-  const encrypted = encryptedLabel(field);
-  if (encrypted !== null) return [encrypted];
-  if (field.format === 'interoperableAddressName') {
-    const interoperable = describeInteroperable(field, raw, format, ctx);
-    if (interoperable) {
-      return [
-        interoperable.sender
-          ? interoperable.address ?? SENDER_TEXT
-          : interoperable.name,
-      ];
-    }
-  }
-  if (field.format === 'tokenTicker') {
-    const ticker = describeTokenTicker(field, raw, format, ctx);
-    if (ticker) return [ticker.token?.symbol ?? ticker.address ?? raw];
-  }
-  const shown =
-    field.format === 'addressName'
-      ? describeAddress(field, raw, format, ctx)
-      : null;
-  if (shown) {
-    return [
-      shown.sender
-        ? shown.address ?? SENDER_TEXT
-        : shown.token?.symbol ?? shown.address ?? SENDER_TEXT,
-    ];
-  }
-  return [formatEip7730Field(field, raw, format, ctx).text];
+  const shown = describeFieldValue(field, raw, format, ctx);
+  if (shown.kind === 'text') return [shown.text];
+  return [
+    shown.sender
+      ? shown.address ?? SENDER_TEXT
+      : shown.name ?? shown.token?.symbol ?? shown.address ?? SENDER_TEXT,
+  ];
 }

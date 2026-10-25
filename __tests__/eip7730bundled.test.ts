@@ -11,12 +11,21 @@ import { UNLIMITED_APPROVAL_WARNING } from '../src/constants/approval';
 import { describeCall } from '../src/utils/callDescription';
 import { encodeEip712Type } from '../src/utils/eip712';
 import {
+  displayDescriptor,
+  displayMessage,
+  ENCRYPTED_VALUE_LABEL,
+  type DescriptorDisplay,
+  type DisplayNode,
+} from '../src/utils/eip7730/display';
+import {
   formatEip7730Field,
   interpolateIntent,
 } from '../src/utils/eip7730/format';
 import * as lookup from '../src/utils/eip7730/lookup';
 import {
+  buildArgsEachResolver,
   buildArgsPathResolver,
+  buildEip712Resolvers,
   decodeArgsBySignature,
   resolveEip712FieldValue,
 } from '../src/utils/eip7730/paths';
@@ -25,6 +34,7 @@ import type {
   Eip7730DisplayFormat,
   Eip7730Index,
 } from '../src/utils/eip7730/zip';
+import { checksumEthAddress } from '../src/utils/ethereumAddress';
 
 // The bundled index answers at once; a promise here would make every review screen wait.
 function now(result: lookup.FormatLookup): Eip7730DisplayFormat | null {
@@ -49,7 +59,26 @@ const word = (v: string | bigint) =>
     ? v.slice(2).padStart(64, '0')
     : v.toString(16).padStart(64, '0');
 
-// The review's own answer for the call: the entry matched, decoded and fitted to the request.
+// The entry's intent and every row the review shows, element blocks included.
+function rows(
+  format: Eip7730DisplayFormat,
+  display: DescriptorDisplay,
+): Record<string, string> {
+  const out: Record<string, string> = { intent: format.intent ?? '' };
+  const walk = (nodes: DisplayNode[]) => {
+    for (const node of nodes) {
+      if (node.kind === 'text' || node.kind === 'address') {
+        out[node.label] = node.value;
+      } else if (node.kind === 'item') {
+        walk(node.nodes);
+      }
+    }
+  };
+  walk(display.nodes);
+  return out;
+}
+
+// The review's own answer for the call: the entry matched, decoded, fitted and displayed.
 function renderCalldata(
   to: string,
   data: string,
@@ -65,21 +94,11 @@ function renderCalldata(
   if (described instanceof Promise)
     throw new Error('bundled lookup returned a promise');
   expect(described.view).toBe('descriptor');
-  const { format, resolvePath } = described.descriptor!;
-  return rows(format, { chainId, contractAddress: to, resolvePath });
-}
-
-function rows(
-  descriptor: Eip7730DisplayFormat,
-  ctx: Parameters<typeof formatEip7730Field>[3],
-): Record<string, string> {
-  return Object.fromEntries([
-    ['intent', descriptor.intent ?? ''],
-    ...descriptor.fields.map(f => [
-      f.label,
-      formatEip7730Field(f, ctx.resolvePath(f.path), descriptor, ctx).text,
-    ]),
-  ]);
+  const descriptor = described.descriptor!;
+  return rows(
+    descriptor.format,
+    displayDescriptor(descriptor, { chainId, contract: to, depth: 0 }),
+  );
 }
 
 describe('bundled EIP-7730 descriptors', () => {
@@ -90,7 +109,7 @@ describe('bundled EIP-7730 descriptors', () => {
     );
     expect(out.intent).toBe('Send');
     expect(out.Amount).toBe('1.5 USDT');
-    expect(out.To.toLowerCase()).toBe(RECIPIENT);
+    expect(out.To).toBe(checksumEthAddress(RECIPIENT));
   });
 
   it('USDT unlimited approval reads "Unlimited USDT"', () => {
@@ -132,7 +151,7 @@ describe('bundled EIP-7730 descriptors', () => {
       '0x6e553f65' + word(AMOUNT) + word(RECIPIENT),
     );
     expect(out['Deposit asset']).toBe('1.5 USDC');
-    expect(out['Send shares to'].toLowerCase()).toBe(RECIPIENT);
+    expect(out['Send shares to']).toBe(checksumEthAddress(RECIPIENT));
     expect(
       descriptor!.fields.find(f => f.label === 'Share ticker')?.value,
     ).toBe('kmmUSDC');
@@ -187,12 +206,17 @@ describe('bundled EIP-7730 descriptors', () => {
     it('matches by encoded type and renders the amount', () => {
       const descriptor = lookupEip712(1, USDC, encodedType, domain);
       expect(descriptor?.intent).toBe('Authorize USDC transfer');
-      const container = { to: USDC, value: '0', chainId: 1 };
-      const out = rows(descriptor!, {
-        chainId: 1,
-        contractAddress: USDC,
-        resolvePath: path => resolveEip712FieldValue(path, message, container),
-      });
+      const resolvers = buildEip712Resolvers(
+        { types, primaryType: 'TransferWithAuthorization', message },
+        { to: USDC, value: '0', chainId: 1 },
+      );
+      const out = rows(
+        descriptor!,
+        displayMessage(
+          { format: descriptor!, ...resolvers },
+          { chainId: 1, verifyingContract: USDC },
+        ),
+      );
       expect(out.Amount).toBe('1.5 USDC');
     });
 
@@ -253,7 +277,7 @@ describe('visibility rules', () => {
 describe('encrypted amounts', () => {
   const CUSDC = '0xe978f22157048e5db8e5d07971376e86671672b2';
 
-  it('shows a confidential transfer amount as the placeholder, never the handle', () => {
+  it('shows a confidential transfer amount as the placeholder, the handle only as itself', () => {
     const handle = `0x${'ab'.repeat(32)}`;
     const selector = Object.keys(
       (bundled as unknown as Eip7730Index).contracts[CUSDC] ?? {},
@@ -265,17 +289,23 @@ describe('encrypted amounts', () => {
     });
     expect(selector).toBeDefined();
     const descriptor = lookupCalldata(1, CUSDC, selector!)!;
-    const resolvePath = buildArgsPathResolver(
-      { to: RECIPIENT, amount: handle },
-      { to: CUSDC, chainId: 1 },
+    const args = { to: RECIPIENT, amount: handle };
+    const container = { to: CUSDC, chainId: 1 };
+    const { [ENCRYPTED_VALUE_LABEL]: shownHandle, ...out } = rows(
+      descriptor,
+      displayDescriptor(
+        {
+          format: descriptor,
+          resolvePath: buildArgsPathResolver(args, container),
+          resolveEach: buildArgsEachResolver(args, container),
+          miscasedAt: () => false,
+        },
+        { chainId: 1, contract: CUSDC, depth: 0 },
+      ),
     );
-    const out = rows(descriptor, {
-      chainId: 1,
-      contractAddress: CUSDC,
-      resolvePath,
-    });
     expect(Object.values(out)).toContain('[Encrypted Amount]');
     expect(JSON.stringify(out)).not.toContain('abab');
+    expect(shownHandle).toBe(handle);
   });
 });
 
