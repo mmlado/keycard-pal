@@ -10,6 +10,7 @@ import RNKeycard from 'react-native-keycard';
 import { PAIRING_PASSWORD } from '@/constants/keycard';
 import {
   cardHasRoute,
+  cardPredatesRoute,
   routeAbsence,
   type GenerationBoundRoute,
 } from '@/navigation/generationBoundRoutes';
@@ -56,7 +57,7 @@ export interface ExecuteOptions {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
   /**
-   * The route this operation belongs to, when newer cards lack it. Checked right after SELECT.
+   * The route this operation belongs to, when only some cards have it. Checked right after SELECT.
    */
   requiresRoute?: GenerationBoundRoute;
   /** Wait for a re-tap when the card leaves mid-operation. Read-only operations only. */
@@ -399,10 +400,13 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
 
       // First of all: a card without this operation is sent nothing beyond SELECT.
       const requiredRoute = requiresRouteRef.current;
-      if (
-        requiredRoute &&
-        !cardHasRoute(requiredRoute, cardGeneration(appInfo))
-      ) {
+      const generation = cardGeneration(appInfo);
+      if (requiredRoute && !cardHasRoute(requiredRoute, generation)) {
+        // The copy sends the user to a newer card, which the typed PIN may not belong to.
+        if (cardPredatesRoute(requiredRoute, generation)) {
+          pinRef.current = '';
+          pinVerifiedRef.current = false;
+        }
         throw new Error(routeAbsence(requiredRoute).sheetError);
       }
 

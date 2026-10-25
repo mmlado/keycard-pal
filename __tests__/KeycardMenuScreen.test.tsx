@@ -59,6 +59,7 @@ describe('KeycardMenuScreen', () => {
     renderScreen();
     expect(screen.getByText('Initialize')).toBeTruthy();
     expect(screen.getByText('Key pair')).toBeTruthy();
+    expect(screen.getByText('Derive with BIP85')).toBeTruthy();
     expect(screen.getByText('Set card name')).toBeTruthy();
     expect(screen.getByText('Secrets')).toBeTruthy();
     expect(screen.getByText('Manage pairing slots')).toBeTruthy();
@@ -67,7 +68,7 @@ describe('KeycardMenuScreen', () => {
 
   it('shows a leading icon on every row', () => {
     renderScreen();
-    for (const index of [0, 1, 2, 3, 4, 5]) {
+    for (const index of [0, 1, 2, 3, 4, 5, 6]) {
       expect(screen.getByTestId(`menu-icon-${index}`)).toBeTruthy();
     }
   });
@@ -78,8 +79,9 @@ describe('KeycardMenuScreen', () => {
     expect(screen.queryByTestId('menu-nfc-indicator-1')).toBeNull();
     expect(screen.queryByTestId('menu-nfc-indicator-2')).toBeNull();
     expect(screen.queryByTestId('menu-nfc-indicator-3')).toBeNull();
-    expect(screen.getByTestId('menu-nfc-indicator-4')).toBeTruthy();
-    expect(screen.queryByTestId('menu-nfc-indicator-5')).toBeNull();
+    expect(screen.queryByTestId('menu-nfc-indicator-4')).toBeNull();
+    expect(screen.getByTestId('menu-nfc-indicator-5')).toBeTruthy();
+    expect(screen.queryByTestId('menu-nfc-indicator-6')).toBeNull();
   });
 
   it('renders the NFC indicator with the primary accent color', () => {
@@ -94,6 +96,7 @@ describe('KeycardMenuScreen', () => {
     for (const [label, destination] of [
       ['Initialize', 'InitCard'],
       ['Key pair', 'KeyPairMenu'],
+      ['Derive with BIP85', 'Bip85Menu'],
       ['Set card name', 'SetCardName'],
       ['Secrets', 'SecretsMenu'],
       ['Manage pairing slots', 'PairingSlots'],
@@ -117,6 +120,22 @@ describe('KeycardMenuScreen', () => {
       mockGenerationsInUse = ['3.1'];
       renderScreen();
       expect(screen.getByText('Manage pairing slots')).toBeTruthy();
+    });
+  });
+
+  // The entry stays for anyone who ticked a card that can derive BIP85.
+  describe('BIP85 entry', () => {
+    it('is hidden when only 3.x cards are ticked', () => {
+      mockGenerationsInUse = ['3.1'];
+      renderScreen();
+      expect(screen.queryByText('Derive with BIP85')).toBeNull();
+      expect(screen.getByText('Key pair')).toBeTruthy();
+    });
+
+    it('stays when 4.x cards are ticked', () => {
+      mockGenerationsInUse = ['4.0'];
+      renderScreen();
+      expect(screen.getByText('Derive with BIP85')).toBeTruthy();
     });
   });
 

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Derive with BIP85, under Keycard, for Keycards with applet 4.0 or later: a 12, 18 or 24-word BIP39 recovery phrase, a Bitcoin WIF or BIP32 XPRV private key, 32 or 64 bytes of hex entropy, or a Base64 password, by index
+
 ### Changed
 
 - The backup check of a generated key pair shows a preparing step after the last answer instead of pausing when it opens

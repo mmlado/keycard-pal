@@ -36,6 +36,10 @@ import KeySizeScreen from '../screens/keypair/KeySizeScreen';
 import MnemonicScreen from '../screens/keypair/MnemonicScreen';
 import Slip39Screen from '../screens/keypair/Slip39Screen';
 
+// BIP85 screens
+import Bip85MenuScreen from '../screens/bip85/Bip85MenuScreen';
+import Bip85Screen from '../screens/bip85/Bip85Screen';
+
 // Secrets screens
 import ChangeSecretScreen from '../screens/secrets/ChangeSecretScreen';
 import SecretsMenuScreen from '../screens/secrets/SecretsMenuScreen';
@@ -125,6 +129,18 @@ export const routes: Route[] = [
   {
     name: 'Slip39',
     component: Slip39Screen,
+    options: defaultHeaderOptions,
+  },
+
+  // BIP85 flow
+  {
+    name: 'Bip85Menu',
+    component: Bip85MenuScreen,
+    options: { ...defaultHeaderOptions, title: 'Derive with BIP85' },
+  },
+  {
+    name: 'Bip85',
+    component: Bip85Screen,
     options: defaultHeaderOptions,
   },
 

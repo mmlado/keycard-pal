@@ -73,6 +73,7 @@ export const Icons = {
   secrets: mdi('shield-lock-outline', onSurface),
   pairingSlots: mdi('cellphone-link', onSurface),
   factoryReset: mdi('restore', onSurface),
+  bip85: mdi('file-tree-outline', onSurface),
 
   // Key pair menu. The phrase icons mark length only.
   phraseShort: mdi('text-short', onSurface),
@@ -83,6 +84,10 @@ export const Icons = {
   sharesGenerate: mdi('call-split', onSurface),
   sharesImport: mdi('call-merge', onSurface),
   sharesVerify: mdi('checkbox-multiple-marked-outline', onSurface),
+
+  // BIP85 menu. Phrases and keys reuse the glyphs above.
+  hex: mdi('hexadecimal', onSurface),
+  password: mdi('form-textbox-password', onSurface),
 
   // Secrets menu
   pin: mdi('dialpad', onSurface),

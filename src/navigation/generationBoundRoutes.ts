@@ -1,17 +1,30 @@
-import { Generation, isNewerGeneration } from '@/utils/cardGeneration';
+import {
+  Generation,
+  generationLabel,
+  isNewerGeneration,
+} from '@/utils/cardGeneration';
 
-/** Destinations newer cards no longer have. `ChangeSecret` is bound for the pairing secret only. */
-export type GenerationBoundRoute = 'PairingSlots' | 'ChangePairingSecret';
+/** Destinations only some cards have. `ChangeSecret` is bound for the pairing secret only. */
+export type GenerationBoundRoute =
+  | 'PairingSlots'
+  | 'ChangePairingSecret'
+  | 'Bip85';
+
+/** The first and last generation that have a destination; at least one is set. */
+type GenerationSpan =
+  | { first: Generation; last?: Generation }
+  | { first?: Generation; last: Generation };
 
 /**
- * The last generation that has each destination; the whole list lives here. `isRouteHidden` and
+ * The generations that have each destination; the whole list lives here. `isRouteHidden` and
  * `everyCardInUseHasRoute` answer the user's preference, `cardHasRoute` answers the tapped card.
  * Only the last one refuses anything.
  */
-const LAST_GENERATION: Record<GenerationBoundRoute, Generation> = {
-  PairingSlots: '3.1',
-  ChangePairingSecret: '3.1',
-};
+const ROUTE_GENERATIONS = {
+  PairingSlots: { last: '3.1' },
+  ChangePairingSecret: { last: '3.1' },
+  Bip85: { first: '4.0' },
+} as const satisfies Record<GenerationBoundRoute, GenerationSpan>;
 
 /** No ticked generation has it: leave the menu entry out. An empty selection hides nothing. */
 export function isRouteHidden(
@@ -43,7 +56,24 @@ export function cardHasRoute(
   if (generation === null) {
     return false;
   }
-  return !isNewerGeneration(generation, LAST_GENERATION[route]);
+  const { last }: GenerationSpan = ROUTE_GENERATIONS[route];
+  return (
+    !cardPredatesRoute(route, generation) &&
+    !(last && isNewerGeneration(generation, last))
+  );
+}
+
+/** The card is older than the destination, so the user is sent to another card. */
+export function cardPredatesRoute(
+  route: GenerationBoundRoute,
+  generation: Generation | null,
+): boolean {
+  const { first }: GenerationSpan = ROUTE_GENERATIONS[route];
+  return (
+    generation !== null &&
+    first !== undefined &&
+    isNewerGeneration(first, generation)
+  );
 }
 
 /** What the user is told when the tapped card lacks a destination. */
@@ -75,6 +105,16 @@ const NOT_ON_CARD: Record<GenerationBoundRoute, RouteAbsence> = {
     sheetError:
       'This Keycard has no pairing secret, so nothing was changed. Tap the ' +
       'card you started with.',
+  },
+  Bip85: {
+    title: 'No BIP85 on this Keycard',
+    // Shown on the index screen while an older card is ticked.
+    detail: `This needs a Keycard with applet ${generationLabel(
+      ROUTE_GENERATIONS.Bip85.first,
+    )}.`,
+    sheetError:
+      'This Keycard cannot derive BIP85 secrets, so nothing was derived. Tap ' +
+      'a newer Keycard.',
   },
 };
 
