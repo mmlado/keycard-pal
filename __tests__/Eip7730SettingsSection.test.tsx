@@ -9,6 +9,7 @@ import {
 
 import Eip7730SettingsSectionOffline from '../src/components/settings/eip7730/Eip7730SettingsSection.offline';
 import Eip7730SettingsSectionOnline from '../src/components/settings/eip7730/Eip7730SettingsSection.online';
+import { SAVE_FAILED } from '../src/components/settings/TextInputSetting';
 import { IMPORT_SOURCE_WARNING } from '../src/constants/eip7730';
 import { setSavedIndex } from '../src/utils/eip7730/lookup';
 import { rfc3339 } from '../src/utils/rfc3339';
@@ -324,12 +325,30 @@ describe('Eip7730SettingsSection.online', () => {
     );
     fireEvent.press(screen.getByText('Save'));
     await waitFor(() => {
-      expect(mockClearLastModified).toHaveBeenCalled();
+      expect(mockSaveUrl).toHaveBeenCalledWith(
+        'https://example.test/registry.zip',
+      );
     });
-    expect(mockSaveUrl).toHaveBeenCalledWith(
+    expect(mockClearEtag).toHaveBeenCalled();
+    expect(mockClearLastModified).toHaveBeenCalled();
+  });
+
+  it('says the URL could not be saved when storing it fails', async () => {
+    mockLoadSource.mockResolvedValue('auto');
+    mockSaveUrl.mockRejectedValueOnce(new Error('storage full'));
+    render(<Eip7730SettingsSectionOnline />);
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(DEFAULT_URL)).toBeTruthy();
+    });
+    fireEvent.changeText(
+      screen.getByPlaceholderText(DEFAULT_URL),
       'https://example.test/registry.zip',
     );
-    expect(mockClearEtag).toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(screen.getByText(SAVE_FAILED)).toBeTruthy();
+    expect(screen.getByText('Save')).toBeTruthy();
   });
 
   it('saves the default URL for an empty field, and reverts an edit', async () => {

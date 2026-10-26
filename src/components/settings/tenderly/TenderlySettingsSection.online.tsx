@@ -2,26 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../../theme';
+import theme from '@/theme';
 
-import SettingsToggleRow from '../SettingsToggleRow';
-import TextInputSetting from '../TextInputSetting';
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
+import TextInputSetting from '@/components/settings/TextInputSetting';
 
 import {
   loadTenderlyConfig,
   saveTenderlyCredentials,
   saveTenderlyEnabled,
   type TenderlyCredentials,
-} from '../../../storage/tenderly.online';
+} from '@/storage/tenderly.online';
 
 const TENDERLY_REGISTER_URL = 'https://dashboard.tenderly.co/register';
 
 export default function TenderlySettingsSection() {
   const [enabled, setEnabled] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [accountSlug, setAccountSlug] = useState('');
-  const [projectSlug, setProjectSlug] = useState('');
-  const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState<TenderlyCredentials>({
     accountSlug: '',
     projectSlug: '',
@@ -36,9 +33,6 @@ export default function TenderlySettingsSection() {
       .then(config => {
         if (cancelled) return;
         setEnabled(config.enabled);
-        setAccountSlug(config.credentials.accountSlug);
-        setProjectSlug(config.credentials.projectSlug);
-        setApiKey(config.credentials.apiKey);
         setSaved(config.credentials);
         setLoaded(true);
       })
@@ -59,22 +53,15 @@ export default function TenderlySettingsSection() {
     }
   }, []);
 
+  // Each field saves all three, so a second save keeps what the first one stored.
   const saveCredentials = useCallback(
     async (patch: Partial<TenderlyCredentials>) => {
       const creds = { ...savedRef.current, ...patch };
-      try {
-        await saveTenderlyCredentials(creds);
-        setSaved(creds);
-      } catch {
-        // leave UI state as-is; user can retry
-      }
+      await saveTenderlyCredentials(creds);
+      setSaved(creds);
     },
     [],
   );
-
-  const accountSlugDirty = loaded && accountSlug !== saved.accountSlug;
-  const projectSlugDirty = loaded && projectSlug !== saved.projectSlug;
-  const apiKeyDirty = loaded && apiKey !== saved.apiKey;
 
   if (!loaded) return null;
 
@@ -89,53 +76,24 @@ export default function TenderlySettingsSection() {
         <>
           <TextInputSetting
             label="Account slug"
-            value={accountSlug}
-            dirty={accountSlugDirty}
+            value={saved.accountSlug}
             placeholder="my-account"
-            disableSave={accountSlug.trim() === ''}
-            onChangeText={setAccountSlug}
-            onRevert={
-              saved.accountSlug
-                ? () => setAccountSlug(saved.accountSlug)
-                : undefined
-            }
-            onSave={() => {
-              const v = accountSlug.trim();
-              setAccountSlug(v);
-              saveCredentials({ accountSlug: v });
-            }}
+            required
+            onSave={accountSlug => saveCredentials({ accountSlug })}
           />
           <TextInputSetting
             label="Project slug"
-            value={projectSlug}
-            dirty={projectSlugDirty}
+            value={saved.projectSlug}
             placeholder="my-project"
-            disableSave={projectSlug.trim() === ''}
-            onChangeText={setProjectSlug}
-            onRevert={
-              saved.projectSlug
-                ? () => setProjectSlug(saved.projectSlug)
-                : undefined
-            }
-            onSave={() => {
-              const v = projectSlug.trim();
-              setProjectSlug(v);
-              saveCredentials({ projectSlug: v });
-            }}
+            required
+            onSave={projectSlug => saveCredentials({ projectSlug })}
           />
           <TextInputSetting
             label="API key"
-            value={apiKey}
-            dirty={apiKeyDirty}
+            value={saved.apiKey}
             placeholder="Enter API key"
-            disableSave={apiKey.trim() === ''}
-            onChangeText={setApiKey}
-            onRevert={saved.apiKey ? () => setApiKey(saved.apiKey) : undefined}
-            onSave={() => {
-              const v = apiKey.trim();
-              setApiKey(v);
-              saveCredentials({ apiKey: v });
-            }}
+            required
+            onSave={apiKey => saveCredentials({ apiKey })}
           />
           <Text
             style={styles.link}

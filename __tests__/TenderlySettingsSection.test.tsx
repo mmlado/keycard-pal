@@ -1,6 +1,7 @@
 import React from 'react';
 import { Linking } from 'react-native';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -9,6 +10,7 @@ import {
 
 import TenderlySettingsSection from '../src/components/settings/tenderly/TenderlySettingsSection.online';
 import TenderlySettingsSectionOffline from '../src/components/settings/tenderly/TenderlySettingsSection.offline';
+import { SAVE_FAILED } from '../src/components/settings/TextInputSetting';
 
 const mockLoadTenderlyConfig = jest.fn();
 const mockSaveTenderlyEnabled = jest.fn();
@@ -110,6 +112,17 @@ describe('TenderlySettingsSection.online', () => {
     expect(mockSaveTenderlyEnabled).toHaveBeenCalledWith(true);
   });
 
+  it('turns the switch back when storing it fails', async () => {
+    mockLoadTenderlyConfig.mockResolvedValue(EMPTY_CONFIG);
+    mockSaveTenderlyEnabled.mockRejectedValueOnce(new Error('storage full'));
+    render(<TenderlySettingsSection />);
+    await waitFor(() => expect(screen.getByRole('switch')).toBeTruthy());
+    await act(async () => {
+      fireEvent(screen.getByRole('switch'), 'valueChange', true);
+    });
+    expect(screen.getByRole('switch').props.value).toBe(false);
+  });
+
   it('shows Save button when account slug is edited', async () => {
     mockLoadTenderlyConfig.mockResolvedValue(FULL_CONFIG);
     render(<TenderlySettingsSection />);
@@ -133,10 +146,26 @@ describe('TenderlySettingsSection.online', () => {
       screen.getByPlaceholderText('my-account'),
       'new-account',
     );
-    fireEvent.press(screen.getAllByText('Save')[0]);
+    await act(async () => {
+      fireEvent.press(screen.getAllByText('Save')[0]);
+    });
     expect(mockSaveTenderlyCredentials).toHaveBeenCalledWith(
       expect.objectContaining({ accountSlug: 'new-account' }),
     );
+  });
+
+  it('says a credential could not be saved when storing it fails', async () => {
+    mockLoadTenderlyConfig.mockResolvedValue(FULL_CONFIG);
+    mockSaveTenderlyCredentials.mockRejectedValue(new Error('storage full'));
+    render(<TenderlySettingsSection />);
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('my-account')).toBeTruthy(),
+    );
+    fireEvent.changeText(screen.getByPlaceholderText('my-account'), 'other');
+    await act(async () => {
+      fireEvent.press(screen.getAllByText('Save')[0]);
+    });
+    expect(screen.getByText(SAVE_FAILED)).toBeTruthy();
   });
 
   it('shows Tenderly registration link when enabled', async () => {
@@ -185,7 +214,9 @@ describe('TenderlySettingsSection.online', () => {
       screen.getByPlaceholderText('my-project'),
       'new-project',
     );
-    fireEvent.press(screen.getAllByText('Save')[0]);
+    await act(async () => {
+      fireEvent.press(screen.getAllByText('Save')[0]);
+    });
     expect(mockSaveTenderlyCredentials).toHaveBeenCalledWith(
       expect.objectContaining({ projectSlug: 'new-project' }),
     );
@@ -201,7 +232,9 @@ describe('TenderlySettingsSection.online', () => {
       screen.getByPlaceholderText('Enter API key'),
       'newkey',
     );
-    fireEvent.press(screen.getAllByText('Save')[0]);
+    await act(async () => {
+      fireEvent.press(screen.getAllByText('Save')[0]);
+    });
     expect(mockSaveTenderlyCredentials).toHaveBeenCalledWith(
       expect.objectContaining({ apiKey: 'newkey' }),
     );
@@ -235,7 +268,9 @@ describe('TenderlySettingsSection.online', () => {
       screen.getByPlaceholderText('my-account'),
       'new-account',
     );
-    fireEvent.press(screen.getAllByText('Save')[0]);
+    await act(async () => {
+      fireEvent.press(screen.getAllByText('Save')[0]);
+    });
     await waitFor(() =>
       expect(mockSaveTenderlyCredentials).toHaveBeenCalledTimes(1),
     );
@@ -245,7 +280,9 @@ describe('TenderlySettingsSection.online', () => {
       screen.getByPlaceholderText('my-project'),
       'new-project',
     );
-    fireEvent.press(screen.getAllByText('Save')[0]);
+    await act(async () => {
+      fireEvent.press(screen.getAllByText('Save')[0]);
+    });
     await waitFor(() =>
       expect(mockSaveTenderlyCredentials).toHaveBeenCalledTimes(2),
     );

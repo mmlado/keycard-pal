@@ -1,79 +1,173 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import TextInputSetting from '../src/components/settings/TextInputSetting';
-import { FieldFocusContext } from '../src/components/settings/fieldFocus';
+import TextInputSetting, {
+  SAVE_FAILED,
+} from '../src/components/settings/TextInputSetting';
 
-function renderField(onFieldFocus: jest.Mock) {
-  return render(
-    <FieldFocusContext.Provider value={onFieldFocus}>
-      <TextInputSetting
-        label="Project ID"
-        value="abc"
-        dirty={false}
-        placeholder="Enter WalletConnect Project ID"
-        onChangeText={jest.fn()}
-        onSave={jest.fn()}
-      />
-    </FieldFocusContext.Provider>,
+const mockKeep = {
+  block: { ref: { current: null }, onLayout: jest.fn() },
+  input: { onFocus: jest.fn(), onBlur: jest.fn() },
+};
+
+jest.mock('../src/components/KeyboardAwareScrollView', () => ({
+  useKeepAboveKeyboard: () => mockKeep,
+}));
+
+function renderField(
+  props: Partial<React.ComponentProps<typeof TextInputSetting>> = {},
+) {
+  const onSave = jest.fn(async () => undefined);
+  const view = render(
+    <TextInputSetting
+      label="Project ID"
+      value="abc"
+      placeholder="Enter WalletConnect Project ID"
+      onSave={onSave}
+      {...props}
+    />,
   );
+  return { ...view, onSave: (props.onSave as jest.Mock) ?? onSave };
 }
 
+const input = () =>
+  screen.getByPlaceholderText('Enter WalletConnect Project ID');
+
+beforeEach(() => jest.clearAllMocks());
+
 describe('TextInputSetting', () => {
-  // The screen owns the ScrollView, so it is the only one that can scroll a
-  // focused field clear of the keyboard: the field has to hand itself over.
-  it('hands its field block to the field-focus context on focus', () => {
-    const onFieldFocus = jest.fn();
-    renderField(onFieldFocus);
-
-    fireEvent(
-      screen.getByPlaceholderText('Enter WalletConnect Project ID'),
-      'focus',
-    );
-
-    expect(onFieldFocus).toHaveBeenCalledTimes(1);
-    expect(onFieldFocus.mock.calls[0][0]).toBeTruthy();
+  it('shows the stored value and no buttons until it is edited', () => {
+    renderField();
+    expect(input().props.value).toBe('abc');
+    expect(screen.queryByText('Save')).toBeNull();
+    expect(screen.queryByText('Revert')).toBeNull();
   });
 
-  // Revert and Save appear under the field after it was scrolled into view.
-  it('hands itself over again when its layout changes while focused', () => {
-    const onFieldFocus = jest.fn();
-    renderField(onFieldFocus);
-    const input = screen.getByPlaceholderText('Enter WalletConnect Project ID');
+  it('offers Save and Revert for an edit, and Revert brings the stored value back', () => {
+    renderField();
+    fireEvent.changeText(input(), 'abcd');
+    expect(screen.getByText('Save')).toBeTruthy();
 
-    fireEvent(input, 'focus');
-    fireEvent(screen.root, 'layout', { nativeEvent: { layout: {} } });
+    fireEvent.press(screen.getByText('Revert'));
 
-    expect(onFieldFocus).toHaveBeenCalledTimes(2);
-    expect(onFieldFocus.mock.calls[1][0]).toBe(onFieldFocus.mock.calls[0][0]);
+    expect(input().props.value).toBe('abc');
+    expect(screen.queryByText('Save')).toBeNull();
   });
 
-  it('stays put on a layout change once it has lost focus', () => {
-    const onFieldFocus = jest.fn();
-    renderField(onFieldFocus);
-    const input = screen.getByPlaceholderText('Enter WalletConnect Project ID');
-
-    fireEvent(screen.root, 'layout', { nativeEvent: { layout: {} } });
-    fireEvent(input, 'focus');
-    fireEvent(input, 'blur');
-    fireEvent(screen.root, 'layout', { nativeEvent: { layout: {} } });
-
-    // The focus, then the blur handing the screen no field.
-    expect(onFieldFocus).toHaveBeenCalledTimes(2);
-    expect(onFieldFocus.mock.calls[1][0]).toBeNull();
+  it('counts an edit that only adds spaces as no edit', () => {
+    renderField();
+    fireEvent.changeText(input(), ' abc ');
+    expect(screen.queryByText('Save')).toBeNull();
   });
 
-  it('renders without a provider', () => {
-    render(
+  it('saves the trimmed draft and takes the stored value afterwards', async () => {
+    const { rerender, onSave } = renderField();
+    fireEvent.changeText(input(), '  xyz ');
+    await act(async () => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(onSave).toHaveBeenCalledWith('xyz');
+
+    rerender(
       <TextInputSetting
         label="Project ID"
-        value="abc"
-        dirty={false}
-        onChangeText={jest.fn()}
-        onSave={jest.fn()}
+        value="xyz"
+        placeholder="Enter WalletConnect Project ID"
+        onSave={onSave}
       />,
     );
+    expect(input().props.value).toBe('xyz');
+    expect(screen.queryByText('Save')).toBeNull();
+  });
 
-    expect(screen.getByDisplayValue('abc')).toBeTruthy();
+  it('shows the stored value after a save that stores what was already there', async () => {
+    // The registry URL stores the default for an empty field.
+    renderField({ value: 'https://default', onSave: jest.fn(async () => {}) });
+    fireEvent.changeText(input(), '');
+    await act(async () => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(input().props.value).toBe('https://default');
+  });
+
+  it('keeps the draft and shows the line a save returns', async () => {
+    renderField({
+      onSave: jest.fn(async () => 'Not an Ethereum mainnet endpoint.'),
+    });
+    fireEvent.changeText(input(), 'https://other');
+    await act(async () => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(screen.getByText('Not an Ethereum mainnet endpoint.')).toBeTruthy();
+    expect(input().props.value).toBe('https://other');
+
+    fireEvent.changeText(input(), 'https://other2');
+    expect(screen.queryByText('Not an Ethereum mainnet endpoint.')).toBeNull();
+  });
+
+  it('says a save failed when it throws, and keeps the draft', async () => {
+    renderField({
+      onSave: jest.fn(async () => {
+        throw new Error('storage full');
+      }),
+    });
+    fireEvent.changeText(input(), 'new-id');
+    await act(async () => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(screen.getByText(SAVE_FAILED)).toBeTruthy();
+    expect(input().props.value).toBe('new-id');
+  });
+
+  it('shows a spinner and locks the input while it saves', async () => {
+    let finish: () => void = () => {};
+    renderField({
+      onSave: jest.fn(
+        () =>
+          new Promise<void>(resolve => {
+            finish = resolve;
+          }),
+      ),
+    });
+    fireEvent.changeText(input(), 'slow');
+    act(() => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(screen.queryByText('Save')).toBeNull();
+    expect(screen.queryByText('Revert')).toBeNull();
+    expect(input().props.editable).toBe(false);
+
+    await act(async () => finish());
+    expect(input().props.editable).toBe(true);
+  });
+
+  it('keeps Save off for an empty draft when a value is required', async () => {
+    const { onSave } = renderField({ required: true });
+    fireEvent.changeText(input(), '   ');
+    await act(async () => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('follows the stored value when it changes underneath', () => {
+    const { rerender, onSave } = renderField({ value: '' });
+    rerender(
+      <TextInputSetting
+        label="Project ID"
+        value="https://default"
+        placeholder="Enter WalletConnect Project ID"
+        onSave={onSave}
+      />,
+    );
+    expect(input().props.value).toBe('https://default');
+  });
+
+  it('hands its block and its input to the scroll area', () => {
+    renderField();
+    fireEvent(input(), 'focus');
+    fireEvent(input(), 'blur');
+    expect(mockKeep.input.onFocus).toHaveBeenCalledTimes(1);
+    expect(mockKeep.input.onBlur).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,26 +1,12 @@
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  type ComponentRef,
-} from 'react';
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
-import { useHeaderHeight } from '@react-navigation/elements';
+import React, { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '@/assets/icons';
 import type { DashboardAction, SettingsScreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
+import { Icons } from '@/assets/icons';
+import KeyboardAwareScrollView from '@/components/KeyboardAwareScrollView';
 import DashboardLayoutSettingsSection from '@/components/settings/DashboardLayoutSettingsSection';
 import Eip7730SettingsSection from '@/components/settings/eip7730/Eip7730SettingsSection.online';
 import EnsSettingsSection from '@/components/settings/ens/EnsSettingsSection.online';
@@ -30,10 +16,6 @@ import PinPadSettingsSection from '@/components/settings/PinPadSettingsSection';
 import TenderlySettingsSection from '@/components/settings/tenderly/TenderlySettingsSection.online';
 import TokenImagesSettingsSection from '@/components/settings/TokenImagesSettingsSection.online';
 import WalletConnectSettingsSection from '@/components/settings/WalletConnectSettingsSection.online';
-import {
-  FieldFocusContext,
-  type SettingsField,
-} from '@/components/settings/fieldFocus';
 
 import { useIdentifyCard } from '@/hooks/keycard/useIdentifyCard';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
@@ -47,12 +29,8 @@ export const dashboardEntry: DashboardAction = {
   navigate: nav => nav.navigate('Settings'),
 };
 
-/** Breathing room left between a focused field and the top of the keyboard. */
-const FIELD_GAP = 16;
-
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const insets = useSafeAreaInsets();
-  const headerHeight = useHeaderHeight();
   const { setPreference } = usePreferences();
 
   // "Set from my Keycard": a SELECT-only tap.
@@ -68,78 +46,6 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     }
   }, [identifyPhase, generation, setPreference]);
 
-  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
-  const focusedField = useRef<SettingsField | null>(null);
-  const scrollOffset = useRef(0);
-  // Screen y of the keyboard's top edge, or the screen bottom while it is down.
-  const keyboardTop = useRef(Number.POSITIVE_INFINITY);
-
-  const scrollFieldIntoView = useCallback(() => {
-    const field = focusedField.current;
-    if (!field) return;
-    field.measureInWindow((_x, y, _width, height) => {
-      const hidden = y + height + FIELD_GAP - keyboardTop.current;
-      if (hidden > 0) {
-        scrollRef.current?.scrollTo({
-          y: scrollOffset.current + hidden,
-          animated: true,
-        });
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    const subscriptions = [
-      Keyboard.addListener(
-        Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-        event => {
-          keyboardTop.current = event.endCoordinates.screenY;
-        },
-      ),
-      Keyboard.addListener(
-        Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-        () => {
-          keyboardTop.current = Number.POSITIVE_INFINITY;
-        },
-      ),
-    ];
-    // UIKit scrolls a focused field flush with the keyboard during the keyboard animation,
-    // which can land after ours; scrolling again once it settles restores FIELD_GAP.
-    if (Platform.OS === 'ios') {
-      subscriptions.push(
-        Keyboard.addListener('keyboardDidShow', event => {
-          keyboardTop.current = event.endCoordinates.screenY;
-          scrollFieldIntoView();
-        }),
-      );
-    }
-    return () => subscriptions.forEach(subscription => subscription.remove());
-  }, [scrollFieldIntoView]);
-
-  const handleFieldFocus = useCallback(
-    (field: SettingsField | null) => {
-      focusedField.current = field;
-      // Moving between fields with the keyboard already up: nothing else will
-      // fire, so this is the only chance to bring the new one into view.
-      scrollFieldIntoView();
-    },
-    [scrollFieldIntoView],
-  );
-
-  // The keyboard shrinks the ScrollView through the KeyboardAvoidingView, and
-  // only once that has laid out is there a viewport to scroll the field into.
-  const handleViewportLayout = useCallback(
-    () => scrollFieldIntoView(),
-    [scrollFieldIntoView],
-  );
-
-  const handleScroll = useCallback(
-    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      scrollOffset.current = event.nativeEvent.contentOffset.y;
-    },
-    [],
-  );
-
   // No `done` navigation here: the user stays in Settings.
   const { sheet } = useKeycardScreen({
     keycard: identify,
@@ -150,22 +56,13 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={headerHeight}
-    >
-      <ScrollView
-        ref={scrollRef}
-        onLayout={handleViewportLayout}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
+    <View style={styles.root}>
+      <KeyboardAwareScrollView
         style={styles.container}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: insets.bottom + 16 },
         ]}
-        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
           <KeycardSettingsSection />
@@ -176,25 +73,24 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           />
           <PinPadSettingsSection />
           <TokenImagesSettingsSection />
-          <FieldFocusContext.Provider value={handleFieldFocus}>
-            <EnsSettingsSection />
-            <WalletConnectSettingsSection />
-            <TenderlySettingsSection />
-            <Eip7730SettingsSection />
-          </FieldFocusContext.Provider>
+          <EnsSettingsSection />
+          <WalletConnectSettingsSection />
+          <TenderlySettingsSection />
+          <Eip7730SettingsSection />
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* No shop link on this sheet: "Buy a Keycard" is the first row of this
           very screen, and the user stays here when the tap is cancelled. */}
       {sheet}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
+  root: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   container: {
     flex: 1,

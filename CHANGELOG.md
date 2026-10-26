@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The signing and key export screen's title reads "Enter Keycard PIN" only while the PIN pad is up
 - The success sheet after signing, key export and unpairing names what was done instead of an empty line
 - On iOS, the NFC sheet names what was done after signing, key export, unpairing and verifying instead of "Success"
+- A Settings text field that cannot be stored says so under the field instead of failing silently
 
 ## [1.15.1] - 2026-10-20
 

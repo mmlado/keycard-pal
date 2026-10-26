@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -8,6 +9,7 @@ import {
 
 import EnsSettingsSection from '../src/components/settings/ens/EnsSettingsSection.online';
 import EnsSettingsSectionOffline from '../src/components/settings/ens/EnsSettingsSection.offline';
+import { SAVE_FAILED } from '../src/components/settings/TextInputSetting';
 
 const mockLoadEnsSettings = jest.fn();
 const mockSaveEnsEnabled = jest.fn();
@@ -236,6 +238,25 @@ describe('EnsSettingsSection.online', () => {
       ).toBeTruthy();
     });
     expect(mockSaveEnsRpcUrl).not.toHaveBeenCalled();
+  });
+
+  it('says the URL could not be saved when storing it fails', async () => {
+    mockLoadEnsSettings.mockResolvedValue(settingsWithUrl('https://saved.rpc'));
+    mockValidateRpcUrl.mockResolvedValue('ok');
+    mockSaveEnsRpcUrl.mockRejectedValue(new Error('storage full'));
+    render(<EnsSettingsSection />);
+    await waitFor(() =>
+      expect(screen.getByDisplayValue('https://saved.rpc')).toBeTruthy(),
+    );
+    fireEvent.changeText(
+      screen.getByDisplayValue('https://saved.rpc'),
+      'https://new.rpc',
+    );
+    await act(async () => {
+      fireEvent.press(screen.getByText('Save'));
+    });
+    expect(screen.getByText(SAVE_FAILED)).toBeTruthy();
+    expect(screen.getByDisplayValue('https://new.rpc')).toBeTruthy();
   });
 
   it('saving empty string calls saveEnsRpcUrl("")', async () => {
