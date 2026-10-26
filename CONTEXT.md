@@ -101,6 +101,10 @@ _Avoid_: Audited descriptor, verified descriptor, trusted descriptor
 What the review shows for one contract call: the descriptor index entry that describes it, the app's own decoding, or the call as written, and which row names its contract.
 _Avoid_: Call match, call view
 
+**Message description**:
+What the review shows for one EIP-712 message: the descriptor index entry that describes it, that the message falls outside that entry's rules, or that no entry describes it.
+_Avoid_: Message match, message lookup
+
 **Descriptor display**:
 What the review shows for a call or an EIP-712 message that an EIP-7730 descriptor describes: its heading, where the descriptor came from and who reviewed it, group headings, one block per array element, and a row per field with its warnings.
 _Avoid_: Descriptor review (an auditor reviews a descriptor), field list, clear-signing view
@@ -109,6 +113,7 @@ _Avoid_: Descriptor review (an auditor reviews a descriptor), field list, clear-
 
 - Each contract call in a review, the transaction and every call inside it, has one **Call description**.
 - A **Call description** that names a descriptor index entry is shown as a **Descriptor display**, and every call inside it has its own **Call description**.
+- Each EIP-712 message in a review has one **Message description**.
 - A **descriptor index** entry takes priority over `ContractCallSection` rendering when a match is found, and over `SpecialEip712Section` only when it comes from a **reviewed descriptor**.
 - When no **EIP-7730 descriptor** matches, the app falls back to existing ABI-based decoding and special renderers unchanged.
 - EIP-712 messages with no `verifyingContract` in the domain are excluded from **descriptor index** lookup and fall back to existing rendering.

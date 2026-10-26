@@ -5,7 +5,7 @@ import path from 'path';
 import { parseTransaction } from 'viem';
 
 import { describeCall } from '../../src/utils/callDescription';
-import { eip712DomainChainId, encodeEip712Type } from '../../src/utils/eip712';
+import { parseEip712RawTypedData } from '../../src/utils/eip712';
 import {
   displayCallSection,
   displayInnerCall,
@@ -13,11 +13,9 @@ import {
   type DescriptorDisplay,
   type DisplayNode,
 } from '../../src/utils/eip7730/display';
-import { lookupEip712 } from '../../src/utils/eip7730/lookup';
-import { buildEip712Resolvers } from '../../src/utils/eip7730/paths';
-import { fitsRequest } from '../../src/utils/eip7730/visibility';
 import type { Eip7730DisplayFormat } from '../../src/utils/eip7730/zip';
 import { classifyEthPayload } from '../../src/utils/ethPayload';
+import { describeMessage } from '../../src/utils/messageDescription';
 
 const REGISTRY = process.env.VECTORS_DIR ?? '';
 const OUT = process.env.VECTORS_REPORT ?? '';
@@ -134,7 +132,7 @@ function prepare(vector: Vector): Prepared {
     }
     const to = tx.to ?? undefined;
     const chainId = tx.chainId ?? 1;
-    // The review's own answer for the transaction, the lookup and fitsRequest included.
+    // The review's own answer for the transaction, so the harness cannot drift from it.
     const described = describeCall({
       chainId,
       contract: to,
@@ -166,37 +164,33 @@ function prepare(vector: Vector): Prepared {
       nodes,
     };
   }
-  const typed = vector.data;
-  // A message the review refuses to sign is no pass, however it would render.
-  const payload = classifyEthPayload(
-    Buffer.from(JSON.stringify(typed), 'utf8').toString('hex'),
-    2,
+  const signData = Buffer.from(JSON.stringify(vector.data), 'utf8').toString(
+    'hex',
   );
+  // A message the review refuses to sign is no pass, however it would render.
+  const payload = classifyEthPayload(signData, 2);
   if (payload.kind === 'invalid') return { why: `refused: ${payload.reason}` };
-  const chainId = eip712DomainChainId(typed.domain);
-  const verifying = typed.domain?.verifyingContract;
-  const encoded = encodeEip712Type(typed.primaryType, typed.types);
-  if (chainId === undefined || !verifying || !encoded)
-    return { why: 'domain lacks chain or contract' };
-  const found = lookupEip712(chainId, verifying, encoded, typed.domain);
-  if (found instanceof Promise) throw new Error('unexpected promise');
-  if (!found) return { why: 'no entry for the message' };
-  const descriptor = {
-    format: found,
-    ...buildEip712Resolvers(typed, {
-      from: vector.from,
-      to: verifying,
-      value: '0',
-      chainId,
-    }),
+  // The review's own answer for the message, so the harness cannot drift from it.
+  const described = describeMessage(
+    parseEip712RawTypedData(signData),
+    vector.from,
+  );
+  if (described instanceof Promise) throw new Error('unexpected promise');
+  const { descriptor, rejected, chainId, verifyingContract } = described;
+  if (!descriptor)
+    return {
+      why: rejected
+        ? 'entry rejected (mustMatch or lengths)'
+        : chainId === undefined || !verifyingContract
+        ? 'domain lacks chain or contract'
+        : 'no entry for the message',
+    };
+  const display = displayMessage(descriptor, described);
+  return {
+    format: descriptor.format,
+    display,
+    nodes: [{ kind: 'entry', display }],
   };
-  if (!fitsRequest(found, descriptor))
-    return { why: 'entry rejected (mustMatch or lengths)' };
-  const display = displayMessage(descriptor, {
-    chainId,
-    verifyingContract: verifying,
-  });
-  return { format: found, display, nodes: [{ kind: 'entry', display }] };
 }
 
 test('registry test vectors', () => {

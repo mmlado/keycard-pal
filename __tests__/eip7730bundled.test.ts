@@ -9,7 +9,6 @@ import {
 import bundled from '../src/data/eip7730.json';
 import { UNLIMITED_APPROVAL_WARNING } from '../src/constants/approval';
 import { describeCall } from '../src/utils/callDescription';
-import { encodeEip712Type } from '../src/utils/eip712';
 import {
   displayDescriptor,
   displayMessage,
@@ -25,7 +24,6 @@ import * as lookup from '../src/utils/eip7730/lookup';
 import {
   buildArgsEachResolver,
   buildArgsPathResolver,
-  buildEip712Resolvers,
   decodeArgsBySignature,
   resolveEip712FieldValue,
 } from '../src/utils/eip7730/paths';
@@ -35,6 +33,7 @@ import type {
   Eip7730Index,
 } from '../src/utils/eip7730/zip';
 import { checksumEthAddress } from '../src/utils/ethereumAddress';
+import { describeMessage } from '../src/utils/messageDescription';
 
 // The bundled index answers at once; a promise here would make every review screen wait.
 function now(result: lookup.FormatLookup): Eip7730DisplayFormat | null {
@@ -201,29 +200,35 @@ describe('bundled EIP-7730 descriptors', () => {
       validBefore: '1800000000',
       nonce: `0x${'11'.repeat(32)}`,
     };
-    const encodedType = encodeEip712Type('TransferWithAuthorization', types)!;
+    // The review's own answer for the message.
+    const describe = (messageDomain: Record<string, unknown>) => {
+      const described = describeMessage(
+        {
+          types,
+          primaryType: 'TransferWithAuthorization',
+          domain: messageDomain,
+          message,
+        },
+        undefined,
+      );
+      if (described instanceof Promise)
+        throw new Error('bundled lookup returned a promise');
+      return described;
+    };
 
     it('matches by encoded type and renders the amount', () => {
-      const descriptor = lookupEip712(1, USDC, encodedType, domain);
-      expect(descriptor?.intent).toBe('Authorize USDC transfer');
-      const resolvers = buildEip712Resolvers(
-        { types, primaryType: 'TransferWithAuthorization', message },
-        { to: USDC, value: '0', chainId: 1 },
-      );
+      const described = describe(domain);
+      const descriptor = described.descriptor!;
+      expect(descriptor.format.intent).toBe('Authorize USDC transfer');
       const out = rows(
-        descriptor!,
-        displayMessage(
-          { format: descriptor!, ...resolvers },
-          { chainId: 1, verifyingContract: USDC },
-        ),
+        descriptor.format,
+        displayMessage(descriptor, described),
       );
       expect(out.Amount).toBe('1.5 USDC');
     });
 
     it('does not match a message from another domain', () => {
-      expect(
-        lookupEip712(1, USDC, encodedType, { ...domain, name: 'Fake Coin' }),
-      ).toBeNull();
+      expect(describe({ ...domain, name: 'Fake Coin' }).descriptor).toBeNull();
     });
   });
 });
