@@ -1,6 +1,11 @@
 import React, { act } from 'react';
 import { TextInput } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import Slip39Screen from '../src/screens/keypair/Slip39Screen';
@@ -48,6 +53,13 @@ jest.mock('react-native-paper', () => {
 });
 
 jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
+
+jest.mock('../src/components/BottomActionArea', () => {
+  const { View } = require('react-native');
+  return ({ children }: any) => (
+    <View testID="bottom-action-area">{children}</View>
+  );
+});
 const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
 >;
@@ -162,6 +174,13 @@ describe('Slip39Screen', () => {
   afterEach(() => {
     (Math.random as jest.Mock).mockRestore();
     jest.useRealTimers();
+  });
+
+  it('keeps the share button clear of the keyboard in the bottom action area', () => {
+    renderScreen('import');
+    expect(
+      within(screen.getByTestId('bottom-action-area')).getByText('Next share'),
+    ).toBeTruthy();
   });
 
   it('adds shares until the SLIP39 threshold is reached', async () => {

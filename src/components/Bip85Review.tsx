@@ -5,6 +5,7 @@ import { Text } from 'react-native-paper';
 import theme from '@/theme';
 
 import BlurredSecret from '@/components/BlurredSecret';
+import BottomActionArea from '@/components/BottomActionArea';
 import PrimaryButton from '@/components/PrimaryButton';
 
 import { bip85Format, bip85Path, type Bip85Format } from '@/utils/bip85';
@@ -95,13 +96,13 @@ export default function Bip85Review({ format, index, entropy, onDone }: Props) {
         <Text style={styles.path}>{bip85Path(format, index)}</Text>
       </ScrollView>
 
-      <View style={styles.buttonArea}>
+      <BottomActionArea style={styles.buttonArea}>
         <PrimaryButton
           testID="primary-button"
           label={revealed || secret === null ? 'Done' : 'Reveal'}
           onPress={handleButton}
         />
-      </View>
+      </BottomActionArea>
     </View>
   );
 }

@@ -1,6 +1,11 @@
 import React, { act } from 'react';
 import { TextInput } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import { routeAbsence } from '../src/navigation/generationBoundRoutes';
 import ChangeSecretScreen, {
@@ -26,6 +31,13 @@ jest.mock('react-native-paper', () => {
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
+
+jest.mock('../src/components/BottomActionArea', () => {
+  const { View } = require('react-native');
+  return ({ children }: any) => (
+    <View testID="bottom-action-area">{children}</View>
+  );
+});
 const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
 >;
@@ -179,6 +191,13 @@ describe('ChangeSecretScreen', () => {
       });
     });
 
+    it('keeps the PIN pad above the bottom inset in the bottom action area', async () => {
+      await renderScreen('pin');
+      expect(
+        within(screen.getByTestId('bottom-action-area')).getByText('6 digits'),
+      ).toBeTruthy();
+    });
+
     it('shows "6 digits" label', async () => {
       await renderScreen('pin');
       expect(screen.getByText('6 digits')).toBeTruthy();
@@ -272,6 +291,13 @@ describe('ChangeSecretScreen', () => {
       expect(navigation.setOptions).toHaveBeenCalledWith({
         title: 'Enter new pairing secret',
       });
+    });
+
+    it('keeps Continue clear of the keyboard in the bottom action area', async () => {
+      await renderScreen('pairing');
+      expect(
+        within(screen.getByTestId('bottom-action-area')).getByText('Continue'),
+      ).toBeTruthy();
     });
 
     it('does not show a PIN pad', async () => {
@@ -373,6 +399,15 @@ describe('ChangeSecretScreen', () => {
           />,
         );
         expect(mockIdentifyStart).toHaveBeenCalledTimes(1);
+      });
+
+      it('keeps Read Keycard in the bottom action area', async () => {
+        await renderScreen('pairing');
+        expect(
+          within(screen.getByTestId('bottom-action-area')).getByTestId(
+            'identify-card-button',
+          ),
+        ).toBeTruthy();
       });
 
       it('asks for nothing yet', async () => {
@@ -501,9 +536,11 @@ describe('ChangeSecretScreen', () => {
         expect(MockNFCBottomSheet).not.toHaveBeenCalled();
       });
 
-      it('goes back from its one button', async () => {
+      it('goes back from its one button, held in the bottom action area', async () => {
         await renderScreen('pairing');
-        fireEvent.press(screen.getByText('Go back'));
+        fireEvent.press(
+          within(screen.getByTestId('bottom-action-area')).getByText('Go back'),
+        );
         expect(navigation.goBack).toHaveBeenCalledTimes(1);
       });
 

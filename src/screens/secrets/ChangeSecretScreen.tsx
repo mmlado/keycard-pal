@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '@/assets/icons';
 import {
@@ -11,6 +10,7 @@ import {
 import type { ChangeSecretScreenProps, SecretType } from '@/navigation/types';
 import theme from '@/theme';
 
+import BottomActionArea from '@/components/BottomActionArea';
 import PinPad from '@/components/PinPad';
 import PrimaryButton from '@/components/PrimaryButton';
 import TextEntry from '@/components/TextEntry';
@@ -65,13 +65,11 @@ export default function ChangeSecretScreen({
 }: ChangeSecretScreenProps) {
   const { secretType } = route.params;
   const config = SECRET_CONFIG[secretType];
-  const insets = useSafeAreaInsets();
 
   const keycard = useChangeSecret(secretType);
   const { phase } = keycard;
 
-  // The pairing secret is identify-then-operate (ADR-0012). The first tap is skipped when every
-  // ticked card has one; `requiresRoute` still guards the operating tap.
+  // Identify-then-operate (ADR-0012); skipping it is safe because `requiresRoute` guards the tap.
   const { preferences } = usePreferences();
   const needsIdentify =
     secretType === 'pairing' &&
@@ -123,14 +121,14 @@ export default function ChangeSecretScreen({
 
   if (unavailable) {
     return (
-      <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={styles.container}>
         <View style={styles.message}>
           <Text style={styles.messageTitle}>{absence.title}</Text>
           <Text style={styles.messageDetail}>{absence.detail}</Text>
         </View>
-        <View style={styles.footer}>
+        <BottomActionArea style={styles.footer}>
           <PrimaryButton label="Go back" onPress={() => navigation.goBack()} />
-        </View>
+        </BottomActionArea>
       </View>
     );
   }
@@ -138,15 +136,14 @@ export default function ChangeSecretScreen({
   const showInput = phase === 'idle' && !identifying;
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
+    <View style={styles.container}>
       {identifying && (
         <>
           <View style={styles.message}>
             <Text style={styles.messageDetail}>{IDENTIFY_EXPLAINER}</Text>
           </View>
-          <View style={styles.footer}>
-            {/* Always drawn, so it neither flashes before the tap starts nor
-                leaves a blank screen behind Apple's sheet. */}
+          <BottomActionArea style={styles.footer}>
+            {/* Always drawn, so nothing flashes or goes blank behind Apple's sheet. */}
             <PrimaryButton
               label="Read Keycard"
               icon={Icons.nfcActivate}
@@ -154,20 +151,22 @@ export default function ChangeSecretScreen({
               disabled={identifyPhase !== 'idle'}
               testID="identify-card-button"
             />
-          </View>
+          </BottomActionArea>
         </>
       )}
 
       {showInput && config.inputType === 'numeric' && (
-        <PinPad
-          key={entry.step}
-          length={entry.length}
-          onComplete={
-            entry.step === 'entry' ? entry.handleEntry : entry.handleConfirm
-          }
-          error={entry.error}
-          onType={entry.clearError}
-        />
+        <BottomActionArea style={styles.pinPad}>
+          <PinPad
+            key={entry.step}
+            length={entry.length}
+            onComplete={
+              entry.step === 'entry' ? entry.handleEntry : entry.handleConfirm
+            }
+            error={entry.error}
+            onType={entry.clearError}
+          />
+        </BottomActionArea>
       )}
 
       {showInput && config.inputType === 'text' && (
@@ -211,5 +210,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
+  },
+  pinPad: {
+    flex: 1,
   },
 });

@@ -1,6 +1,11 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Keyboard, Platform } from 'react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import Bip85Screen, {
   BIP85_INDEX_EXPLAINER,
@@ -13,12 +18,7 @@ import type { Bip85Format } from '../src/utils/bip85';
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({
-    top: 0,
-    bottom: mockBottomInset,
-    left: 0,
-    right: 0,
-  }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 jest.mock('react-native-paper', () => {
@@ -52,18 +52,11 @@ const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
 >;
 
-let mockBottomInset = 0;
-let keyboardDidShow: ((event: any) => void) | null = null;
-let keyboardDidHide: (() => void) | null = null;
-
-jest.spyOn(Keyboard, 'addListener').mockImplementation((event, callback) => {
-  if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
-    keyboardDidShow = callback as (event: any) => void;
-  }
-  if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
-    keyboardDidHide = callback as () => void;
-  }
-  return { remove: jest.fn() } as any;
+jest.mock('../src/components/BottomActionArea', () => {
+  const { View } = require('react-native');
+  return ({ children }: any) => (
+    <View testID="bottom-action-area">{children}</View>
+  );
 });
 
 const mockStart = jest.fn();
@@ -150,9 +143,6 @@ describe('Bip85Screen', () => {
     navigation.goBack.mockClear();
     navigation.reset.mockClear();
     navigation.setOptions.mockClear();
-    keyboardDidShow = null;
-    keyboardDidHide = null;
-    mockBottomInset = 0;
     mockGenerationsInUse = ['4.0'];
   });
 
@@ -220,33 +210,11 @@ describe('Bip85Screen', () => {
       expect(BIP85_INDEX_TOO_HIGH).toBe('The highest index is 2147483647.');
     });
 
-    it('moves the bottom action above the keyboard', () => {
-      const { toJSON } = renderScreen();
-
-      act(() => {
-        keyboardDidShow?.({ endCoordinates: { height: 280 } });
-      });
-      expect(JSON.stringify(toJSON())).toContain('"paddingBottom":288');
-
-      act(() => {
-        keyboardDidHide?.();
-      });
-      expect(JSON.stringify(toJSON())).toContain('"paddingBottom":16');
-    });
-
-    it('adds the navigation bar back on Android', () => {
-      const origOS = Platform.OS;
-      Platform.OS = 'android';
-      try {
-        mockBottomInset = 63;
-        const { toJSON } = renderScreen();
-        act(() => {
-          keyboardDidShow?.({ endCoordinates: { height: 280 } });
-        });
-        expect(JSON.stringify(toJSON())).toContain('"paddingBottom":351');
-      } finally {
-        Platform.OS = origOS;
-      }
+    it('keeps Derive clear of the keyboard in the bottom action area', () => {
+      renderScreen();
+      expect(
+        within(screen.getByTestId('bottom-action-area')).getByText('Derive'),
+      ).toBeTruthy();
     });
 
     it('hides the form during the tap', () => {

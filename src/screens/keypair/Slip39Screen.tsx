@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Keyboard,
-  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -12,20 +10,22 @@ import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { APP_NAME } from '@/constants/app';
-import type { Slip39ScreenProps } from '../../navigation/types';
-import theme from '../../theme';
+import type { Slip39ScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import { Icons } from '../../assets/icons';
-import MnemonicBackupCheck from '../../components/MnemonicBackupCheck';
-import MnemonicWordEntry from '../../components/MnemonicWordEntry';
-import PrimaryButton from '../../components/PrimaryButton';
+import { Icons } from '@/assets/icons';
+import BottomActionArea from '@/components/BottomActionArea';
+import MnemonicBackupCheck from '@/components/MnemonicBackupCheck';
+import MnemonicWordEntry from '@/components/MnemonicWordEntry';
+import PrimaryButton from '@/components/PrimaryButton';
 
-import { useGenerateSlip39Shares } from '../../hooks/keycard/useGenerateSlip39Shares';
-import { useLoadKey } from '../../hooks/keycard/useLoadKey';
-import { useSeedReviewTimer } from '../../hooks/useSeedReviewTimer';
-import { useVerifyFingerprint } from '../../hooks/keycard/useVerifyFingerprint';
-import { useKeycardScreen } from '../../hooks/useKeycardScreen';
-import { pubKeyFingerprint } from '../../utils/cryptoAccount';
+import { useGenerateSlip39Shares } from '@/hooks/keycard/useGenerateSlip39Shares';
+import { useLoadKey } from '@/hooks/keycard/useLoadKey';
+import { useVerifyFingerprint } from '@/hooks/keycard/useVerifyFingerprint';
+import { useKeycardScreen } from '@/hooks/useKeycardScreen';
+import { useSeedReviewTimer } from '@/hooks/useSeedReviewTimer';
+
+import { pubKeyFingerprint } from '@/utils/cryptoAccount';
 import {
   SLIP39_MAX_SHARES,
   SLIP39_SHARE_WORD_COUNT,
@@ -37,7 +37,7 @@ import {
   previewSlip39ShareMetadata,
   recoverSlip39Secret,
   slip39SecretToKeyPair,
-} from '../../utils/slip39';
+} from '@/utils/slip39';
 
 function parseCount(value: string): number {
   return Number.parseInt(value, 10);
@@ -52,7 +52,6 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   const [shares, setShares] = useState<string[]>([]);
   const [passphrase, setPassphrase] = useState('');
   const [shareError, setShareError] = useState<string | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [shareCount, setShareCount] = useState('3');
   const [threshold, setThreshold] = useState('2');
   const [generatedShares, setGeneratedShares] = useState<string[]>([]);
@@ -75,21 +74,6 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedShareIndex, backupStep]);
-
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      e => setKeyboardHeight(e.endCoordinates.height),
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   const operationShares = mode === 'generate' ? generatedShares : shares;
   const parsedShareCount = parseCount(shareCount);
@@ -280,9 +264,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     return () => clearTimeout(timeout);
   }, [mode, generateSlip39, parsedShareCount, parsedThreshold]);
 
-  // Done-navigation keys on the load/verify hook (`keycard`); the back guard,
-  // PIN-entry title, and cancel key on whichever hook is running the tap
-  // (`activeKeycard`, which is the generate hook during share generation).
+  // Done follows `keycard`; the guard, title and cancel follow the hook running the tap.
   const { sheet } = useKeycardScreen({
     keycard,
     navigation,
@@ -373,7 +355,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   }
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
+    <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -528,12 +510,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
         )}
       </ScrollView>
 
-      <View
-        style={[
-          styles.buttonContainer,
-          keyboardHeight > 0 && { paddingBottom: keyboardHeight + 8 },
-        ]}
-      >
+      <BottomActionArea style={styles.buttonContainer}>
         {mode === 'generate' &&
         generatedShares.length === 0 &&
         !isCreatingGeneratedShares ? (
@@ -578,7 +555,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
             disabled={!isReady}
           />
         ) : null}
-      </View>
+      </BottomActionArea>
 
       {sheet}
     </View>

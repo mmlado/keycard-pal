@@ -1,11 +1,14 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '../../assets/icons';
-import PrimaryButton from '../PrimaryButton';
-import theme from '../../theme';
+import theme from '@/theme';
+
+import { Icons } from '@/assets/icons';
+import BottomActionArea from '@/components/BottomActionArea';
+import PrimaryButton from '@/components/PrimaryButton';
+
+import SheetOverlay from './SheetOverlay';
 
 type Props = {
   onCancel: () => void;
@@ -13,19 +16,8 @@ type Props = {
 };
 
 export default function GenuineWarning({ onCancel, onProceed }: Props) {
-  const insets = useSafeAreaInsets();
-
   return (
-    <View
-      testID="genuine-warning"
-      style={[
-        styles.container,
-        {
-          paddingTop: Math.max(insets.top, 24),
-          paddingBottom: Math.max(insets.bottom, 16) + 8,
-        },
-      ]}
-    >
+    <SheetOverlay testID="genuine-warning">
       <View style={styles.content}>
         <Icons.exclamation width={64} height={64} color={theme.colors.error} />
         <Text variant="headlineSmall" style={styles.title}>
@@ -38,7 +30,7 @@ export default function GenuineWarning({ onCancel, onProceed }: Props) {
         </Text>
       </View>
 
-      <View style={styles.buttons}>
+      <BottomActionArea testID="genuine-warning-actions" style={styles.buttons}>
         <PrimaryButton
           testID="cancel-button"
           label="Cancel"
@@ -54,17 +46,12 @@ export default function GenuineWarning({ onCancel, onProceed }: Props) {
             Proceed Anyway
           </Text>
         </Pressable>
-      </View>
-    </View>
+      </BottomActionArea>
+    </SheetOverlay>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    paddingHorizontal: 24,
-  },
   content: {
     flex: 1,
     justifyContent: 'center',
