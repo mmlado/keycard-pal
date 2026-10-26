@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '@/assets/icons';
 import {
@@ -12,6 +11,7 @@ import { Bip85ScreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
 import Bip85Review from '@/components/Bip85Review';
+import BottomActionArea from '@/components/BottomActionArea';
 import PrimaryButton from '@/components/PrimaryButton';
 
 import { useDeriveBip85 } from '@/hooks/keycard/useDeriveBip85';
@@ -28,12 +28,10 @@ export const BIP85_INDEX_TOO_HIGH = `The highest index is ${BIP85_MAX_INDEX}.`;
 
 export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
   const { format } = route.params;
-  const insets = useSafeAreaInsets();
   const { preferences } = usePreferences();
   const [index, setIndex] = useState('0');
   // The field stays editable until the PIN pad opens; the result shows this one.
   const [derivedIndex, setDerivedIndex] = useState<number | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const keycard = useDeriveBip85();
   const { phase, result, start, reset } = keycard;
 
@@ -65,26 +63,6 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
     preferences.generationsInUse,
   );
 
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      e => setKeyboardHeight(e.endCoordinates.height),
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-  // Android reports the keyboard height with the navigation bar inset already
-  // taken off, so it has to be added back.
-  const keyboardPadding =
-    keyboardHeight + (Platform.OS === 'android' ? insets.bottom : 0) + 8;
-
   const tooHigh = Number(index) > BIP85_MAX_INDEX;
 
   const handleDerive = useCallback(() => {
@@ -94,15 +72,7 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
   }, [format, index, start]);
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingBottom:
-            keyboardHeight > 0 ? keyboardPadding : insets.bottom + 16,
-        },
-      ]}
-    >
+    <View style={styles.container}>
       {phase === 'idle' && (
         <View style={styles.content}>
           <View style={styles.body}>
@@ -127,14 +97,14 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
             </Text>
           </View>
 
-          <View style={styles.footer}>
+          <BottomActionArea>
             <PrimaryButton
               label="Derive"
               onPress={handleDerive}
               icon={Icons.nfcActivate}
               disabled={index === '' || tooHigh}
             />
-          </View>
+          </BottomActionArea>
         </View>
       )}
 
@@ -197,8 +167,5 @@ const styles = StyleSheet.create({
   },
   errorHidden: {
     opacity: 0,
-  },
-  footer: {
-    paddingBottom: 16,
   },
 });

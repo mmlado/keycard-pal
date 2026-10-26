@@ -1,6 +1,11 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import GenuineWarning from '../src/components/NFCBottomSheet/GenuineWarning';
 
@@ -60,12 +65,11 @@ describe('GenuineWarning', () => {
     expect(containerStyle().paddingTop).toBe(48);
   });
 
-  it('pads the bottom by the inset plus 8, with a 16 floor', () => {
-    renderWarning();
-    expect(containerStyle().paddingBottom).toBe(24);
-    screen.unmount();
+  it('holds its buttons 16 above the bottom inset', () => {
     mockInsets.bottom = 34;
     renderWarning();
-    expect(containerStyle().paddingBottom).toBe(42);
+    const actions = screen.getByTestId('genuine-warning-actions');
+    expect(StyleSheet.flatten(actions.props.style).paddingBottom).toBe(50);
+    expect(within(actions).getByTestId('proceed-button')).toBeTruthy();
   });
 });

@@ -1,11 +1,23 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import TextEntry from '../src/components/TextEntry';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
+
+jest.mock('../src/components/BottomActionArea', () => {
+  const { View } = require('react-native');
+  return ({ children }: any) => (
+    <View testID="bottom-action-area">{children}</View>
+  );
+});
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -52,6 +64,13 @@ describe('TextEntry', () => {
   beforeEach(() => {
     onSubmit.mockClear();
     onType.mockClear();
+  });
+
+  it('keeps Continue clear of the keyboard in the bottom action area', () => {
+    renderEntry();
+    expect(
+      within(screen.getByTestId('bottom-action-area')).getByText('Continue'),
+    ).toBeTruthy();
   });
 
   it('renders a TextInput', () => {

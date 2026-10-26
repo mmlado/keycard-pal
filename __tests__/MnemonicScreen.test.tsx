@@ -1,6 +1,11 @@
 import React, { act } from 'react';
 import { Keyboard, StyleSheet, TextInput } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import MnemonicScreen from '../src/screens/keypair/MnemonicScreen';
@@ -25,6 +30,13 @@ jest.mock('react-native-paper', () => {
 });
 
 jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
+
+jest.mock('../src/components/BottomActionArea', () => {
+  const { View } = require('react-native');
+  return ({ children }: any) => (
+    <View testID="bottom-action-area">{children}</View>
+  );
+});
 const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
 >;
@@ -679,45 +691,11 @@ describe('MnemonicScreen', () => {
     });
   });
 
-  describe('keyboard handling', () => {
-    let listeners: Record<string, (e: any) => void>;
-
-    beforeEach(() => {
-      listeners = {};
-      jest
-        .spyOn(Keyboard, 'addListener')
-        .mockImplementation((event: string, cb: (e: any) => void) => {
-          listeners[event] = cb;
-          return { remove: jest.fn() } as any;
-        });
-    });
-
-    afterEach(() => {
-      jest.restoreAllMocks();
-    });
-
-    it('updates keyboardHeight when keyboard shows', async () => {
-      renderScreen();
-      await act(async () => {
-        listeners.keyboardDidShow?.({
-          endCoordinates: { height: 300, screenX: 0, screenY: 0, width: 0 },
-        });
-      });
-      expect(screen.getByText('Continue')).toBeTruthy();
-    });
-
-    it('resets keyboardHeight when keyboard hides', async () => {
-      renderScreen();
-      await act(async () => {
-        listeners.keyboardDidShow?.({
-          endCoordinates: { height: 300, screenX: 0, screenY: 0, width: 0 },
-        });
-      });
-      await act(async () => {
-        listeners.keyboardDidHide?.({});
-      });
-      expect(screen.getByText('Continue')).toBeTruthy();
-    });
+  it('keeps Continue clear of the keyboard in the bottom action area', () => {
+    renderScreen();
+    expect(
+      within(screen.getByTestId('bottom-action-area')).getByText('Continue'),
+    ).toBeTruthy();
   });
 
   describe('NFC cancel', () => {

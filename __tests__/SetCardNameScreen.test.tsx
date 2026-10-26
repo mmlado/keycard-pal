@@ -1,29 +1,27 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Keyboard, Platform } from 'react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import SetCardNameScreen from '../src/screens/SetCardNameScreen';
 
 const mockStart = jest.fn();
 const mockCancel = jest.fn();
 let mockPhase = 'idle';
-let keyboardDidShow: ((event: any) => void) | null = null;
-let keyboardDidHide: (() => void) | null = null;
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-let mockBottomInset = 0;
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({
-    top: 0,
-    bottom: mockBottomInset,
-    left: 0,
-    right: 0,
-  }),
-}));
+jest.mock('../src/components/BottomActionArea', () => {
+  const { View } = require('react-native');
+  return ({ children }: any) => (
+    <View testID="bottom-action-area">{children}</View>
+  );
+});
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -38,16 +36,6 @@ jest.mock('../src/assets/icons', () => {
       nfcActivate: Icon,
     },
   };
-});
-
-jest.spyOn(Keyboard, 'addListener').mockImplementation((event, callback) => {
-  if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
-    keyboardDidShow = callback as (event: any) => void;
-  }
-  if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
-    keyboardDidHide = callback as () => void;
-  }
-  return { remove: jest.fn() } as any;
 });
 
 jest.mock('../src/components/NFCBottomSheet', () => {
@@ -93,9 +81,6 @@ describe('SetCardNameScreen', () => {
     navigation.goBack.mockClear();
     navigation.reset.mockClear();
     navigation.setOptions.mockClear();
-    keyboardDidShow = null;
-    keyboardDidHide = null;
-    mockBottomInset = 0;
   });
 
   it('submits the entered card name', () => {
@@ -147,60 +132,12 @@ describe('SetCardNameScreen', () => {
     });
   });
 
-  it('moves the bottom action above the keyboard', () => {
-    const { toJSON } = renderScreen();
-    fireEvent.changeText(screen.getByPlaceholderText('Unnamed card'), 'Vault');
-
-    act(() => {
-      keyboardDidShow?.({ endCoordinates: { height: 280 } });
-    });
-
-    expect(JSON.stringify(toJSON())).toContain('"paddingBottom":288');
-
-    act(() => {
-      keyboardDidHide?.();
-    });
-
-    expect(JSON.stringify(toJSON())).toContain('"paddingBottom":16');
-  });
-
-  it('clears the keyboard by the same margin in both Android navigation modes', () => {
-    const origOS = Platform.OS;
-    Platform.OS = 'android';
-
-    try {
-      // Android reports the IME height with the navigation bar inset taken
-      // off, so the same keyboard frame is reported shorter under the taller
-      // three-button bar.
-      const modes = [
-        { inset: 63, reported: 280 },
-        { inset: 126, reported: 217 },
-      ];
-
-      for (const { inset, reported } of modes) {
-        mockBottomInset = inset;
-        const { toJSON, unmount } = renderScreen();
-
-        act(() => {
-          keyboardDidShow?.({ endCoordinates: { height: reported } });
-        });
-
-        expect(JSON.stringify(toJSON())).toContain('"paddingBottom":351');
-        unmount();
-      }
-    } finally {
-      Platform.OS = origOS;
-    }
-  });
-
-  it('does not add the bottom inset on iOS, where the keyboard height includes it', () => {
-    mockBottomInset = 34;
-    const { toJSON } = renderScreen();
-
-    act(() => {
-      keyboardDidShow?.({ endCoordinates: { height: 280 } });
-    });
-
-    expect(JSON.stringify(toJSON())).toContain('"paddingBottom":288');
+  it('keeps Save card name clear of the keyboard in the bottom action area', () => {
+    renderScreen();
+    expect(
+      within(screen.getByTestId('bottom-action-area')).getByText(
+        'Save card name',
+      ),
+    ).toBeTruthy();
   });
 });

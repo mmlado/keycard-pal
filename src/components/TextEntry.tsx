@@ -1,15 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../theme';
+import theme from '@/theme';
+
+import BottomActionArea from './BottomActionArea';
 import PrimaryButton from './PrimaryButton';
 
 type TextEntryProps = {
   onSubmit: (value: string) => void;
   error?: string;
   onType: () => void;
-  /** Change this value to clear the input field (e.g. when switching entry steps) */
+  /** A new value clears the field. */
   resetKey?: string | number;
 };
 
@@ -20,26 +22,10 @@ export default function TextEntry({
   resetKey,
 }: TextEntryProps) {
   const [value, setValue] = useState('');
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     setValue('');
   }, [resetKey]);
-
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      e => setKeyboardHeight(e.endCoordinates.height),
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   const handleSubmit = useCallback(() => {
     if (!value) {
@@ -50,12 +36,7 @@ export default function TextEntry({
   }, [value, onSubmit]);
 
   return (
-    <View
-      style={[
-        styles.container,
-        keyboardHeight > 0 && { paddingBottom: keyboardHeight + 8 },
-      ]}
-    >
+    <View style={styles.container}>
       <View style={styles.field}>
         <TextInput
           style={styles.input}
@@ -73,11 +54,13 @@ export default function TextEntry({
           {error ?? ''}
         </Text>
       </View>
-      <PrimaryButton
-        label="Continue"
-        onPress={handleSubmit}
-        disabled={!value}
-      />
+      <BottomActionArea>
+        <PrimaryButton
+          label="Continue"
+          onPress={handleSubmit}
+          disabled={!value}
+        />
+      </BottomActionArea>
     </View>
   );
 }
@@ -88,7 +71,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     justifyContent: 'flex-end',
     gap: 16,
-    paddingBottom: 16,
   },
   field: {
     flex: 1,

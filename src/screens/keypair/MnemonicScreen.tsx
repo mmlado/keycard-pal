@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
-  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -10,31 +9,29 @@ import {
 import { validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { Text } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MnemonicScreenProps } from '../../navigation/types';
-import theme from '../../theme';
+import { MnemonicScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import { Icons } from '../../assets/icons';
-import CameraView from '../../components/CameraView';
-import { type ReadCodeEvent } from '../../components/Camera';
-import MnemonicWordEntry from '../../components/MnemonicWordEntry';
-import PrimaryButton from '../../components/PrimaryButton';
+import { Icons } from '@/assets/icons';
+import BottomActionArea from '@/components/BottomActionArea';
+import { type ReadCodeEvent } from '@/components/Camera';
+import CameraView from '@/components/CameraView';
+import MnemonicWordEntry from '@/components/MnemonicWordEntry';
+import PrimaryButton from '@/components/PrimaryButton';
 
-import {
-  deriveMnemonicKeyPair,
-  useLoadKey,
-} from '../../hooks/keycard/useLoadKey';
-import { useVerifyFingerprint } from '../../hooks/keycard/useVerifyFingerprint';
-import { deriveMnemonicFingerprint } from '../../hooks/keycard/useVerifyMnemonic';
-import { useKeycardScreen } from '../../hooks/useKeycardScreen';
+import { deriveMnemonicKeyPair, useLoadKey } from '@/hooks/keycard/useLoadKey';
+import { useVerifyFingerprint } from '@/hooks/keycard/useVerifyFingerprint';
+import { deriveMnemonicFingerprint } from '@/hooks/keycard/useVerifyMnemonic';
+import { useKeycardScreen } from '@/hooks/useKeycardScreen';
+
 import {
   decodeCompactSeedQr,
   decodeSeedQr,
   isCompactSeedQrBytes,
   isSeedQrPayload,
   type SeedQrDecodeResult,
-} from '../../utils/seedQr';
+} from '@/utils/seedQr';
 
 const SCAN_ERROR_LINGER_MS = 2000;
 
@@ -43,13 +40,11 @@ export default function MnemonicScreen({
   route,
 }: MnemonicScreenProps) {
   const mode = route.params?.mode ?? 'import';
-  const insets = useSafeAreaInsets();
   const [wordCount, setWordCount] = useState<12 | 24>(12);
   const [input, setInput] = useState('');
   const [words, setWords] = useState<string[]>([]);
   const [passphrase, setPassphrase] = useState('');
   const [phraseError, setPhraseError] = useState<string | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,10 +57,7 @@ export default function MnemonicScreen({
     setScanError(null);
   }, []);
 
-  // The scanner re-reports a rejection on every frame the offending code stays
-  // in view, so the notice expires on a timer rather than by hand: a dismiss
-  // control would be undone by the next frame. It holds while the code is on
-  // screen and clears once the camera moves off it.
+  // The scanner re-reports a rejection every frame, so the notice expires on a timer.
   const rejectScan = useCallback((message: string) => {
     setScanError(message);
     if (scanErrorTimer.current) {
@@ -85,21 +77,6 @@ export default function MnemonicScreen({
     },
     [],
   );
-
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      e => setKeyboardHeight(e.endCoordinates.height),
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   const loadKey = useLoadKey();
   const verifyFingerprint = useVerifyFingerprint();
@@ -125,8 +102,7 @@ export default function MnemonicScreen({
   }, [loadKey, mode, passphrase, verifyFingerprint, words]);
 
   const handleScanPress = useCallback(() => {
-    // The scanner is an overlay on this screen, so the word input keeps focus
-    // and the keyboard would otherwise stay up covering the viewfinder.
+    // The word input keeps focus under the scanner overlay, so the keyboard would cover it.
     Keyboard.dismiss();
     clearScanError();
     setScanning(true);
@@ -194,7 +170,7 @@ export default function MnemonicScreen({
   const isComplete = words.length === wordCount;
 
   return (
-    <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
+    <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -213,8 +189,7 @@ export default function MnemonicScreen({
           onWordsChange={setWords}
           onScanPress={handleScanPress}
           scanTestID="scan-seedqr-button"
-          // Keyboard.dismiss() alone leaves the input focused, so Android can put
-          // the keyboard straight back up under the camera overlay.
+          // Keyboard.dismiss() leaves the input focused, and Android raises the keyboard again.
           editable={!scanning}
         />
 
@@ -229,19 +204,14 @@ export default function MnemonicScreen({
         />
       </ScrollView>
 
-      <View
-        style={[
-          styles.buttonContainer,
-          keyboardHeight > 0 && { paddingBottom: keyboardHeight + 8 },
-        ]}
-      >
+      <BottomActionArea style={styles.buttonContainer}>
         <PrimaryButton
           label={mode === 'verify' ? 'Verify' : 'Continue'}
           icon={Icons.nfcActivate}
           onPress={handleContinue}
           disabled={!isComplete}
         />
-      </View>
+      </BottomActionArea>
 
       {sheet}
 

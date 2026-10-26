@@ -1,24 +1,24 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { SetCardNameScreenProps } from '../navigation/types';
-import theme from '../theme';
+import type { SetCardNameScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import { Icons } from '../assets/icons';
-import PrimaryButton from '../components/PrimaryButton';
-import { useSetCardName } from '../hooks/keycard/useSetCardName';
-import { useKeycardScreen } from '../hooks/useKeycardScreen';
-import { MAX_KEYCARD_NAME_LENGTH } from '../utils/keycardName';
+import { Icons } from '@/assets/icons';
+import BottomActionArea from '@/components/BottomActionArea';
+import PrimaryButton from '@/components/PrimaryButton';
+
+import { useSetCardName } from '@/hooks/keycard/useSetCardName';
+import { useKeycardScreen } from '@/hooks/useKeycardScreen';
+
+import { MAX_KEYCARD_NAME_LENGTH } from '@/utils/keycardName';
 
 export default function SetCardNameScreen({
   navigation,
 }: SetCardNameScreenProps) {
-  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const keycard = useSetCardName();
   const { phase, start } = keycard;
 
@@ -30,26 +30,6 @@ export default function SetCardNameScreen({
     showOnDone: true,
   });
 
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      e => setKeyboardHeight(e.endCoordinates.height),
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardHeight(0),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-  // Android reports the keyboard height with the navigation bar inset already
-  // taken off, so it has to be added back.
-  const keyboardPadding =
-    keyboardHeight + (Platform.OS === 'android' ? insets.bottom : 0) + 8;
-
   const handleSubmit = useCallback(() => {
     try {
       setError(null);
@@ -60,15 +40,7 @@ export default function SetCardNameScreen({
   }, [name, start]);
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingBottom:
-            keyboardHeight > 0 ? keyboardPadding : insets.bottom + 16,
-        },
-      ]}
-    >
+    <View style={styles.container}>
       {phase === 'idle' && (
         <View style={styles.content}>
           <View style={styles.body}>
@@ -95,13 +67,13 @@ export default function SetCardNameScreen({
             </Text>
           </View>
 
-          <View style={styles.footer}>
+          <BottomActionArea>
             <PrimaryButton
               label="Save card name"
               onPress={handleSubmit}
               icon={Icons.nfcActivate}
             />
-          </View>
+          </BottomActionArea>
         </View>
       )}
 
@@ -150,8 +122,5 @@ const styles = StyleSheet.create({
   },
   errorHidden: {
     opacity: 0,
-  },
-  footer: {
-    paddingBottom: 16,
   },
 });

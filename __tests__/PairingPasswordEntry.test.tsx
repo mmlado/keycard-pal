@@ -1,6 +1,12 @@
 import React from 'react';
 import { Keyboard, StyleSheet } from 'react-native';
-import { act, render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import PairingPasswordEntry from '../src/components/NFCBottomSheet/PairingPasswordEntry';
 
@@ -83,19 +89,28 @@ describe('PairingPasswordEntry', () => {
     expect(containerStyle().paddingTop).toBe(48);
   });
 
-  it('pads the bottom above the keyboard while it is up', () => {
+  it('keeps its buttons above the keyboard, which the Modal makes no room for', () => {
     mockInsets.bottom = 34;
     renderEntry();
+    const actions = () =>
+      StyleSheet.flatten(
+        screen.getByTestId('pairing-password-actions').props.style,
+      );
 
     act(() => {
       keyboardShow?.({ endCoordinates: { height: 336 } });
     });
-    expect(containerStyle().paddingBottom).toBe(344);
+    expect(actions().paddingBottom).toBe(360);
+    expect(
+      within(screen.getByTestId('pairing-password-actions')).getByText(
+        'Cancel',
+      ),
+    ).toBeTruthy();
 
     act(() => {
       keyboardHide?.();
     });
-    expect(containerStyle().paddingBottom).toBe(42);
+    expect(actions().paddingBottom).toBe(50);
   });
 
   it('renders title and body text', () => {

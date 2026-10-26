@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The backup check of a generated key pair shows a preparing step after the last answer instead of pausing when it opens
 - The store descriptions, the README and the F-Droid `NonFreeNet` reason list the clear-signing registry download among the optional network features
 - WalletConnect typed data that cannot be signed opens the review with the reason instead of being refused at once
+- Entry screens keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
 
 ### Fixed
 

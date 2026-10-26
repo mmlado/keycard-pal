@@ -1,12 +1,25 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 
 import Bip85Review, {
   BIP85_INVALID_KEY,
   BIP85_RESULT_EXPLAINER,
 } from '../src/components/Bip85Review';
 import type { Bip85Format } from '../src/utils/bip85';
+
+jest.mock('../src/components/BottomActionArea', () => {
+  const { View } = require('react-native');
+  return ({ children }: any) => (
+    <View testID="bottom-action-area">{children}</View>
+  );
+});
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -43,6 +56,13 @@ const hidden = { includeHiddenElements: true };
 describe('Bip85Review', () => {
   beforeEach(() => {
     onDone.mockClear();
+  });
+
+  it('keeps its button above the bottom inset in the bottom action area', () => {
+    renderReview('words12', new Uint8Array(16));
+    expect(
+      within(screen.getByTestId('bottom-action-area')).getByText('Reveal'),
+    ).toBeTruthy();
   });
 
   describe('recovery phrase', () => {
