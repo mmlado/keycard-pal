@@ -50,6 +50,11 @@ describe('BottomActionArea', () => {
     });
   });
 
+  it('holds it 16 above the bottom edge on a phone with no bottom inset', () => {
+    renderArea();
+    expect(areaStyle().paddingBottom).toBe(16);
+  });
+
   it('rises to 24 above the keyboard as iOS announces it, without adding the inset the height already holds', () => {
     mockInsets.bottom = 34;
     renderArea();

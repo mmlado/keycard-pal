@@ -18,16 +18,15 @@ export default function BottomActionArea({
 }) {
   const insets = useSafeAreaInsets();
   const overlap = useKeyboardOverlap();
+  const rest = insets.bottom + REST_GAP;
   return (
     <View
       testID={testID}
       style={[
         style,
         {
-          paddingBottom: Math.max(
-            insets.bottom + REST_GAP,
-            overlap + KEYBOARD_GAP,
-          ),
+          paddingBottom:
+            overlap > 0 ? Math.max(rest, overlap + KEYBOARD_GAP) : rest,
         },
       ]}
     >
