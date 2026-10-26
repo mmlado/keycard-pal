@@ -120,10 +120,14 @@ function renderScreen(
     ...hookMock(mockStartGenerate, generatePhase, generateResult as any),
     reset: mockResetGenerate,
   });
-  mockUseLoadKey.mockReturnValue(hookMock(mockStartLoad, phase, result));
-  mockUseVerifyFingerprint.mockReturnValue(
-    hookMock(mockStartVerify, phase, result),
-  );
+  mockUseLoadKey.mockReturnValue({
+    ...hookMock(mockStartLoad, phase, result),
+    successMessage: 'Key pair has been added to Keycard',
+  });
+  mockUseVerifyFingerprint.mockReturnValue({
+    ...hookMock(mockStartVerify, phase, result),
+    successMessage: 'Compared with Keycard',
+  });
   return render(<Slip39Screen navigation={navigation} route={route(mode)} />);
 }
 
@@ -251,12 +255,39 @@ describe('Slip39Screen', () => {
     expect(getPressableByText('Import to Keycard')).toBeDefined();
   });
 
-  it('uses verify hook and reset toast in verify mode', async () => {
-    await renderScreen('verify', 'done', 'match');
+  it('shows a check mark when the shares match, and stays', async () => {
+    renderScreen('verify', 'done', 'match');
+
+    expect(screen.getByTestId('verify-match')).toBeTruthy();
+    expect(screen.getByText('SLIP39 shares match')).toBeTruthy();
+    expect(navigation.reset).not.toHaveBeenCalled();
+  });
+
+  it('shows an X when the shares do not match, and OK leaves with no toast', async () => {
+    renderScreen('verify', 'done', 'mismatch');
+
+    expect(screen.getByTestId('verify-mismatch')).toBeTruthy();
+    expect(screen.getByText('SLIP39 shares do not match')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByText('OK'));
+    });
+    expect(navigation.reset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: 'Dashboard', params: { toast: undefined } }],
+    });
+  });
+
+  it('leaves an import with the key pair toast', async () => {
+    renderScreen('import', 'done');
 
     expect(navigation.reset).toHaveBeenCalledWith({
       index: 0,
-      routes: [{ name: 'Dashboard', params: { toast: 'SLIP39 shares match' } }],
+      routes: [
+        {
+          name: 'Dashboard',
+          params: { toast: 'Key pair has been added to Keycard' },
+        },
+      ],
     });
   });
 

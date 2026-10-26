@@ -14,8 +14,6 @@ export function useFactoryReset(): UseFactoryResetOperation {
       await cmdSet.factoryReset();
       return '';
     }, []),
-    // Reads on Apple's sheet the moment the session ends, ahead of the toast
-    // the Dashboard shows once that sheet clears.
     { successMessage: 'Factory reset done' },
   );
 }

@@ -105,6 +105,7 @@ function hookMock(phase: string) {
     phase,
     status: '',
     result: null,
+    successMessage: 'Key pair has been added to Keycard',
     start: mockStart,
     cancel: mockCancel,
     submitPin: mockSubmitPin,

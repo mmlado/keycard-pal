@@ -3,14 +3,14 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '../assets/icons';
-import { DashboardAction, FactoryResetSreenProps } from '../navigation/types';
-import theme from '../theme';
+import { DashboardAction, FactoryResetSreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import PrimaryButton from '../components/PrimaryButton';
+import { Icons } from '@/assets/icons';
+import PrimaryButton from '@/components/PrimaryButton';
 
-import { useFactoryReset } from '../hooks/keycard/useFactoryReset';
-import { useKeycardScreen } from '../hooks/useKeycardScreen';
+import { useFactoryReset } from '@/hooks/keycard/useFactoryReset';
+import { useKeycardScreen } from '@/hooks/useKeycardScreen';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Factory reset',
@@ -31,7 +31,7 @@ export default function FactoryResetScreen({
     keycard,
     navigation,
     title: 'Factory reset',
-    done: { toast: 'Factory reset done' },
+    done: {},
     showOnDone: true,
   });
 

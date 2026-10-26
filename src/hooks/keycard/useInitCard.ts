@@ -105,7 +105,6 @@ export function useInitCard(): UseInitCardOperation {
       },
       [handshakeSucceeded, puk],
     ),
-    // Mirrors InitCardScreen's done toast.
     { successMessage: 'Card initialized', whitelistedCardKeys },
   );
 

@@ -43,9 +43,7 @@ const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
 
 jest.mock('../src/components/PinPad', () => () => null);
 
-jest.mock('../src/assets/icons', () => ({
-  Icons: { nfcActivate: () => null, qr: () => null },
-}));
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 jest.mock('../src/components/Camera', () => ({
   Camera: ({ onReadCode }: any) => {
@@ -111,9 +109,19 @@ function hookMock(phase = 'idle', result: string | null = null) {
   };
 }
 
+const loadKeyMock = (phase = 'idle') => ({
+  ...hookMock(phase),
+  successMessage: 'Key pair has been added to Keycard',
+});
+
+const verifyMock = (phase = 'idle', result: string | null = null) => ({
+  ...hookMock(phase, result),
+  successMessage: 'Compared with Keycard',
+});
+
 function renderScreen(phase = 'idle') {
-  mockUseLoadKey.mockReturnValue(hookMock(phase));
-  mockUseVerifyFingerprint.mockReturnValue(hookMock(phase));
+  mockUseLoadKey.mockReturnValue(loadKeyMock(phase));
+  mockUseVerifyFingerprint.mockReturnValue(verifyMock(phase));
   return render(<MnemonicScreen navigation={navigation} route={route} />);
 }
 
@@ -190,8 +198,8 @@ describe('MnemonicScreen', () => {
     mockStart.mockClear();
     mockCancel.mockClear();
     MockNFCBottomSheet.mockClear();
-    mockUseLoadKey.mockReturnValue(hookMock());
-    mockUseVerifyFingerprint.mockReturnValue(hookMock());
+    mockUseLoadKey.mockReturnValue(loadKeyMock());
+    mockUseVerifyFingerprint.mockReturnValue(verifyMock());
   });
 
   describe('layout', () => {
@@ -619,8 +627,8 @@ describe('MnemonicScreen', () => {
 
   describe('verify mode', () => {
     function renderVerify(phase = 'idle', result: string | null = null) {
-      mockUseLoadKey.mockReturnValue(hookMock(phase));
-      mockUseVerifyFingerprint.mockReturnValue(hookMock(phase, result));
+      mockUseLoadKey.mockReturnValue(loadKeyMock(phase));
+      mockUseVerifyFingerprint.mockReturnValue(verifyMock(phase, result));
       return render(
         <MnemonicScreen navigation={navigation} route={routeVerify} />,
       );
@@ -645,26 +653,43 @@ describe('MnemonicScreen', () => {
       expect(mockStart).toHaveBeenCalledWith(expect.any(Number));
     });
 
-    it('resets to Dashboard with match toast', async () => {
+    it('shows a check mark when the phrase matches, and stays', async () => {
       renderVerify('done', 'match');
+      expect(screen.getByTestId('verify-match')).toBeTruthy();
+      expect(screen.getByText('Recovery phrase matches')).toBeTruthy();
+      expect(screen.queryByText('Verify')).toBeNull();
+      expect(navigation.reset).not.toHaveBeenCalled();
+    });
+
+    it('shows an X when the phrase does not match', async () => {
+      renderVerify('done', 'mismatch');
+      expect(screen.getByTestId('verify-mismatch')).toBeTruthy();
+      expect(screen.getByText('Recovery phrase does not match')).toBeTruthy();
+      expect(navigation.reset).not.toHaveBeenCalled();
+    });
+
+    it('OK on the result goes to the Dashboard with no toast', async () => {
+      renderVerify('done', 'mismatch');
+      await act(async () => {
+        fireEvent.press(screen.getByText('OK'));
+      });
       expect(navigation.reset).toHaveBeenCalledWith({
         index: 0,
-        routes: [
-          { name: 'Dashboard', params: { toast: 'Recovery phrase matches' } },
-        ],
+        routes: [{ name: 'Dashboard', params: { toast: undefined } }],
       });
     });
 
-    it('resets to Dashboard with mismatch toast', async () => {
-      renderVerify('done', 'mismatch');
+    it('back from the result goes to the Dashboard, not to the phrase', async () => {
+      renderVerify('done', 'match');
+      const beforeRemove = navigation.addListener.mock.calls
+        .filter(([type]: [string]) => type === 'beforeRemove')
+        .pop()[1];
+      const preventDefault = jest.fn();
+      act(() => beforeRemove({ preventDefault }));
+      expect(preventDefault).toHaveBeenCalled();
       expect(navigation.reset).toHaveBeenCalledWith({
         index: 0,
-        routes: [
-          {
-            name: 'Dashboard',
-            params: { toast: 'Recovery phrase does not match' },
-          },
-        ],
+        routes: [{ name: 'Dashboard', params: { toast: undefined } }],
       });
     });
   });

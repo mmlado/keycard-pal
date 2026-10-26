@@ -1906,6 +1906,13 @@ describe('useKeycardOp', () => {
     mockIsNFCEnabled.mockClear();
   });
 
+  it('hands back its success message, for the screen to show after the tap', () => {
+    const { result } = renderHook(() =>
+      useKeycardOp<string>(jest.fn(), { successMessage: 'Card named' }),
+    );
+    expect(result.current.successMessage).toBe('Card named');
+  });
+
   it('start() transitions to nfc when requiresPin is false', async () => {
     const { result } = renderHook(() =>
       useKeycardOp<string>(jest.fn(), { requiresPin: false }),

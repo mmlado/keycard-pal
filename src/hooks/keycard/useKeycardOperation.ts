@@ -62,7 +62,7 @@ export interface ExecuteOptions {
   requiresRoute?: GenerationBoundRoute;
   /** Wait for a re-tap when the card leaves mid-operation. Read-only operations only. */
   retryOnTagLoss?: boolean;
-  /** Shown on success. Keep it equal to the screen's done-toast. */
+  /** Shown on Apple's sheet and the success sheet. */
   successMessage?: string;
 }
 
@@ -646,6 +646,12 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   };
 }
 
+export type KeycardOp<T, I = void> = Omit<UseKeycardOperation<T>, 'execute'> & {
+  start: (input: I) => void;
+  /** The operation's one success wording: Apple's sheet, the success sheet and the done toast. */
+  successMessage: string | undefined;
+};
+
 /** The input given to start() reaches every retry until the operation succeeds, is cancelled or reset, or discards it. */
 export function useKeycardOp<T, I = void>(
   op: (
@@ -654,7 +660,7 @@ export function useKeycardOp<T, I = void>(
     helpers: KeycardOperationHelpers,
   ) => Promise<T>,
   options: ExecuteOptions = {},
-): Omit<UseKeycardOperation<T>, 'execute'> & { start: (input: I) => void } {
+): KeycardOp<T, I> {
   const { execute, ...rest } = useKeycardOperation<T>();
   const opRef = useRef(op);
   opRef.current = op;
@@ -673,5 +679,5 @@ export function useKeycardOp<T, I = void>(
     [execute],
   );
 
-  return { ...rest, start };
+  return { ...rest, start, successMessage: options.successMessage };
 }

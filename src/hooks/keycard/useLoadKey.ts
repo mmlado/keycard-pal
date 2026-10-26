@@ -16,7 +16,6 @@ export function useLoadKey() {
   return useKeycardOp(loadKeyPair, {
     requiresPin: true,
     requiresMasterKey: false,
-    // Mirrors ConfirmKeyScreen's done toast.
     successMessage: 'Key pair has been added to Keycard',
   });
 }

@@ -54,6 +54,7 @@ jest.mock('../src/hooks/keycard/useUnblockPin', () => ({
     result: null,
     pinError: null,
     pukError: mockHook.pukError,
+    successMessage: 'PIN unblocked',
     start: mockStart,
     cancel: mockCancel,
     reset: jest.fn(),

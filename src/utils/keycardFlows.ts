@@ -26,11 +26,7 @@ import {
   type ExportKeysResult,
 } from './keycardExport';
 
-/**
- * What happens after the card operation succeeds. 'ur' outcomes navigate to
- * QRResult (via the sign or export reset stack); 'wc-signature' outcomes are
- * responded to the WalletConnect relay instead of showing a QR.
- */
+/** A QR code to show, or a signature to answer the WalletConnect request with. */
 export type FlowOutcome =
   | {
       kind: 'ur';
@@ -41,33 +37,31 @@ export type FlowOutcome =
     }
   | { kind: 'wc-signature'; rawSig: string; wcContext: WCContext };
 
-/**
- * One Keycard operation, prepared and ready to run: the card op and the
- * completion that consumes its result are created together as a closure pair
- * over the same narrowed params, so they can never disagree about what the
- * result means — no shape-sniffing, no casts at the consumer.
- */
+/** Built together over the same params, so the card op and its output agree on the result. */
 export type KeycardFlowRun = {
   cardOp: (
     cmdSet: Commandset,
     setStatus: (status: string) => void,
   ) => Promise<unknown>;
   buildOutput: (result: unknown) => FlowOutcome;
+  /** Shown on Apple's sheet and the success sheet. */
+  successMessage: string;
 };
 
-// Internal helper: ties cardOp's result type to buildOutput's input type,
-// then erases it for the generic executor.
+// Ties cardOp's result type to buildOutput's input, then erases it for the executor.
 function flow<R>(run: {
   cardOp: (
     cmdSet: Commandset,
     setStatus: (status: string) => void,
   ) => Promise<R>;
   buildOutput: (result: R) => FlowOutcome;
+  successMessage: string;
 }): KeycardFlowRun {
   return run as KeycardFlowRun;
 }
 
 const SIGN_RESULT_TITLE = 'Show signature to the wallet';
+const SIGNED_MESSAGE = 'Signed';
 
 type EthSignParams = Extract<
   KeycardParams,
@@ -90,9 +84,7 @@ function prepareEthSign(params: EthSignParams): KeycardFlowRun {
     params.chainId,
   );
   const chainId = payloadChainId(payload, params.chainId);
-  // signingDigest throws on 'invalid' with the classification reason —
-  // buildSignKeycardParams withholds the Sign button for these, so this is
-  // a belt-and-braces guard, surfaced as a prepare error.
+  // Throws on an invalid payload: the review shows no Sign button for one, so this is a backstop.
   const hash = signingDigest(payload);
   return flow<Uint8Array>({
     cardOp: async cmdSet => {
@@ -125,12 +117,12 @@ function prepareEthSign(params: EthSignParams): KeycardFlowRun {
         doneNavigation: 'sign',
       };
     },
+    successMessage: SIGNED_MESSAGE,
   });
 }
 
 function prepareBtcPsbtSign(params: BtcPsbtParams): KeycardFlowRun {
-  // Throws on a malformed PSBT — the review keeps its Sign button on
-  // unparseable PSBTs by design, so this is the path that catches them.
+  // Throws on a malformed PSBT, which the review still offers to sign.
   const session = new BtcSigningSession(params.psbtHex);
   return flow<{ psbtHex: string }>({
     cardOp: async (cmdSet, setStatus) => {
@@ -143,6 +135,7 @@ function prepareBtcPsbtSign(params: BtcPsbtParams): KeycardFlowRun {
       title: SIGN_RESULT_TITLE,
       doneNavigation: 'sign',
     }),
+    successMessage: SIGNED_MESSAGE,
   });
 }
 
@@ -171,16 +164,13 @@ function prepareBtcMessageSign(params: BtcMessageParams): KeycardFlowRun {
         doneNavigation: 'sign',
       };
     },
+    successMessage: SIGNED_MESSAGE,
   });
 }
 
 function prepareExportKey(params: ExportKeyParams): KeycardFlowRun {
   const target = getExportTarget(params.target);
-  // Captured by the cardOp closure, so it survives reconnects within this
-  // screen visit: a tag loss mid-export resumes at the first key not yet
-  // fetched instead of re-exporting all of them (shorter re-tap, less chance
-  // of a second loss). Same-card only — the cache self-invalidates on UID
-  // change — and it dies with the flow, never outliving the screen.
+  // Lives with the flow, so a re-tap after a tag loss resumes at the first key not yet read.
   const resumeCache = makeExportResumeCache();
   return flow<ExportKeysResult>({
     cardOp: (cmdSet, setStatus) =>
@@ -192,15 +182,11 @@ function prepareExportKey(params: ExportKeyParams): KeycardFlowRun {
       description: XPUB_EXPLAINER,
       doneNavigation: 'export',
     }),
+    successMessage: 'Key exported',
   });
 }
 
-/**
- * Prepare the flow for a Keycard route: all heavy local work (payload
- * classification, hashing, PSBT parsing) happens here, BEFORE the NFC prompt
- * opens. Throws when the payload cannot be prepared — callers surface the
- * error instead of opening the PIN pad.
- */
+/** The heavy local work happens here, before the NFC prompt; throws when the payload cannot be prepared. */
 export function prepareKeycardFlow(params: KeycardParams): KeycardFlowRun {
   if (params.operation === 'export_key') {
     return prepareExportKey(params);

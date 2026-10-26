@@ -28,7 +28,7 @@ export default function ConfirmKeyScreen({
     keycard,
     navigation,
     title: 'Check your backup',
-    done: { toast: 'Key pair has been added to Keycard' },
+    done: {},
   });
 
   const [attemptKey, setAttemptKey] = useState(0);

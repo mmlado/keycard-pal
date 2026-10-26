@@ -26,7 +26,6 @@ type SecretConfig = {
   length?: number;
   entryTitle: string;
   confirmTitle: string;
-  toast: string;
 };
 
 const SECRET_CONFIG: Record<SecretType, SecretConfig> = {
@@ -35,20 +34,17 @@ const SECRET_CONFIG: Record<SecretType, SecretConfig> = {
     length: 6,
     entryTitle: 'Enter new PIN',
     confirmTitle: 'Confirm new PIN',
-    toast: 'PIN changed',
   },
   puk: {
     inputType: 'numeric',
     length: 12,
     entryTitle: 'Enter new PUK',
     confirmTitle: 'Confirm new PUK',
-    toast: 'PUK changed',
   },
   pairing: {
     inputType: 'text',
     entryTitle: 'Enter new pairing secret',
     confirmTitle: 'Confirm pairing secret',
-    toast: 'Pairing secret changed',
   },
 };
 
@@ -113,7 +109,7 @@ export default function ChangeSecretScreen({
     navigation,
     title: identifying || unavailable ? PAIRING_SECRET_TITLE : stepTitle,
     pinEntryTitle: 'Enter current PIN',
-    done: { toast: config.toast },
+    done: {},
     stepBack: entry.goBack,
     // The identify tap's done is no outcome: the sheet steps aside for the input.
     showOnDone: !identifying,

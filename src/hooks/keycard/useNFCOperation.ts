@@ -32,6 +32,8 @@ export interface UseNFCOperation<T, I = void> {
   openNFCSettings: (() => void) | undefined;
   /** See UseNFCSessionOperation.retryUnsafeRef. */
   retryUnsafeRef: { current: boolean };
+  /** The operation's one success wording: Apple's sheet, the success sheet and the done toast. */
+  successMessage: string | undefined;
 }
 
 export function useNFCOperation<T, I = void>(
@@ -122,5 +124,6 @@ export function useNFCOperation<T, I = void>(
     reset,
     openNFCSettings,
     retryUnsafeRef,
+    successMessage: options.successMessage,
   };
 }

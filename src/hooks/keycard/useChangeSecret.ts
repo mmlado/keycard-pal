@@ -3,16 +3,10 @@ import { Commandset } from 'keycard-sdk/dist/commandset';
 
 import type { SecretType } from '@/navigation/types';
 
-import { useKeycardOp, type UseKeycardOperation } from './useKeycardOperation';
+import { useKeycardOp, type KeycardOp } from './useKeycardOperation';
 
-export type UseChangeSecretOperation = Omit<
-  UseKeycardOperation<void>,
-  'execute'
-> & {
-  start: (newSecret: string) => void;
-};
+export type UseChangeSecretOperation = KeycardOp<void, string>;
 
-/** Keep equal to ChangeSecretScreen's toasts. */
 const SECRET_CHANGED_MESSAGE: Record<SecretType, string> = {
   pin: 'PIN changed',
   puk: 'PUK changed',
@@ -49,7 +43,6 @@ export function useChangeSecret(
       // Catches a different card being tapped the second time.
       requiresRoute:
         secretType === 'pairing' ? 'ChangePairingSecret' : undefined,
-      // Mirrors ChangeSecretScreen's per-secret done toast.
       successMessage: SECRET_CHANGED_MESSAGE[secretType],
     },
   );

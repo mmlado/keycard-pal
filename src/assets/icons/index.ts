@@ -53,6 +53,8 @@ export const Icons = {
   nfcActivate: NfcActivate,
   checkmark: mdi('check', theme.colors.secondary),
   exclamation: mdi('alert-circle', theme.colors.errorDark),
+  verifyMatch: mdi('check-circle-outline', theme.colors.secondary),
+  verifyMismatch: mdi('close-circle-outline', theme.colors.error),
   nfc: {
     default: NfcDefault,
     success: mdi('check-circle-outline', theme.colors.secondary),
