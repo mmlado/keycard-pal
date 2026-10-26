@@ -5,21 +5,17 @@ import { Commandset } from 'keycard-sdk/dist/commandset';
 import { attemptsLeft } from '@/utils/keycardErrors';
 import {
   useKeycardOp,
+  type KeycardOp,
   type KeycardOperationHelpers,
   type KeycardPhase,
-  type UseKeycardOperation,
 } from './useKeycardOperation';
 
-export type UseUnblockPinOperation = Omit<
-  UseKeycardOperation<void>,
-  'execute'
-> & {
+export type UseUnblockPinOperation = Omit<KeycardOp<void>, 'start'> & {
   start: (puk: string, newPin: string) => void;
   /** The card refused the PUK and still has attempts left; the screen asks for it again. */
   pukError: string | null;
 };
 
-/** Keep equal to UnblockPinScreen's done toast. */
 export const PIN_UNBLOCKED_MESSAGE = 'PIN unblocked';
 export const PUK_BLOCKED_STATUS =
   'The PUK is blocked. This Keycard can only be factory reset, which erases its key.';

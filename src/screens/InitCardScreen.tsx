@@ -2,17 +2,17 @@ import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '../assets/icons';
-import { DashboardAction, InitCardScreenProps } from '../navigation/types';
-import theme from '../theme';
+import { DashboardAction, InitCardScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import ConfirmPrompt from '../components/ConfirmPropmpt';
-import PinPad from '../components/PinPad';
-import PukReview from '../components/PukReview';
+import { Icons } from '@/assets/icons';
+import ConfirmPrompt from '@/components/ConfirmPropmpt';
+import PinPad from '@/components/PinPad';
+import PukReview from '@/components/PukReview';
 
-import { useInitCard } from '../hooks/keycard/useInitCard';
-import { useConfirmedEntry } from '../hooks/useConfirmedEntry';
-import { useKeycardScreen } from '../hooks/useKeycardScreen';
+import { useInitCard } from '@/hooks/keycard/useInitCard';
+import { useConfirmedEntry } from '@/hooks/useConfirmedEntry';
+import { useKeycardScreen } from '@/hooks/useKeycardScreen';
 
 export const dashboardEntry: DashboardAction = {
   label: 'Initialize',
@@ -98,7 +98,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
     keycard,
     navigation,
     title,
-    done: { toast: () => (uncertainPuk ? undefined : 'Card initialized') },
+    done: { toast: () => (uncertainPuk ? undefined : keycard.successMessage) },
     hold: showPuk,
     stayOnCancel: initSent,
     stepBack,

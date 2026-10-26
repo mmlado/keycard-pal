@@ -345,6 +345,7 @@ describe('PairingSlotsScreen', () => {
         requiresPin: true,
         requiresMasterKey: false,
         requiresRoute: 'PairingSlots',
+        successMessage: 'Slot 3 was unpaired',
       });
     });
 

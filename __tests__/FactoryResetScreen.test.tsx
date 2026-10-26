@@ -59,6 +59,7 @@ function hookMock(phase: string) {
     phase,
     status: '',
     result: null,
+    successMessage: 'Factory reset done',
     start: mockStart,
     cancel: mockCancel,
     reset: mockReset,

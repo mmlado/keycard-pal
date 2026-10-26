@@ -52,6 +52,7 @@ describe('useVerifyFingerprint', () => {
     expect(capturedOptions).toEqual({
       requiresPin: true,
       retryOnTagLoss: true,
+      successMessage: 'Compared with Keycard',
     });
   });
 

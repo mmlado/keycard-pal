@@ -88,6 +88,7 @@ export default function PairingSlotsScreen({
 
   const handleConfirmUnpair = useCallback(() => {
     const slotIndex = pendingSlotIndex!;
+    const unpaired = `Slot ${slotIndex + 1} was unpaired`;
     setPendingSlotIndex(null);
     setUnpairing(true);
     executeUnpair(
@@ -102,13 +103,14 @@ export default function PairingSlotsScreen({
         }
         // Re-read in the same connection, so no second tap is needed.
         await readSlotInfoFromCmdSet(cmdSet);
-        setUnpairNotice(`Slot ${slotIndex + 1} was unpaired`);
+        setUnpairNotice(unpaired);
       },
       // The slots were read from one card; the unpair tap can land on another.
       {
         requiresPin: true,
         requiresMasterKey: false,
         requiresRoute: 'PairingSlots',
+        successMessage: unpaired,
       },
     );
   }, [pendingSlotIndex, executeUnpair, slotInfo, readSlotInfoFromCmdSet]);

@@ -19,6 +19,7 @@ import { type ReadCodeEvent } from '@/components/Camera';
 import CameraView from '@/components/CameraView';
 import MnemonicWordEntry from '@/components/MnemonicWordEntry';
 import PrimaryButton from '@/components/PrimaryButton';
+import VerifyResult from '@/components/VerifyResult';
 
 import { deriveMnemonicKeyPair, useLoadKey } from '@/hooks/keycard/useLoadKey';
 import { useVerifyFingerprint } from '@/hooks/keycard/useVerifyFingerprint';
@@ -81,6 +82,10 @@ export default function MnemonicScreen({
   const loadKey = useLoadKey();
   const verifyFingerprint = useVerifyFingerprint();
   const keycard = mode === 'verify' ? verifyFingerprint : loadKey;
+  const verifyResult =
+    mode === 'verify' && verifyFingerprint.phase === 'done'
+      ? verifyFingerprint.result
+      : null;
 
   const handleTextChange = useCallback((text: string) => {
     setInput(text);
@@ -108,7 +113,7 @@ export default function MnemonicScreen({
     setScanning(true);
   }, [clearScanError]);
 
-  const { sheet } = useKeycardScreen({
+  const { leave, sheet } = useKeycardScreen({
     keycard,
     navigation,
     title: scanning
@@ -116,14 +121,9 @@ export default function MnemonicScreen({
       : mode === 'verify'
       ? 'Verify recovery phrase'
       : 'Import recovery phrase',
-    done: {
-      toast: doneResult =>
-        mode === 'verify'
-          ? doneResult === 'match'
-            ? 'Recovery phrase matches'
-            : 'Recovery phrase does not match'
-          : 'Key pair has been added to Keycard',
-    },
+    // A verify shows its own result, so nothing follows it on the Dashboard.
+    done: mode === 'verify' ? undefined : {},
+    hold: verifyResult !== null,
     stayOnCancel: true,
   });
 
@@ -166,6 +166,23 @@ export default function MnemonicScreen({
     },
     [clearScanError, rejectScan],
   );
+
+  if (verifyResult) {
+    return (
+      <View style={styles.container}>
+        <VerifyResult
+          matches={verifyResult === 'match'}
+          text={
+            verifyResult === 'match'
+              ? 'Recovery phrase matches'
+              : 'Recovery phrase does not match'
+          }
+          onDone={leave}
+        />
+        {sheet}
+      </View>
+    );
+  }
 
   const isComplete = words.length === wordCount;
 

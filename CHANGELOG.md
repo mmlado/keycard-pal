@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The store descriptions, the README and the F-Droid `NonFreeNet` reason list the clear-signing registry download among the optional network features
 - WalletConnect typed data that cannot be signed opens the review with the reason instead of being refused at once
 - Entry screens keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
+- Verifying a recovery phrase or SLIP39 shares ends on a screen with a check mark or an X instead of a toast
 
 ### Fixed
 
@@ -31,6 +32,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Cancel after a refused tap leaves Change PIN, Unblock PIN and Initialize instead of stepping back through the form
 - With a WalletConnect request or proposal open, Unblock PIN and Don't have a Keycard? from the NFC sheet stay open instead of returning to the Dashboard
 - The signing and key export screen's title reads "Enter Keycard PIN" only while the PIN pad is up
+- The success sheet after signing, key export and unpairing names what was done instead of an empty line
+- On iOS, the NFC sheet names what was done after signing, key export, unpairing and verifying instead of "Success"
 
 ## [1.15.1] - 2026-10-20
 

@@ -53,6 +53,7 @@ export default function KeycardScreen({
       // Read-only on the card, so a re-tap may run it again.
       execute((cmdSet, { setStatus }) => flowRun.cardOp(cmdSet, setStatus), {
         retryOnTagLoss: true,
+        successMessage: flowRun.successMessage,
       });
     } catch (e: any) {
       setFlowError(e?.message ?? 'Failed to prepare the operation.');

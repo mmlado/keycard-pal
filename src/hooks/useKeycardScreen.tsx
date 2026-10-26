@@ -12,6 +12,7 @@ export type KeycardScreenKeycard = NFCOperation & {
   cancel: () => void;
   /** See UseNFCSessionOperation.userCancels. */
   userCancels: number;
+  successMessage?: string;
 };
 
 export type KeycardScreenNavigation = {
@@ -35,31 +36,21 @@ export type UseKeycardScreenOptions = {
   title: string;
   /** Header title while the Keycard PIN pad is up. */
   pinEntryTitle?: string;
-  /** When set, phase 'done' resets to Dashboard with this toast. */
+  /** Done resets to Dashboard; the toast is the operation's success message unless `toast` says otherwise. */
   done?: {
-    toast: string | ((result: unknown) => string | undefined);
+    toast?: string | ((result: unknown) => string | undefined);
     /** Skip navigation while result is null. */
     requireResult?: boolean;
   };
-  /**
-   * The screen is showing what comes after the tap and calls leave() itself:
-   * done does not navigate, and back means leave(). Scope it to that state.
-   */
+  /** The screen shows what follows the tap and calls leave(): done stays put and back means leave(). */
   hold?: boolean;
   /** The hook the guard, PIN title, sheet and onCancel follow when there are two. */
   activeKeycard?: KeycardScreenKeycard;
-  /**
-   * Steps the screen's own form back once the keycard guard passes, for
-   * hardware back and the header back alike. True when it stepped; false lets
-   * the screen go.
-   */
+  /** Steps the screen's own form back, for either back; false lets the screen go. */
   stepBack?: () => boolean;
   /** onCancel only cancels the tap instead of also leaving the screen. */
   stayOnCancel?: boolean;
-  /**
-   * How the screen leaves after a cancel, in place of going back. Navigate
-   * before awaiting anything: the sheet may navigate right after (Unblock PIN, the shop).
-   */
+  /** Leaves after a cancel instead of going back. Navigate before awaiting: the sheet may navigate next. */
   leaveOnCancel?: () => void;
   /** The sheet shows its success state on done. */
   showOnDone?: boolean;
@@ -84,16 +75,16 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
   optionsRef.current = options;
   const activeRef = useRef(active);
   activeRef.current = active;
-  // Set before this hook navigates: beforeRemove fires for reset too, and
-  // stepBack would veto it.
+  // beforeRemove fires for this hook's own reset too, and stepBack would veto it.
   const leavingRef = useRef(false);
 
   const leave = useCallback(() => {
     const { done, keycard } = optionsRef.current;
-    const toast =
-      typeof done?.toast === 'function'
-        ? done.toast(keycard.result)
-        : done?.toast;
+    const toast = !done
+      ? undefined
+      : typeof done.toast === 'function'
+      ? done.toast(keycard.result)
+      : done.toast ?? keycard.successMessage;
     leavingRef.current = true;
     navigation.reset({
       index: 0,

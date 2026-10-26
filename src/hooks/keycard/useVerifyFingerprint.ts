@@ -23,5 +23,7 @@ export function useVerifyFingerprint() {
   return useKeycardOp(compareFingerprint, {
     requiresPin: true,
     retryOnTagLoss: true,
+    // Either outcome: the tap did its job, and the result screen gives the answer.
+    successMessage: 'Compared with Keycard',
   });
 }

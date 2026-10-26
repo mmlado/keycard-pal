@@ -18,6 +18,7 @@ import BottomActionArea from '@/components/BottomActionArea';
 import MnemonicBackupCheck from '@/components/MnemonicBackupCheck';
 import MnemonicWordEntry from '@/components/MnemonicWordEntry';
 import PrimaryButton from '@/components/PrimaryButton';
+import VerifyResult from '@/components/VerifyResult';
 
 import { useGenerateSlip39Shares } from '@/hooks/keycard/useGenerateSlip39Shares';
 import { useLoadKey } from '@/hooks/keycard/useLoadKey';
@@ -86,6 +87,10 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   const loadKey = useLoadKey();
   const verifyFingerprint = useVerifyFingerprint();
   const keycard = mode === 'verify' ? verifyFingerprint : loadKey;
+  const verifyResult =
+    mode === 'verify' && verifyFingerprint.phase === 'done'
+      ? verifyFingerprint.result
+      : null;
   const activeKeycard =
     mode === 'generate' && generatedShares.length === 0
       ? generateSlip39
@@ -265,7 +270,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   }, [mode, generateSlip39, parsedShareCount, parsedThreshold]);
 
   // Done follows `keycard`; the guard, title and cancel follow the hook running the tap.
-  const { sheet } = useKeycardScreen({
+  const { leave, sheet } = useKeycardScreen({
     keycard,
     navigation,
     title:
@@ -278,14 +283,9 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
         : mode === 'verify'
         ? 'Verify SLIP39 shares'
         : 'Import SLIP39 shares',
-    done: {
-      toast: doneResult =>
-        mode === 'verify'
-          ? doneResult === 'match'
-            ? 'SLIP39 shares match'
-            : 'SLIP39 shares do not match'
-          : 'Key pair has been added to Keycard',
-    },
+    // A verify shows its own result, so nothing follows it on the Dashboard.
+    done: mode === 'verify' ? undefined : {},
+    hold: verifyResult !== null,
     activeKeycard,
     stayOnCancel: true,
   });
@@ -312,6 +312,23 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   const handleShareVerifyFailure = useCallback(() => {
     setBackupStep('display');
   }, []);
+
+  if (verifyResult) {
+    return (
+      <View style={styles.container}>
+        <VerifyResult
+          matches={verifyResult === 'match'}
+          text={
+            verifyResult === 'match'
+              ? 'SLIP39 shares match'
+              : 'SLIP39 shares do not match'
+          }
+          onDone={leave}
+        />
+        {sheet}
+      </View>
+    );
+  }
 
   if (
     mode === 'generate' &&

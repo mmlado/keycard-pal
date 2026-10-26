@@ -26,7 +26,7 @@ export default function SetCardNameScreen({
     keycard,
     navigation,
     title: 'Set card name',
-    done: { toast: 'Card name updated' },
+    done: {},
     showOnDone: true,
   });
 

@@ -231,6 +231,7 @@ describe('ChangeSecretScreen', () => {
       mockUseChangeSecret.mockReturnValue({
         ...hookMock('done'),
         result: undefined,
+        successMessage: 'PIN changed',
       });
       render(
         <ChangeSecretScreen navigation={navigation} route={routeFor('pin')} />,
@@ -270,6 +271,7 @@ describe('ChangeSecretScreen', () => {
       mockUseChangeSecret.mockReturnValue({
         ...hookMock('done'),
         result: undefined,
+        successMessage: 'PUK changed',
       });
       render(
         <ChangeSecretScreen navigation={navigation} route={routeFor('puk')} />,
@@ -337,6 +339,7 @@ describe('ChangeSecretScreen', () => {
       mockUseChangeSecret.mockReturnValue({
         ...hookMock('done'),
         result: undefined,
+        successMessage: 'Pairing secret changed',
       });
       render(
         <ChangeSecretScreen

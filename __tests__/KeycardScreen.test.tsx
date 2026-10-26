@@ -239,6 +239,13 @@ describe('KeycardScreen', () => {
       await renderScreen('pin_entry');
       expect(mockExecute).toHaveBeenCalledTimes(1);
     });
+
+    it("hands execute the flow's success message", async () => {
+      await renderScreen('pin_entry');
+      expect(mockExecute.mock.calls[0][1]).toEqual(
+        expect.objectContaining({ successMessage: 'Signed' }),
+      );
+    });
   });
 
   describe('NFCBottomSheet variant prop', () => {

@@ -124,6 +124,35 @@ describe('done navigation', () => {
     });
   });
 
+  it("toasts the operation's own success message when the screen names none", () => {
+    const navigation = makeNavigation();
+    renderScreenHook({
+      keycard: { ...makeKeycard('done', 'ok'), successMessage: 'Card named' },
+      navigation,
+      title: 'T',
+      done: {},
+    });
+    expect(navigation.reset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: 'Dashboard', params: { toast: 'Card named' } }],
+    });
+  });
+
+  it("prefers the screen's toast to the operation's success message", () => {
+    const navigation = makeNavigation();
+    renderScreenHook({
+      keycard: { ...makeKeycard('done', 'ok'), successMessage: 'Card named' },
+      navigation,
+      title: 'T',
+      done: { toast: 'All set' },
+    });
+    expect(navigation.reset).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routes: [{ name: 'Dashboard', params: { toast: 'All set' } }],
+      }),
+    );
+  });
+
   it('computes the toast from the result', () => {
     const navigation = makeNavigation();
     renderScreenHook({
@@ -588,6 +617,23 @@ describe('held screen', () => {
         routes: [{ name: 'Dashboard', params: { toast: 'Matches' } }],
       }),
     );
+  });
+
+  // A verify result: nothing follows it on the Dashboard.
+  it('leave() without done sends no toast, whatever the operation says', () => {
+    const navigation = makeNavigation();
+    const { result } = renderScreenHook({
+      keycard: { ...makeKeycard('done', 'match'), successMessage: 'Compared' },
+      navigation,
+      title: 'T',
+      hold: true,
+    });
+    expect(navigation.reset).not.toHaveBeenCalled();
+    result.current.leave();
+    expect(navigation.reset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: 'Dashboard', params: { toast: undefined } }],
+    });
   });
 
   // InitCardScreen: no "Card initialized" over a PUK the card may not hold.

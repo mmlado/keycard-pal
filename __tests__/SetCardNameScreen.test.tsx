@@ -58,6 +58,7 @@ jest.mock('../src/hooks/keycard/useSetCardName', () => ({
     status: '',
     start: mockStart,
     cancel: mockCancel,
+    successMessage: 'Card name updated',
   }),
 }));
 

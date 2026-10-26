@@ -368,3 +368,29 @@ describe('export key flow', () => {
     });
   });
 });
+
+describe('success wording', () => {
+  it("says what the card did, for Apple's sheet and the success sheet", () => {
+    expect(prepareKeycardFlow(ethParams).successMessage).toBe('Signed');
+    expect(
+      prepareKeycardFlow({
+        operation: 'sign',
+        signMode: 'btc',
+        psbtHex: 'deadbeef',
+      } as any).successMessage,
+    ).toBe('Signed');
+    expect(
+      prepareKeycardFlow({
+        operation: 'sign',
+        signMode: 'btc-message',
+        requestId: 'req-3',
+        signDataHex: 'cafebabe',
+        derivationPath: "m/84'/0'/0'/0/0",
+      } as any).successMessage,
+    ).toBe('Signed');
+    expect(
+      prepareKeycardFlow({ operation: 'export_key', target: 'ethereum' } as any)
+        .successMessage,
+    ).toBe('Key exported');
+  });
+});

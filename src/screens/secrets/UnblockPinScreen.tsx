@@ -61,8 +61,7 @@ export default function UnblockPinScreen({
     keycard,
     navigation,
     title,
-    // Mirrors useUnblockPin's success message.
-    done: { toast: 'PIN unblocked' },
+    done: {},
     stepBack,
     showOnDone: true,
   });

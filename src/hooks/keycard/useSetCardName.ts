@@ -35,7 +35,6 @@ export function useSetCardName() {
   const { start: startOp, ...rest } = useKeycardOp(writeCardName, {
     requiresPin: true,
     requiresMasterKey: false,
-    // Mirrors SetCardNameScreen's done toast.
     successMessage: 'Card name updated',
   });
 

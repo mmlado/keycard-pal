@@ -82,6 +82,7 @@ function hookMock(phase: string, initSent = false) {
     result: null,
     puk: PUK,
     initSent,
+    successMessage: 'Card initialized',
     start: mockStart,
     cancel: mockCancel,
     reset: mockReset,

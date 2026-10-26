@@ -82,6 +82,16 @@ describe('useNFCOperation', () => {
       expect(result.current.status).toBe('');
       expect(result.current.result).toBeNull();
     });
+
+    it('hands back its success message, for the screen to show after the tap', () => {
+      const { result } = renderHook(() =>
+        useNFCOperation(
+          useCallback(async () => 'ok', []),
+          { successMessage: 'Card reset' },
+        ),
+      );
+      expect(result.current.successMessage).toBe('Card reset');
+    });
   });
 
   describe('start', () => {
