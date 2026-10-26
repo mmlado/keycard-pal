@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons } from 'react-native-paper';
 
@@ -12,18 +12,11 @@ import InfoRow from '@/components/InfoRow';
 
 import { useRegistryAnswer } from '@/hooks/useRegistryAnswer';
 
-import {
-  eip712DomainChainId,
-  encodeEip712Type,
-  parseEip712RawTypedData,
-  type Eip712Summary,
-} from '@/utils/eip712';
+import { parseEip712RawTypedData, type Eip712Summary } from '@/utils/eip712';
 import { displayMessage } from '@/utils/eip7730/display';
-import { lookupEip712 } from '@/utils/eip7730/lookup';
-import { buildEip712Resolvers } from '@/utils/eip7730/paths';
 import { reviewerNames } from '@/utils/eip7730/source';
-import { fitsRequest } from '@/utils/eip7730/visibility';
 import type { EthPayload } from '@/utils/ethPayload';
+import { describeMessage } from '@/utils/messageDescription';
 
 import Eip7730Display from './Eip7730Display';
 import {
@@ -50,64 +43,27 @@ export default function Eip712JsonPanel({
   const [tab, setTab] = useState<Tab>('details');
   const specialEip712 = eip712.special;
 
-  const rawTypedData = useMemo(
-    () => parseEip712RawTypedData(request.signData),
-    [request.signData],
-  );
-  const verifyingContract = eip712.domain?.verifyingContract;
-  // ERC-7730 binds a message to its domain's chain; WalletConnect requests carry no other.
-  const domainChainId = rawTypedData
-    ? eip712DomainChainId(rawTypedData.domain)
-    : undefined;
-
-  const lookup = useCallback(() => {
-    if (domainChainId === undefined || !verifyingContract || !rawTypedData) {
-      return null;
-    }
-    const encodedType = encodeEip712Type(
-      rawTypedData.primaryType,
-      rawTypedData.types,
-    );
-    if (!encodedType) return null;
-    return lookupEip712(
-      domainChainId,
-      verifyingContract,
-      encodedType,
-      rawTypedData.domain,
-    );
-  }, [domainChainId, verifyingContract, rawTypedData]);
-  const { answer: matchedFormat, loading } = useRegistryAnswer(lookup);
-
-  const resolvers = useMemo(
+  const ask = useCallback(
     () =>
-      buildEip712Resolvers(
-        rawTypedData ?? { types: {}, primaryType: '', message: {} },
-        {
-          from: request.address,
-          to: verifyingContract,
-          value: '0',
-          chainId: domainChainId,
-        },
+      describeMessage(
+        parseEip712RawTypedData(request.signData),
+        request.address,
       ),
-    [domainChainId, verifyingContract, rawTypedData, request.address],
+    [request.signData, request.address],
   );
+  const { answer: description, loading } = useRegistryAnswer(ask);
 
-  const matched = matchedFormat && { format: matchedFormat, ...resolvers };
-  const rejected = matched !== null && !fitsRequest(matched.format, matched);
+  const matched = description?.descriptor ?? null;
   // The app's Permit and SafeTx reviews are reviewed code; an unreviewed descriptor is not.
   const descriptor =
     matched &&
-    !rejected &&
     (!specialEip712 || reviewerNames(matched.format.reviewedBy).length > 0)
       ? matched
       : null;
   // Only the Details tab shows it, and a long message formats every row.
   const display =
-    tab === 'details' && descriptor
-      ? displayMessage(descriptor, {
-          chainId: domainChainId,
-          verifyingContract,
-        })
+    tab === 'details' && description && descriptor
+      ? displayMessage(descriptor, description)
       : null;
 
   // The classification's digest is the one the card signs.
@@ -115,7 +71,9 @@ export default function Eip712JsonPanel({
 
   return (
     <View style={styles.panel}>
-      {rejected && <WarningRow text={DESCRIPTOR_CHECK_FAILED_WARNING} />}
+      {description?.rejected && (
+        <WarningRow text={DESCRIPTOR_CHECK_FAILED_WARNING} />
+      )}
       <SegmentedButtons
         value={tab}
         onValueChange={v => setTab(v as Tab)}
