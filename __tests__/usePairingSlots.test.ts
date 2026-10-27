@@ -2,39 +2,24 @@ import { act, renderHook } from '@testing-library/react-native';
 
 import { usePairingSlots } from '../src/hooks/keycard/usePairingSlots';
 
+import {
+  insertCard,
+  mockStartNFC,
+  mockStopNFC,
+  mockStopNFCWithError,
+  resetFakeCard,
+  tapCard,
+} from './fakeCard.testUtils';
 import { filler, v4Select } from './selectResponse.testUtils';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-let capturedOnConnected: ((...args: any[]) => Promise<void>) | null = null;
-
-const mockStartNFC = jest.fn();
-const mockStopNFC = jest.fn();
-const mockStopNFCWithError = jest.fn();
-
-jest.mock('react-native-keycard', () => ({
-  __esModule: true,
-  default: {
-    Core: {
-      onKeycardConnected: (cb: (...args: any[]) => Promise<void>) => {
-        capturedOnConnected = cb;
-        return { remove: jest.fn() };
-      },
-      onKeycardDisconnected: () => ({ remove: jest.fn() }),
-      onNFCUserCancelled: () => ({ remove: jest.fn() }),
-      onNFCTimeout: () => ({ remove: jest.fn() }),
-      startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: (message?: string, isError?: boolean) =>
-        isError ? mockStopNFCWithError(message) : mockStopNFC(),
-      isNFCEnabled: () => Promise.resolve(true),
-      openNFCSettings: () => Promise.resolve(true),
-      setNFCMessage: () => Promise.resolve(true),
-    },
-    NFCCardChannel: class {},
-  },
-}));
+jest.mock(
+  'react-native-keycard',
+  () => require('./fakeCard.testUtils').bridgeModule,
+);
 
 const mockSelect = jest.fn();
 const mockApplicationInfo = {
@@ -46,12 +31,7 @@ const mockCmdSet = {
   applicationInfo: mockApplicationInfo,
 };
 
-jest.mock('keycard-sdk', () => ({
-  __esModule: true,
-  default: {
-    Commandset: jest.fn().mockImplementation(() => mockCmdSet),
-  },
-}));
+jest.mock('keycard-sdk', () => require('./fakeCard.testUtils').sdkModule());
 
 const mockLoadPairing = jest.fn();
 const mockDeletePairing = jest.fn();
@@ -96,7 +76,7 @@ async function readSlots(pairingIndex: number | null = 3) {
     hook.result.current.checkSlots();
   });
   await act(async () => {
-    await capturedOnConnected?.();
+    await tapCard();
   });
   return hook;
 }
@@ -146,12 +126,8 @@ function startUnpair(
 
 describe('usePairingSlots', () => {
   beforeEach(() => {
-    mockStartNFC.mockResolvedValue(undefined);
-    mockStopNFC.mockResolvedValue(undefined);
-    mockStopNFCWithError.mockResolvedValue(undefined);
-    mockStartNFC.mockClear();
-    mockStopNFC.mockClear();
-    mockStopNFCWithError.mockClear();
+    resetFakeCard();
+    insertCard(mockCmdSet);
     mockSelect.mockClear();
     mockSelect.mockResolvedValue({ sw: 0x9000 });
     mockLoadPairing.mockClear();
@@ -166,7 +142,6 @@ describe('usePairingSlots', () => {
       instanceUID: new Uint8Array([0xab, 0xcd]),
       freePairingSlots: 7,
     };
-    capturedOnConnected = null;
   });
 
   describe('initial state', () => {

@@ -1,10 +1,13 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { useCallback } from 'react';
 import { AppState } from 'react-native';
+
+import { KEYCARD_CA_PUBLIC_KEY } from '../src/constants/keycard';
+
 import useNFCSession, {
   CARD_MOVED_STATUS,
 } from '../src/hooks/keycard/useNFCSession';
-import { KEYCARD_CA_PUBLIC_KEY } from '../src/constants/keycard';
+
 import {
   CARD_NOT_GENUINE_STATUS,
   NO_CERTIFICATE_STATUS,
@@ -14,77 +17,38 @@ import {
   resetLastTappedGeneration,
 } from '../src/utils/lastTappedGeneration';
 
+import {
+  cancelSheet,
+  fakeCommandset,
+  insertCard,
+  loseCard,
+  mockCommandset,
+  mockIsNFCEnabled,
+  mockSetNFCMessage,
+  mockStartNFC,
+  mockStopNFC,
+  mockStopNFCWithError,
+  mockStopNFCWithMessage,
+  resetFakeCard,
+  tapCard,
+  timeOut,
+} from './fakeCard.testUtils';
+
 const ANDROID_TAG_LOST = 'CardIO Error: Error: Tag was lost.';
 const IOS_TAG_LOST = 'CardIO Error: Error: NFCError:100';
 
 // ---------------------------------------------------------------------------
-// RNKeycard mock — captures event callbacks so tests can trigger them
+// The fake card
 // ---------------------------------------------------------------------------
 
-let capturedOnConnected: (() => Promise<void>) | null = null;
-let capturedOnDisconnected: (() => void) | null = null;
-let capturedOnCancelled: (() => void) | null = null;
-let capturedOnTimeout: (() => void) | null = null;
-
-const mockStartNFC = jest.fn();
-const mockStopNFC = jest.fn();
-const mockStopNFCWithError = jest.fn();
-const mockStopNFCWithMessage = jest.fn();
-const mockIsNFCEnabled = jest.fn();
-const mockOpenNFCSettings = jest.fn();
-const mockSetNFCMessage = jest.fn();
-
-jest.mock('react-native-keycard', () => ({
-  __esModule: true,
-  default: {
-    Core: {
-      onKeycardConnected: (cb: () => Promise<void>) => {
-        capturedOnConnected = cb;
-        return { remove: jest.fn() };
-      },
-      onKeycardDisconnected: (cb: () => void) => {
-        capturedOnDisconnected = cb;
-        return { remove: jest.fn() };
-      },
-      onNFCUserCancelled: (cb: () => void) => {
-        capturedOnCancelled = cb;
-        return { remove: jest.fn() };
-      },
-      onNFCTimeout: (cb: () => void) => {
-        capturedOnTimeout = cb;
-        return { remove: jest.fn() };
-      },
-      startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: (message?: string, isError?: boolean) =>
-        isError
-          ? mockStopNFCWithError(message)
-          : message
-          ? mockStopNFCWithMessage(message)
-          : mockStopNFC(),
-      isNFCEnabled: () => mockIsNFCEnabled(),
-      openNFCSettings: () => mockOpenNFCSettings(),
-      setNFCMessage: (msg: string) => mockSetNFCMessage(msg),
-    },
-    NFCCardChannel: class {},
-  },
-}));
+jest.mock(
+  'react-native-keycard',
+  () => require('./fakeCard.testUtils').bridgeModule,
+);
 
 const mockSelect = jest.fn();
 
-// What each Commandset was built with: CA keys and whitelist.
-const mockCommandsetArgs: unknown[][] = [];
-
-jest.mock('keycard-sdk', () => ({
-  __esModule: true,
-  default: {
-    Commandset: class {
-      select = mockSelect;
-      constructor(...args: unknown[]) {
-        mockCommandsetArgs.push(args);
-      }
-    },
-  },
-}));
+jest.mock('keycard-sdk', () => require('./fakeCard.testUtils').sdkModule());
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -98,29 +62,12 @@ describe('useNFCSession', () => {
   let mockOnCardDisconnected: jest.Mock;
 
   beforeEach(() => {
-    mockStartNFC.mockResolvedValue(undefined);
-    mockStopNFC.mockResolvedValue(undefined);
-    mockStopNFCWithError.mockResolvedValue(undefined);
-    mockStopNFCWithMessage.mockResolvedValue(undefined);
-    mockIsNFCEnabled.mockResolvedValue(true);
-    mockOpenNFCSettings.mockResolvedValue(true);
-    mockSetNFCMessage.mockResolvedValue(true);
+    resetFakeCard();
+    insertCard(fakeCommandset(undefined, { select: mockSelect }));
     mockSelect.mockResolvedValue({ sw: 0x9000 });
-    mockStartNFC.mockClear();
-    mockStopNFC.mockClear();
-    mockStopNFCWithError.mockClear();
-    mockStopNFCWithMessage.mockClear();
-    mockIsNFCEnabled.mockClear();
-    mockOpenNFCSettings.mockClear();
-    mockSetNFCMessage.mockClear();
     mockSelect.mockClear();
     mockOnCardConnected = jest.fn().mockResolvedValue(undefined);
     mockOnCardDisconnected = jest.fn().mockResolvedValue(undefined);
-    mockCommandsetArgs.length = 0;
-    capturedOnConnected = null;
-    capturedOnDisconnected = null;
-    capturedOnCancelled = null;
-    capturedOnTimeout = null;
     capturedAppStateListener = null;
     (AppState.addEventListener as jest.Mock).mockImplementation(
       (_event: string, cb: (state: string) => void) => {
@@ -514,7 +461,7 @@ describe('useNFCSession', () => {
       const { result } = makeHook();
       expect(result.current.phase).toBe('idle');
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(mockOnCardConnected).not.toHaveBeenCalled();
       expect(result.current.phase).toBe('idle');
@@ -536,7 +483,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(result.current.phase).toBe('done');
       }
@@ -579,7 +526,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(result.current.phase).toBe('done');
         return result;
@@ -607,7 +554,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('done');
       expect(log).toHaveBeenCalledWith('[Keycard] stopNFC failed:', failure);
@@ -621,13 +568,13 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('done');
 
       mockOnCardConnected.mockClear();
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(mockOnCardConnected).not.toHaveBeenCalled();
     });
@@ -639,13 +586,13 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
 
       mockOnCardConnected.mockResolvedValueOnce(undefined);
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(mockOnCardConnected).toHaveBeenCalledTimes(2);
       expect(result.current.phase).toBe('done');
@@ -662,8 +609,8 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnConnected?.();
-        await capturedOnConnected?.();
+        tapCard();
+        await tapCard();
       });
       expect(mockOnCardConnected).toHaveBeenCalledTimes(1);
       await act(async () => {
@@ -679,7 +626,7 @@ describe('useNFCSession', () => {
       });
       expect(result.current.phase).toBe('nfc');
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(mockOnCardConnected).toHaveBeenCalledTimes(1);
       expect(result.current.phase).toBe('done');
@@ -692,7 +639,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('bad mac');
@@ -705,7 +652,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(mockStopNFCWithError).toHaveBeenCalledWith('bad mac');
     });
@@ -717,7 +664,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('SELECT failed: 0x6A82');
@@ -738,20 +685,20 @@ describe('useNFCSession', () => {
       });
     }
 
-    async function tapCard() {
+    async function startAndTap() {
       const hook = makeHook();
       await act(async () => {
         hook.result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       return hook;
     }
 
     it('refuses a card below 3.1 before the operation sees it', async () => {
       selectReturning({ appVersion: 0x0300 });
-      const { result } = await tapCard();
+      const { result } = await startAndTap();
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe(TOO_OLD);
       expect(mockStopNFCWithError).toHaveBeenCalledWith(TOO_OLD);
@@ -760,14 +707,14 @@ describe('useNFCSession', () => {
 
     it('hands a 3.1 card to the operation', async () => {
       selectReturning({ appVersion: 0x0301 });
-      const { result } = await tapCard();
+      const { result } = await startAndTap();
       expect(mockOnCardConnected).toHaveBeenCalled();
       expect(result.current.phase).toBe('done');
     });
 
     it('does not refuse a card that reports no version', async () => {
       selectReturning({});
-      const { result } = await tapCard();
+      const { result } = await startAndTap();
       expect(mockOnCardConnected).toHaveBeenCalled();
       expect(result.current.phase).toBe('done');
     });
@@ -780,13 +727,13 @@ describe('useNFCSession', () => {
 
       it('notes a 3.x card', async () => {
         selectReturning({ appVersion: 0x0302 });
-        await tapCard();
+        await startAndTap();
         expect(getLastTappedGeneration()).toBe('3.1');
       });
 
       it('notes a 4.0 card', async () => {
         selectReturning({ appVersion: 0x0400 });
-        await tapCard();
+        await startAndTap();
         expect(getLastTappedGeneration()).toBe('4.0');
       });
 
@@ -795,19 +742,19 @@ describe('useNFCSession', () => {
         mockOnCardConnected.mockRejectedValueOnce(
           new Error('operation failed'),
         );
-        await tapCard();
+        await startAndTap();
         expect(getLastTappedGeneration()).toBe('4.0');
       });
 
       it('notes nothing for a card it refused', async () => {
         selectReturning({ appVersion: 0x0300 });
-        await tapCard();
+        await startAndTap();
         expect(getLastTappedGeneration()).toBeNull();
       });
 
       it('notes nothing when SELECT told it nothing', async () => {
         mockSelect.mockResolvedValue({ sw: 0x9000 });
-        await tapCard();
+        await startAndTap();
         expect(getLastTappedGeneration()).toBeNull();
       });
     });
@@ -824,7 +771,7 @@ describe('useNFCSession', () => {
         hook.result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       return hook;
     }
@@ -842,13 +789,13 @@ describe('useNFCSession', () => {
 
     it('states the CA key instead of relying on the SDK default', async () => {
       await tap();
-      const [, caKeys] = mockCommandsetArgs[0];
+      const [, caKeys] = mockCommandset.mock.calls[0];
       expect(caKeys).toEqual([KEYCARD_CA_PUBLIC_KEY]);
     });
 
     it('whitelists nothing unless the caller says so', async () => {
       await tap();
-      expect(mockCommandsetArgs[0][2]).toEqual([]);
+      expect(mockCommandset.mock.calls[0][2]).toEqual([]);
     });
 
     // Asked on every tap, so a fresh approval is in force on the next one.
@@ -856,13 +803,13 @@ describe('useNFCSession', () => {
       const approved = new Uint8Array(33).fill(2);
       const whitelistedCardKeys = jest.fn().mockResolvedValue([approved]);
       const { result } = await tap({ whitelistedCardKeys });
-      expect(mockCommandsetArgs[0][2]).toEqual([approved]);
+      expect(mockCommandset.mock.calls[0][2]).toEqual([approved]);
 
       await act(async () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(whitelistedCardKeys).toHaveBeenCalledTimes(2);
     });
@@ -934,7 +881,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       expect(result.current.phase).toBe('idle');
     });
@@ -942,7 +889,7 @@ describe('useNFCSession', () => {
     it('user-cancelled does not change phase when idle', async () => {
       const { result } = makeHook();
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       expect(result.current.phase).toBe('idle');
     });
@@ -954,7 +901,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       expect(result.current.userCancels).toBe(1);
     });
@@ -966,7 +913,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          capturedOnCancelled?.();
+          cancelSheet();
         });
       }
       expect(result.current.userCancels).toBe(2);
@@ -975,7 +922,7 @@ describe('useNFCSession', () => {
     it('does not count a cancel outside a tap', async () => {
       const { result } = makeHook();
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       expect(result.current.userCancels).toBe(0);
     });
@@ -990,7 +937,7 @@ describe('useNFCSession', () => {
       await act(async () => {});
       expect(result.current.phase).toBe('error');
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       expect(result.current.userCancels).toBe(0);
       expect(result.current.phase).toBe('error');
@@ -1002,7 +949,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       expect(result.current.status).toBe('Timed out — tap again');
     });
@@ -1010,7 +957,7 @@ describe('useNFCSession', () => {
     it('timeout does not update status when not in nfc phase', async () => {
       const { result } = makeHook();
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       expect(result.current.status).toBe('');
     });
@@ -1021,7 +968,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnDisconnected?.();
+        loseCard();
       });
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
@@ -1035,14 +982,14 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('Card is locked');
 
       // Android NFC always fires disconnect after an operation — must not override the error
       await act(async () => {
-        capturedOnDisconnected?.();
+        loseCard();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('Card is locked');
@@ -1051,7 +998,7 @@ describe('useNFCSession', () => {
     it('card disconnected outside nfc does not change status', async () => {
       const { result } = makeHook();
       await act(async () => {
-        capturedOnDisconnected?.();
+        loseCard();
       });
       expect(result.current.phase).toBe('idle');
       expect(result.current.status).toBe('');
@@ -1069,7 +1016,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
     }
 
@@ -1111,12 +1058,12 @@ describe('useNFCSession', () => {
       await startAndFail(result, ANDROID_TAG_LOST);
       // The runloop's disconnect event lands after the classified error.
       await act(async () => {
-        capturedOnDisconnected?.();
+        loseCard();
       });
       // Re-tap, now a real error.
       mockOnCardConnected.mockRejectedValue(new Error('Invalid MAC'));
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('Invalid MAC');
@@ -1127,7 +1074,7 @@ describe('useNFCSession', () => {
       await startAndFail(result, ANDROID_TAG_LOST);
       mockOnCardConnected.mockResolvedValue(undefined);
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(mockOnCardConnected).toHaveBeenCalledTimes(2);
       expect(result.current.cardPresence).toBe('connected');
@@ -1152,13 +1099,13 @@ describe('useNFCSession', () => {
       });
       let firstRun: Promise<void> | undefined;
       act(() => {
-        firstRun = capturedOnConnected?.();
+        firstRun = tapCard();
       });
       await act(async () => {});
 
       // The user taps again while the first run is still blocked.
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(mockOnCardConnected).toHaveBeenCalledTimes(1); // queued, not run
 
@@ -1188,11 +1135,11 @@ describe('useNFCSession', () => {
       });
       let firstRun: Promise<void> | undefined;
       act(() => {
-        firstRun = capturedOnConnected?.();
+        firstRun = tapCard();
       });
       await act(async () => {});
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
 
       await act(async () => {
@@ -1234,7 +1181,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
 
         expect(result.current.phase).toBe('nfc');
@@ -1251,10 +1198,10 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
 
         expect(mockOnCardConnected).toHaveBeenCalledTimes(1);
@@ -1270,7 +1217,7 @@ describe('useNFCSession', () => {
         });
         for (let i = 0; i < 3; i++) {
           await act(async () => {
-            await capturedOnConnected?.();
+            await tapCard();
           });
         }
 
@@ -1299,7 +1246,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(result.current.phase).toBe('error');
         expect(result.current.status).toBe('Invalid MAC');
@@ -1316,7 +1263,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe(
@@ -1332,7 +1279,7 @@ describe('useNFCSession', () => {
     async function failOnce(message = ANDROID_TAG_LOST) {
       mockOnCardConnected.mockRejectedValueOnce(new Error(message));
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
     }
 
@@ -1358,7 +1305,7 @@ describe('useNFCSession', () => {
       await failOnce();
       mockOnCardConnected.mockResolvedValue(undefined);
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       await act(async () => {
         jest.advanceTimersByTime(10000);
@@ -1370,7 +1317,7 @@ describe('useNFCSession', () => {
     async function failDuringSelect() {
       mockSelect.mockRejectedValueOnce(new Error(ANDROID_TAG_LOST));
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
     }
 
@@ -1437,7 +1384,7 @@ describe('useNFCSession', () => {
       });
       mockStartNFC.mockClear();
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       expect(result.current.phase).toBe('nfc');
       expect(mockStartNFC).not.toHaveBeenCalled();
@@ -1455,7 +1402,7 @@ describe('useNFCSession', () => {
       });
       for (let i = 0; i < 2; i++) {
         await act(async () => {
-          capturedOnTimeout?.();
+          timeOut();
         });
         await act(async () => {
           jest.advanceTimersByTime(500);
@@ -1463,7 +1410,7 @@ describe('useNFCSession', () => {
       }
       expect(result.current.phase).toBe('nfc');
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('Timed out — tap again');
@@ -1476,7 +1423,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('Timed out — tap again');
@@ -1488,12 +1435,12 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('done');
       mockStartNFC.mockClear();
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       await act(async () => {
         jest.advanceTimersByTime(500);
@@ -1509,7 +1456,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe('Timed out — tap again');
@@ -1521,7 +1468,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       mockStartNFC.mockClear();
       unmount();
@@ -1550,7 +1497,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(mockSetNFCMessage).toHaveBeenCalledWith('Selecting applet...');
       });
@@ -1568,7 +1515,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(mockSetNFCMessage).toHaveBeenCalledWith(
           'Exporting key 2 of 3...',
@@ -1585,7 +1532,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(result.current.phase).toBe('nfc');
         expect(mockSetNFCMessage).toHaveBeenCalledWith(CARD_MOVED_STATUS);
@@ -1600,7 +1547,7 @@ describe('useNFCSession', () => {
         });
         mockSetNFCMessage.mockClear();
         await act(async () => {
-          capturedOnDisconnected?.();
+          loseCard();
         });
         expect(mockSetNFCMessage).toHaveBeenCalledWith(CARD_MOVED_STATUS);
       });
@@ -1617,7 +1564,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(mockStopNFCWithError).toHaveBeenCalledWith(
           'SELECT failed: 0x6A82',
@@ -1640,10 +1587,10 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         await act(async () => {
-          capturedOnDisconnected?.();
+          loseCard();
         });
         expect(mockSetNFCMessage).not.toHaveBeenCalled();
       });
@@ -1657,7 +1604,7 @@ describe('useNFCSession', () => {
           result.current.startNFC();
         });
         await act(async () => {
-          await capturedOnConnected?.();
+          await tapCard();
         });
         expect(result.current.phase).toBe('done');
       });
