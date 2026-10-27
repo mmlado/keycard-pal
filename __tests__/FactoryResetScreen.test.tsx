@@ -1,9 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import FactoryResetScreen, {
-  dashboardEntry,
-} from '../src/screens/FactoryResetScreen';
+import FactoryResetScreen from '../src/screens/FactoryResetScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 
 // ---------------------------------------------------------------------------
@@ -213,22 +211,6 @@ describe('FactoryResetScreen', () => {
     it('does not navigate when phase is not done', async () => {
       await renderScreen('idle');
       expect(navigation.reset).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // dashboardEntry export
-  // -------------------------------------------------------------------------
-
-  describe('dashboardEntry', () => {
-    it('has the correct label', () => {
-      expect(dashboardEntry.label).toBe('Factory reset');
-    });
-
-    it('navigates to FactoryReset when invoked', () => {
-      const nav = { navigate: jest.fn() } as any;
-      dashboardEntry.navigate(nav);
-      expect(nav.navigate).toHaveBeenCalledWith('FactoryReset');
     });
   });
 });

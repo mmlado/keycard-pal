@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,6 +8,7 @@ import { ConfirmKeySreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
 import MnemonicBackupCheck from '@/components/MnemonicBackupCheck';
+import PreparingKeyCard from '@/components/PreparingKeyCard';
 
 import { deriveMnemonicKeyPair, useLoadKey } from '@/hooks/keycard/useLoadKey';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
@@ -65,13 +65,9 @@ export default function ConfirmKeyScreen({
 
       {preparing && (
         <View style={styles.preparing}>
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.progressText}>Preparing key material...</Text>
-            <Text style={styles.description}>
-              {APP_NAME} is deriving the key before it asks you to tap the card.
-            </Text>
-          </View>
+          <PreparingKeyCard
+            description={`${APP_NAME} is deriving the key before it asks you to tap the card.`}
+          />
         </View>
       )}
 
@@ -90,21 +86,5 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     justifyContent: 'center',
     paddingHorizontal: 16,
-  },
-  loadingCard: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceElevated,
-    borderRadius: 8,
-    gap: 12,
-    padding: 24,
-  },
-  progressText: {
-    color: theme.colors.onSurfaceVariant,
-    fontSize: 14,
-  },
-  description: {
-    color: theme.colors.onSurfaceVariant,
-    fontSize: 14,
-    lineHeight: 22,
   },
 });

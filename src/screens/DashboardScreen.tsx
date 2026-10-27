@@ -42,11 +42,9 @@ export default function DashboardScreen({
     navigation.navigate('QRScanner');
   }, [navigation]);
 
-  const entries = dashboardActions.map(action => ({
-    label: action.label,
-    detail: action.detail,
-    icon: action.icon,
-    onPress: () => action.navigate(navigation),
+  const entries = dashboardActions.map(({ navigate, ...entry }) => ({
+    ...entry,
+    onPress: () => navigate(navigation),
   }));
 
   return (
@@ -56,8 +54,7 @@ export default function DashboardScreen({
         { paddingTop: insets.top, paddingBottom: insets.bottom },
       ]}
     >
-      {/* Above the grid, not in its footer: it follows a tap the user just
-          made, and below the tiles it would sit off screen on a small phone. */}
+      {/* Not in the footer: below the tiles it would sit off screen on a small phone. */}
       <UnselectedKeycardReminder />
       <EntryList
         entries={entries}

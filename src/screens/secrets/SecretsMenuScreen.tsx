@@ -2,16 +2,10 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '@/assets/icons';
-import { DashboardAction, SecretsMenuScreenProps } from '@/navigation/types';
+import { SecretsMenuScreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
 import EntryList, { EntryListItem } from '@/components/EntryList';
-
-export const dashboardEntry: DashboardAction = {
-  label: 'Secrets',
-  icon: Icons.secrets,
-  navigate: nav => nav.navigate('SecretsMenu'),
-};
 
 export default function SecretsMenuScreen({
   navigation,

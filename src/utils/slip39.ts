@@ -49,12 +49,24 @@ function intToIndices(value: number, length: number, bits: number): number[] {
   return indices;
 }
 
-export function normalizeSlip39Share(input: string): string {
+function normalizeSlip39Share(input: string): string {
   return input.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
 }
 
-export function isSlip39Word(word: string): boolean {
+function isSlip39Word(word: string): boolean {
   return WORD_LIST.includes(word.toLowerCase());
+}
+
+export function parseSlip39Share(input: string): string {
+  const normalized = normalizeSlip39Share(input);
+  if (!normalized) {
+    throw new Error('Enter a SLIP39 share');
+  }
+  const invalid = normalized.split(' ').find(word => !isSlip39Word(word));
+  if (invalid) {
+    throw new Error(`"${invalid}" is not a valid SLIP39 word`);
+  }
+  return normalized;
 }
 
 function decodeShareIndices(words: string[]): number[] {

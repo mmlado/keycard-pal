@@ -1,11 +1,13 @@
 import { NavigationProp } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import type { IconComponent } from '../assets/icons';
-import type { WCContext } from '../constants/walletConnect';
-import type { ScanResult } from '../types';
-import type { Bip85Format } from '../utils/bip85';
-import type { ExportTargetId } from '../utils/exportTargets';
+import type { WCContext } from '@/constants/walletConnect';
+import type { ScanResult } from '@/types';
+
+import type { EntryListItem } from '@/components/EntryList';
+
+import type { Bip85Format } from '@/utils/bip85';
+import type { ExportTargetId } from '@/utils/exportTargets';
 
 export type KeycardParams =
   | {
@@ -36,7 +38,6 @@ export type KeycardParams =
       operation: 'export_key';
       target: ExportTargetId;
     };
-// Future: | { operation: 'change_pin' } | { operation: 'generate_key' }
 
 export type SecretType = 'pin' | 'puk' | 'pairing';
 
@@ -80,9 +81,7 @@ export type RootStackParamList = {
   UrlQR: {
     url: string;
     title?: string;
-    /** Shown under the URL. Carries the affiliate disclosure when the QR is
-     *  the affiliate link, which is the whole commercial surface offline, and
-     *  nothing on a build whose link earns no commission. */
+    /** Carries the affiliate disclosure: offline, the QR is the whole commercial surface. */
     note?: string;
   };
   Settings: undefined;
@@ -243,10 +242,6 @@ export type WalletConnectPairingScreenProps = NativeStackScreenProps<
   'WalletConnectPairing'
 >;
 
-export type DashboardAction = {
-  label: string;
-  /** Shown only when the entry renders as the full-width hero tile. */
-  detail?: string;
-  icon: IconComponent;
+export type DashboardAction = Omit<EntryListItem, 'onPress'> & {
   navigate: (navigation: NavigationProp<RootStackParamList>) => void;
 };

@@ -4,6 +4,7 @@ import {
   decodeSlip39ShareMetadata,
   generateSlip39SharesFromKeycardEntropy,
   getSlip39ShareProgress,
+  parseSlip39Share,
   previewSlip39ShareMetadata,
   recoverSlip39Secret,
   slip39SecretFromKeycardEntropy,
@@ -17,6 +18,20 @@ const SHARES = [
 ];
 
 describe('slip39 utilities', () => {
+  it('normalizes a share as typed', () => {
+    expect(parseSlip39Share(`  ${SHARES[0].toUpperCase()}\n`)).toBe(SHARES[0]);
+  });
+
+  it('asks for a share when nothing is entered', () => {
+    expect(() => parseSlip39Share('  ')).toThrow('Enter a SLIP39 share');
+  });
+
+  it('names the first word that is not a SLIP39 word', () => {
+    expect(() =>
+      parseSlip39Share(SHARES[0].replace('graduate', 'nope')),
+    ).toThrow('"nope" is not a valid SLIP39 word');
+  });
+
   it('decodes shell-compatible single-group share metadata', () => {
     const metadata = decodeSlip39ShareMetadata(SHARES[0]);
 

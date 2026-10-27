@@ -393,6 +393,27 @@ describe('Slip39Screen', () => {
     ).toBeTruthy();
   });
 
+  it('keeps Import disabled while the last share has an invalid word', async () => {
+    renderScreen('import');
+    await act(async () => {
+      fireEvent.changeText(getTextInputs()[0], SHARE_1);
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByText('Next share'));
+    });
+    await act(async () => {
+      fireEvent.changeText(
+        getTextInputs()[0],
+        SHARE_2.replace('very', 'invalidword'),
+      );
+    });
+
+    expect(
+      screen.getByText('"invalidword" is not a valid SLIP39 word'),
+    ).toBeTruthy();
+    expect(getPressableByText('Import to Keycard').props.disabled).toBe(true);
+  });
+
   it('handles generateSlip39SharesFromKeycardEntropy error', async () => {
     const entropy = new Uint8Array([1, 2, 3]);
     renderScreen('generate', 'idle', null, 'done', entropy);

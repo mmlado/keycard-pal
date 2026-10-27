@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DashboardAction, FactoryResetSreenProps } from '@/navigation/types';
+import { FactoryResetSreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
 import { Icons } from '@/assets/icons';
@@ -11,12 +11,6 @@ import PrimaryButton from '@/components/PrimaryButton';
 
 import { useFactoryReset } from '@/hooks/keycard/useFactoryReset';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
-
-export const dashboardEntry: DashboardAction = {
-  label: 'Factory reset',
-  icon: Icons.factoryReset,
-  navigate: nav => nav.navigate('FactoryReset'),
-};
 
 export default function FactoryResetScreen({
   navigation,
