@@ -1,9 +1,6 @@
 import { Platform } from 'react-native';
 
 import { importRegistryZipFromPicker } from '../src/utils/eip7730/import';
-import { BUNDLED_ATTESTATIONS } from '../src/utils/eip7730/knownAttestations';
-
-import { testIndex } from './eip7730Index.testUtils';
 
 const mockPick = jest.fn();
 jest.mock('@react-native-documents/picker', () => ({
@@ -19,53 +16,25 @@ jest.mock('react-native-fs', () => ({
   default: { readFile: (...args: any[]) => mockReadFile(...args) },
 }));
 
-const mockSaveIndex = jest.fn();
-jest.mock('../src/storage/eip7730Index', () => ({
-  saveIndex: (...args: any[]) => mockSaveIndex(...args),
-}));
-
-const mockSetSavedIndex = jest.fn();
+const mockAdopt = jest.fn();
 jest.mock('../src/utils/eip7730/lookup', () => ({
-  setSavedIndex: (...args: any[]) => mockSetSavedIndex(...args),
+  adoptRegistry: (...args: any[]) => mockAdopt(...args),
 }));
-
-const mockProcess = jest.fn();
-jest.mock('../src/utils/eip7730/zip', () => ({
-  ...jest.requireActual('../src/utils/eip7730/zip'),
-  processRegistryZip: (...args: any[]) => mockProcess(...args),
-}));
-
-const INDEX = testIndex({
-  contracts: { '1:0xabc': { '0xa9059cbb': { intent: 'Send', fields: [] } } },
-});
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockPick.mockResolvedValue([{ uri: 'content://registry.zip' }]);
   mockReadFile.mockResolvedValue(Buffer.from('zip').toString('base64'));
-  mockProcess.mockReturnValue(INDEX);
-  mockSaveIndex.mockResolvedValue({
-    version: 3,
-    generatedAt: '2026-10-12T00:00:00.000Z',
-  });
+  mockAdopt.mockResolvedValue({ ok: true });
 });
 
 describe('importRegistryZipFromPicker', () => {
-  it('saves and activates an index with descriptors', async () => {
-    const result = await importRegistryZipFromPicker();
-    expect(result).toEqual({ ok: true, index: INDEX });
-    expect(mockSaveIndex).toHaveBeenCalledWith(INDEX, 'import');
-    expect(mockSetSavedIndex).toHaveBeenCalledWith({
-      generatedAt: '2026-10-12T00:00:00.000Z',
-      source: 'import',
-    });
-  });
-
-  it('skips the signatures the bundled index already verified', async () => {
-    await importRegistryZipFromPicker();
-    expect(mockProcess.mock.calls[0][1]).toEqual({
-      verified: BUNDLED_ATTESTATIONS,
-    });
+  it('adopts the file as an import', async () => {
+    expect(await importRegistryZipFromPicker()).toEqual({ ok: true });
+    expect(Array.from(mockAdopt.mock.calls[0][0])).toEqual([
+      ...Buffer.from('zip'),
+    ]);
+    expect(mockAdopt.mock.calls[0][1]).toBe('import');
   });
 
   it("opens Android's system picker, which grants the file it returns", async () => {
@@ -90,10 +59,7 @@ describe('importRegistryZipFromPicker', () => {
     mockPick.mockResolvedValue([
       { uri: 'file:///private/var/mobile/tmp/My%20registry.zip' },
     ]);
-    expect(await importRegistryZipFromPicker()).toEqual({
-      ok: true,
-      index: INDEX,
-    });
+    expect(await importRegistryZipFromPicker()).toEqual({ ok: true });
     expect(mockReadFile).toHaveBeenCalledWith(
       '/private/var/mobile/tmp/My registry.zip',
       'base64',
@@ -109,34 +75,16 @@ describe('importRegistryZipFromPicker', () => {
     );
   });
 
-  it('refuses a zip with no descriptors and keeps the current index', async () => {
-    mockProcess.mockReturnValue({ ...INDEX, contracts: {} });
-    expect(await importRegistryZipFromPicker()).toEqual({
-      ok: false,
-      reason: 'invalid',
-    });
-    expect(mockSaveIndex).not.toHaveBeenCalled();
-    expect(mockSetSavedIndex).not.toHaveBeenCalled();
-  });
-
-  it('reports a failed save and keeps the current index', async () => {
-    mockSaveIndex.mockRejectedValueOnce(new Error('ENOSPC'));
-    expect(await importRegistryZipFromPicker()).toEqual({
-      ok: false,
-      reason: 'unsaved',
-    });
-    expect(mockSetSavedIndex).not.toHaveBeenCalled();
-  });
-
-  it('refuses a file that is not a zip', async () => {
-    mockProcess.mockImplementation(() => {
-      throw new Error('not a zip');
-    });
-    expect(await importRegistryZipFromPicker()).toEqual({
-      ok: false,
-      reason: 'invalid',
-    });
-  });
+  it.each(['invalid', 'unsaved'] as const)(
+    'passes on an adoption refused as %s',
+    async reason => {
+      mockAdopt.mockResolvedValueOnce({ ok: false, reason, message: 'why' });
+      expect(await importRegistryZipFromPicker()).toEqual({
+        ok: false,
+        reason,
+      });
+    },
+  );
 
   it('reports a cancelled pick and an unreadable file', async () => {
     mockPick.mockRejectedValueOnce(new Error('cancelled'));
@@ -163,7 +111,7 @@ describe('importRegistryZipFromPicker', () => {
       expect(await importRegistryZipFromPicker()).toMatchObject({
         ok: true,
       });
-      expect(Array.from(mockProcess.mock.calls[0][0])).toEqual([
+      expect(Array.from(mockAdopt.mock.calls[0][0])).toEqual([
         ...Buffer.from('zip'),
       ]);
     } finally {

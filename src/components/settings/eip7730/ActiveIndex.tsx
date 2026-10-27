@@ -6,8 +6,11 @@ import theme from '@/theme';
 
 import SettingsButton from './SettingsButton';
 
-import { getSavedIndex, subscribeSavedIndex } from '@/utils/eip7730/lookup';
-import { revertToBundledIndex } from '@/utils/eip7730/restore';
+import {
+  getSavedIndex,
+  revertToBundledIndex,
+  subscribeSavedIndex,
+} from '@/utils/eip7730/lookup';
 import { rfc3339 } from '@/utils/rfc3339';
 
 type Props = {
