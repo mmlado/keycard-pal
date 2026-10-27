@@ -36,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The success sheet after signing, key export and unpairing names what was done instead of an empty line
 - On iOS, the NFC sheet names what was done after signing, key export, unpairing and verifying instead of "Success"
 - A Settings text field that cannot be stored says so under the field instead of failing silently
+- Unpairing a slot refuses a different Keycard than the one whose slots are listed
+- Unpairing this phone's own slot forgets its pairing also when the list did not mark the slot as this device
 
 ## [1.15.1] - 2026-10-20
 

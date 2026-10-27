@@ -1,18 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { cardHasRoute } from '@/navigation/generationBoundRoutes';
 
-import { loadPairing } from '@/storage/pairingStorage';
+import type { KeycardScreenKeycard } from '@/hooks/useKeycardScreen';
+
+import { deletePairing, loadPairing } from '@/storage/pairingStorage';
 import { cardGeneration } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
 import { selectFailureMessage } from '@/utils/keycardErrors';
 import { UNREADABLE_CARD_STATUS } from './useIdentifyCard';
-import {
-  useNFCOperation,
-  type CardPresence,
-  type NFCSessionPhase,
-} from './useNFCOperation';
+import { useKeycardOperation } from './useKeycardOperation';
+import { useNFCOperation } from './useNFCOperation';
 
 const TOTAL_SLOTS = 10;
 
@@ -24,26 +23,25 @@ export interface SlotInfo {
 }
 
 export interface UsePairingSlots {
-  phase: NFCSessionPhase;
-  cardPresence: CardPresence;
-  userCancels: number;
+  /** The tap under way, the read or the unpair, for useKeycardScreen. */
+  tap: KeycardScreenKeycard;
+  /** From the unpair's start until its tap ends. */
+  unpairing: boolean;
   slotInfo: SlotInfo | null;
   /** A tap showed a card without pairing slots. The read still ends in 'done'. */
   noPairingSlots: boolean;
-  status: string;
+  /** The last unpair's success wording, until dismissed. */
+  unpaired: string | null;
+  dismissUnpaired: () => void;
   checkSlots: () => void;
-  /** Same as `checkSlots`, for the sheet's "Try again". */
-  retry: () => void;
-  cancel: () => void;
-  reset: () => void;
-  resetNFCOnly: () => void;
-  openNFCSettings: (() => void) | undefined;
-  readSlotInfoFromCmdSet: (cmdSet: Commandset) => Promise<void>;
+  unpair: (slotIndex: number) => void;
 }
 
 export function usePairingSlots(): UsePairingSlots {
   const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
   const [noPairingSlots, setNoPairingSlots] = useState(false);
+  const [unpairing, setUnpairing] = useState(false);
+  const [unpaired, setUnpaired] = useState<string | null>(null);
 
   const readSlotInfo = useCallback(async (cmdSet: Commandset) => {
     const appInfo = cmdSet.applicationInfo;
@@ -69,73 +67,101 @@ export function usePairingSlots(): UsePairingSlots {
     });
   }, []);
 
-  const handleConnected = useCallback(
-    async (cmdSet: Commandset) => {
-      await readSlotInfo(cmdSet);
-    },
-    [readSlotInfo],
-  );
-
-  const {
-    start,
-    cancel: nfcCancel,
-    reset: nfcReset,
-    phase,
-    status,
-    cardPresence,
-    userCancels,
-    openNFCSettings,
-  } = useNFCOperation(handleConnected, {
+  const read = useNFCOperation(readSlotInfo, {
     // Read-only SELECT-response read: safe to re-run on a re-tap.
     retryOnTagLoss: true,
   });
+  const { start: startRead, reset: resetRead } = read;
 
   const checkSlots = useCallback(() => {
     setSlotInfo(null);
     setNoPairingSlots(false);
-    start();
-  }, [start]);
+    startRead();
+  }, [startRead]);
 
-  const cancel = useCallback(() => {
-    nfcCancel();
-  }, [nfcCancel]);
+  const unpairOp = useKeycardOperation<void>();
+  const { phase: unpairPhase, execute, reset: resetUnpair } = unpairOp;
 
-  const reset = useCallback(() => {
-    setSlotInfo(null);
-    setNoPairingSlots(false);
-    nfcReset();
-  }, [nfcReset]);
-
-  // Resets NFC state only — keeps slotInfo so screen stays populated.
-  const resetNFCOnly = useCallback(() => {
-    nfcReset();
-  }, [nfcReset]);
-
-  // Re-reads after unpair, in the same connection. SELECT refreshes applicationInfo.
-  const readSlotInfoFromCmdSet = useCallback(
-    async (cmdSet: Commandset) => {
-      const selectResp = await cmdSet.select();
-      if (selectResp.sw !== 0x9000) {
-        throw new Error(selectFailureMessage(selectResp.sw));
+  const unpair = useCallback(
+    (slotIndex: number) => {
+      if (!slotInfo) {
+        return;
       }
-      await readSlotInfo(cmdSet);
+      const { cardKey } = slotInfo;
+      const message = `Slot ${slotIndex + 1} was unpaired`;
+      setUnpairing(true);
+      execute(
+        async cmdSet => {
+          // The tap pairs the card when this phone had no pairing, so the read's own slot may be stale.
+          const ownSlot = cmdSet.getPairing()?.pairingIndex;
+          await cmdSet.unpair(slotIndex);
+          if (slotIndex === ownSlot) {
+            try {
+              await deletePairing(cardKey);
+            } catch {
+              // Card-side unpair already succeeded; local cleanup is best-effort.
+            }
+          }
+          // Re-read in the same connection, so no second tap is needed.
+          const selectResp = await cmdSet.select();
+          if (selectResp.sw !== 0x9000) {
+            throw new Error(selectFailureMessage(selectResp.sw));
+          }
+          await readSlotInfo(cmdSet);
+          setUnpaired(message);
+        },
+        {
+          requiresPin: true,
+          requiresMasterKey: false,
+          // The slots were read from one card; the unpair tap can land on another.
+          requiresRoute: 'PairingSlots',
+          requiresCardKey: cardKey,
+          successMessage: message,
+        },
+      );
     },
-    [readSlotInfo],
+    [slotInfo, execute, readSlotInfo],
   );
 
+  useEffect(() => {
+    if (unpairPhase === 'done') {
+      resetUnpair();
+      resetRead();
+    }
+  }, [unpairPhase, resetUnpair, resetRead]);
+
+  // When the unpair tap ends, not while it waits for its NFC check.
+  const lastUnpairPhaseRef = useRef(unpairPhase);
+  useEffect(() => {
+    const last = lastUnpairPhaseRef.current;
+    lastUnpairPhaseRef.current = unpairPhase;
+    if (last !== 'idle' && unpairPhase === 'idle') {
+      setUnpairing(false);
+    }
+  }, [unpairPhase]);
+
+  const dismissUnpaired = useCallback(() => setUnpaired(null), []);
+
+  const tap: KeycardScreenKeycard = unpairing
+    ? unpairOp
+    : {
+        phase: read.phase,
+        status: read.status,
+        cardPresence: read.cardPresence,
+        userCancels: read.userCancels,
+        cancel: read.cancel,
+        retry: checkSlots,
+        openNFCSettings: read.openNFCSettings,
+      };
+
   return {
-    phase,
-    cardPresence,
-    userCancels,
+    tap,
+    unpairing,
     slotInfo,
     noPairingSlots,
-    status,
+    unpaired,
+    dismissUnpaired,
     checkSlots,
-    retry: checkSlots,
-    cancel,
-    reset,
-    resetNFCOnly,
-    openNFCSettings,
-    readSlotInfoFromCmdSet,
+    unpair,
   };
 }

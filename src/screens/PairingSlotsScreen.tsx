@@ -11,41 +11,29 @@ import ConfirmPrompt from '@/components/ConfirmPropmpt';
 import Menu from '@/components/Menu';
 import PrimaryButton from '@/components/PrimaryButton';
 
-import { useKeycardOperation } from '@/hooks/keycard/useKeycardOperation';
 import { usePairingSlots } from '@/hooks/keycard/usePairingSlots';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
-
-import { deletePairing } from '@/storage/pairingStorage';
 
 export default function PairingSlotsScreen({
   navigation,
 }: PairingSlotsScreenProps) {
   const insets = useSafeAreaInsets();
   const [pendingSlotIndex, setPendingSlotIndex] = useState<number | null>(null);
-  const [unpairNotice, setUnpairNotice] = useState<string | null>(null);
-  // Until the unpair tap ends, so cancelling it, on Apple's sheet too, stays here.
-  const [unpairing, setUnpairing] = useState(false);
 
-  const check = usePairingSlots();
   const {
-    phase: checkPhase,
+    tap,
+    unpairing,
     slotInfo,
     noPairingSlots,
+    unpaired,
+    dismissUnpaired,
     checkSlots,
-    resetNFCOnly: resetCheckNFCOnly,
-    readSlotInfoFromCmdSet,
-  } = check;
+    unpair,
+  } = usePairingSlots();
+  const phase = tap.phase;
 
-  const unpairHook = useKeycardOperation<void>();
-  const {
-    phase: unpairPhase,
-    execute: executeUnpair,
-    reset: resetUnpair,
-  } = unpairHook;
-
-  const active = unpairing ? unpairHook : check;
   const { sheet } = useKeycardScreen({
-    keycard: active,
+    keycard: tap,
     navigation,
     title: 'Pairing slots',
     stayOnCancel: unpairing,
@@ -59,28 +47,10 @@ export default function PairingSlotsScreen({
       return;
     }
     readStartedRef.current = true;
-    if (checkPhase === 'idle' && !slotInfo && !noPairingSlots) {
+    if (phase === 'idle' && !slotInfo && !noPairingSlots) {
       checkSlots();
     }
-  }, [checkPhase, slotInfo, noPairingSlots, checkSlots]);
-
-  useEffect(() => {
-    if (unpairPhase === 'done') {
-      resetUnpair();
-      // slotInfo was already refreshed inside the unpair tap.
-      resetCheckNFCOnly();
-    }
-  }, [unpairPhase, resetUnpair, resetCheckNFCOnly]);
-
-  // When the unpair tap ends, not while it waits for its NFC check.
-  const lastUnpairPhaseRef = useRef(unpairPhase);
-  useEffect(() => {
-    const last = lastUnpairPhaseRef.current;
-    lastUnpairPhaseRef.current = unpairPhase;
-    if (last !== 'idle' && unpairPhase === 'idle') {
-      setUnpairing(false);
-    }
-  }, [unpairPhase]);
+  }, [phase, slotInfo, noPairingSlots, checkSlots]);
 
   const handleUnpairPress = useCallback((slotIndex: number) => {
     setPendingSlotIndex(slotIndex);
@@ -88,32 +58,9 @@ export default function PairingSlotsScreen({
 
   const handleConfirmUnpair = useCallback(() => {
     const slotIndex = pendingSlotIndex!;
-    const unpaired = `Slot ${slotIndex + 1} was unpaired`;
     setPendingSlotIndex(null);
-    setUnpairing(true);
-    executeUnpair(
-      async cmdSet => {
-        await cmdSet.unpair(slotIndex);
-        if (slotInfo?.ourSlotIndex === slotIndex) {
-          try {
-            await deletePairing(slotInfo.cardKey);
-          } catch {
-            // Card-side unpair already succeeded; local cleanup is best-effort.
-          }
-        }
-        // Re-read in the same connection, so no second tap is needed.
-        await readSlotInfoFromCmdSet(cmdSet);
-        setUnpairNotice(unpaired);
-      },
-      // The slots were read from one card; the unpair tap can land on another.
-      {
-        requiresPin: true,
-        requiresMasterKey: false,
-        requiresRoute: 'PairingSlots',
-        successMessage: unpaired,
-      },
-    );
-  }, [pendingSlotIndex, executeUnpair, slotInfo, readSlotInfoFromCmdSet]);
+    unpair(slotIndex);
+  }, [pendingSlotIndex, unpair]);
 
   const handleCancelUnpairConfirm = useCallback(() => {
     setPendingSlotIndex(null);
@@ -135,8 +82,7 @@ export default function PairingSlotsScreen({
   }
 
   const showContent =
-    !unpairing &&
-    (checkPhase === 'idle' || checkPhase === 'done' || checkPhase === 'error');
+    !unpairing && (phase === 'idle' || phase === 'done' || phase === 'error');
 
   const absence = routeAbsence('PairingSlots');
 
@@ -170,7 +116,7 @@ export default function PairingSlotsScreen({
             </>
           )}
 
-          {!slotInfo && !noPairingSlots && checkPhase !== 'error' && (
+          {!slotInfo && !noPairingSlots && phase !== 'error' && (
             <View style={styles.centeredContent}>
               <Text style={styles.description}>
                 Tap your Keycard to read the pairing slot status.
@@ -178,7 +124,7 @@ export default function PairingSlotsScreen({
             </View>
           )}
 
-          {checkPhase === 'error' && (
+          {phase === 'error' && (
             <View style={styles.centeredContent}>
               <Text style={styles.description}>
                 Could not read pairing slot data. Make sure you are tapping the
@@ -205,11 +151,8 @@ export default function PairingSlotsScreen({
 
       {sheet}
 
-      <Snackbar
-        visible={unpairNotice !== null}
-        onDismiss={() => setUnpairNotice(null)}
-      >
-        {unpairNotice ?? ''}
+      <Snackbar visible={unpaired !== null} onDismiss={dismissUnpaired}>
+        {unpaired ?? ''}
       </Snackbar>
     </View>
   );
