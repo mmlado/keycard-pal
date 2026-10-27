@@ -3,6 +3,7 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { AppState } from 'react-native';
 import {
+  DIFFERENT_CARD_STATUS,
   NOT_GENUINE_STATUS,
   PAIRING_PASSWORD_NEEDED_STATUS,
   PIN_BLOCKED_STATUS,
@@ -14,6 +15,7 @@ import { NOTHING_TO_SEND_STATUS } from '../src/hooks/keycard/useNFCOperation';
 import { checkGenuine } from '../src/utils/genuineCheck';
 import { loadPairing } from '../src/storage/pairingStorage';
 import { routeAbsence } from '../src/navigation/generationBoundRoutes';
+import { getCardKey } from '../src/utils/cardIdentity';
 
 import { filler, v3Select, v4Select } from './selectResponse.testUtils';
 
@@ -795,6 +797,93 @@ describe('useKeycardOperation', () => {
       expect(result.current.status).not.toBe(
         routeAbsence('PairingSlots').sheetError,
       );
+    });
+  });
+
+  // A screen that read one card can get its second tap from another.
+  describe('requiresCardKey', () => {
+    const EXPECTED = v3Select(0x0302);
+    const OTHER = v3Select(0x0302, { instanceUID: filler(16, 0x02) });
+    const expectedKey = getCardKey(EXPECTED)!;
+
+    function useCard(applicationInfo: unknown) {
+      const cmdSet = { ...makeMockCmdSet(), applicationInfo };
+      const Keycard = require('keycard-sdk').default;
+      Keycard.Commandset.mockImplementation(() => cmdSet);
+      return cmdSet;
+    }
+
+    async function tapWithPin() {
+      const op = jest.fn().mockResolvedValue('result');
+      const hook = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        hook.result.current.execute(op, {
+          requiresMasterKey: false,
+          requiresCardKey: expectedKey,
+        });
+      });
+      await act(async () => {
+        hook.result.current.submitPin('123456');
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      return { ...hook, op };
+    }
+
+    it('refuses another card and sends it nothing beyond SELECT', async () => {
+      const cmdSet = useCard(OTHER);
+      const { result, op } = await tapWithPin();
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(DIFFERENT_CARD_STATUS);
+      expect(cmdSet.getData).not.toHaveBeenCalled();
+      expect(mockCheckGenuine).not.toHaveBeenCalled();
+      expect(cmdSet.autoPair).not.toHaveBeenCalled();
+      expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+      expect(cmdSet.verifyPIN).not.toHaveBeenCalled();
+      expect(op).not.toHaveBeenCalled();
+    });
+
+    // The typed PIN is the expected card's.
+    it('runs on the expected card at the next tap, without asking for the PIN again', async () => {
+      useCard(OTHER);
+      const { result, op } = await tapWithPin();
+
+      const cmdSet = useCard(EXPECTED);
+      await act(async () => {
+        result.current.retry();
+      });
+      expect(result.current.phase).toBe('nfc');
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(cmdSet.verifyPIN).toHaveBeenCalledWith('123456');
+      expect(op).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs on the expected card', async () => {
+      useCard(EXPECTED);
+      const { result, op } = await tapWithPin();
+      expect(op).toHaveBeenCalledTimes(1);
+      expect(result.current.phase).toBe('done');
+    });
+
+    it('does not carry over to the next operation', async () => {
+      useCard(OTHER);
+      const { result } = await tapWithPin();
+      expect(result.current.status).toBe(DIFFERENT_CARD_STATUS);
+
+      const next = jest.fn().mockResolvedValue('next');
+      await act(async () => {
+        result.current.execute(next, {
+          requiresPin: false,
+          requiresMasterKey: false,
+        });
+      });
+      await act(async () => {
+        await capturedOnConnected?.();
+      });
+      expect(next).toHaveBeenCalledTimes(1);
     });
   });
 

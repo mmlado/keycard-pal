@@ -29,12 +29,17 @@ jest.mock('../../src/storage/pairingStorage', () => ({
   loadPairing: jest.fn(),
 }));
 
-// The sheet takes this hook as it is, so NFC off must reach it as Open NFC Settings.
+jest.mock('react-native-encrypted-storage', () => ({
+  __esModule: true,
+  default: { getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn() },
+}));
+
+// The host takes the read as it is, so NFC off must reach it as Open NFC Settings.
 it('carries the NFC settings action when a read finds NFC off', async () => {
   const { result } = renderHook(() => usePairingSlots());
   await act(async () => {
     result.current.checkSlots();
   });
-  expect(result.current.phase).toBe('error');
-  expect(typeof result.current.openNFCSettings).toBe('function');
+  expect(result.current.tap.phase).toBe('error');
+  expect(typeof result.current.tap.openNFCSettings).toBe('function');
 });

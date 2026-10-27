@@ -60,6 +60,8 @@ export interface ExecuteOptions {
    * The route this operation belongs to, when only some cards have it. Checked right after SELECT.
    */
   requiresRoute?: GenerationBoundRoute;
+  /** The card key of the card this operation was prepared on. Checked right after SELECT. */
+  requiresCardKey?: string;
   /** Wait for a re-tap when the card leaves mid-operation. Read-only operations only. */
   retryOnTagLoss?: boolean;
   /** Shown on Apple's sheet and the success sheet. */
@@ -92,6 +94,8 @@ export interface UseKeycardOperation<T> {
 export const PAIRING_PASSWORD_NEEDED_STATUS =
   'This Keycard needs its pairing password.';
 export const NOT_GENUINE_STATUS = 'This Keycard may not be genuine.';
+export const DIFFERENT_CARD_STATUS =
+  'This is a different Keycard. Tap the same one as before.';
 export const PIN_BLOCKED_STATUS =
   "This Keycard's PIN is blocked. Unblock it with your PUK.";
 
@@ -129,6 +133,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const requiresPinRef = useRef(true);
   const requiresMasterKeyRef = useRef(true);
   const requiresRouteRef = useRef<GenerationBoundRoute | undefined>(undefined);
+  const requiresCardKeyRef = useRef<string | undefined>(undefined);
   const operationRunningRef = useRef(false);
   const retryOnTagLossRef = useRef(false);
   const successMessageRef = useRef<string | undefined>(undefined);
@@ -417,6 +422,11 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
           'This Keycard is not initialized. Initialize it first.',
         );
       }
+      // Before pairing and the PIN, which belong to the expected card; the PIN is kept for it.
+      const requiredCardKey = requiresCardKeyRef.current;
+      if (requiredCardKey && cardKey !== requiredCardKey) {
+        throw new Error(DIFFERENT_CARD_STATUS);
+      }
       const hasCertificate = secureChannelVersion(appInfo) === 'v2';
       console.log(
         `[Keycard] SELECT OK — card key: ${cardKey}, ` +
@@ -515,6 +525,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       requiresPinRef.current = options.requiresPin ?? true;
       requiresMasterKeyRef.current = options.requiresMasterKey ?? true;
       requiresRouteRef.current = options.requiresRoute;
+      requiresCardKeyRef.current = options.requiresCardKey;
       retryOnTagLossRef.current = options.retryOnTagLoss ?? false;
       successMessageRef.current = options.successMessage;
       operationRunningRef.current = false;
