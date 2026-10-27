@@ -1,5 +1,4 @@
 /* eslint-disable no-bitwise */
-import { RLP } from '@ethereumjs/rlp';
 import {
   decodeAbiParameters,
   formatEther,
@@ -11,6 +10,7 @@ import {
 import selectorsData from '../data/selectors.json';
 import { DATA_TYPE_LABELS } from '../types';
 
+import type { TransactionFields } from './ethPayload';
 import { checksumEthAddress } from './ethereumAddress';
 import { isWholeBytes } from './hex';
 
@@ -331,16 +331,8 @@ export type ParsedFees =
     }
   | { kind: 'unknown' };
 
-type RlpBytes = Uint8Array;
-type RlpValue = RlpBytes | RlpValue[];
-
 function bufToHex(b: Uint8Array): string {
   return '0x' + Buffer.from(b).toString('hex');
-}
-
-function bufToBigInt(b: Uint8Array): bigint {
-  if (b.length === 0) return 0n;
-  return BigInt('0x' + Buffer.from(b).toString('hex'));
 }
 
 function weiToNative(wei: bigint, symbol: string): string {
@@ -369,171 +361,28 @@ function toAddress(b: Uint8Array): string | undefined {
   return checksumEthAddress('0x' + Buffer.from(b).toString('hex'));
 }
 
-function isBytes(value: RlpValue | undefined): value is RlpBytes {
-  return value instanceof Uint8Array;
-}
-
-function assertBytes(value: RlpValue | undefined, field: string): RlpBytes {
-  if (!isBytes(value)) {
-    throw new Error(`Invalid Ethereum transaction: ${field} must be bytes`);
-  }
-  return value;
-}
-
-function assertList(value: RlpValue | undefined, field: string): RlpValue[] {
-  if (!Array.isArray(value)) {
-    throw new Error(
-      `Invalid Ethereum transaction: ${field} must be an RLP list`,
-    );
-  }
-  return value;
-}
-
-/** Parse a legacy (type 1) unsigned tx: RLP([nonce, gasPrice, gasLimit, to, value, data]) */
-function parseLegacy(bytes: Buffer, symbol: string): ParsedTx {
-  const decoded = assertList(RLP.decode(bytes) as RlpValue, 'legacy payload');
-  if (decoded.length < 6) {
-    throw new Error(
-      'Invalid Ethereum transaction: legacy payload is incomplete',
-    );
-  }
-  const [nonce, gasPrice, gasLimit, to, value, data] = decoded;
-  const dataHex =
-    assertBytes(data, 'data').length > 0
-      ? bufToHex(assertBytes(data, 'data'))
-      : undefined;
-  return {
-    nonce: Number(bufToBigInt(assertBytes(nonce, 'nonce'))),
-    to: toAddress(assertBytes(to, 'to')),
-    value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
-    valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
-    data: dataHex,
-    fees: {
-      kind: 'legacy',
-      gasPrice: weiToGwei(bufToBigInt(assertBytes(gasPrice, 'gasPrice'))),
-      gasLimit: bufToBigInt(assertBytes(gasLimit, 'gasLimit')).toString(),
-    },
-  };
-}
-
-/** Parse an EIP-1559 (type 4 / 0x02) unsigned tx:
- *  0x02 || RLP([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList]) */
-function parseEIP1559(bytes: Buffer, symbol: string): ParsedTx {
-  // Strip the 0x02 type prefix
-  const rlpBytes = bytes[0] === 0x02 ? bytes.slice(1) : bytes;
-  const decoded = assertList(
-    RLP.decode(rlpBytes) as RlpValue,
-    'EIP-1559 payload',
-  );
-  if (decoded.length !== 9) {
-    throw new Error(
-      'Invalid Ethereum transaction: EIP-1559 payload must have 9 fields',
-    );
-  }
-  const [
-    ,
-    nonce,
-    maxPriorityFeePerGas,
-    maxFeePerGas,
-    gasLimit,
-    to,
-    value,
-    data,
-    accessList,
-  ] = decoded;
-  assertList(accessList, 'accessList');
-  const dataHexEip1559 =
-    assertBytes(data, 'data').length > 0
-      ? bufToHex(assertBytes(data, 'data'))
-      : undefined;
-  return {
-    nonce: Number(bufToBigInt(assertBytes(nonce, 'nonce'))),
-    to: toAddress(assertBytes(to, 'to')),
-    value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
-    valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
-    data: dataHexEip1559,
-    fees: {
-      kind: 'eip1559',
-      maxFeePerGas: weiToGwei(
-        bufToBigInt(assertBytes(maxFeePerGas, 'maxFeePerGas')),
-      ),
-      maxPriorityFeePerGas: weiToGwei(
-        bufToBigInt(assertBytes(maxPriorityFeePerGas, 'maxPriorityFeePerGas')),
-      ),
-      gasLimit: bufToBigInt(assertBytes(gasLimit, 'gasLimit')).toString(),
-    },
-  };
-}
-
-/** EIP-2930 (type 0x01): 0x01 || RLP([chainId, nonce, gasPrice, gasLimit, to, value, data, accessList]) */
-function parseEIP2930(bytes: Buffer, symbol: string): ParsedTx {
-  const rlpBytes = bytes.slice(1);
-  const decoded = assertList(
-    RLP.decode(rlpBytes) as RlpValue,
-    'EIP-2930 payload',
-  );
-  if (decoded.length !== 8) {
-    throw new Error(
-      'Invalid Ethereum transaction: EIP-2930 payload must have 8 fields',
-    );
-  }
-  const [, nonce, gasPrice, gasLimit, to, value, data, accessList] = decoded;
-  assertList(accessList, 'accessList');
-  const dataHexEip2930 =
-    assertBytes(data, 'data').length > 0
-      ? bufToHex(assertBytes(data, 'data'))
-      : undefined;
-  return {
-    nonce: Number(bufToBigInt(assertBytes(nonce, 'nonce'))),
-    to: toAddress(assertBytes(to, 'to')),
-    value: weiToNative(bufToBigInt(assertBytes(value, 'value')), symbol),
-    valueWei: bufToBigInt(assertBytes(value, 'value')).toString(),
-    data: dataHexEip2930,
-    fees: {
-      kind: 'legacy',
-      gasPrice: weiToGwei(bufToBigInt(assertBytes(gasPrice, 'gasPrice'))),
-      gasLimit: bufToBigInt(assertBytes(gasLimit, 'gasLimit')).toString(),
-    },
-  };
-}
-
-/**
- * dataType 1 = Legacy transaction (or EIP-2930 if first byte is 0x01)
- * dataType 4 = EIP-2718 typed transaction (0x01 EIP-2930 or 0x02 EIP-1559)
- * Others (EIP-712, personal sign) are not transactions — return null.
- */
-export function parseTx(
-  signDataHex: string,
-  dataType: number,
+/** The review's text for a transaction the classification decoded. */
+export function formatTx(
+  tx: TransactionFields,
   nativeCurrencySymbol: string = 'ETH',
-): ParsedTx | null {
-  try {
-    const bytes = Buffer.from(signDataHex, 'hex');
-    if (dataType === 1 && bytes[0] === 0x01)
-      return parseEIP2930(bytes, nativeCurrencySymbol);
-    if (dataType === 1) return parseLegacy(bytes, nativeCurrencySymbol);
-    if (dataType === 4 && bytes[0] === 0x01)
-      return parseEIP2930(bytes, nativeCurrencySymbol);
-    if (dataType === 4 && bytes[0] === 0x02)
-      return parseEIP1559(bytes, nativeCurrencySymbol);
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function validateEthTransactionSignData(
-  signDataHex: string,
-  dataType: number,
-): void {
-  if (dataType !== 1 && dataType !== 4) {
-    return;
-  }
-
-  const tx = parseTx(signDataHex, dataType);
-  if (!tx) {
-    throw new Error('Invalid Ethereum transaction payload');
-  }
+): ParsedTx {
+  const gasLimit = tx.gasLimit.toString();
+  return {
+    nonce: Number(tx.nonce),
+    to: toAddress(tx.to),
+    value: weiToNative(tx.value, nativeCurrencySymbol),
+    valueWei: tx.value.toString(),
+    data: tx.data.length > 0 ? bufToHex(tx.data) : undefined,
+    fees:
+      tx.fees.kind === 'legacy'
+        ? { kind: 'legacy', gasPrice: weiToGwei(tx.fees.gasPrice), gasLimit }
+        : {
+            kind: 'eip1559',
+            maxFeePerGas: weiToGwei(tx.fees.maxFeePerGas),
+            maxPriorityFeePerGas: weiToGwei(tx.fees.maxPriorityFeePerGas),
+            gasLimit,
+          },
+  };
 }
 
 /**

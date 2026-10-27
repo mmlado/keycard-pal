@@ -7,10 +7,14 @@ import {
 } from 'viem';
 
 import {
+  classifyEthPayload,
+  payloadTransaction,
+} from '../src/utils/ethPayload';
+import {
   decodeCalldata,
+  formatTx,
   getTxLabel,
-  parseTx,
-  validateEthTransactionSignData,
+  type ParsedTx,
 } from '../src/utils/txParser';
 
 // ---------------------------------------------------------------------------
@@ -28,7 +32,7 @@ function bigIntToMinBytes(n: bigint): Uint8Array {
   return Buffer.from(padded, 'hex');
 }
 
-/** Build a legacy unsigned tx: RLP([nonce, gasPrice, gasLimit, to, value, data]) */
+/** Build an EIP-155 legacy unsigned tx: RLP([nonce, gasPrice, gasLimit, to, value, data, chainId, 0, 0]) */
 function buildLegacyTxHex({
   nonce = 1n,
   gasPrice = 20_000_000_000n, // 20 Gwei
@@ -36,6 +40,7 @@ function buildLegacyTxHex({
   to = '0xd3cda913deb6f4967b2ef3aa68f5a843da74c4ef',
   value = 1_000_000_000_000_000_000n, // 1 ETH
   data = new Uint8Array(0),
+  chainId = 1n,
 } = {}): string {
   const encoded = RLP.encode([
     bigIntToMinBytes(nonce),
@@ -44,6 +49,9 @@ function buildLegacyTxHex({
     hexToBytes(to),
     bigIntToMinBytes(value),
     data,
+    bigIntToMinBytes(chainId),
+    new Uint8Array(0),
+    new Uint8Array(0),
   ]);
   return Buffer.from(encoded).toString('hex');
 }
@@ -104,38 +112,48 @@ function buildEIP1559TxHex({
 }
 
 // ---------------------------------------------------------------------------
-// parseTx
+// formatTx
 // ---------------------------------------------------------------------------
 
-describe('parseTx', () => {
+/** The review's text for a request the classification accepts as a transaction. */
+function reviewedTx(
+  hex: string,
+  dataType: number,
+  symbol?: string,
+): ParsedTx | undefined {
+  const tx = payloadTransaction(classifyEthPayload(hex, dataType));
+  return tx && formatTx(tx, symbol);
+}
+
+describe('formatTx', () => {
   describe('legacy (dataType=1, no type prefix)', () => {
     it('parses to address', () => {
       const hex = buildLegacyTxHex();
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.to).toBe('0xD3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef');
     });
 
     it('parses value as ETH string', () => {
       const hex = buildLegacyTxHex();
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.value).toBe('1 ETH');
     });
 
     it('parses valueWei as decimal string', () => {
       const hex = buildLegacyTxHex({ value: 1_000_000_000_000_000_000n });
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.valueWei).toBe('1000000000000000000');
     });
 
     it('parses valueWei as "0" for zero value', () => {
       const hex = buildLegacyTxHex({ value: 0n });
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.valueWei).toBe('0');
     });
 
     it('parses fees as legacy kind', () => {
       const hex = buildLegacyTxHex();
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.fees.kind).toBe('legacy');
       if (tx?.fees.kind === 'legacy') {
         expect(tx.fees.gasPrice).toMatch(/Gwei/);
@@ -148,7 +166,7 @@ describe('parseTx', () => {
         gasPrice: 0n,
         to: '0x',
       });
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.to).toBeUndefined();
       expect(tx?.fees.kind).toBe('legacy');
       if (tx?.fees.kind === 'legacy') {
@@ -160,25 +178,25 @@ describe('parseTx', () => {
   describe('EIP-2930 (dataType=1, 0x01 prefix)', () => {
     it('parses to address', () => {
       const hex = buildEIP2930TxHex();
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.to).toBe('0xD3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef');
     });
 
     it('parses value as ETH string', () => {
       const hex = buildEIP2930TxHex();
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.value).toMatch(/ETH/);
     });
 
     it('parses valueWei as decimal string', () => {
       const hex = buildEIP2930TxHex({ value: 500_000_000_000_000_000n });
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.valueWei).toBe('500000000000000000');
     });
 
     it('parses fees as legacy kind (gasPrice)', () => {
       const hex = buildEIP2930TxHex();
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.fees.kind).toBe('legacy');
       if (tx?.fees.kind === 'legacy') {
         expect(tx.fees.gasPrice).toMatch(/Gwei/);
@@ -188,7 +206,7 @@ describe('parseTx', () => {
 
     it('parses nonce correctly', () => {
       const hex = buildEIP2930TxHex({ nonce: 7n });
-      const tx = parseTx(hex, 1);
+      const tx = reviewedTx(hex, 1);
       expect(tx?.nonce).toBe(7);
     });
   });
@@ -196,13 +214,13 @@ describe('parseTx', () => {
   describe('EIP-2930 encoded as ERC-4527 typed transaction (dataType=4, 0x01 prefix)', () => {
     it('parses to address', () => {
       const hex = buildEIP2930TxHex();
-      const tx = parseTx(hex, 4);
+      const tx = reviewedTx(hex, 4);
       expect(tx?.to).toBe('0xD3CDa913deb6F4967B2eF3Aa68F5a843da74c4Ef');
     });
 
     it('parses fees as legacy kind (gasPrice)', () => {
       const hex = buildEIP2930TxHex();
-      const tx = parseTx(hex, 4);
+      const tx = reviewedTx(hex, 4);
       expect(tx?.fees.kind).toBe('legacy');
       if (tx?.fees.kind === 'legacy') {
         expect(tx.fees.gasPrice).toMatch(/Gwei/);
@@ -213,7 +231,7 @@ describe('parseTx', () => {
 
   describe('EIP-1559 (dataType=4, 0x02 prefix)', () => {
     it('parses a valid type-2 transaction with an empty access list', () => {
-      const tx = parseTx(buildEIP1559TxHex(), 4);
+      const tx = reviewedTx(buildEIP1559TxHex(), 4);
       expect(tx?.to).toBe('0x0000000000000000000000000000000000000001');
       expect(tx?.value).toBe('1 wei');
       expect(tx?.valueWei).toBe('1');
@@ -223,83 +241,30 @@ describe('parseTx', () => {
         expect(tx.fees.gasLimit).toBe('21000');
       }
     });
-
-    it('rejects a type-2 transaction whose access list is encoded as bytes', () => {
-      const shiftedFieldsFromQrkitDemo =
-        '02e80180843b9aca008504a817c800825208940000000000000000000000000000000000000000010180c0';
-      expect(parseTx(shiftedFieldsFromQrkitDemo, 4)).toBeNull();
-    });
-  });
-
-  it('returns null for non-transaction dataType (EIP-712)', () => {
-    expect(parseTx('deadbeef', 2)).toBeNull();
-  });
-
-  it('returns null for malformed hex', () => {
-    expect(parseTx('zzzz', 1)).toBeNull();
-  });
-
-  it('returns null for incomplete legacy payloads', () => {
-    expect(parseTx(Buffer.from(RLP.encode([])).toString('hex'), 1)).toBeNull();
-  });
-
-  it('returns null when legacy fields are not byte values', () => {
-    const malformed = RLP.encode([
-      [], // nonce must be bytes
-      bigIntToMinBytes(1n),
-      bigIntToMinBytes(21000n),
-      hexToBytes('0x0000000000000000000000000000000000000001'),
-      bigIntToMinBytes(1n),
-      new Uint8Array(0),
-    ]);
-
-    expect(parseTx(Buffer.from(malformed).toString('hex'), 1)).toBeNull();
-  });
-
-  it('returns null for typed transaction payloads with wrong field counts', () => {
-    const eip1559 = Buffer.from(
-      new Uint8Array([0x02, ...RLP.encode([])]),
-    ).toString('hex');
-    const eip2930 = Buffer.from(
-      new Uint8Array([0x01, ...RLP.encode([])]),
-    ).toString('hex');
-
-    expect(parseTx(eip1559, 4)).toBeNull();
-    expect(parseTx(eip2930, 1)).toBeNull();
-  });
-
-  it('validates transaction sign data only for transaction data types', () => {
-    expect(() => validateEthTransactionSignData('deadbeef', 2)).not.toThrow();
-    expect(() =>
-      validateEthTransactionSignData(buildEIP2930TxHex(), 4),
-    ).not.toThrow();
-    expect(() => validateEthTransactionSignData('deadbeef', 1)).toThrow(
-      'Invalid Ethereum transaction payload',
-    );
   });
 
   describe('nativeCurrencySymbol param', () => {
     it('uses custom symbol in value for legacy tx', () => {
       const hex = buildLegacyTxHex({ value: 1_000_000_000_000_000_000n });
-      const tx = parseTx(hex, 1, 'BNB');
+      const tx = reviewedTx(hex, 1, 'BNB');
       expect(tx?.value).toBe('1 BNB');
     });
 
     it('uses custom symbol in value for EIP-1559 tx', () => {
       const hex = buildEIP1559TxHex({ value: 1_000_000_000_000_000_000n });
-      const tx = parseTx(hex, 4, 'POL');
+      const tx = reviewedTx(hex, 4, 'POL');
       expect(tx?.value).toBe('1 POL');
     });
 
     it('uses custom symbol in value for EIP-2930 tx', () => {
       const hex = buildEIP2930TxHex({ value: 1_000_000_000_000_000_000n });
-      const tx = parseTx(hex, 1, 'AVAX');
+      const tx = reviewedTx(hex, 1, 'AVAX');
       expect(tx?.value).toBe('1 AVAX');
     });
 
     it('uses custom symbol in value for dataType=4 EIP-2930 tx', () => {
       const hex = buildEIP2930TxHex({ value: 1_000_000_000_000_000_000n });
-      const tx = parseTx(hex, 4, 'AVAX');
+      const tx = reviewedTx(hex, 4, 'AVAX');
       expect(tx?.value).toBe('1 AVAX');
     });
   });
@@ -702,7 +667,7 @@ describe('decodeCalldata', () => {
     });
   });
 
-  it('parseTx carries the calldata of an ERC-20 transfer in a legacy tx', () => {
+  it('formatTx carries the calldata of an ERC-20 transfer in a legacy tx', () => {
     // Build a legacy tx with ERC-20 transfer calldata
     const toContract = Buffer.from(
       'a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
@@ -716,8 +681,11 @@ describe('decodeCalldata', () => {
       toContract,
       Buffer.alloc(0), // value = 0
       calldata,
+      Buffer.from([0x01]), // chainId
+      Buffer.alloc(0),
+      Buffer.alloc(0),
     ]);
-    const tx = parseTx(Buffer.from(encoded).toString('hex'), 1);
+    const tx = reviewedTx(Buffer.from(encoded).toString('hex'), 1);
     expect(tx?.data).toBe(TRANSFER_HEX.toLowerCase());
     expect(decodeCalldata(tx!.data!)).toEqual({
       kind: 'erc20-transfer',

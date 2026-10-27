@@ -154,7 +154,7 @@ describe('handleUR', () => {
     }
   });
 
-  it('returns an error for an eth-sign-request with malformed EIP-1559 RLP', () => {
+  it('scans a malformed transaction as a sign request, which the review refuses', () => {
     const shiftedFieldsFromQrkitDemo =
       '02e80180843b9aca008504a817c800825208940000000000000000000000000000000000000000010180c0';
     const cbor = buildCbor(shiftedFieldsFromQrkitDemo, 4, "m/44'/60'/0'/0/0", {
@@ -164,9 +164,9 @@ describe('handleUR', () => {
     });
 
     const result = handleUR('eth-sign-request', cbor);
-    expect(result.kind).toBe('error');
-    if (result.kind === 'error') {
-      expect(result.message).toMatch(/Failed to parse sign request/);
+    expect(result.kind).toBe('eth-sign-request');
+    if (result.kind === 'eth-sign-request') {
+      expect(result.request.signData).toBe(shiftedFieldsFromQrkitDemo);
     }
   });
 

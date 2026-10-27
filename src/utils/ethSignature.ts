@@ -1,4 +1,3 @@
-/* eslint-disable no-bitwise */
 import { ETHSignature } from '@keystonehq/bc-ur-registry-eth';
 import Keycard from 'keycard-sdk';
 import { hexToBytes } from 'viem';
@@ -23,22 +22,15 @@ function pad32(arr: Uint8Array): Uint8Array {
   return padded;
 }
 
+/** Minimal big-endian bytes; no bitwise operators, which truncate an EIP-155 v to 32 bits. */
 function encodeV(v: number): Uint8Array {
-  if (v <= 0xff) {
-    return new Uint8Array([v]);
-  }
-  if (v <= 0xffff) {
-    return new Uint8Array([(v >> 8) & 0xff, v & 0xff]);
-  }
-  if (v <= 0xffffff) {
-    return new Uint8Array([(v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff]);
-  }
-  return new Uint8Array([
-    (v >> 24) & 0xff,
-    (v >> 16) & 0xff,
-    (v >> 8) & 0xff,
-    v & 0xff,
-  ]);
+  const bytes: number[] = [];
+  let rest = v;
+  do {
+    bytes.unshift(rest % 256);
+    rest = Math.floor(rest / 256);
+  } while (rest > 0);
+  return new Uint8Array(bytes);
 }
 
 function bytesToHex(bytes: Uint8Array): string {

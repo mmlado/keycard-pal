@@ -18,24 +18,70 @@ import {
 } from './erc8213';
 import { isWholeBytes } from './hex';
 
+/** An unsigned transaction's fields, decoded from the bytes the card signs. */
+export type TransactionFields = {
+  nonce: bigint;
+  gasLimit: bigint;
+  /** Empty for a contract creation. */
+  to: Uint8Array;
+  value: bigint;
+  data: Uint8Array;
+  fees:
+    | { kind: 'legacy'; gasPrice: bigint }
+    | { kind: 'eip1559'; maxFeePerGas: bigint; maxPriorityFeePerGas: bigint };
+};
+
 /**
  * The one classification of an Ethereum sign request: the digest a variant carries is the
- * one the card signs and the review shows. Transactions follow txParser.parseTx's accept set.
+ * one the card signs and the review shows.
  */
 export type EthPayload =
-  | { kind: 'tx-legacy'; raw: Uint8Array; chainId?: number }
-  | { kind: 'tx-eip2930'; raw: Uint8Array; chainId?: number }
-  | { kind: 'tx-eip1559'; raw: Uint8Array; chainId?: number }
+  | {
+      kind: 'tx-legacy';
+      raw: Uint8Array;
+      chainId: number;
+      tx: TransactionFields;
+    }
+  | {
+      kind: 'tx-eip2930';
+      raw: Uint8Array;
+      chainId: number;
+      tx: TransactionFields;
+    }
+  | {
+      kind: 'tx-eip1559';
+      raw: Uint8Array;
+      chainId: number;
+      tx: TransactionFields;
+    }
   | { kind: 'personal-message'; raw: Uint8Array; digest: string }
   | { kind: 'eip712-json'; typedData: Eip712RawTypedData; digest: string }
   | { kind: 'eip712-prehashed'; prehashed: Eip712Prehashed; digest: string }
   | { kind: 'raw-digest'; digest: string }
-  | { kind: 'invalid'; reason: string; chainId?: number };
+  | {
+      kind: 'invalid';
+      reason: string;
+      chainId?: number;
+      /** Set when the bytes decode as a transaction refused for its chain. */
+      tx?: TransactionFields;
+    };
 
 export type EthPayloadKind = EthPayload['kind'];
 
+type TransactionKind = 'tx-legacy' | 'tx-eip2930' | 'tx-eip1559';
+
 const RLP_LIST_MIN = 0xc0;
 const DIGEST_BYTES = 32;
+const ADDRESS_BYTES = 20;
+const MAX_CHAIN_ID = BigInt(Number.MAX_SAFE_INTEGER);
+// Keeps a legacy transaction's v, 35 + 2 * chainId + recId, an exact number.
+const MAX_LEGACY_CHAIN_ID = (MAX_CHAIN_ID - 36n) / 2n;
+
+const TRANSACTION_NAMES: Record<TransactionKind, string> = {
+  'tx-legacy': 'A legacy transaction',
+  'tx-eip2930': 'An EIP-2930 transaction',
+  'tx-eip1559': 'An EIP-1559 transaction',
+};
 
 function invalid(reason: string): EthPayload {
   return { kind: 'invalid', reason };
@@ -49,37 +95,116 @@ function hexToBytes(hex: string): Uint8Array {
   return new Uint8Array(Buffer.from(hex, 'hex'));
 }
 
-/** The chain the bytes sign for: first in a typed transaction, seventh in an EIP-155 legacy one. */
-function signedChainId(raw: Uint8Array, typed: boolean): bigint | undefined {
+function toBigInt(bytes: Uint8Array): bigint {
+  return bytes.length === 0
+    ? 0n
+    : BigInt(`0x${Buffer.from(bytes).toString('hex')}`);
+}
+
+function isBytes(value: unknown): value is Uint8Array {
+  return value instanceof Uint8Array;
+}
+
+type DecodedTransaction = { chainId: bigint; tx: TransactionFields };
+
+/** The transaction the bytes hold, or why they hold none. */
+function decodeTransaction(
+  kind: TransactionKind,
+  raw: Uint8Array,
+): DecodedTransaction | string {
+  let list: unknown;
   try {
-    const decoded = RLP.decode(typed ? raw.subarray(1) : raw);
-    if (!Array.isArray(decoded)) return undefined;
-    const field = typed
-      ? decoded[0]
-      : decoded.length === 9
-      ? decoded[6]
-      : undefined;
-    if (!(field instanceof Uint8Array)) return undefined;
-    return field.length === 0
-      ? 0n
-      : BigInt(`0x${Buffer.from(field).toString('hex')}`);
+    list = RLP.decode(kind === 'tx-legacy' ? raw : raw.subarray(1));
   } catch {
-    // parseTx rejects what does not decode, at scan time.
-    return undefined;
+    return 'The transaction is not valid RLP.';
   }
+  if (!Array.isArray(list)) {
+    return 'The transaction is not an RLP list.';
+  }
+  if (kind === 'tx-legacy' && list.length === 6) {
+    return 'The legacy transaction has no EIP-155 chain ID, so it would be valid on every chain.';
+  }
+  const length = kind === 'tx-eip2930' ? 8 : 9;
+  if (list.length !== length) {
+    return `${TRANSACTION_NAMES[kind]} has ${length} fields, this one has ${list.length}.`;
+  }
+  const values = kind === 'tx-legacy' ? list : list.slice(0, -1);
+  if (!values.every(isBytes)) {
+    return 'A transaction field holds a list where a value belongs.';
+  }
+  if (kind !== 'tx-legacy' && !Array.isArray(list[length - 1])) {
+    return 'The access list of the transaction is not a list.';
+  }
+
+  let chain: Uint8Array;
+  let tx: TransactionFields;
+  if (kind === 'tx-legacy') {
+    const [nonce, gasPrice, gasLimit, to, value, data, chainId, r, s] = values;
+    if (r.length > 0 || s.length > 0) {
+      return 'An EIP-155 legacy transaction ends with an empty r and s, and this one does not.';
+    }
+    chain = chainId;
+    tx = {
+      nonce: toBigInt(nonce),
+      gasLimit: toBigInt(gasLimit),
+      to,
+      value: toBigInt(value),
+      data,
+      fees: { kind: 'legacy', gasPrice: toBigInt(gasPrice) },
+    };
+  } else if (kind === 'tx-eip2930') {
+    const [chainId, nonce, gasPrice, gasLimit, to, value, data] = values;
+    chain = chainId;
+    tx = {
+      nonce: toBigInt(nonce),
+      gasLimit: toBigInt(gasLimit),
+      to,
+      value: toBigInt(value),
+      data,
+      fees: { kind: 'legacy', gasPrice: toBigInt(gasPrice) },
+    };
+  } else {
+    const [chainId, nonce, priorityFee, maxFee, gasLimit, to, value, data] =
+      values;
+    chain = chainId;
+    tx = {
+      nonce: toBigInt(nonce),
+      gasLimit: toBigInt(gasLimit),
+      to,
+      value: toBigInt(value),
+      data,
+      fees: {
+        kind: 'eip1559',
+        maxFeePerGas: toBigInt(maxFee),
+        maxPriorityFeePerGas: toBigInt(priorityFee),
+      },
+    };
+  }
+  if (tx.to.length !== 0 && tx.to.length !== ADDRESS_BYTES) {
+    return 'The recipient of the transaction is not 20 bytes.';
+  }
+  return { chainId: toBigInt(chain), tx };
 }
 
 function transaction(
-  kind: 'tx-legacy' | 'tx-eip2930' | 'tx-eip1559',
+  kind: TransactionKind,
   raw: Uint8Array,
   requestChainId: number | undefined,
 ): EthPayload {
-  const signed = signedChainId(raw, kind !== 'tx-legacy');
-  if (signed === undefined) return { kind, raw };
-  if (signed > BigInt(Number.MAX_SAFE_INTEGER)) {
-    return invalid('The transaction names a chain ID out of range.');
+  const decoded = decodeTransaction(kind, raw);
+  if (typeof decoded === 'string') return invalid(decoded);
+  const { tx } = decoded;
+  if (
+    decoded.chainId >
+    (kind === 'tx-legacy' ? MAX_LEGACY_CHAIN_ID : MAX_CHAIN_ID)
+  ) {
+    return {
+      kind: 'invalid',
+      reason: 'The transaction names a chain ID out of range.',
+      tx,
+    };
   }
-  const chainId = Number(signed);
+  const chainId = Number(decoded.chainId);
   // A typed transaction's v does not name the chain, so the review would show one chain while the card signs for another.
   if (requestChainId !== undefined && chainId !== requestChainId) {
     return {
@@ -88,9 +213,17 @@ function transaction(
         chainId,
       )}, but the request says ${getChainName(requestChainId)}.`,
       chainId,
+      tx,
     };
   }
-  return { kind, raw, chainId };
+  return { kind, raw, chainId, tx };
+}
+
+/** The decoded transaction, also when refused for its chain, so the review keeps its rows. */
+export function payloadTransaction(
+  payload: EthPayload,
+): TransactionFields | undefined {
+  return 'tx' in payload ? payload.tx : undefined;
 }
 
 /** The chain to review and sign for: the transaction's own when it names one. */

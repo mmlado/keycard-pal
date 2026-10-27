@@ -6,6 +6,7 @@ import { getChainName } from '../src/utils/chainMetadata';
 import {
   classifyEthPayload,
   payloadChainId,
+  payloadTransaction,
   signingDigest,
   type EthPayload,
 } from '../src/utils/ethPayload';
@@ -21,14 +22,13 @@ function hex(bytes: Uint8Array): string {
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-// Minimal legacy tx: RLP list first byte (>= 0xc0). Classification only
-// inspects the first byte; scan-time validation (parseTx) guards structure.
+// Chain 1, nonce 0, a transfer of nothing to 0xaabb…ccdd.
 const LEGACY_TX_HEX =
-  'e980843b9aca0082520894aabbccddeeff00112233445566778899aabbccdd8080018080';
+  'e380843b9aca0082520894aabbccddeeff00112233445566778899aabbccdd8080018080';
 const EIP2930_TX_HEX =
-  '01f85901018082520894aabbccddeeff00112233445566778899aabbccdd8080c0';
+  '01de01800182520894aabbccddeeff00112233445566778899aabbccdd8080c0';
 const EIP1559_TX_HEX =
-  '02f8590101010182520894aabbccddeeff00112233445566778899aabbccdd8080c0';
+  '02df0180010182520894aabbccddeeff00112233445566778899aabbccdd8080c0';
 
 const TYPED_DATA = {
   domain: {
@@ -259,22 +259,136 @@ describe('classifyEthPayload', () => {
 
 // ── Signing digest ───────────────────────────────────────────────────────────
 
+const n = (v: number) => {
+  const h = v.toString(16);
+  return v === 0
+    ? new Uint8Array()
+    : Buffer.from(h.length % 2 ? `0${h}` : h, 'hex');
+};
+const TO = Buffer.from('aabbccddeeff00112233445566778899aabbccdd', 'hex');
+const enc = (fields: unknown[]) =>
+  Buffer.from(RLP.encode(fields as never)).toString('hex');
+const eip1559 = (chain: number) =>
+  '02' + enc([n(chain), n(0), n(1), n(1), n(21000), TO, n(0), n(0), []]);
+const eip2930 = (chain: number) =>
+  '01' + enc([n(chain), n(0), n(1), n(21000), TO, n(0), n(0), []]);
+const legacy155 = (chain: number) =>
+  enc([n(0), n(1), n(21000), TO, n(0), n(0), n(chain), n(0), n(0)]);
+
+describe('the transactions it accepts', () => {
+  it('decodes the fields the review shows', () => {
+    const data = Buffer.from('a9059cbb', 'hex');
+    const legacy = enc([
+      n(7),
+      n(2),
+      n(21000),
+      TO,
+      n(5),
+      data,
+      n(1),
+      n(0),
+      n(0),
+    ]);
+    expect(payloadTransaction(classifyEthPayload(legacy, 1))).toEqual({
+      nonce: 7n,
+      gasLimit: 21000n,
+      to: new Uint8Array(TO),
+      value: 5n,
+      data: new Uint8Array(data),
+      fees: { kind: 'legacy', gasPrice: 2n },
+    });
+    const typed =
+      '02' + enc([n(1), n(3), n(4), n(9), n(21000), TO, n(0), n(0), []]);
+    expect(payloadTransaction(classifyEthPayload(typed, 4))).toMatchObject({
+      nonce: 3n,
+      fees: { kind: 'eip1559', maxPriorityFeePerGas: 4n, maxFeePerGas: 9n },
+    });
+  });
+
+  it('accepts a contract creation, whose recipient is empty', () => {
+    const creation =
+      '02' + enc([n(1), n(0), n(1), n(1), n(21000), n(0), n(0), n(0), []]);
+    expect(classifyEthPayload(creation, 4).kind).toBe('tx-eip1559');
+  });
+
+  it.each([
+    ['bytes that are not RLP', '02f8', 4, 'The transaction is not valid RLP.'],
+    [
+      'bytes left over after the RLP',
+      legacy155(1) + '00',
+      1,
+      'The transaction is not valid RLP.',
+    ],
+    ['an RLP string', '0282abcd', 4, 'The transaction is not an RLP list.'],
+    [
+      'an EIP-1559 transaction with 8 fields',
+      '02' + enc([n(1), n(0), n(1), n(1), n(21000), TO, n(0), n(0)]),
+      4,
+      'An EIP-1559 transaction has 9 fields, this one has 8.',
+    ],
+    [
+      'an EIP-2930 transaction with 9 fields',
+      '01' + enc([n(1), n(0), n(1), n(21000), TO, n(0), n(0), [], n(0)]),
+      1,
+      'An EIP-2930 transaction has 8 fields, this one has 9.',
+    ],
+    [
+      'a legacy transaction with 7 fields',
+      enc([n(0), n(1), n(21000), TO, n(0), n(0), n(1)]),
+      1,
+      'A legacy transaction has 9 fields, this one has 7.',
+    ],
+    [
+      'a list where a value belongs',
+      enc([[], n(1), n(21000), TO, n(0), n(0), n(1), n(0), n(0)]),
+      1,
+      'A transaction field holds a list where a value belongs.',
+    ],
+    [
+      "qrkit's demo EIP-1559 transaction",
+      '02e80180843b9aca008504a817c800825208940000000000000000000000000000000000000000010180c0',
+      4,
+      'The transaction is not valid RLP.',
+    ],
+    [
+      'an access list that is not a list',
+      '02' + enc([n(1), n(0), n(1), n(1), n(21000), TO, n(0), n(0), n(0)]),
+      4,
+      'The access list of the transaction is not a list.',
+    ],
+    [
+      'a legacy transaction with an r',
+      enc([n(0), n(1), n(21000), TO, n(0), n(0), n(1), n(1), n(0)]),
+      1,
+      'An EIP-155 legacy transaction ends with an empty r and s, and this one does not.',
+    ],
+    [
+      'a legacy transaction with an s',
+      enc([n(0), n(1), n(21000), TO, n(0), n(0), n(1), n(0), n(1)]),
+      1,
+      'An EIP-155 legacy transaction ends with an empty r and s, and this one does not.',
+    ],
+    [
+      'a recipient of 19 bytes',
+      '02' +
+        enc([n(1), n(0), n(1), n(1), n(21000), TO.subarray(1), n(0), n(0), []]),
+      4,
+      'The recipient of the transaction is not 20 bytes.',
+    ],
+  ])('refuses %s', (_, signData, dataType, reason) => {
+    const payload = classifyEthPayload(signData, dataType);
+    expect(payload).toEqual({ kind: 'invalid', reason });
+    expect(payloadTransaction(payload)).toBeUndefined();
+  });
+
+  it('keeps a transaction refused for its chain, so its review keeps the rows', () => {
+    const payload = classifyEthPayload(eip1559(1), 4, 11155111);
+    expect(payload.kind).toBe('invalid');
+    expect(payloadTransaction(payload)).toMatchObject({ gasLimit: 21000n });
+  });
+});
+
 describe('the chain a transaction signs for', () => {
-  const n = (v: number) => {
-    const h = v.toString(16);
-    return v === 0
-      ? new Uint8Array()
-      : Buffer.from(h.length % 2 ? `0${h}` : h, 'hex');
-  };
-  const TO = Buffer.from('aabbccddeeff00112233445566778899aabbccdd', 'hex');
-  const enc = (fields: unknown[]) =>
-    Buffer.from(RLP.encode(fields as never)).toString('hex');
-  const eip1559 = (chain: number) =>
-    '02' + enc([n(chain), n(0), n(1), n(1), n(21000), TO, n(0), n(0), []]);
-  const eip2930 = (chain: number) =>
-    '01' + enc([n(chain), n(0), n(1), n(21000), TO, n(0), n(0), []]);
-  const legacy155 = (chain: number) =>
-    enc([n(0), n(1), n(21000), TO, n(0), n(0), n(chain), n(0), n(0)]);
   const legacyPre155 = enc([n(0), n(1), n(21000), TO, n(0), n(0)]);
   const SEPOLIA = 11155111;
   const mismatch = `The transaction is for ${getChainName(
@@ -308,6 +422,7 @@ describe('the chain a transaction signs for', () => {
         kind: 'invalid',
         reason: mismatch,
         chainId: 1,
+        tx: expect.objectContaining({ to: new Uint8Array(TO) }),
       });
     }
   });
@@ -317,10 +432,12 @@ describe('the chain a transaction signs for', () => {
     expect(payloadChainId(payload, undefined)).toBe(137);
   });
 
-  it("keeps the request's chain for a legacy transaction without EIP-155", () => {
-    const payload = classifyEthPayload(legacyPre155, 1, 137);
-    expect(payload).toEqual({ kind: 'tx-legacy', raw: expect.any(Uint8Array) });
-    expect(payloadChainId(payload, 137)).toBe(137);
+  it('refuses a legacy transaction without EIP-155, which names no chain', () => {
+    expect(classifyEthPayload(legacyPre155, 1, 137)).toEqual({
+      kind: 'invalid',
+      reason:
+        'The legacy transaction has no EIP-155 chain ID, so it would be valid on every chain.',
+    });
   });
 
   it('refuses a chain ID past what a number can hold', () => {
@@ -337,7 +454,23 @@ describe('the chain a transaction signs for', () => {
         n(0),
         [],
       ]);
-    expect(classifyEthPayload(huge, 4).kind).toBe('invalid');
+    expect(classifyEthPayload(huge, 4)).toEqual({
+      kind: 'invalid',
+      reason: 'The transaction names a chain ID out of range.',
+      tx: expect.objectContaining({ to: new Uint8Array(TO) }),
+    });
+  });
+
+  it('refuses a legacy chain ID whose v would not be an exact number', () => {
+    const limit = (Number.MAX_SAFE_INTEGER - 37) / 2;
+    expect(classifyEthPayload(legacy155(limit), 1)).toMatchObject({
+      kind: 'tx-legacy',
+      chainId: limit,
+    });
+    expect(classifyEthPayload(legacy155(limit + 1), 1)).toMatchObject({
+      kind: 'invalid',
+      reason: 'The transaction names a chain ID out of range.',
+    });
   });
 });
 

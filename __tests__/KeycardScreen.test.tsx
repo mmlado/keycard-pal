@@ -515,7 +515,8 @@ describe('KeycardScreen', () => {
         params: {
           operation: 'sign',
           signMode: 'eth',
-          signData: 'deadbeef',
+          signData:
+            'df800182520894aabbccddeeff00112233445566778899aabbccdd8080018080',
           derivationPath: "m/44'/60'/0'/0",
           dataType: 1,
           chainId: 1,
@@ -649,7 +650,8 @@ describe('KeycardScreen', () => {
       params: {
         operation: 'sign',
         signMode: 'eth',
-        signData: 'deadbeef',
+        signData:
+          'df800182520894aabbccddeeff00112233445566778899aabbccdd8080018080',
         derivationPath: "m/44'/60'/0'/0",
         dataType: 1,
         chainId: 1,
