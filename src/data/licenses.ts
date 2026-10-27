@@ -529,13 +529,17 @@ const bundled: LicenseEntry[] = [
   { package: 'react-native-encrypted-storage', licenseType: 'MIT' },
   { package: 'react-native-fs', licenseType: 'MIT' },
   { package: 'react-native-get-random-values', licenseType: 'MIT' },
+  { package: 'react-native-is-edge-to-edge', licenseType: 'MIT' },
+  { package: 'react-native-keyboard-controller', licenseType: 'MIT' },
   { package: 'react-native-keycard', licenseType: 'MIT' },
   { package: 'react-native-paper', licenseType: 'MIT' },
   { package: 'react-native-qrcode-svg', licenseType: 'MIT' },
+  { package: 'react-native-reanimated', licenseType: 'MIT' },
   { package: 'react-native-safe-area-context', licenseType: 'MIT' },
   { package: 'react-native-screens', licenseType: 'MIT' },
   { package: 'react-native-svg', licenseType: 'MIT' },
   { package: 'react-native-vector-icons', licenseType: 'MIT' },
+  { package: 'react-native-worklets', licenseType: 'MIT' },
   { package: 'viem', licenseType: 'MIT' },
 ];
 

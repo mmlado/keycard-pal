@@ -2,27 +2,25 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../../theme';
+import theme from '@/theme';
 
-import TextInputSetting from '../TextInputSetting';
-import SettingsToggleRow from '../SettingsToggleRow';
+import SettingsToggleRow from '@/components/settings/SettingsToggleRow';
+import TextInputSetting from '@/components/settings/TextInputSetting';
 
-import { clearEnsNameCache } from '../../../hooks/ens/useEnsName.online';
-import { validateRpcUrl } from '../../../utils/ens/client.online';
+import { clearEnsNameCache } from '@/hooks/ens/useEnsName.online';
+
 import {
   DEFAULT_ENS_RPC_URL,
   loadEnsSettings,
   saveEnsEnabled,
   saveEnsRpcUrl,
-} from '../../../storage/ensSettings.online';
+} from '@/storage/ensSettings.online';
+import { validateRpcUrl } from '@/utils/ens/client.online';
 
 export default function EnsSettingsSection() {
-  const [input, setInput] = useState('');
   const [savedUrl, setSavedUrl] = useState('');
   const [enabled, setEnabled] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [validating, setValidating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,7 +29,6 @@ export default function EnsSettingsSection() {
         if (!cancelled) {
           setEnabled(settings.enabled);
           setSavedUrl(settings.rpcUrl);
-          setInput(settings.rpcUrl);
           setLoaded(true);
         }
       })
@@ -46,10 +43,8 @@ export default function EnsSettingsSection() {
   const handleToggle = useCallback(
     async (value: boolean) => {
       setEnabled(value);
-      setError(null);
       if (value && !savedUrl) {
         setSavedUrl(DEFAULT_ENS_RPC_URL);
-        setInput(DEFAULT_ENS_RPC_URL);
         await Promise.all([
           saveEnsEnabled(true),
           saveEnsRpcUrl(DEFAULT_ENS_RPC_URL),
@@ -62,38 +57,19 @@ export default function EnsSettingsSection() {
     [savedUrl],
   );
 
-  const dirty = loaded && input !== savedUrl;
-
-  const handleRevert = useCallback(() => {
-    setInput(savedUrl);
-    setError(null);
-  }, [savedUrl]);
-
-  const handleSave = useCallback(async () => {
-    const trimmed = input.trim();
-    if (!trimmed) {
-      await saveEnsRpcUrl('');
-      setSavedUrl('');
-      setError(null);
-      return;
+  const handleSave = useCallback(async (url: string) => {
+    if (url) {
+      const result = await validateRpcUrl(url);
+      if (result === 'non-mainnet') {
+        return 'Not an Ethereum mainnet endpoint.';
+      }
+      if (result !== 'ok') {
+        return 'Could not reach RPC endpoint — URL not saved.';
+      }
     }
-
-    setValidating(true);
-    setError(null);
-
-    const result = await validateRpcUrl(trimmed);
-    setValidating(false);
-
-    if (result === 'ok') {
-      await saveEnsRpcUrl(trimmed);
-      setSavedUrl(trimmed);
-      setError(null);
-    } else if (result === 'non-mainnet') {
-      setError('Not an Ethereum mainnet endpoint.');
-    } else {
-      setError('Could not reach RPC endpoint — URL not saved.');
-    }
-  }, [input]);
+    await saveEnsRpcUrl(url);
+    setSavedUrl(url);
+  }, []);
 
   if (!loaded) return null;
 
@@ -107,17 +83,9 @@ export default function EnsSettingsSection() {
       {enabled && (
         <TextInputSetting
           label="RPC URL"
-          value={input}
-          dirty={dirty}
-          saving={validating}
-          error={error}
+          value={savedUrl}
           placeholder={DEFAULT_ENS_RPC_URL}
           keyboardType="url"
-          onChangeText={value => {
-            setInput(value);
-            setError(null);
-          }}
-          onRevert={handleRevert}
           onSave={handleSave}
         />
       )}

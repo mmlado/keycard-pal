@@ -33,7 +33,6 @@ export default function Eip7730SettingsSection() {
   const [source, setSource] = useState<Eip7730DescriptorSource>('manual');
   const [wifiOnly, setWifiOnly] = useState(false);
   const [savedUrl, setSavedUrl] = useState(DEFAULT_EIP7730_REGISTRY_URL);
-  const [urlInput, setUrlInput] = useState(DEFAULT_EIP7730_REGISTRY_URL);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +41,6 @@ export default function Eip7730SettingsSection() {
         if (cancelled) return;
         setSource(s);
         setSavedUrl(u);
-        setUrlInput(u);
         setWifiOnly(w);
         setLoaded(true);
       })
@@ -75,20 +73,14 @@ export default function Eip7730SettingsSection() {
     await saveWifiOnly(value);
   }, []);
 
-  const dirty = loaded && urlInput.trim() !== savedUrl;
-
-  const handleUrlRevert = useCallback(() => {
-    setUrlInput(savedUrl);
-  }, [savedUrl]);
-
-  const handleUrlSave = useCallback(async () => {
-    const trimmed = urlInput.trim() || DEFAULT_EIP7730_REGISTRY_URL;
-    await saveDescriptorUrl(trimmed);
-    setSavedUrl(trimmed);
-    setUrlInput(trimmed);
+  // The validators go first, so a failed save leaves the old URL and a Save to retry.
+  const handleUrlSave = useCallback(async (url: string) => {
+    const next = url || DEFAULT_EIP7730_REGISTRY_URL;
     await clearEtag();
     await clearLastModified();
-  }, [urlInput]);
+    await saveDescriptorUrl(next);
+    setSavedUrl(next);
+  }, []);
 
   const handleReverted = useCallback(async () => {
     setSource('manual');
@@ -124,12 +116,9 @@ export default function Eip7730SettingsSection() {
         <View style={styles.autoBlock}>
           <TextInputSetting
             label="Registry zip URL"
-            value={urlInput}
-            dirty={dirty}
+            value={savedUrl}
             placeholder={DEFAULT_EIP7730_REGISTRY_URL}
             keyboardType="url"
-            onChangeText={setUrlInput}
-            onRevert={handleUrlRevert}
             onSave={handleUrlSave}
           />
           <SettingsToggleRow

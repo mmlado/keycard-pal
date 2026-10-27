@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardTypeOptions,
@@ -8,62 +8,85 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../theme';
+import theme from '@/theme';
 
-import { useFieldFocus, type SettingsField } from './fieldFocus';
+import { useKeepAboveKeyboard } from '@/components/KeyboardAwareScrollView';
+
+export const SAVE_FAILED = 'Could not save. Try again.';
 
 export default function TextInputSetting({
   label,
   value,
-  dirty,
-  saving,
-  error,
   placeholder,
   keyboardType,
-  disableSave,
-  onChangeText,
-  onRevert,
+  required,
   onSave,
 }: {
   label: string;
+  /** What is stored; the draft follows it whenever it changes. */
   value: string;
-  dirty: boolean;
-  saving?: boolean;
-  error?: string | null;
   placeholder?: string;
   keyboardType?: KeyboardTypeOptions;
-  disableSave?: boolean;
-  onChangeText: (v: string) => void;
-  onRevert?: () => void;
-  onSave: () => void;
+  required?: boolean;
+  /** Stores the trimmed draft; a string it returns is shown as the error line. */
+  onSave: (draft: string) => Promise<string | null | void>;
 }) {
-  const blockRef = useRef<SettingsField>(null);
-  const focused = useRef(false);
-  const onFieldFocus = useFieldFocus();
-  const handleFocus = useCallback(() => {
-    focused.current = true;
-    onFieldFocus(blockRef.current);
-  }, [onFieldFocus]);
-  const handleBlur = useCallback(() => {
-    focused.current = false;
-    onFieldFocus(null);
-  }, [onFieldFocus]);
-  // Revert and Save appear after the field was scrolled into view.
-  const handleLayout = useCallback(() => {
-    if (focused.current) onFieldFocus(blockRef.current);
-  }, [onFieldFocus]);
+  const [draft, setDraft] = useState(value);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // A save can store what was already stored, so the draft is synced after each one too.
+  const [saves, setSaves] = useState(0);
+  const { block, input } = useKeepAboveKeyboard();
+
+  // Before paint, or a field that is no longer dirty shows Revert and Save for a frame.
+  useLayoutEffect(() => {
+    setDraft(value);
+  }, [value, saves]);
+
+  const trimmed = draft.trim();
+  const dirty = trimmed !== value;
+
+  const handleChange = useCallback((text: string) => {
+    setDraft(text);
+    setError(null);
+  }, []);
+
+  const handleRevert = useCallback(() => {
+    setDraft(value);
+    setError(null);
+  }, [value]);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    let line: string | null | void;
+    try {
+      line = await onSave(trimmed);
+    } catch {
+      line = SAVE_FAILED;
+    }
+    setSaving(false);
+    if (line) {
+      setError(line);
+    } else {
+      setSaves(count => count + 1);
+    }
+  }, [onSave, trimmed]);
+
+  const saveDisabled = saving || (required === true && trimmed === '');
 
   return (
-    <View ref={blockRef} onLayout={handleLayout} style={styles.block}>
+    <View onLayout={block.onLayout} style={styles.block}>
       <Text variant="bodySmall" style={styles.label}>
         {label}
       </Text>
       <TextInput
-        onFocus={handleFocus}
-        onBlur={handleBlur}
+        onFocus={input.onFocus}
+        onBlur={input.onBlur}
+        onLayout={input.onLayout}
         style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
+        value={draft}
+        onChangeText={handleChange}
         autoCapitalize="none"
         autoCorrect={false}
         placeholder={placeholder}
@@ -74,17 +97,17 @@ export default function TextInputSetting({
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {(dirty || saving) && (
         <View style={styles.buttonRow}>
-          {dirty && !saving && onRevert && (
-            <Text style={styles.revertButton} onPress={onRevert}>
+          {dirty && !saving && (
+            <Text style={styles.revertButton} onPress={handleRevert}>
               Revert
             </Text>
           )}
           <Text
             style={[
               styles.saveButton,
-              (saving || disableSave) && styles.saveButtonDisabled,
+              saveDisabled && styles.saveButtonDisabled,
             ]}
-            onPress={saving || disableSave ? undefined : onSave}
+            onPress={saveDisabled ? undefined : handleSave}
           >
             {saving ? (
               <ActivityIndicator size="small" color={theme.colors.primary} />

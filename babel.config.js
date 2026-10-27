@@ -10,5 +10,7 @@ module.exports = {
         },
       },
     ],
+    // Last, as Reanimated's Worklets requires.
+    'react-native-worklets/plugin',
   ],
 };

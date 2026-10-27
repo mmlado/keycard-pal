@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - WalletConnect typed data that cannot be signed opens the review with the reason instead of being refused at once
 - Entry screens keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
 - Verifying a recovery phrase or SLIP39 shares ends on a screen with a check mark or an X instead of a toast
+- Screens that take typing move with the keyboard as it slides in and out, instead of jumping once it has landed
 
 ### Fixed
 
@@ -34,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The signing and key export screen's title reads "Enter Keycard PIN" only while the PIN pad is up
 - The success sheet after signing, key export and unpairing names what was done instead of an empty line
 - On iOS, the NFC sheet names what was done after signing, key export, unpairing and verifying instead of "Success"
+- A Settings text field that cannot be stored says so under the field instead of failing silently
 
 ## [1.15.1] - 2026-10-20
 

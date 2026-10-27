@@ -68,7 +68,8 @@ jobs:
           ANDROID_KEYSTORE_PATH: release.keystore
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: cd android && ./gradlew clean assembleFullRelease assembleOfflineRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
+        # No clean: the checkout is fresh, and in the same call clean deletes Reanimated's prefab package before the app's CMake reads it.
+        run: cd android && ./gradlew assembleFullRelease assembleOfflineRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --no-daemon
 
       # Autolinking is not flavor-aware; the offline APK must not carry the
       # online-only native modules the full flavor links by hand (#270).

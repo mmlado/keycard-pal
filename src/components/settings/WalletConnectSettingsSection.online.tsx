@@ -2,39 +2,28 @@ import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../../theme';
+import theme from '@/theme';
 
-import TextInputSetting from './TextInputSetting';
+import TextInputSetting from '@/components/settings/TextInputSetting';
 
-import { loadWCProjectId, saveWCProjectId } from '../../storage/walletConnect';
-import { wcClient } from '../../utils/walletConnect/client.online';
+import { loadWCProjectId, saveWCProjectId } from '@/storage/walletConnect';
+import { wcClient } from '@/utils/walletConnect/client.online';
 
 export default function WalletConnectSettingsSection() {
-  const [input, setInput] = useState('');
   const [saved, setSaved] = useState('');
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     loadWCProjectId()
-      .then(id => {
-        setInput(id);
-        setSaved(id);
-      })
+      .then(setSaved)
       .finally(() => setLoaded(true));
   }, []);
 
-  const dirty = loaded && input !== saved;
-
-  const handleRevert = useCallback(() => {
-    setInput(saved);
-  }, [saved]);
-
-  const handleSave = useCallback(async () => {
-    const trimmed = input.trim();
-    await saveWCProjectId(trimmed);
-    setSaved(trimmed);
+  const handleSave = useCallback(async (projectId: string) => {
+    await saveWCProjectId(projectId);
+    setSaved(projectId);
     wcClient.resetClient();
-  }, [input]);
+  }, []);
 
   if (!loaded) return null;
 
@@ -45,11 +34,8 @@ export default function WalletConnectSettingsSection() {
       </Text>
       <TextInputSetting
         label="Project ID"
-        value={input}
-        dirty={dirty}
+        value={saved}
         placeholder="Enter WalletConnect Project ID"
-        onChangeText={setInput}
-        onRevert={handleRevert}
         onSave={handleSave}
       />
     </View>
