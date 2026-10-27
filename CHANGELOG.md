@@ -12,36 +12,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- The backup check of a generated key pair shows a preparing step after the last answer instead of pausing when it opens
-- The store descriptions, the README and the F-Droid `NonFreeNet` reason list the clear-signing registry download among the optional network features
-- WalletConnect typed data that cannot be signed opens the review with the reason instead of being refused at once
-- Entry screens keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
+- WalletConnect typed data that cannot be signed and an Ethereum transaction that does not decode open the review with the reason, instead of being refused at once or failing at scan
 - Verifying a recovery phrase or SLIP39 shares ends on a screen with a check mark or an X instead of a toast
-- Screens that take typing move with the keyboard as it slides in and out, instead of jumping once it has landed
-- An Ethereum transaction that does not decode opens the review with the reason instead of failing at scan
+- The backup check of a generated key pair shows a preparing step after the last answer instead of pausing when it opens
+- Screens that take typing move with the keyboard as it slides in and out, and keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
+- The store descriptions, the README and the F-Droid `NonFreeNet` reason list the clear-signing registry download among the optional network features
 
 ### Fixed
 
-- WalletConnect typed data is signed under its declared EIP712Domain, giving the same signature as over QR
-- Typed data that names no primaryType, or that the signature would not fully cover, is refused with the reason
-- Try again after the card refuses a PIN, PUK or pairing secret change sends the entered secret again instead of an empty one
-- Try again after a refused or interrupted key pair load sends the key pair again instead of failing
+- WalletConnect typed data is signed under its declared EIP712Domain, giving the same signature as over QR, and typed data that names no primaryType or that the signature would not fully cover is refused with the reason
+- A legacy Ethereum transaction that is not an unsigned EIP-155 one, or a transaction whose recipient is not 20 bytes, is refused instead of signed, and a legacy transaction for a chain ID above 2^31 is signed with a `v` that names its chain
+- A WalletConnect request left by back, swipe or Go back is rejected, so the next request in the session is shown instead of refused as busy, and back on the success sheet after signing sends the dApp the signature instead of a rejection
+- Cancel on Apple's NFC sheet leaves the signing, key export, key generation, Pairing slots and WalletConnect pairing screens and rejects the WalletConnect request or proposal it was for, and Cancel after a refused tap leaves Change PIN, Unblock PIN and Initialize instead of stepping back through the form
 - Cancel during a tap no longer brings the error sheet back when the command already sent to the card fails afterwards
-- A WalletConnect request left by back, swipe or Go back is rejected, so the next request in the session is shown instead of refused as busy
-- Back on the success sheet after signing a WalletConnect request sends the dApp the signature instead of a rejection
-- Cancel on Apple's NFC sheet leaves the signing, key export, key generation, Pairing slots and WalletConnect pairing screens, and rejects the WalletConnect request or proposal it was for
-- Pairing slots offers Open NFC Settings when a read stops because NFC is off
-- Cancel after a refused tap leaves Change PIN, Unblock PIN and Initialize instead of stepping back through the form
 - With a WalletConnect request or proposal open, Unblock PIN and Don't have a Keycard? from the NFC sheet stay open instead of returning to the Dashboard
+- Try again after the card refuses a PIN, PUK or pairing secret change, or after a refused or interrupted key pair load, sends the secret or the key pair again instead of an empty one or failing
+- The success sheet after signing, key export and unpairing names what was done instead of an empty line, and on iOS so does Apple's NFC sheet, after verifying too, instead of "Success"
 - The signing and key export screen's title reads "Enter Keycard PIN" only while the PIN pad is up
-- The success sheet after signing, key export and unpairing names what was done instead of an empty line
-- On iOS, the NFC sheet names what was done after signing, key export, unpairing and verifying instead of "Success"
+- Pairing slots offers Open NFC Settings when NFC is off, and unpairing refuses a different Keycard than the one listed, no longer reports a slot the card refused as unpaired, and forgets this phone's pairing also when the list did not mark its slot
 - A Settings text field that cannot be stored says so under the field instead of failing silently
-- Unpairing a slot refuses a different Keycard than the one whose slots are listed
-- Unpairing this phone's own slot forgets its pairing also when the list did not mark the slot as this device
-- A slot the Keycard refuses to unpair is no longer reported as unpaired
-- A legacy Ethereum transaction that is not an unsigned EIP-155 one, or a transaction whose recipient is not 20 bytes, is refused instead of signed
-- A legacy Ethereum transaction for a chain ID above 2^31 is signed with a `v` that names its chain
 
 ## [1.15.1] - 2026-10-20
 
