@@ -20,7 +20,6 @@ import { isWholeBytes } from './hex';
 
 /** An unsigned transaction's fields, decoded from the bytes the card signs. */
 export type TransactionFields = {
-  nonce: bigint;
   gasLimit: bigint;
   /** Empty for a contract creation. */
   to: Uint8Array;
@@ -139,13 +138,12 @@ function decodeTransaction(
   let chain: Uint8Array;
   let tx: TransactionFields;
   if (kind === 'tx-legacy') {
-    const [nonce, gasPrice, gasLimit, to, value, data, chainId, r, s] = values;
+    const [, gasPrice, gasLimit, to, value, data, chainId, r, s] = values;
     if (r.length > 0 || s.length > 0) {
       return 'An EIP-155 legacy transaction ends with an empty r and s, and this one does not.';
     }
     chain = chainId;
     tx = {
-      nonce: toBigInt(nonce),
       gasLimit: toBigInt(gasLimit),
       to,
       value: toBigInt(value),
@@ -153,10 +151,9 @@ function decodeTransaction(
       fees: { kind: 'legacy', gasPrice: toBigInt(gasPrice) },
     };
   } else if (kind === 'tx-eip2930') {
-    const [chainId, nonce, gasPrice, gasLimit, to, value, data] = values;
+    const [chainId, , gasPrice, gasLimit, to, value, data] = values;
     chain = chainId;
     tx = {
-      nonce: toBigInt(nonce),
       gasLimit: toBigInt(gasLimit),
       to,
       value: toBigInt(value),
@@ -164,11 +161,9 @@ function decodeTransaction(
       fees: { kind: 'legacy', gasPrice: toBigInt(gasPrice) },
     };
   } else {
-    const [chainId, nonce, priorityFee, maxFee, gasLimit, to, value, data] =
-      values;
+    const [chainId, , priorityFee, maxFee, gasLimit, to, value, data] = values;
     chain = chainId;
     tx = {
-      nonce: toBigInt(nonce),
       gasLimit: toBigInt(gasLimit),
       to,
       value: toBigInt(value),

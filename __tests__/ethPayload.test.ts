@@ -290,7 +290,6 @@ describe('the transactions it accepts', () => {
       n(0),
     ]);
     expect(payloadTransaction(classifyEthPayload(legacy, 1))).toEqual({
-      nonce: 7n,
       gasLimit: 21000n,
       to: new Uint8Array(TO),
       value: 5n,
@@ -300,7 +299,6 @@ describe('the transactions it accepts', () => {
     const typed =
       '02' + enc([n(1), n(3), n(4), n(9), n(21000), TO, n(0), n(0), []]);
     expect(payloadTransaction(classifyEthPayload(typed, 4))).toMatchObject({
-      nonce: 3n,
       fees: { kind: 'eip1559', maxPriorityFeePerGas: 4n, maxFeePerGas: 9n },
     });
   });

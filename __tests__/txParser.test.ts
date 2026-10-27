@@ -203,12 +203,6 @@ describe('formatTx', () => {
         expect(tx.fees.gasLimit).toBe('30000');
       }
     });
-
-    it('parses nonce correctly', () => {
-      const hex = buildEIP2930TxHex({ nonce: 7n });
-      const tx = reviewedTx(hex, 1);
-      expect(tx?.nonce).toBe(7);
-    });
   });
 
   describe('EIP-2930 encoded as ERC-4527 typed transaction (dataType=4, 0x01 prefix)', () => {

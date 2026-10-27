@@ -317,7 +317,6 @@ export type ParsedTx = {
   value?: string; // in ETH, e.g. "0.01"
   valueWei?: string; // raw value in Wei as decimal string, for simulation
   data?: string; // hex calldata
-  nonce?: number;
   fees: ParsedFees;
 };
 
@@ -368,7 +367,6 @@ export function formatTx(
 ): ParsedTx {
   const gasLimit = tx.gasLimit.toString();
   return {
-    nonce: Number(tx.nonce),
     to: toAddress(tx.to),
     value: weiToNative(tx.value, nativeCurrencySymbol),
     valueWei: tx.value.toString(),
