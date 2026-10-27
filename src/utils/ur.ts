@@ -11,7 +11,6 @@ import {
   inspectBtcPsbt,
   parseCryptoPsbtRequest,
 } from './btcPsbt';
-import { validateEthTransactionSignData } from './txParser';
 
 function parseEthSignRequest(cbor: Buffer): EthSignRequestType {
   const parsed = EthSignRequest.fromCBOR(cbor);
@@ -25,8 +24,6 @@ function parseEthSignRequest(cbor: Buffer): EthSignRequestType {
     ? signDataBuf.toString('hex')
     : String(signDataBuf);
   const dataType = parsed.getDataType() ?? 1;
-
-  validateEthTransactionSignData(signData, dataType);
 
   return {
     signData,

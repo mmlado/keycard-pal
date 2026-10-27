@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Entry screens keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
 - Verifying a recovery phrase or SLIP39 shares ends on a screen with a check mark or an X instead of a toast
 - Screens that take typing move with the keyboard as it slides in and out, instead of jumping once it has landed
+- An Ethereum transaction that does not decode opens the review with the reason instead of failing at scan
 
 ### Fixed
 
@@ -39,6 +40,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Unpairing a slot refuses a different Keycard than the one whose slots are listed
 - Unpairing this phone's own slot forgets its pairing also when the list did not mark the slot as this device
 - A slot the Keycard refuses to unpair is no longer reported as unpaired
+- A legacy Ethereum transaction that is not an unsigned EIP-155 one, or a transaction whose recipient is not 20 bytes, is refused instead of signed
+- A legacy Ethereum transaction for a chain ID above 2^31 is signed with a `v` that names its chain
 
 ## [1.15.1] - 2026-10-20
 

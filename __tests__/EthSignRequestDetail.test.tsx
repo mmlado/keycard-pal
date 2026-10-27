@@ -114,18 +114,28 @@ function addr(hex: string): Uint8Array {
   return Buffer.from(hex.replace('0x', ''), 'hex');
 }
 
-/** Legacy unsigned tx: RLP([nonce, gasPrice, gasLimit, to, value, data]) */
-function legacyTxHex(value: bigint = 1_000_000_000_000_000_000n): string {
+/** EIP-155 legacy unsigned tx: RLP([nonce, gasPrice, gasLimit, to, value, data, chainId, 0, 0]) */
+function legacyTx(fields: Uint8Array[], chainId: bigint = 1n): string {
   return Buffer.from(
-    RLP.encode([
+    RLP.encode([...fields, bn(chainId), new Uint8Array(0), new Uint8Array(0)]),
+  ).toString('hex');
+}
+
+function legacyTxHex(
+  value: bigint = 1_000_000_000_000_000_000n,
+  chainId: bigint = 1n,
+): string {
+  return legacyTx(
+    [
       bn(1n),
       bn(20_000_000_000n),
       bn(21000n),
       addr('0xd3cda913deb6f4967b2ef3aa68f5a843da74c4ef'),
       bn(value),
       new Uint8Array(0),
-    ]),
-  ).toString('hex');
+    ],
+    chainId,
+  );
 }
 
 /** EIP-1559 tx: 0x02 || RLP([chainId, nonce, maxPFG, maxFG, gasLimit, to, value, data, []]) */
@@ -185,7 +195,7 @@ function typedDataHex(payload: unknown): string {
 describe('EthSignRequestDetail — chain name', () => {
   it('shows chain name for BNB Smart Chain (56)', () => {
     renderDetail({
-      signData: legacyTxHex(),
+      signData: legacyTxHex(1_000_000_000_000_000_000n, BigInt(56)),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
       chainId: 56,
@@ -195,7 +205,7 @@ describe('EthSignRequestDetail — chain name', () => {
 
   it('shows chain name for Polygon (137)', () => {
     renderDetail({
-      signData: legacyTxHex(),
+      signData: legacyTxHex(1_000_000_000_000_000_000n, BigInt(137)),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
       chainId: 137,
@@ -205,7 +215,7 @@ describe('EthSignRequestDetail — chain name', () => {
 
   it('shows chain name for Base (8453)', () => {
     renderDetail({
-      signData: legacyTxHex(),
+      signData: legacyTxHex(1_000_000_000_000_000_000n, BigInt(8453)),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
       chainId: 8453,
@@ -215,7 +225,7 @@ describe('EthSignRequestDetail — chain name', () => {
 
   it('falls back to "Chain N" for unknown chain', () => {
     renderDetail({
-      signData: legacyTxHex(),
+      signData: legacyTxHex(1_000_000_000_000_000_000n, BigInt(0xdeadbeef)),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
       chainId: 0xdeadbeef,
@@ -223,10 +233,10 @@ describe('EthSignRequestDetail — chain name', () => {
     expect(screen.getByText('Chain 3735928559')).toBeTruthy();
   });
 
-  it('omits chain row when chainId is undefined', () => {
+  it('omits chain row for a message when the request names no chain', () => {
     renderDetail({
-      signData: legacyTxHex(),
-      dataType: 1,
+      signData: Buffer.from('hello', 'utf8').toString('hex'),
+      dataType: 3,
       derivationPath: "m/44'/60'/0'/0",
     });
     expect(screen.queryByText('Chain')).toBeNull();
@@ -250,7 +260,7 @@ describe('EthSignRequestDetail — native currency symbol', () => {
 
   it('shows BNB symbol for BNB Smart Chain (chainId=56)', () => {
     renderDetail({
-      signData: legacyTxHex(),
+      signData: legacyTxHex(1_000_000_000_000_000_000n, 56n),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
       chainId: 56,
@@ -279,13 +289,13 @@ describe('EthSignRequestDetail — native currency symbol', () => {
     expect(screen.getByText(/ETH/)).toBeTruthy();
   });
 
-  it('defaults to ETH symbol when chainId is undefined', () => {
+  it("takes the symbol from the transaction's own chain when the request names none", () => {
     renderDetail({
-      signData: legacyTxHex(),
+      signData: legacyTxHex(1_000_000_000_000_000_000n, 56n),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
     });
-    expect(screen.getByText(/ETH/)).toBeTruthy();
+    expect(screen.getByText('1 BNB')).toBeTruthy();
   });
 });
 
@@ -551,16 +561,14 @@ describe('EthSignRequestDetail — amount row visibility', () => {
 
   function erc20TxHex(): string {
     const data = Buffer.from(ERC20_TRANSFER, 'hex');
-    return Buffer.from(
-      RLP.encode([
-        bn(1n),
-        bn(20_000_000_000n),
-        bn(60000n),
-        addr('0xdac17f958d2ee523a2206206994597c13d831ec7'),
-        bn(0n), // zero ETH value
-        data,
-      ]),
-    ).toString('hex');
+    return legacyTx([
+      bn(1n),
+      bn(20_000_000_000n),
+      bn(60000n),
+      addr('0xdac17f958d2ee523a2206206994597c13d831ec7'),
+      bn(0n), // zero ETH value
+      data,
+    ]);
   }
 
   it('hides native amount when value is zero and decoded ERC-20 call present', () => {
@@ -579,16 +587,14 @@ describe('EthSignRequestDetail — amount row visibility', () => {
   it('shows native amount when value is non-zero even with decoded call', () => {
     // 0.001 ETH + ERC-20 calldata (unusual but valid)
     const data = Buffer.from(ERC20_TRANSFER, 'hex');
-    const txHex = Buffer.from(
-      RLP.encode([
-        bn(1n),
-        bn(20_000_000_000n),
-        bn(60000n),
-        addr('0xdac17f958d2ee523a2206206994597c13d831ec7'),
-        bn(1_000_000_000_000_000n), // 0.001 ETH
-        data,
-      ]),
-    ).toString('hex');
+    const txHex = legacyTx([
+      bn(1n),
+      bn(20_000_000_000n),
+      bn(60000n),
+      addr('0xdac17f958d2ee523a2206206994597c13d831ec7'),
+      bn(1_000_000_000_000_000n), // 0.001 ETH
+      data,
+    ]);
     renderDetail({
       signData: txHex,
       dataType: 1,
@@ -1007,16 +1013,14 @@ describe('EthSignRequestDetail — registry entries for calls the app cannot dec
         1_400_000n,
       ],
     });
-    return Buffer.from(
-      RLP.encode([
-        bn(1n),
-        bn(20_000_000_000n),
-        bn(200_000n),
-        addr(ONEINCH_V4),
-        bn(0n),
-        Buffer.from(data.slice(2), 'hex'),
-      ]),
-    ).toString('hex');
+    return legacyTx([
+      bn(1n),
+      bn(20_000_000_000n),
+      bn(200_000n),
+      addr(ONEINCH_V4),
+      bn(0n),
+      Buffer.from(data.slice(2), 'hex'),
+    ]);
   }
 
   it("shows the entry's sentence in place of its intent", () => {
@@ -1030,16 +1034,14 @@ describe('EthSignRequestDetail — registry entries for calls the app cannot dec
       args: [RECIPIENT, 150_000_000n],
     });
     renderDetail({
-      signData: Buffer.from(
-        RLP.encode([
-          bn(1n),
-          bn(20_000_000_000n),
-          bn(100_000n),
-          addr(UNIBTC),
-          bn(0n),
-          Buffer.from(data.slice(2), 'hex'),
-        ]),
-      ).toString('hex'),
+      signData: legacyTx([
+        bn(1n),
+        bn(20_000_000_000n),
+        bn(100_000n),
+        addr(UNIBTC),
+        bn(0n),
+        Buffer.from(data.slice(2), 'hex'),
+      ]),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
       chainId: 1,
@@ -1074,16 +1076,14 @@ describe('EthSignRequestDetail — registry entries for calls the app cannot dec
       ],
     });
     renderDetail({
-      signData: Buffer.from(
-        RLP.encode([
-          bn(1n),
-          bn(20_000_000_000n),
-          bn(300_000n),
-          addr(AAVE_V3_POOL),
-          bn(0n),
-          Buffer.from(data.slice(2), 'hex'),
-        ]),
-      ).toString('hex'),
+      signData: legacyTx([
+        bn(1n),
+        bn(20_000_000_000n),
+        bn(300_000n),
+        addr(AAVE_V3_POOL),
+        bn(0n),
+        Buffer.from(data.slice(2), 'hex'),
+      ]),
       dataType: 1,
       derivationPath: "m/44'/60'/0'/0",
       chainId: 1,
@@ -1254,6 +1254,41 @@ describe('EthSignRequestDetail — invalid payload banner', () => {
     expect(screen.getByText(/31 bytes/)).toBeTruthy();
   });
 
+  it('shows a malformed transaction as written under the banner', () => {
+    renderDetail({
+      signData: 'e8aabbccdd',
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0",
+      chainId: 1,
+    });
+    expect(
+      screen.getByText(
+        'This request cannot be signed. The transaction is not valid RLP.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('e8aabbccdd')).toBeTruthy();
+    expect(screen.queryByText('To')).toBeNull();
+  });
+
+  it('refuses a legacy transaction without EIP-155', () => {
+    renderDetail({
+      signData: Buffer.from(
+        RLP.encode([
+          bn(1n),
+          bn(20_000_000_000n),
+          bn(21000n),
+          addr('0xd3cda913deb6f4967b2ef3aa68f5a843da74c4ef'),
+          bn(1n),
+          new Uint8Array(0),
+        ]),
+      ).toString('hex'),
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0",
+      chainId: 1,
+    });
+    expect(screen.getByText(/has no EIP-155 chain ID/)).toBeTruthy();
+  });
+
   it('does not show the banner for a signable payload', () => {
     renderDetail({
       signData: 'ab'.repeat(32),
@@ -1273,16 +1308,14 @@ describe('EthSignRequestDetail — destination', () => {
   const ACCOUNT = '0xd3cda913deb6f4967b2ef3aa68f5a843da74c4ef';
 
   function callTx(data: string): EthSignRequest {
-    const hex = Buffer.from(
-      RLP.encode([
-        bn(1n),
-        bn(20_000_000_000n),
-        bn(100_000n),
-        addr(DEST),
-        bn(0n),
-        Buffer.from(data.replace('0x', ''), 'hex'),
-      ]),
-    ).toString('hex');
+    const hex = legacyTx([
+      bn(1n),
+      bn(20_000_000_000n),
+      bn(100_000n),
+      addr(DEST),
+      bn(0n),
+      Buffer.from(data.replace('0x', ''), 'hex'),
+    ]);
     return {
       signData: hex,
       dataType: 1,
@@ -1357,16 +1390,14 @@ describe('EthSignRequestDetail — destination', () => {
 });
 
 describe('EthSignRequestDetail — a saved descriptor index', () => {
-  const hex = Buffer.from(
-    RLP.encode([
-      bn(1n),
-      bn(20_000_000_000n),
-      bn(100_000n),
-      addr('0x000000000000000000000000000000000000c0d3'),
-      bn(1_000_000_000_000_000n),
-      Buffer.from(`deadbeef${'00'.repeat(32)}`, 'hex'),
-    ]),
-  ).toString('hex');
+  const hex = legacyTx([
+    bn(1n),
+    bn(20_000_000_000n),
+    bn(100_000n),
+    addr('0x000000000000000000000000000000000000c0d3'),
+    bn(1_000_000_000_000_000n),
+    Buffer.from(`deadbeef${'00'.repeat(32)}`, 'hex'),
+  ]);
   const request: EthSignRequest = {
     signData: hex,
     dataType: 1,

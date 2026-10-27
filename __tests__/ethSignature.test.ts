@@ -167,6 +167,20 @@ describe('buildEthSignatureUR', () => {
       expect(sig.readUInt32BE(64)).toBe(18_000_035 + recId);
     });
 
+    it('encodes a legacy v past 32 bits', () => {
+      const PALM = 11_297_108_109;
+      const ur = buildEthSignatureUR(
+        tlvHex,
+        HASH,
+        'tx-legacy',
+        PALM,
+        undefined,
+      );
+      const sig: Buffer = decodeUR(ur)[2];
+      expect(sig.subarray(64)).toHaveLength(5);
+      expect(sig.readUIntBE(64, 5)).toBe(35 + 2 * PALM + recId);
+    });
+
     it('eip712-json: v = 27 + recId', () => {
       const ur = buildEthSignatureUR(
         tlvHex,

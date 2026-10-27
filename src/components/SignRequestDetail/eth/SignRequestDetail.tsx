@@ -16,9 +16,13 @@ import { useCallDescription } from '@/hooks/useCallDescription';
 
 import { getChainName, getNativeCurrencySymbol } from '@/utils/chainMetadata';
 import { parseEip712Summary } from '@/utils/eip712';
-import { classifyEthPayload, payloadChainId } from '@/utils/ethPayload';
+import {
+  classifyEthPayload,
+  payloadChainId,
+  payloadTransaction,
+} from '@/utils/ethPayload';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
-import { getTxLabel, parseTx } from '@/utils/txParser';
+import { formatTx, getTxLabel } from '@/utils/txParser';
 
 export default function SignRequestDetail({
   request,
@@ -33,15 +37,14 @@ export default function SignRequestDetail({
   const chainId = payloadChainId(payload, request.chainId);
   const nativeSymbol =
     chainId !== undefined ? getNativeCurrencySymbol(chainId) : 'ETH';
-  // Parse the request once per request, not once per render.
-  const { eip712, tx } = useMemo(
-    () => ({
+  const { eip712, tx } = useMemo(() => {
+    const decoded = payloadTransaction(payload);
+    return {
       eip712:
         request.dataType === 2 ? parseEip712Summary(request.signData) : null,
-      tx: parseTx(request.signData, request.dataType, nativeSymbol),
-    }),
-    [request.signData, request.dataType, nativeSymbol],
-  );
+      tx: decoded ? formatTx(decoded, nativeSymbol) : null,
+    };
+  }, [payload, request.signData, request.dataType, nativeSymbol]);
   // Null while the entry's saved slice is read; the rows that depend on it wait with the panel.
   const { description } = useCallDescription({
     chainId,

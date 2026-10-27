@@ -3,11 +3,12 @@ import type { ScanResult } from '../src/types';
 
 describe('buildSignKeycardParams', () => {
   it('returns eth params for eth-sign-request', () => {
-    // First byte >= 0xc0 → classifies as tx-legacy (signable)
+    // RLP([0, 1, 21000, to, 0, 0x, 1, 0, 0]): a legacy transaction for chain 1.
     const result: ScanResult = {
       kind: 'eth-sign-request',
       request: {
-        signData: 'e8aabbccdd',
+        signData:
+          'df800182520894aabbccddeeff00112233445566778899aabbccdd8080018080',
         dataType: 1,
         derivationPath: "m/44'/60'/0'/0",
         chainId: 1,
@@ -17,7 +18,8 @@ describe('buildSignKeycardParams', () => {
     expect(buildSignKeycardParams(result)).toEqual({
       operation: 'sign',
       signMode: 'eth',
-      signData: 'e8aabbccdd',
+      signData:
+        'df800182520894aabbccddeeff00112233445566778899aabbccdd8080018080',
       derivationPath: "m/44'/60'/0'/0",
       chainId: 1,
       requestId: 'req-1',
@@ -46,6 +48,19 @@ describe('buildSignKeycardParams', () => {
       request: {
         signData: 'aabbccdd',
         dataType: 1,
+        derivationPath: "m/44'/60'/0'/0",
+      },
+    };
+    expect(buildSignKeycardParams(result)).toBeNull();
+  });
+
+  it('returns null for a transaction that does not decode', () => {
+    const result: ScanResult = {
+      kind: 'eth-sign-request',
+      request: {
+        signData: 'e8aabbccdd',
+        dataType: 1,
+        chainId: 1,
         derivationPath: "m/44'/60'/0'/0",
       },
     };

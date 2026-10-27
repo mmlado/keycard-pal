@@ -235,8 +235,8 @@ function renderScreenWithWc(result: any) {
 }
 
 const fullRequest: EthSignRequest = {
-  // First byte >= 0xc0 → classifies as tx-legacy (signable)
-  signData: 'e8aabbccdd',
+  // RLP([0, 1, 21000, to, 0, 0x, 1, 0, 0]): a legacy transaction for chain 1.
+  signData: 'df800182520894aabbccddeeff00112233445566778899aabbccdd8080018080',
   dataType: 1,
   derivationPath: "m/44'/60'/0'/0",
   chainId: 1,
@@ -317,12 +317,18 @@ describe('TransactionDetailScreen – eth-sign-request result', () => {
     ).toBeDefined();
   });
 
-  it('displays the sign data', async () => {
+  it('shows a malformed transaction with the refusal and no Sign button', async () => {
     renderScreen({
       kind: 'eth-sign-request',
-      request: fullRequest,
+      request: { ...fullRequest, signData: 'e8aabbccdd' },
     });
     expect(screen.getByText('e8aabbccdd')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'This request cannot be signed. The transaction is not valid RLP.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Sign transaction')).toBeNull();
   });
 
   it('displays the derivation path', async () => {
