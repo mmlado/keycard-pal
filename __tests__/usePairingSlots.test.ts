@@ -101,15 +101,30 @@ async function readSlots(pairingIndex: number | null = 3) {
   return hook;
 }
 
+function apduResponse(sw: number) {
+  return {
+    sw,
+    checkOK: (message = 'Unexpected error') => {
+      if (sw !== 0x9000) {
+        throw new Error(`${message}, SW: 0x${sw.toString(16)}`);
+      }
+    },
+  };
+}
+
 /** The card the unpair tap lands on, paired in `ownSlot` by the time the operation runs. */
-function unpairCard({ ownSlot = 3, freeSlotsAfter = 8 } = {}) {
+function unpairCard({
+  ownSlot = 3,
+  freeSlotsAfter = 8,
+  unpairSw = 0x9000,
+} = {}) {
   return {
     applicationInfo: {
       instanceUID: new Uint8Array([0xab, 0xcd]),
       freePairingSlots: freeSlotsAfter,
     },
     getPairing: () => ({ pairingIndex: ownSlot }),
-    unpair: jest.fn().mockResolvedValue(undefined),
+    unpair: jest.fn().mockResolvedValue(apduResponse(unpairSw)),
     select: jest.fn().mockResolvedValue({ sw: 0x9000 }),
   };
 }
@@ -396,26 +411,63 @@ describe('usePairingSlots', () => {
       expect(result.current.unpaired).toBe('Slot 4 was unpaired');
     });
 
-    it('fails when the re-read SELECT fails', async () => {
-      const { result } = await readSlots();
-      const { operation } = startUnpair(result, 2);
-      const card = unpairCard();
-      card.select.mockResolvedValue({ sw: 0x6a82 });
+    it('fails when the card refuses UNPAIR, keeping the pairing and the list', async () => {
+      const { result } = await readSlots(3);
+      const { operation } = startUnpair(result, 3);
+      const card = unpairCard({ ownSlot: 3, unpairSw: 0x6985 });
 
-      await expect(operation(card)).rejects.toThrow('SELECT failed: 0x6A82');
+      await expect(operation(card)).rejects.toThrow('Unpairing failed');
+      expect(mockDeletePairing).not.toHaveBeenCalled();
+      expect(card.select).not.toHaveBeenCalled();
+      expect(result.current.unpaired).toBeNull();
+      expect(result.current.slotInfo?.freeSlots).toBe(7);
     });
 
     // The runner classifies it, as for any operation.
-    it('hands a tag loss in the re-read to the runner', async () => {
+    it('hands a tag loss during UNPAIR to the runner', async () => {
       const { result } = await readSlots();
       const { operation } = startUnpair(result, 2);
       const card = unpairCard();
-      card.select.mockRejectedValue(
+      card.unpair.mockRejectedValue(
         new Error('CardIO Error: Error: Tag was lost.'),
       );
 
       await expect(operation(card)).rejects.toThrow('Tag was lost');
+      expect(result.current.unpaired).toBeNull();
     });
+
+    // Try again would send UNPAIR once more.
+    it.each([
+      ['a failed SELECT', { sw: 0x6a82 }],
+      ['a tag loss', new Error('CardIO Error: Error: Tag was lost.')],
+    ])(
+      'ends as unpaired after %s in the re-read, then reads the slots again',
+      async (_, outcome) => {
+        const { result, rerender } = await readSlots();
+        const { operation } = startUnpair(result, 2);
+        const card = unpairCard();
+        if (outcome instanceof Error) {
+          card.select.mockRejectedValue(outcome);
+        } else {
+          card.select.mockResolvedValue(outcome);
+        }
+
+        await act(async () => {
+          await operation(card);
+        });
+        expect(result.current.unpaired).toBe('Slot 3 was unpaired');
+
+        mockStartNFC.mockClear();
+        mockUnpairPhase = 'done';
+        await act(async () => {
+          rerender({});
+        });
+
+        expect(mockResetUnpair).toHaveBeenCalled();
+        expect(result.current.slotInfo).toBeNull();
+        expect(mockStartNFC).toHaveBeenCalled();
+      },
+    );
   });
 
   describe('the tap under way', () => {

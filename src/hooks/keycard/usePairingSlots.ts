@@ -8,7 +8,6 @@ import type { KeycardScreenKeycard } from '@/hooks/useKeycardScreen';
 import { deletePairing, loadPairing } from '@/storage/pairingStorage';
 import { cardGeneration } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
-import { selectFailureMessage } from '@/utils/keycardErrors';
 import { UNREADABLE_CARD_STATUS } from './useIdentifyCard';
 import { useKeycardOperation } from './useKeycardOperation';
 import { useNFCOperation } from './useNFCOperation';
@@ -81,6 +80,7 @@ export function usePairingSlots(): UsePairingSlots {
 
   const unpairOp = useKeycardOperation<void>();
   const { phase: unpairPhase, execute, reset: resetUnpair } = unpairOp;
+  const rereadFailedRef = useRef(false);
 
   const unpair = useCallback(
     (slotIndex: number) => {
@@ -94,7 +94,8 @@ export function usePairingSlots(): UsePairingSlots {
         async cmdSet => {
           // The tap pairs the card when this phone had no pairing, so the read's own slot may be stale.
           const ownSlot = cmdSet.getPairing()?.pairingIndex;
-          await cmdSet.unpair(slotIndex);
+          const unpairResp = await cmdSet.unpair(slotIndex);
+          unpairResp.checkOK('Unpairing failed');
           if (slotIndex === ownSlot) {
             try {
               await deletePairing(cardKey);
@@ -102,12 +103,18 @@ export function usePairingSlots(): UsePairingSlots {
               // Card-side unpair already succeeded; local cleanup is best-effort.
             }
           }
-          // Re-read in the same connection, so no second tap is needed.
-          const selectResp = await cmdSet.select();
-          if (selectResp.sw !== 0x9000) {
-            throw new Error(selectFailureMessage(selectResp.sw));
+          // UNPAIR is done: a failed re-read must not let Try again send it again.
+          let reread = false;
+          try {
+            const selectResp = await cmdSet.select();
+            if (selectResp.sw === 0x9000) {
+              await readSlotInfo(cmdSet);
+              reread = true;
+            }
+          } catch {
+            // A fresh read follows once the tap ends.
           }
-          await readSlotInfo(cmdSet);
+          rereadFailedRef.current = !reread;
           setUnpaired(message);
         },
         {
@@ -124,11 +131,17 @@ export function usePairingSlots(): UsePairingSlots {
   );
 
   useEffect(() => {
-    if (unpairPhase === 'done') {
-      resetUnpair();
+    if (unpairPhase !== 'done') {
+      return;
+    }
+    resetUnpair();
+    if (rereadFailedRef.current) {
+      rereadFailedRef.current = false;
+      checkSlots();
+    } else {
       resetRead();
     }
-  }, [unpairPhase, resetUnpair, resetRead]);
+  }, [unpairPhase, resetUnpair, resetRead, checkSlots]);
 
   // When the unpair tap ends, not while it waits for its NFC check.
   const lastUnpairPhaseRef = useRef(unpairPhase);

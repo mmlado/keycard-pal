@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A Settings text field that cannot be stored says so under the field instead of failing silently
 - Unpairing a slot refuses a different Keycard than the one whose slots are listed
 - Unpairing this phone's own slot forgets its pairing also when the list did not mark the slot as this device
+- A slot the Keycard refuses to unpair is no longer reported as unpaired
 
 ## [1.15.1] - 2026-10-20
 
