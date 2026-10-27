@@ -1,225 +1,142 @@
 import React from 'react';
-import { Keyboard, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
+import { useFocusedInputHandler } from 'react-native-keyboard-controller';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import KeyboardAwareScrollView, {
+  FIELD_GAP,
   useKeepAboveKeyboard,
 } from '../src/components/KeyboardAwareScrollView';
 import TextInputSetting from '../src/components/settings/TextInputSetting';
 
-jest.mock('@react-navigation/elements', () => ({ useHeaderHeight: () => 64 }));
-
 type Handles = ReturnType<typeof useKeepAboveKeyboard>;
-let field: Handles;
+const fields: Handles[] = [];
 
-// A field the test focuses by hand, its block measured where the test says.
-function Probe() {
-  field = useKeepAboveKeyboard();
+// Fields the test lays out and focuses by hand.
+function Probe({ index }: { index: number }) {
+  fields[index] = useKeepAboveKeyboard();
   return null;
 }
 
-function focusFieldAt(y: number, height = 120) {
-  (field.block.ref as { current: unknown }).current = {
-    measureInWindow: (
-      cb: (x: number, y: number, w: number, h: number) => void,
-    ) => cb(0, y, 300, height),
-  };
-  act(() => field.input.onFocus());
+const layout = (values: { y?: number; height: number }) => ({
+  nativeEvent: { layout: { x: 0, y: values.y ?? 0, width: 300, ...values } },
+});
+
+function lay(
+  field: Handles,
+  input: { y: number; height: number },
+  block: number,
+) {
+  act(() => {
+    field.input.onLayout(layout(input) as any);
+    field.block.onLayout(layout({ height: block }) as any);
+  });
 }
 
-function renderArea() {
-  const view = render(
+function renderArea(count = 1) {
+  render(
     <KeyboardAwareScrollView>
-      <Probe />
+      {Array.from({ length: count }, (_, index) => (
+        <Probe key={index} index={index} />
+      ))}
     </KeyboardAwareScrollView>,
   );
-  const scrollView = screen.UNSAFE_getByType(ScrollView);
-  const scrollTo = jest.fn();
-  // The area holds this instance by ref, so replacing the method intercepts it.
-  (scrollView.instance as any).scrollTo = scrollTo;
-  return { ...view, scrollView, scrollTo };
 }
 
-// The area picks its event names by platform, so the test drives whichever it registered.
-let listeners: Record<string, (event: any) => void> = {};
-let added: string[] = [];
-let removed: string[] = [];
+const bottomOffset = () =>
+  screen.UNSAFE_getByType(ScrollView).props.bottomOffset;
 
-function showKeyboard(screenY: number) {
+// The library reports where the focused input's caret ends, from the input's top.
+function caretAt(y: number) {
+  const [handler] = jest.mocked(useFocusedInputHandler).mock.calls.at(-1)!;
   act(() => {
-    listeners.keyboardWillShow?.({ endCoordinates: { screenY } });
-    listeners.keyboardDidShow?.({ endCoordinates: { screenY } });
-  });
-}
-
-function hideKeyboard() {
-  act(() => {
-    listeners.keyboardWillHide?.({});
-    listeners.keyboardDidHide?.({});
-  });
-}
-
-function scrollBy(scrollView: any, y: number) {
-  act(() => {
-    scrollView.props.onScroll({ nativeEvent: { contentOffset: { y } } });
+    handler.onSelectionChange!({
+      target: 1,
+      selection: {
+        start: { x: 0, y: 0, position: 0 },
+        end: { x: 0, y, position: 0 },
+      },
+    });
+    // The update reaches React in a microtask, which the fake timers hold.
+    jest.runAllTicks();
   });
 }
 
 beforeEach(() => {
-  listeners = {};
-  added = [];
-  removed = [];
-  jest.spyOn(Keyboard, 'addListener').mockImplementation(((
-    event: string,
-    handler: (e: any) => void,
-  ) => {
-    listeners[event] = handler;
-    added.push(event);
-    return { remove: () => removed.push(event) };
-  }) as any);
-});
-
-afterEach(() => {
-  jest.restoreAllMocks();
+  fields.length = 0;
 });
 
 describe('KeyboardAwareScrollView', () => {
-  it('scrolls a field the keyboard would cover, by exactly the hidden amount', () => {
-    const { scrollView, scrollTo } = renderArea();
-    showKeyboard(1000);
-    scrollBy(scrollView, 200);
-
-    // The field ends at 1020, plus the 16px gap, against a keyboard top of 1000.
-    focusFieldAt(900);
-
-    expect(scrollTo).toHaveBeenCalledWith({ y: 236, animated: true });
+  it('keeps the caret FIELD_GAP above the keyboard while no field is focused', () => {
+    renderArea();
+    expect(bottomOffset()).toBe(FIELD_GAP);
   });
 
-  it('leaves a field the keyboard does not reach alone', () => {
-    const { scrollView, scrollTo } = renderArea();
-    showKeyboard(1000);
-    scrollBy(scrollView, 200);
-
-    focusFieldAt(100);
-
-    expect(scrollTo).not.toHaveBeenCalled();
+  it('takes the caret to be at the bottom of its input until the library reports it', () => {
+    renderArea();
+    lay(fields[0], { y: 20, height: 40 }, 60);
+    act(() => fields[0].input.onFocus());
+    expect(bottomOffset()).toBe(FIELD_GAP);
   });
 
-  it('does nothing while the keyboard is down', () => {
-    const { scrollTo } = renderArea();
+  it('adds the part of the focused input below its caret', () => {
+    renderArea();
+    lay(fields[0], { y: 20, height: 40 }, 60);
+    act(() => fields[0].input.onFocus());
 
-    focusFieldAt(900);
+    caretAt(33);
 
-    expect(scrollTo).not.toHaveBeenCalled();
+    expect(bottomOffset()).toBe(FIELD_GAP + 7);
   });
 
-  it('stops scrolling once the keyboard is dismissed', () => {
-    const { scrollTo } = renderArea();
-    showKeyboard(1000);
-    hideKeyboard();
+  it('clamps the caret to its input, as the library does', () => {
+    renderArea();
+    lay(fields[0], { y: 20, height: 40 }, 60);
+    act(() => fields[0].input.onFocus());
 
-    focusFieldAt(900);
+    caretAt(55);
+    expect(bottomOffset()).toBe(FIELD_GAP);
 
-    expect(scrollTo).not.toHaveBeenCalled();
+    caretAt(-5);
+    expect(bottomOffset()).toBe(FIELD_GAP + 40);
   });
 
-  it('forgets a field once it loses focus', () => {
-    const { scrollView, scrollTo } = renderArea();
-    showKeyboard(1000);
-    focusFieldAt(900);
-    act(() => field.input.onBlur());
-    scrollTo.mockClear();
+  it('adds Revert and Save once they appear under the focused input', () => {
+    renderArea();
+    lay(fields[0], { y: 20, height: 40 }, 60);
+    act(() => fields[0].input.onFocus());
+    caretAt(33);
 
-    act(() => scrollView.props.onLayout());
+    act(() => fields[0].block.onLayout(layout({ height: 100 }) as any));
 
-    expect(scrollTo).not.toHaveBeenCalled();
+    expect(bottomOffset()).toBe(FIELD_GAP + 7 + 40);
   });
 
-  // The keyboard shrinks the ScrollView, and only then is there a viewport to scroll into.
-  it('retries on layout, which is when the shrunk viewport exists', () => {
-    const { scrollView, scrollTo } = renderArea();
-    showKeyboard(1000);
-    focusFieldAt(900);
-    scrollTo.mockClear();
-
-    act(() => scrollView.props.onLayout());
-
-    expect(scrollTo).toHaveBeenCalledWith({ y: 36, animated: true });
+  it('ignores the caret and layout of a field that is not focused', () => {
+    renderArea();
+    lay(fields[0], { y: 20, height: 40 }, 100);
+    caretAt(33);
+    expect(bottomOffset()).toBe(FIELD_GAP);
   });
 
-  it("scrolls again when a focused field's block grows, as when Revert and Save appear", () => {
-    const { scrollTo } = renderArea();
-    showKeyboard(1000);
-    focusFieldAt(900);
-    scrollTo.mockClear();
+  it('follows focus from one field to the next, and back to the gap on blur', () => {
+    renderArea(2);
+    lay(fields[0], { y: 20, height: 40 }, 100);
+    lay(fields[1], { y: 20, height: 40 }, 60);
+    act(() => fields[0].input.onFocus());
+    expect(bottomOffset()).toBe(FIELD_GAP + 40);
 
-    act(() => field.block.onLayout());
+    act(() => {
+      fields[0].input.onBlur();
+      fields[1].input.onFocus();
+    });
+    expect(bottomOffset()).toBe(FIELD_GAP);
 
-    expect(scrollTo).toHaveBeenCalledWith({ y: 36, animated: true });
+    act(() => fields[1].input.onBlur());
+    expect(bottomOffset()).toBe(FIELD_GAP);
   });
 
-  it('leaves a block that grows without focus alone', () => {
-    const { scrollTo } = renderArea();
-    showKeyboard(1000);
-    focusFieldAt(900);
-    act(() => field.input.onBlur());
-    scrollTo.mockClear();
-
-    act(() => field.block.onLayout());
-
-    expect(scrollTo).not.toHaveBeenCalled();
-  });
-
-  it('measures from the current scroll offset', () => {
-    const { scrollView, scrollTo } = renderArea();
-    showKeyboard(1000);
-    scrollBy(scrollView, 500);
-
-    focusFieldAt(900);
-
-    expect(scrollTo).toHaveBeenCalledWith({ y: 536, animated: true });
-  });
-
-  // UIKit scrolls the focused field flush with the keyboard during its animation.
-  it('scrolls again on iOS once the keyboard has settled', () => {
-    const { scrollTo } = renderArea();
-    focusFieldAt(900);
-    act(() =>
-      listeners.keyboardWillShow({ endCoordinates: { screenY: 1000 } }),
-    );
-    expect(scrollTo).not.toHaveBeenCalled();
-
-    act(() => listeners.keyboardDidShow({ endCoordinates: { screenY: 1000 } }));
-
-    expect(scrollTo).toHaveBeenCalledWith({ y: 36, animated: true });
-  });
-
-  it("scrolls against the keyboard's settled frame, not the one announced", () => {
-    const { scrollTo } = renderArea();
-    focusFieldAt(900);
-    act(() =>
-      listeners.keyboardWillShow({ endCoordinates: { screenY: 1000 } }),
-    );
-
-    act(() => listeners.keyboardDidShow({ endCoordinates: { screenY: 950 } }));
-
-    expect(scrollTo).toHaveBeenCalledWith({ y: 86, animated: true });
-  });
-
-  it('drops every keyboard listener it added when it goes', () => {
-    const { unmount } = renderArea();
-    expect(Object.keys(listeners).sort()).toEqual([
-      'keyboardDidShow',
-      'keyboardWillHide',
-      'keyboardWillShow',
-    ]);
-
-    unmount();
-
-    expect(removed.sort()).toEqual(added.sort());
-  });
-
-  it('keeps a real settings field above the keyboard, Revert and Save included', () => {
+  it('takes a real settings field, Revert and Save included', () => {
     render(
       <KeyboardAwareScrollView>
         <TextInputSetting
@@ -230,34 +147,28 @@ describe('KeyboardAwareScrollView', () => {
         />
       </KeyboardAwareScrollView>,
     );
-    const scrollTo = jest.fn();
-    (screen.UNSAFE_getByType(ScrollView).instance as any).scrollTo = scrollTo;
     const input = screen.getByPlaceholderText('Project ID');
-    // The jest View is a mock component; the field's ref is its instance.
-    let block: any = input;
-    while (!(block.props.onLayout && block.instance)) block = block.parent;
-    block.instance.measureInWindow = (
-      cb: (x: number, y: number, w: number, h: number) => void,
-    ) => cb(0, 900, 300, 120);
-    showKeyboard(1000);
+    // The block is the label's nearest ancestor with a layout handler; the input has its own.
+    let block: any = screen.getByText('Project ID');
+    while (!block.props.onLayout) block = block.parent;
 
+    fireEvent(input, 'layout', layout({ y: 24, height: 40 }));
+    fireEvent(block, 'layout', layout({ height: 64 }));
     fireEvent(input, 'focus');
-    expect(scrollTo).toHaveBeenCalledWith({ y: 36, animated: true });
+    caretAt(33);
+    expect(bottomOffset()).toBe(FIELD_GAP + 7);
 
-    scrollTo.mockClear();
     fireEvent.changeText(input, 'abcd');
     expect(screen.getByText('Save')).toBeTruthy();
-    fireEvent(block, 'layout');
-    expect(scrollTo).toHaveBeenCalledWith({ y: 36, animated: true });
+    fireEvent(block, 'layout', layout({ height: 100 }));
+    expect(bottomOffset()).toBe(FIELD_GAP + 7 + 36);
 
-    scrollTo.mockClear();
     fireEvent(input, 'blur');
-    fireEvent(block, 'layout');
-    expect(scrollTo).not.toHaveBeenCalled();
+    expect(bottomOffset()).toBe(FIELD_GAP);
   });
 
-  it('a field outside any scroll area renders and hands its block to no one', () => {
-    render(<Probe />);
-    expect(() => act(() => field.input.onFocus())).not.toThrow();
+  it('a field outside any scroll area renders and hands its reach to no one', () => {
+    render(<Probe index={0} />);
+    expect(() => act(() => fields[0].input.onFocus())).not.toThrow();
   });
 });

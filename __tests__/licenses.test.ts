@@ -47,6 +47,21 @@ describe('license list', () => {
     },
   );
 
+  it.each([
+    'react-native-keyboard-controller',
+    'react-native-reanimated',
+    'react-native-worklets',
+    'react-native-is-edge-to-edge',
+  ])(
+    'lists %s, which keyboard handling needs in both builds, under its installed license',
+    name => {
+      expect(licenses).toContainEqual({
+        package: name,
+        licenseType: installedLicense(name),
+      });
+    },
+  );
+
   it('claims no online-only package in the offline build', () => {
     expect(offlineStub).toEqual([]);
   });

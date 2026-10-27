@@ -6,8 +6,8 @@ import TextInputSetting, {
 } from '../src/components/settings/TextInputSetting';
 
 const mockKeep = {
-  block: { ref: { current: null }, onLayout: jest.fn() },
-  input: { onFocus: jest.fn(), onBlur: jest.fn() },
+  block: { onLayout: jest.fn() },
+  input: { onFocus: jest.fn(), onBlur: jest.fn(), onLayout: jest.fn() },
 };
 
 jest.mock('../src/components/KeyboardAwareScrollView', () => ({

@@ -21,9 +21,11 @@ const base = {
     'testUtils\\.ts$',
   ],
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation|@noble/(secp256k1|hashes|curves)|@scure/(bip32|bip39|base)|keycard-sdk)/)',
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?|@react-navigation|@noble/(secp256k1|hashes|curves)|@scure/(bip32|bip39|base)|keycard-sdk|react-native-(reanimated|worklets|keyboard-controller|is-edge-to-edge))/)',
   ],
   setupFilesAfterEnv: ['./jest.setup.js'],
+  // Reanimated and Worklets take their JavaScript implementations: Jest has no native modules.
+  resolver: 'react-native-reanimated/jest/resolver',
   // Project-level: at the root of a `projects` config this is ignored.
   coveragePathIgnorePatterns: ['/node_modules/', '/__tests__/'],
   moduleNameMapper: {

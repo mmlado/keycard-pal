@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - WalletConnect typed data that cannot be signed opens the review with the reason instead of being refused at once
 - Entry screens keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
 - Verifying a recovery phrase or SLIP39 shares ends on a screen with a check mark or an X instead of a toast
+- Screens that take typing move with the keyboard as it slides in and out, instead of jumping once it has landed
 
 ### Fixed
 

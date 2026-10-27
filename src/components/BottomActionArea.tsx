@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { useKeyboardOverlap } from '@/hooks/useKeyboardOverlap';
 
 const REST_GAP = 16;
 const KEYBOARD_GAP = 24;
@@ -17,20 +17,20 @@ export default function BottomActionArea({
   testID?: string;
 }) {
   const insets = useSafeAreaInsets();
-  const overlap = useKeyboardOverlap();
+  // Negative while the keyboard is up, and all of it: the provider treats the bars as translucent.
+  const { height } = useReanimatedKeyboardAnimation();
   const rest = insets.bottom + REST_GAP;
+  const padding = useAnimatedStyle(() => {
+    const overlap = -height.value;
+    return {
+      paddingBottom:
+        overlap > 0 ? Math.max(rest, overlap + KEYBOARD_GAP) : rest,
+    };
+  });
+
   return (
-    <View
-      testID={testID}
-      style={[
-        style,
-        {
-          paddingBottom:
-            overlap > 0 ? Math.max(rest, overlap + KEYBOARD_GAP) : rest,
-        },
-      ]}
-    >
+    <Animated.View testID={testID} style={[style, padding]}>
       {children}
-    </View>
+    </Animated.View>
   );
 }

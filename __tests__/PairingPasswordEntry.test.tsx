@@ -1,7 +1,7 @@
 import React from 'react';
-import { Keyboard, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import {
-  act,
   fireEvent,
   render,
   screen,
@@ -16,22 +16,17 @@ import PairingPasswordEntry from '../src/components/NFCBottomSheet/PairingPasswo
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 
-let keyboardShow: ((event: any) => void) | null = null;
-let keyboardHide: (() => void) | null = null;
-
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockInsets,
 }));
 
-jest.spyOn(Keyboard, 'addListener').mockImplementation((event, callback) => {
-  if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
-    keyboardShow = callback as (event: any) => void;
-  }
-  if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
-    keyboardHide = callback as () => void;
-  }
-  return { remove: jest.fn() } as any;
-});
+// The library's height: negative while the keyboard is up.
+function keyboardAt(height: number) {
+  (useReanimatedKeyboardAnimation as jest.Mock).mockReturnValue({
+    height: { value: -height },
+    progress: { value: height > 0 ? 1 : 0 },
+  });
+}
 
 jest.mock('react-native-paper', () => {
   const { Text } = require('react-native');
@@ -63,8 +58,7 @@ beforeEach(() => {
   onCancel.mockClear();
   mockInsets.top = 0;
   mockInsets.bottom = 0;
-  keyboardShow = null;
-  keyboardHide = null;
+  keyboardAt(0);
 });
 
 function containerStyle() {
@@ -91,25 +85,23 @@ describe('PairingPasswordEntry', () => {
 
   it('keeps its buttons above the keyboard, which the Modal makes no room for', () => {
     mockInsets.bottom = 34;
-    renderEntry();
     const actions = () =>
       StyleSheet.flatten(
         screen.getByTestId('pairing-password-actions').props.style,
       );
 
-    act(() => {
-      keyboardShow?.({ endCoordinates: { height: 336 } });
-    });
+    keyboardAt(336);
+    const { unmount } = renderEntry();
     expect(actions().paddingBottom).toBe(360);
     expect(
       within(screen.getByTestId('pairing-password-actions')).getByText(
         'Cancel',
       ),
     ).toBeTruthy();
+    unmount();
 
-    act(() => {
-      keyboardHide?.();
-    });
+    keyboardAt(0);
+    renderEntry();
     expect(actions().paddingBottom).toBe(50);
   });
 

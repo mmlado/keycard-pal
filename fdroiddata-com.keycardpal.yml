@@ -65,6 +65,7 @@ Builds:
       # "unknown maven repo" false positives in files Gradle has to read.
       - node_modules/react-native/ReactAndroid/publish.gradle
       - node_modules/react-native-screens/android/build.gradle
+      - node_modules/react-native-keyboard-controller/android/build.gradle
       - node_modules/react-native-svg/android/build.gradle
       - node_modules/react-native-safe-area-context/android/build.gradle
       - node_modules/react-native-encrypted-storage/android/build.gradle
@@ -104,6 +105,7 @@ Builds:
       # "unknown maven repo" false positives in files Gradle has to read.
       - node_modules/react-native/ReactAndroid/publish.gradle
       - node_modules/react-native-screens/android/build.gradle
+      - node_modules/react-native-keyboard-controller/android/build.gradle
       - node_modules/react-native-svg/android/build.gradle
       - node_modules/react-native-safe-area-context/android/build.gradle
       - node_modules/react-native-encrypted-storage/android/build.gradle

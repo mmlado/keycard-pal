@@ -24,6 +24,14 @@ jest.mock('react-native-fs', () => ({
   },
 }));
 
+// The keyboard library and its Reanimated peer run on native modules Jest does not have.
+jest.mock('react-native-keyboard-controller', () =>
+  require('react-native-keyboard-controller/jest'),
+);
+jest.mock('react-native-reanimated', () =>
+  require('react-native-reanimated/mock'),
+);
+
 // Clear any pending fake timers between tests to prevent bleed-over.
 afterEach(() => {
   jest.clearAllTimers();

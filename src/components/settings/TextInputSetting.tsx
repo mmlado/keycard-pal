@@ -76,13 +76,14 @@ export default function TextInputSetting({
   const saveDisabled = saving || (required === true && trimmed === '');
 
   return (
-    <View ref={block.ref} onLayout={block.onLayout} style={styles.block}>
+    <View onLayout={block.onLayout} style={styles.block}>
       <Text variant="bodySmall" style={styles.label}>
         {label}
       </Text>
       <TextInput
         onFocus={input.onFocus}
         onBlur={input.onBlur}
+        onLayout={input.onLayout}
         style={styles.input}
         value={draft}
         onChangeText={handleChange}

@@ -1,6 +1,7 @@
-import { act, render, screen } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 import React from 'react';
-import { Keyboard, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 
 import BottomActionArea from '../src/components/BottomActionArea';
 
@@ -10,23 +11,20 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => mockInsets,
 }));
 
-const listeners: Record<string, (event?: unknown) => void> = {};
-const removed: string[] = [];
+const keyboard = useReanimatedKeyboardAnimation as jest.Mock;
+
+// The library's height: negative while the keyboard is up.
+function keyboardAt(height: number) {
+  keyboard.mockReturnValue({
+    height: { value: -height },
+    progress: { value: height > 0 ? 1 : 0 },
+  });
+}
 
 beforeEach(() => {
-  for (const event of Object.keys(listeners)) delete listeners[event];
-  removed.length = 0;
   mockInsets.bottom = 0;
-  jest.spyOn(Keyboard, 'addListener').mockImplementation(((
-    event: string,
-    callback: (event?: unknown) => void,
-  ) => {
-    listeners[event] = callback;
-    return { remove: () => removed.push(event) };
-  }) as unknown as typeof Keyboard.addListener);
+  keyboardAt(0);
 });
-
-afterEach(() => jest.restoreAllMocks());
 
 function renderArea() {
   return render(
@@ -55,31 +53,27 @@ describe('BottomActionArea', () => {
     expect(areaStyle().paddingBottom).toBe(16);
   });
 
-  it('rises to 24 above the keyboard as iOS announces it, without adding the inset the height already holds', () => {
+  it('rises to 24 above the keyboard, without adding the inset the height already holds', () => {
     mockInsets.bottom = 34;
+    keyboardAt(336);
     renderArea();
-    expect(Object.keys(listeners).sort()).toEqual([
-      'keyboardWillHide',
-      'keyboardWillShow',
-    ]);
-
-    act(() => listeners.keyboardWillShow({ endCoordinates: { height: 336 } }));
     expect(areaStyle().paddingBottom).toBe(360);
+  });
 
-    act(() => listeners.keyboardWillHide());
-    expect(areaStyle().paddingBottom).toBe(50);
+  it('is the same in both Android navigation modes, the keyboard reaching the screen bottom', () => {
+    for (const inset of [63, 126]) {
+      mockInsets.bottom = inset;
+      keyboardAt(343);
+      const { unmount } = renderArea();
+      expect(areaStyle().paddingBottom).toBe(367);
+      unmount();
+    }
   });
 
   it('never drops below its resting padding for a short keyboard bar', () => {
     mockInsets.bottom = 34;
+    keyboardAt(20);
     renderArea();
-    act(() => listeners.keyboardWillShow({ endCoordinates: { height: 20 } }));
     expect(areaStyle().paddingBottom).toBe(50);
-  });
-
-  it('stops listening when it unmounts', () => {
-    const { unmount } = renderArea();
-    unmount();
-    expect(removed.sort()).toEqual(['keyboardWillHide', 'keyboardWillShow']);
   });
 });

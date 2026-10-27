@@ -1,26 +1,21 @@
-/**
- * Keycard Pal - Air-Gap Android wallet that works with Keycards
- *
- * @format
- */
-
 import React, { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import theme from './theme';
-import type { RootStackParamList } from './navigation/types';
-import { navigationRef } from './navigation/navigationRef';
-import { routes } from './navigation/routes';
-import { OnlineProviders } from './providers/onlineProviders.online';
-import { PreferencesProvider } from './providers/preferences/Provider';
+import { navigationRef } from '@/navigation/navigationRef';
+import { routes } from '@/navigation/routes';
+import type { RootStackParamList } from '@/navigation/types';
+import { OnlineProviders } from '@/providers/onlineProviders.online';
+import { PreferencesProvider } from '@/providers/preferences/Provider';
+import theme from '@/theme';
 
-import { usePreferences } from './hooks/usePreferences';
+import { usePreferences } from '@/hooks/usePreferences';
 
-import { restorePersistedIndex } from './utils/eip7730/restore';
+import { restorePersistedIndex } from '@/utils/eip7730/restore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -31,12 +26,20 @@ export default function App() {
 
   return (
     <SafeAreaProvider style={styles.root}>
-      <PaperProvider theme={theme}>
-        <StatusBar barStyle="light-content" />
-        <PreferencesProvider>
-          <Navigator />
-        </PreferencesProvider>
-      </PaperProvider>
+      {/* No preload: it shows the keyboard for a moment at launch. */}
+      <KeyboardProvider
+        statusBarTranslucent
+        navigationBarTranslucent
+        preserveEdgeToEdge
+        preload={false}
+      >
+        <PaperProvider theme={theme}>
+          <StatusBar barStyle="light-content" />
+          <PreferencesProvider>
+            <Navigator />
+          </PreferencesProvider>
+        </PaperProvider>
+      </KeyboardProvider>
     </SafeAreaProvider>
   );
 }
