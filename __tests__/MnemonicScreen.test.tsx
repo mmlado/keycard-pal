@@ -125,6 +125,13 @@ function renderScreen(phase = 'idle') {
   return render(<MnemonicScreen navigation={navigation} route={route} />);
 }
 
+/** Lets the deferred key derivation run. */
+async function finishPreparing() {
+  await act(async () => {
+    jest.runOnlyPendingTimers();
+  });
+}
+
 function getTextInputs() {
   return screen.UNSAFE_getAllByType(TextInput);
 }
@@ -334,13 +341,30 @@ describe('MnemonicScreen', () => {
       expect(mockStart).not.toHaveBeenCalled();
     });
 
-    it('calls start() when mnemonic is valid', async () => {
+    it('calls start() with the derived key pair when mnemonic is valid', async () => {
       renderScreen();
       await setInput(VALID_12);
       await act(async () => {
         fireEvent.press(screen.getByText('Continue'));
       });
+      await finishPreparing();
       expect(mockStart).toHaveBeenCalledTimes(1);
+      expect(mockStart).toHaveBeenCalledWith({ type: 'keypair' });
+    });
+
+    it('shows that it is preparing the key before it asks for the card', async () => {
+      renderScreen();
+      await setInput(VALID_12);
+      await act(async () => {
+        fireEvent.press(screen.getByText('Continue'));
+      });
+      expect(screen.getByText('Preparing key material...')).toBeTruthy();
+      expect(mockStart).not.toHaveBeenCalled();
+
+      await finishPreparing();
+
+      expect(mockStart).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText('Preparing key material...')).toBeNull();
     });
 
     it('passes words to useLoadKey', async () => {
@@ -359,6 +383,7 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByText('Continue'));
       });
+      await finishPreparing();
       const { deriveMnemonicKeyPair } = jest.requireMock(
         '../src/hooks/keycard/useLoadKey',
       );
@@ -649,6 +674,9 @@ describe('MnemonicScreen', () => {
       await act(async () => {
         fireEvent.press(screen.getByText('Verify'));
       });
+      expect(screen.getByText('Preparing key material...')).toBeTruthy();
+      expect(mockStart).not.toHaveBeenCalled();
+      await finishPreparing();
 
       expect(mockStart).toHaveBeenCalledWith(expect.any(Number));
     });

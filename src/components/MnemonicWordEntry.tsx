@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   Pressable,
   StyleProp,
@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import theme from '../theme';
+import theme from '@/theme';
 
 import { Icons } from '@/assets/icons';
+
+import { enteredWords, invalidWordError } from '@/utils/wordEntry';
 
 type Props = {
   value: string;
@@ -22,8 +24,6 @@ type Props = {
   wordListName: string;
   placeholder: string;
   errors?: Array<string | null | undefined>;
-  onWordsChange?: (words: string[]) => void;
-  onWordErrorChange?: (error: string | null) => void;
   wordCountOptions?: readonly number[];
   onWordCountChange?: (wordCount: number) => void;
   onScanPress?: () => void;
@@ -41,8 +41,6 @@ export default function MnemonicWordEntry({
   wordListName,
   placeholder,
   errors = [],
-  onWordsChange,
-  onWordErrorChange,
   wordCountOptions,
   onWordCountChange,
   onScanPress,
@@ -51,32 +49,11 @@ export default function MnemonicWordEntry({
   inputStyle,
   wrapperStyle,
 }: Props) {
-  const words = useMemo(
-    () =>
-      value
-        .trim()
-        .split(/\s+/)
-        .filter(w => w.length > 0),
-    [value],
+  const words = useMemo(() => enteredWords(value), [value]);
+  const wordError = useMemo(
+    () => invalidWordError(value, wordCount, wordList, wordListName),
+    [value, wordCount, wordList, wordListName],
   );
-
-  const wordError = useMemo(() => {
-    const hasTrailing = value.endsWith(' ') || value.endsWith('\n');
-    const completeWords =
-      hasTrailing || words.length >= wordCount ? words : words.slice(0, -1);
-    const invalid = completeWords.find(
-      word => !wordList.includes(word.toLowerCase()),
-    );
-    return invalid ? `"${invalid}" is not a valid ${wordListName} word` : null;
-  }, [value, wordCount, wordList, wordListName, words]);
-
-  useEffect(() => {
-    onWordsChange?.(words);
-  }, [onWordsChange, words]);
-
-  useEffect(() => {
-    onWordErrorChange?.(wordError);
-  }, [onWordErrorChange, wordError]);
 
   return (
     <View style={[styles.wrapper, wrapperStyle]}>
@@ -209,9 +186,7 @@ const styles = StyleSheet.create({
   wordInputWithScan: {
     paddingRight: 48,
   },
-  // Covers the whole strip `wordInputWithScan` reserves, not just the glyph: the
-  // input is 128 high, so a tap low in that strip used to land on the text and
-  // open the keyboard instead of the scanner. No text renders under it.
+  // The whole strip `wordInputWithScan` reserves, so a tap low in it opens the scanner, not the keyboard.
   scanIcon: {
     alignItems: 'center',
     bottom: 0,

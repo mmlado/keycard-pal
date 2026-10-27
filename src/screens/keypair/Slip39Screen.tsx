@@ -17,6 +17,7 @@ import { Icons } from '@/assets/icons';
 import BottomActionArea from '@/components/BottomActionArea';
 import MnemonicBackupCheck from '@/components/MnemonicBackupCheck';
 import MnemonicWordEntry from '@/components/MnemonicWordEntry';
+import PreparingKeyCard from '@/components/PreparingKeyCard';
 import PrimaryButton from '@/components/PrimaryButton';
 import VerifyResult from '@/components/VerifyResult';
 
@@ -33,12 +34,12 @@ import {
   SLIP39_WORD_LIST,
   generateSlip39SharesFromKeycardEntropy,
   getSlip39ShareProgress,
-  isSlip39Word,
-  normalizeSlip39Share,
+  parseSlip39Share,
   previewSlip39ShareMetadata,
   recoverSlip39Secret,
   slip39SecretToKeyPair,
 } from '@/utils/slip39';
+import { enteredWords, invalidWordError } from '@/utils/wordEntry';
 
 function parseCount(value: string): number {
   return Number.parseInt(value, 10);
@@ -48,8 +49,17 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   const mode = route.params.mode;
   const insets = useSafeAreaInsets();
   const [shareInput, setShareInput] = useState('');
-  const [shareInputWords, setShareInputWords] = useState<string[]>([]);
-  const [shareWordError, setShareWordError] = useState<string | null>(null);
+  const shareInputWords = useMemo(() => enteredWords(shareInput), [shareInput]);
+  const shareWordError = useMemo(
+    () =>
+      invalidWordError(
+        shareInput,
+        SLIP39_SHARE_WORD_COUNT,
+        SLIP39_WORD_LIST,
+        'SLIP39',
+      ),
+    [shareInput],
+  );
   const [shares, setShares] = useState<string[]>([]);
   const [passphrase, setPassphrase] = useState('');
   const [shareError, setShareError] = useState<string | null>(null);
@@ -134,34 +144,18 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   const currentGeneratedWordHalf =
     currentGeneratedWords.length > 0 ? currentGeneratedWords.length / 2 : 0;
 
-  const commitShare = useCallback(() => {
-    const normalized = normalizeSlip39Share(shareInput);
-    if (!normalized) {
-      setShareError('Enter a SLIP39 share');
-      return;
-    }
-    const invalid = normalized.split(' ').find(word => !isSlip39Word(word));
-    if (invalid) {
-      setShareError(`"${invalid}" is not a valid SLIP39 word`);
-      return;
-    }
-
-    const nextShares = [...shares, normalized];
-    getSlip39ShareProgress(nextShares);
-    setShares(nextShares);
-    setShareInput('');
-    setShareInputWords([]);
-    setShareWordError(null);
-    setShareError(null);
-  }, [shareInput, shares]);
-
   const handleAddShare = useCallback(() => {
     try {
-      commitShare();
+      const nextShares = [...shares, parseSlip39Share(shareInput)];
+      // Throws for a share that does not belong with the ones already added.
+      getSlip39ShareProgress(nextShares);
+      setShares(nextShares);
+      setShareInput('');
+      setShareError(null);
     } catch (e: any) {
       setShareError(e.message);
     }
-  }, [commitShare]);
+  }, [shareInput, shares]);
 
   const prepareAndStart = useCallback(
     (sharesToRecover: string[]) => {
@@ -173,8 +167,6 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
           secret.fill(0);
 
           setShareInput('');
-          setShareInputWords([]);
-          setShareWordError(null);
           setShareError(null);
 
           if (mode === 'verify') {
@@ -195,25 +187,12 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   const handleImportOrVerify = useCallback(() => {
     try {
       if (mode !== 'generate' && !importComplete) {
-        const normalized = normalizeSlip39Share(shareInput);
-        if (!normalized) {
-          throw new Error('Enter a SLIP39 share');
-        }
-        const invalid = normalized.split(' ').find(word => !isSlip39Word(word));
-        if (invalid) {
-          throw new Error(`"${invalid}" is not a valid SLIP39 word`);
-        }
-
-        const nextShares = [...shares, normalized];
+        const nextShares = [...shares, parseSlip39Share(shareInput)];
         setShares(nextShares);
         prepareAndStart(nextShares);
         return;
       }
-      if (mode === 'generate') {
-        prepareAndStart(operationShares);
-      } else if (importComplete) {
-        prepareAndStart(operationShares);
-      }
+      prepareAndStart(operationShares);
     } catch (e: any) {
       setShareError(e.message);
     }
@@ -356,14 +335,9 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     return (
       <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.preparingContainer}>
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.progressText}>Preparing key material...</Text>
-            <Text style={styles.description}>
-              {APP_NAME} is combining your shares and deriving the key before it
-              asks you to tap the card.
-            </Text>
-          </View>
+          <PreparingKeyCard
+            description={`${APP_NAME} is combining your shares and deriving the key before it asks you to tap the card.`}
+          />
         </View>
 
         {sheet}
@@ -437,8 +411,6 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
               wordListName="SLIP39"
               placeholder="Enter a 20-word SLIP39 share"
               errors={[shareError]}
-              onWordsChange={setShareInputWords}
-              onWordErrorChange={setShareWordError}
               inputStyle={styles.shareInput}
             />
           </View>

@@ -2,10 +2,9 @@ import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DashboardAction, InitCardScreenProps } from '@/navigation/types';
+import { InitCardScreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
-import { Icons } from '@/assets/icons';
 import ConfirmPrompt from '@/components/ConfirmPropmpt';
 import PinPad from '@/components/PinPad';
 import PukReview from '@/components/PukReview';
@@ -13,12 +12,6 @@ import PukReview from '@/components/PukReview';
 import { useInitCard } from '@/hooks/keycard/useInitCard';
 import { useConfirmedEntry } from '@/hooks/useConfirmedEntry';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
-
-export const dashboardEntry: DashboardAction = {
-  label: 'Initialize',
-  icon: Icons.cardInit,
-  navigate: nav => nav.navigate('InitCard'),
-};
 
 type ScreenStep = 'pin_setup' | 'duress_question' | 'duress_setup';
 
@@ -30,8 +23,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
   const keycard = useInitCard();
   const { phase, puk, initSent, start } = keycard;
 
-  // Once INIT went out there is no way back into the entry steps: the PUK is
-  // shown whatever the tap ended in, with the error sheet over it until dismissed.
+  // Once INIT went out the card may hold the PUK, so the entry steps are closed.
   const uncertainPuk = initSent && (phase === 'idle' || phase === 'error');
   const showPuk = phase === 'done' || uncertainPuk;
   const entering = phase === 'idle' && !initSent;

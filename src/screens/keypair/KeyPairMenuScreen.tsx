@@ -1,27 +1,17 @@
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '../../assets/icons';
-import {
-  DashboardAction,
-  KeyPairMenuScreenProps,
-} from '../../navigation/types';
-import theme from '../../theme';
+import { KeyPairMenuScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import EntryList from '../../components/EntryList';
-
-export const dashboardEntry: DashboardAction = {
-  label: 'Key pair',
-  icon: Icons.key,
-  navigate: nav => nav.navigate('KeyPairMenu'),
-};
+import { Icons } from '@/assets/icons';
+import EntryList from '@/components/EntryList';
 
 export default function KeyPairMenuScreen({
   navigation,
 }: KeyPairMenuScreenProps) {
   const insets = useSafeAreaInsets();
-  // The two seed formats offer the same three actions, so the heading carries
-  // the format and each label only has to say what the action does.
+  // The heading carries the seed format, so each label only says what the action does.
   const sections = [
     {
       title: 'BIP39',

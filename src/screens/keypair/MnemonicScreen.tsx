@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   ScrollView,
@@ -10,6 +10,7 @@ import { validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { Text } from 'react-native-paper';
 
+import { APP_NAME } from '@/constants/app';
 import { MnemonicScreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
@@ -18,6 +19,7 @@ import BottomActionArea from '@/components/BottomActionArea';
 import { type ReadCodeEvent } from '@/components/Camera';
 import CameraView from '@/components/CameraView';
 import MnemonicWordEntry from '@/components/MnemonicWordEntry';
+import PreparingKeyCard from '@/components/PreparingKeyCard';
 import PrimaryButton from '@/components/PrimaryButton';
 import VerifyResult from '@/components/VerifyResult';
 
@@ -33,6 +35,7 @@ import {
   isSeedQrPayload,
   type SeedQrDecodeResult,
 } from '@/utils/seedQr';
+import { enteredWords } from '@/utils/wordEntry';
 
 const SCAN_ERROR_LINGER_MS = 2000;
 
@@ -43,11 +46,12 @@ export default function MnemonicScreen({
   const mode = route.params?.mode ?? 'import';
   const [wordCount, setWordCount] = useState<12 | 24>(12);
   const [input, setInput] = useState('');
-  const [words, setWords] = useState<string[]>([]);
+  const words = useMemo(() => enteredWords(input), [input]);
   const [passphrase, setPassphrase] = useState('');
   const [phraseError, setPhraseError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const scanErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearScanError = useCallback(() => {
@@ -92,18 +96,26 @@ export default function MnemonicScreen({
     setPhraseError(null);
   }, []);
 
+  // The derivation blocks the JS thread, so the loading state is drawn first.
   const handleContinue = useCallback(() => {
     if (!validateMnemonic(words.join(' '), wordlist)) {
       setPhraseError('Invalid recovery phrase');
       return;
     }
-    if (mode === 'verify') {
-      verifyFingerprint.start(
-        deriveMnemonicFingerprint(words, passphrase || undefined),
-      );
-      return;
-    }
-    loadKey.start(deriveMnemonicKeyPair(words, passphrase || undefined));
+    setPreparing(true);
+    setTimeout(() => {
+      try {
+        if (mode === 'verify') {
+          verifyFingerprint.start(
+            deriveMnemonicFingerprint(words, passphrase || undefined),
+          );
+        } else {
+          loadKey.start(deriveMnemonicKeyPair(words, passphrase || undefined));
+        }
+      } finally {
+        setPreparing(false);
+      }
+    }, 0);
   }, [loadKey, mode, passphrase, verifyFingerprint, words]);
 
   const handleScanPress = useCallback(() => {
@@ -203,7 +215,6 @@ export default function MnemonicScreen({
           wordListName="BIP39"
           placeholder="Enter your recovery phrase"
           errors={[phraseError]}
-          onWordsChange={setWords}
           onScanPress={handleScanPress}
           scanTestID="scan-seedqr-button"
           // Keyboard.dismiss() leaves the input focused, and Android raises the keyboard again.
@@ -226,9 +237,17 @@ export default function MnemonicScreen({
           label={mode === 'verify' ? 'Verify' : 'Continue'}
           icon={Icons.nfcActivate}
           onPress={handleContinue}
-          disabled={!isComplete}
+          disabled={!isComplete || preparing}
         />
       </BottomActionArea>
+
+      {preparing && (
+        <View style={styles.preparing}>
+          <PreparingKeyCard
+            description={`${APP_NAME} is deriving the key before it asks you to tap the card.`}
+          />
+        </View>
+      )}
 
       {sheet}
 
@@ -274,6 +293,12 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   buttonContainer: {
+    paddingHorizontal: 16,
+  },
+  preparing: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: theme.colors.background,
+    justifyContent: 'center',
     paddingHorizontal: 16,
   },
   scanErrorContainer: {

@@ -65,6 +65,8 @@ type MockAction = {
   label: string;
   detail?: string;
   icon: React.ComponentType<any>;
+  requiresNfc?: boolean;
+  generationBoundRoute?: 'PairingSlots' | 'ChangePairingSecret';
   navigate: (nav: any) => void;
 };
 
@@ -172,6 +174,27 @@ describe('DashboardScreen', () => {
       fireEvent.press(screen.getByText('Test Action'));
       expect(mockNavigate).toHaveBeenCalledTimes(1);
       expect(mockNavigate).toHaveBeenCalledWith(navigation);
+    });
+
+    it("carries an entry's NFC mark to the rendered entry", async () => {
+      mockDashboardActions.push(
+        { ...action('One'), requiresNfc: true },
+        action('Two'),
+      );
+      await renderScreen();
+      expect(screen.getByTestId('tile-0-nfc')).toBeTruthy();
+      expect(screen.queryByTestId('tile-1-nfc')).toBeNull();
+    });
+
+    it('leaves out an entry no ticked generation has', async () => {
+      mockGenerationsInUse = ['4.0'];
+      mockDashboardActions.push(
+        { ...action('Slots'), generationBoundRoute: 'PairingSlots' },
+        action('Other'),
+      );
+      await renderScreen();
+      expect(screen.queryByText('Slots')).toBeNull();
+      expect(screen.getByText('Other')).toBeTruthy();
     });
 
     it('only calls the pressed action, not others', async () => {

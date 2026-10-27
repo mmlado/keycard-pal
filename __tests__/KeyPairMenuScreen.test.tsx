@@ -2,9 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import KeyPairMenuScreen, {
-  dashboardEntry,
-} from '../src/screens/keypair/KeyPairMenuScreen';
+import KeyPairMenuScreen from '../src/screens/keypair/KeyPairMenuScreen';
 
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
@@ -147,18 +145,6 @@ describe('KeyPairMenuScreen', () => {
         fireEvent.press(screen.getByText(label));
         expect(navigation.navigate).toHaveBeenCalledWith('Slip39', { mode });
       }
-    });
-  });
-
-  describe('dashboardEntry', () => {
-    it('has the correct label', () => {
-      expect(dashboardEntry.label).toBe('Key pair');
-    });
-
-    it('navigates to KeyPairMenu when invoked', () => {
-      const nav = { navigate: jest.fn() } as any;
-      dashboardEntry.navigate(nav);
-      expect(nav.navigate).toHaveBeenCalledWith('KeyPairMenu');
     });
   });
 });

@@ -2,7 +2,7 @@ import React, { act } from 'react';
 import { BackHandler } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import InitCardScreen, { dashboardEntry } from '../src/screens/InitCardScreen';
+import InitCardScreen from '../src/screens/InitCardScreen';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import {
   PUK_EXPLAINER,
@@ -617,22 +617,6 @@ describe('InitCardScreen', () => {
         routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
       });
       expect(navigation.goBack).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // dashboardEntry export
-  // -------------------------------------------------------------------------
-
-  describe('dashboardEntry', () => {
-    it('has the correct label', () => {
-      expect(dashboardEntry.label).toBe('Initialize');
-    });
-
-    it('navigates to InitCard when invoked', () => {
-      const nav = { navigate: jest.fn() } as any;
-      dashboardEntry.navigate(nav);
-      expect(nav.navigate).toHaveBeenCalledWith('InitCard');
     });
   });
 });
