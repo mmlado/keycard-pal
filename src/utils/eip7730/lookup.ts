@@ -1,7 +1,17 @@
-import { loadSlice, type IndexSource } from '@/storage/eip7730Index';
+import {
+  BUNDLED_REGISTRY,
+  clearSavedIndex,
+  loadManifest,
+  loadSlice,
+  saveIndex,
+  type IndexSource,
+} from '@/storage/eip7730Index';
 
+import { BUNDLED_ATTESTATIONS } from './knownAttestations';
 import {
   indexedFormat,
+  isEmptyIndex,
+  processRegistryZip,
   sliceName,
   type Eip7730DisplayFormat,
   type Eip7730Index,
@@ -10,13 +20,17 @@ import {
 
 export type SavedIndex = { generatedAt: string; source?: IndexSource };
 
+export type AdoptResult =
+  | { ok: true }
+  | { ok: false; reason: 'invalid' | 'unsaved'; message: string };
+
 /** Answers at once from the bundled index or a slice already read, else once the slice is read. */
 export type FormatLookup =
   | Eip7730DisplayFormat
   | null
   | Promise<Eip7730DisplayFormat | null>;
 
-// An external store: imports, downloads and the startup restore all write it outside React.
+// An external store, written outside React by adoptRegistry, the restore and the revert.
 let saved: SavedIndex | null = null;
 let bundled: Eip7730Index | null = null;
 const slices = new Map<string, Eip7730IndexSlice | null>();
@@ -39,6 +53,80 @@ export function subscribeSavedIndex(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
   };
+}
+
+// Each change moves the saved folder and the active source together, so none may interleave.
+let changing: Promise<unknown> = Promise.resolve();
+function oneChangeAtATime<T>(change: () => Promise<T>): Promise<T> {
+  const next = changing.then(change, change);
+  changing = next.catch(() => undefined);
+  return next;
+}
+
+function messageOf(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+export async function adoptRegistry(
+  bytes: Uint8Array,
+  source: IndexSource,
+): Promise<AdoptResult> {
+  let index: Eip7730Index;
+  try {
+    // Skips recovering the signatures the bundled index verified: 13 s on a phone.
+    index = processRegistryZip(bytes, { verified: BUNDLED_ATTESTATIONS });
+  } catch (e) {
+    return { ok: false, reason: 'invalid', message: messageOf(e) };
+  }
+  if (isEmptyIndex(index)) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      message: 'The file has no descriptors this app can read.',
+    };
+  }
+  return oneChangeAtATime(async (): Promise<AdoptResult> => {
+    try {
+      const { generatedAt } = await saveIndex(index, source);
+      setSavedIndex({ generatedAt, source });
+      return { ok: true };
+    } catch (e) {
+      // A save that failed after removing the old folder leaves nothing to read.
+      if (saved && !(await loadManifest())) setSavedIndex(null);
+      return { ok: false, reason: 'unsaved', message: messageOf(e) };
+    }
+  });
+}
+
+let restoring: Promise<void> | null = null;
+
+// One read per app run, shared by both builds; the online download waits on it.
+export function restorePersistedIndex(): Promise<void> {
+  if (!restoring) {
+    restoring = oneChangeAtATime(async () => {
+      // An adoption that ran first already set it.
+      if (saved) return;
+      const manifest = await loadManifest();
+      if (!manifest) return;
+      // An app update brought another registry. Not by date: an offline phone's clock can be anything.
+      if (manifest.bundled !== BUNDLED_REGISTRY) {
+        await clearSavedIndex();
+        return;
+      }
+      setSavedIndex({
+        generatedAt: manifest.generatedAt,
+        source: manifest.source,
+      });
+    });
+  }
+  return restoring;
+}
+
+export function revertToBundledIndex(): Promise<void> {
+  return oneChangeAtATime(async () => {
+    await clearSavedIndex();
+    setSavedIndex(null);
+  });
 }
 
 function bundledIndex(): Eip7730Index {

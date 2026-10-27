@@ -4,19 +4,14 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 import { Eip7730Context } from '../src/providers/eip7730/context';
 import { Eip7730DownloadProvider } from '../src/providers/eip7730/Provider.online';
-import { BUNDLED_ATTESTATIONS } from '../src/utils/eip7730/knownAttestations';
-
-import { testIndex } from './eip7730Index.testUtils';
-
-const mockSaveIndex = jest.fn();
-
-jest.mock('../src/storage/eip7730Index', () => ({
-  saveIndex: (...args: any[]) => mockSaveIndex(...args),
-}));
 
 const mockRestore = jest.fn();
-jest.mock('../src/utils/eip7730/restore', () => ({
+const mockAdopt = jest.fn();
+const mockGetSavedIndex = jest.fn();
+jest.mock('../src/utils/eip7730/lookup', () => ({
   restorePersistedIndex: (...args: any[]) => mockRestore(...args),
+  adoptRegistry: (...args: any[]) => mockAdopt(...args),
+  getSavedIndex: () => mockGetSavedIndex(),
 }));
 
 const mockLoadSource = jest.fn();
@@ -35,26 +30,6 @@ jest.mock('../src/storage/eip7730Settings.online', () => ({
   loadLastModified: (...args: any[]) => mockLoadLastModified(...args),
   saveEtag: (...args: any[]) => mockSaveEtag(...args),
   saveLastModified: (...args: any[]) => mockSaveLastModified(...args),
-}));
-
-const mockProcess = jest.fn();
-jest.mock('../src/utils/eip7730/zip', () => ({
-  processRegistryZip: (...args: any[]) => mockProcess(...args),
-  isEmptyIndex: (index: any) =>
-    Object.keys(index.contracts).length === 0 &&
-    Object.keys(index.eip712).length === 0,
-}));
-
-const INDEX = testIndex({
-  generatedAt: '2025-01-01T00:00:00.000Z',
-  contracts: { '1:0xabc': { '0xa9059cbb': { intent: 'Send', fields: [] } } },
-});
-
-const mockSetSavedIndex = jest.fn();
-const mockGetSavedIndex = jest.fn();
-jest.mock('../src/utils/eip7730/lookup', () => ({
-  setSavedIndex: (...args: any[]) => mockSetSavedIndex(...args),
-  getSavedIndex: () => mockGetSavedIndex(),
 }));
 
 const mockIsOnWifi = jest.fn();
@@ -110,10 +85,7 @@ beforeEach(() => {
   mockGetSavedIndex.mockReturnValue({
     generatedAt: '2025-01-01T00:00:00.000Z',
   });
-  mockSaveIndex.mockResolvedValue({
-    version: 3,
-    generatedAt: '2026-10-12T00:00:00.000Z',
-  });
+  mockAdopt.mockResolvedValue({ ok: true });
   mockLoadSource.mockResolvedValue('manual');
   mockLoadUrl.mockResolvedValue('https://example.test/registry.zip');
   mockLoadWifi.mockResolvedValue(false);
@@ -121,7 +93,6 @@ beforeEach(() => {
   mockLoadLastModified.mockResolvedValue(null);
   mockSaveEtag.mockResolvedValue(undefined);
   mockSaveLastModified.mockResolvedValue(undefined);
-  mockProcess.mockReturnValue(INDEX);
   mockIsOnWifi.mockResolvedValue(true);
   (global as any).fetch = jest.fn();
 });
@@ -159,20 +130,17 @@ describe('Eip7730DownloadProvider', () => {
       'https://example.test/registry.zip',
       expect.objectContaining({ headers: {} }),
     );
-    expect(mockProcess).toHaveBeenCalledWith(expect.any(Uint8Array), {
-      verified: BUNDLED_ATTESTATIONS,
-    });
-    expect(mockSaveIndex).toHaveBeenCalledWith(expect.anything(), 'download');
+    expect(mockAdopt).toHaveBeenCalledWith(expect.any(Uint8Array), 'download');
     expect(mockSaveEtag).toHaveBeenCalledWith('W/abc');
-    expect(mockSetSavedIndex).toHaveBeenCalledWith({
-      generatedAt: '2026-10-12T00:00:00.000Z',
-      source: 'download',
-    });
   });
 
   it('keeps the current index when the download has no descriptors', async () => {
     mockLoadSource.mockResolvedValue('auto');
-    mockProcess.mockReturnValue({ ...INDEX, contracts: {} });
+    mockAdopt.mockResolvedValue({
+      ok: false,
+      reason: 'invalid',
+      message: 'The file has no descriptors this app can read.',
+    });
     (global as any).fetch.mockResolvedValue(buildResponse({ etag: 'W/new' }));
 
     render(
@@ -184,9 +152,10 @@ describe('Eip7730DownloadProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('phase').children[0]).toBe('error');
     });
-    expect(mockSaveIndex).not.toHaveBeenCalled();
+    expect(screen.getByTestId('error').children[0]).toBe(
+      'The file has no descriptors this app can read.',
+    );
     expect(mockSaveEtag).not.toHaveBeenCalled();
-    expect(mockSetSavedIndex).not.toHaveBeenCalled();
   });
 
   it('skips processing when server returns 304', async () => {
@@ -207,8 +176,7 @@ describe('Eip7730DownloadProvider', () => {
       'https://example.test/registry.zip',
       expect.objectContaining({ headers: { 'If-None-Match': 'W/old' } }),
     );
-    expect(mockProcess).not.toHaveBeenCalled();
-    expect(mockSaveIndex).not.toHaveBeenCalled();
+    expect(mockAdopt).not.toHaveBeenCalled();
   });
 
   it('downloads in full when no saved index was restored, whatever the stored ETag', async () => {
@@ -231,10 +199,7 @@ describe('Eip7730DownloadProvider', () => {
       'https://example.test/registry.zip',
       expect.objectContaining({ headers: {} }),
     );
-    expect(mockSetSavedIndex).toHaveBeenCalledWith({
-      generatedAt: '2026-10-12T00:00:00.000Z',
-      source: 'download',
-    });
+    expect(mockAdopt).toHaveBeenCalledWith(expect.any(Uint8Array), 'download');
   });
 
   it('says why when Wi-Fi only blocks the download', async () => {
@@ -382,7 +347,7 @@ describe('Eip7730DownloadProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('phase').children[0]).toBe('done');
     });
-    expect(Array.from(mockProcess.mock.calls[0][0])).toEqual([1, 2, 3]);
+    expect(Array.from(mockAdopt.mock.calls[0][0])).toEqual([1, 2, 3]);
     expect(mockSaveLastModified).toHaveBeenCalledWith(
       'Sat, 10 Oct 2026 00:00:00 GMT',
     );
@@ -444,7 +409,7 @@ describe('Eip7730DownloadProvider', () => {
     expect(screen.getByTestId('error').children[0]).toBe(
       'The file is larger than any registry zip.',
     );
-    expect(mockProcess).not.toHaveBeenCalled();
+    expect(mockAdopt).not.toHaveBeenCalled();
   });
 
   it('gives up on a download that never finishes', async () => {
@@ -494,7 +459,7 @@ describe('Eip7730DownloadProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('phase').children[0]).toBe('error');
     });
-    expect(mockProcess).not.toHaveBeenCalled();
+    expect(mockAdopt).not.toHaveBeenCalled();
   });
 
   it('waits for the saved index before the first auto-download', async () => {

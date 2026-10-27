@@ -15,7 +15,7 @@ import theme from '@/theme';
 
 import { usePreferences } from '@/hooks/usePreferences';
 
-import { restorePersistedIndex } from '@/utils/eip7730/restore';
+import { restorePersistedIndex } from '@/utils/eip7730/lookup';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

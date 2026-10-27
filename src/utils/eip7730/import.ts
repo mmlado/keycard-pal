@@ -2,16 +2,10 @@ import { Platform } from 'react-native';
 import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs';
 
-import { saveIndex } from '@/storage/eip7730Index';
-
-import { BUNDLED_ATTESTATIONS } from './knownAttestations';
-import { setSavedIndex } from './lookup';
-import { isEmptyIndex, processRegistryZip } from './zip';
-
-import type { Eip7730Index } from './zip';
+import { adoptRegistry } from './lookup';
 
 export type ImportResult =
-  | { ok: true; index: Eip7730Index }
+  | { ok: true }
   | { ok: false; reason: 'cancelled' | 'invalid' | 'unreadable' | 'unsaved' };
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -52,20 +46,6 @@ export async function importRegistryZipFromPicker(): Promise<ImportResult> {
     return { ok: false, reason: 'unreadable' };
   }
 
-  let index: Eip7730Index;
-  try {
-    index = processRegistryZip(bytes, { verified: BUNDLED_ATTESTATIONS });
-  } catch {
-    return { ok: false, reason: 'invalid' };
-  }
-  if (isEmptyIndex(index)) return { ok: false, reason: 'invalid' };
-
-  let generatedAt: string;
-  try {
-    ({ generatedAt } = await saveIndex(index, 'import'));
-  } catch {
-    return { ok: false, reason: 'unsaved' };
-  }
-  setSavedIndex({ generatedAt, source: 'import' });
-  return { ok: true, index };
+  const adopted = await adoptRegistry(bytes, 'import');
+  return adopted.ok ? { ok: true } : { ok: false, reason: adopted.reason };
 }
