@@ -1,6 +1,8 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+import { bridgeModule } from './fakeCard.testUtils';
+
 /**
  * Reads the INSTALLED react-native-keycard, not the lockfile: lib/ is rebuilt at
  * install time and has drifted before (ADR-0006, ADR-0008). If a bump changes
@@ -60,6 +62,15 @@ describe('installed react-native-keycard carries the tag-loss contract', () => {
     expect(read('lib/module/index.js')).toContain(
       'Keycard.stopNFC(message, isError)',
     );
+  });
+
+  // The hook tests play this bridge through the fake card, which must not invent a call.
+  it("declares every call the hook tests' fake card plays", () => {
+    const spec = read('src/NativeKeycard.ts');
+    for (const name of Object.keys(bridgeModule.default.Core)) {
+      expect(spec).toMatch(new RegExp(`\\b${name}\\s*[(:]`));
+    }
+    expect(read('src/index.tsx')).toContain('NFCCardChannel: NFCCardChannel');
   });
 
   it('built lib wraps APDUResponse construction inside the try', () => {

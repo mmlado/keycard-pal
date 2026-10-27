@@ -1,59 +1,29 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { useCallback } from 'react';
+
 import { useNFCOperation } from '../src/hooks/keycard/useNFCOperation';
 
+import {
+  cancelSheet,
+  loseCard,
+  mockStartNFC,
+  mockStopNFC,
+  mockStopNFCWithError,
+  resetFakeCard,
+  tapCard,
+  timeOut,
+} from './fakeCard.testUtils';
+
 // ---------------------------------------------------------------------------
-// RNKeycard mock — captures event callbacks so tests can trigger them
+// The fake card
 // ---------------------------------------------------------------------------
 
-let capturedOnConnected: (() => Promise<void>) | null = null;
-let capturedOnDisconnected: (() => void) | null = null;
-let capturedOnCancelled: (() => void) | null = null;
-let capturedOnTimeout: (() => void) | null = null;
+jest.mock(
+  'react-native-keycard',
+  () => require('./fakeCard.testUtils').bridgeModule,
+);
 
-const mockStartNFC = jest.fn();
-const mockStopNFC = jest.fn();
-const mockStopNFCWithError = jest.fn();
-
-jest.mock('react-native-keycard', () => ({
-  __esModule: true,
-  default: {
-    Core: {
-      onKeycardConnected: (cb: () => Promise<void>) => {
-        capturedOnConnected = cb;
-        return { remove: jest.fn() };
-      },
-      onKeycardDisconnected: (cb: () => void) => {
-        capturedOnDisconnected = cb;
-        return { remove: jest.fn() };
-      },
-      onNFCUserCancelled: (cb: () => void) => {
-        capturedOnCancelled = cb;
-        return { remove: jest.fn() };
-      },
-      onNFCTimeout: (cb: () => void) => {
-        capturedOnTimeout = cb;
-        return { remove: jest.fn() };
-      },
-      startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: (message?: string, isError?: boolean) =>
-        isError ? mockStopNFCWithError(message) : mockStopNFC(),
-      isNFCEnabled: () => Promise.resolve(true),
-      openNFCSettings: () => Promise.resolve(true),
-      setNFCMessage: () => Promise.resolve(true),
-    },
-    NFCCardChannel: class {},
-  },
-}));
-
-jest.mock('keycard-sdk', () => ({
-  __esModule: true,
-  default: {
-    Commandset: class {
-      select = jest.fn().mockResolvedValue({ sw: 0x9000 });
-    },
-  },
-}));
+jest.mock('keycard-sdk', () => require('./fakeCard.testUtils').sdkModule());
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -61,16 +31,7 @@ jest.mock('keycard-sdk', () => ({
 
 describe('useNFCOperation', () => {
   beforeEach(() => {
-    mockStartNFC.mockResolvedValue(undefined);
-    mockStopNFC.mockResolvedValue(undefined);
-    mockStopNFCWithError.mockResolvedValue(undefined);
-    mockStartNFC.mockClear();
-    mockStopNFC.mockClear();
-    mockStopNFCWithError.mockClear();
-    capturedOnConnected = null;
-    capturedOnDisconnected = null;
-    capturedOnCancelled = null;
-    capturedOnTimeout = null;
+    resetFakeCard();
   });
 
   describe('initial state', () => {
@@ -159,7 +120,7 @@ describe('useNFCOperation', () => {
       });
       expect(result.current.phase).toBe('nfc');
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       expect(result.current.phase).toBe('idle');
     });
@@ -169,7 +130,7 @@ describe('useNFCOperation', () => {
         useNFCOperation(useCallback(async () => 'ok', [])),
       );
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       expect(result.current.phase).toBe('idle');
     });
@@ -182,7 +143,7 @@ describe('useNFCOperation', () => {
         result.current.start();
       });
       await act(async () => {
-        capturedOnTimeout?.();
+        timeOut();
       });
       expect(result.current.status).toBe('Timed out — tap again');
     });
@@ -195,7 +156,7 @@ describe('useNFCOperation', () => {
         result.current.start();
       });
       await act(async () => {
-        capturedOnDisconnected?.();
+        loseCard();
       });
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
@@ -209,7 +170,7 @@ describe('useNFCOperation', () => {
         useNFCOperation(useCallback(async () => 'ok', [])),
       );
       await act(async () => {
-        capturedOnDisconnected?.();
+        loseCard();
       });
       expect(result.current.phase).toBe('idle');
       expect(result.current.status).toBe('');
@@ -225,7 +186,7 @@ describe('useNFCOperation', () => {
         result.current.start();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('done');
       expect(result.current.result).toBe('ok');
@@ -246,7 +207,7 @@ describe('useNFCOperation', () => {
         result.current.start();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
       mockStartNFC.mockClear();
@@ -258,7 +219,7 @@ describe('useNFCOperation', () => {
       expect(mockStartNFC).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('done');
       expect(result.current.result).toBe('ok');
@@ -284,7 +245,7 @@ describe('useNFCOperation', () => {
       });
       let connectPromise: Promise<void> | undefined;
       act(() => {
-        connectPromise = capturedOnConnected?.();
+        connectPromise = tapCard();
       });
       // Let SELECT resolve, so the operation is entered before the cancel arrives.
       await act(async () => {});
@@ -318,7 +279,7 @@ describe('useNFCOperation', () => {
       });
       let connectPromise: Promise<void> | undefined;
       act(() => {
-        connectPromise = capturedOnConnected?.();
+        connectPromise = tapCard();
       });
       await act(async () => {});
       expect(rejectOp).not.toBeNull();
@@ -353,12 +314,12 @@ describe('useNFCOperation', () => {
       });
       let connectPromise: Promise<void> | undefined;
       act(() => {
-        connectPromise = capturedOnConnected?.();
+        connectPromise = tapCard();
       });
       await act(async () => {});
       expect(rejectOp).not.toBeNull();
       await act(async () => {
-        capturedOnCancelled?.();
+        cancelSheet();
       });
       await act(async () => {
         rejectOp?.(new Error('NFCError:100'));
@@ -387,7 +348,7 @@ describe('useNFCOperation', () => {
         result.current.start();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('error');
       expect(result.current.status).toBe(
@@ -408,7 +369,7 @@ describe('useNFCOperation', () => {
         result.current.start();
       });
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
       expect(result.current.phase).toBe('nfc');
       expect(result.current.cardPresence).toBe('lost');
@@ -429,7 +390,7 @@ describe('useNFCOperation', () => {
 
     async function tap() {
       await act(async () => {
-        await capturedOnConnected?.();
+        await tapCard();
       });
     }
 

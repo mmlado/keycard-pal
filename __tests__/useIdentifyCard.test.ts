@@ -5,44 +5,26 @@ import {
   useIdentifyCard,
 } from '../src/hooks/keycard/useIdentifyCard';
 
+import {
+  insertCard,
+  mockStartNFC,
+  mockStopNFC,
+  mockStopNFCWithError,
+  mockStopNFCWithMessage,
+  resetFakeCard,
+  tapCard,
+} from './fakeCard.testUtils';
 import { blankV3Select, v3Select, v4Select } from './selectResponse.testUtils';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-let capturedOnConnected: ((...args: any[]) => Promise<void>) | null = null;
-
-const mockStartNFC = jest.fn();
-const mockStopNFC = jest.fn();
-const mockStopNFCWithError = jest.fn();
-const mockStopNFCWithMessage = jest.fn();
-
-jest.mock('react-native-keycard', () => ({
-  __esModule: true,
-  default: {
-    Core: {
-      onKeycardConnected: (cb: (...args: any[]) => Promise<void>) => {
-        capturedOnConnected = cb;
-        return { remove: jest.fn() };
-      },
-      onKeycardDisconnected: () => ({ remove: jest.fn() }),
-      onNFCUserCancelled: () => ({ remove: jest.fn() }),
-      onNFCTimeout: () => ({ remove: jest.fn() }),
-      startNFC: (msg: string) => mockStartNFC(msg),
-      stopNFC: (message?: string, isError?: boolean) =>
-        isError
-          ? mockStopNFCWithError(message)
-          : message
-          ? mockStopNFCWithMessage(message)
-          : mockStopNFC(),
-      isNFCEnabled: () => Promise.resolve(true),
-      openNFCSettings: () => Promise.resolve(true),
-      setNFCMessage: () => Promise.resolve(true),
-    },
-    NFCCardChannel: class {},
-  },
-}));
+jest.mock(
+  'react-native-keycard',
+  () => require('./fakeCard.testUtils').bridgeModule,
+);
+jest.mock('keycard-sdk', () => require('./fakeCard.testUtils').sdkModule());
 
 // Everything an operation sends after SELECT; the identify tap must reach none of it.
 const mockSelect = jest.fn();
@@ -62,13 +44,6 @@ const mockCmdSet: { select: jest.Mock; applicationInfo: unknown } & Record<
   ...mockAfterSelect,
 };
 
-jest.mock('keycard-sdk', () => ({
-  __esModule: true,
-  default: {
-    Commandset: jest.fn().mockImplementation(() => mockCmdSet),
-  },
-}));
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -80,20 +55,17 @@ async function tap(appInfo: unknown) {
     hook.result.current.start();
   });
   await act(async () => {
-    await capturedOnConnected?.();
+    await tapCard();
   });
   return hook;
 }
 
 beforeEach(() => {
-  mockStartNFC.mockReset().mockResolvedValue(undefined);
-  mockStopNFC.mockReset().mockResolvedValue(undefined);
-  mockStopNFCWithError.mockReset().mockResolvedValue(undefined);
-  mockStopNFCWithMessage.mockReset().mockResolvedValue(undefined);
+  resetFakeCard();
   mockSelect.mockReset().mockResolvedValue({ sw: 0x9000 });
   Object.values(mockAfterSelect).forEach(fn => fn.mockReset());
   mockCmdSet.applicationInfo = null;
-  capturedOnConnected = null;
+  insertCard(mockCmdSet);
 });
 
 // ---------------------------------------------------------------------------
@@ -176,7 +148,7 @@ describe('useIdentifyCard', () => {
     expect(mockStopNFCWithError).not.toHaveBeenCalled();
 
     await act(async () => {
-      await capturedOnConnected?.();
+      await tapCard();
     });
     expect(result.current.phase).toBe('done');
     expect(result.current.generation).toBe('3.1');
@@ -200,7 +172,7 @@ describe('useIdentifyCard', () => {
     });
     expect(mockStartNFC).toHaveBeenCalledTimes(2);
     await act(async () => {
-      await capturedOnConnected?.();
+      await tapCard();
     });
     expect(result.current.generation).toBe('3.1');
   });
