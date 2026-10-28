@@ -421,6 +421,43 @@ export function uncoveredDomainFields(data: Eip712RawTypedData): string[] {
   return Object.keys(data.domain).filter(key => !covered.has(key));
 }
 
+const STANDARD_DOMAIN_TYPES: Record<string, string> = {
+  name: 'string',
+  version: 'string',
+  chainId: 'uint256',
+  verifyingContract: 'address',
+  salt: 'bytes32',
+};
+
+// Any other domain type changes the domain separator, so the contract the domain names would not accept it.
+export function nonStandardDomainFields(data: Eip712RawTypedData): string[] {
+  const declared = data.types.EIP712Domain;
+  if (declared === undefined) return [];
+  if (!Array.isArray(declared)) return ['an EIP712Domain that is not a list'];
+  const seen = new Set<string>();
+  return declared.flatMap(member => {
+    // structMembers skips such a member, but viem still hashes it.
+    if (
+      !isJsonObject(member) ||
+      typeof member.name !== 'string' ||
+      typeof member.type !== 'string'
+    ) {
+      return ['a field without a name and a type'];
+    }
+    const { name, type } = member;
+    const repeated = seen.has(name);
+    seen.add(name);
+    if (!Object.prototype.hasOwnProperty.call(STANDARD_DOMAIN_TYPES, name)) {
+      return [`${name}, which EIP-712 does not define`];
+    }
+    if (repeated) return [`${name} twice`];
+    const standard = STANDARD_DOMAIN_TYPES[name];
+    return type === standard
+      ? []
+      : [`${name} as ${type} instead of ${standard}`];
+  });
+}
+
 /** Every declared `address` in EIP-55, which viem requires; the encoded 20 bytes stay the same. */
 export function checksumEip712Addresses(data: Eip712RawTypedData): {
   typedData: Eip712RawTypedData;
