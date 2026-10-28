@@ -13,6 +13,7 @@ import SimulationAddressProvider from '@/components/SignRequestDetail/Simulation
 
 import { useWalletConnectSession } from '@/hooks/useWalletConnectSession.online';
 
+import { reviewWording } from '@/utils/reviewWording';
 import { buildSignKeycardParams } from '@/utils/signNavigation';
 
 export default function TransactionDetailScreen({
@@ -24,10 +25,7 @@ export default function TransactionDetailScreen({
   // Any other way out, the provider rejects the request itself.
   const { rejectRequest } = useWalletConnectSession();
 
-  const isBip322Message =
-    result.kind === 'crypto-psbt' &&
-    result.summary.requestType === 'bip322-message';
-
+  const { title, signLabel } = reviewWording(result);
   const keycardParams = buildSignKeycardParams(result, wcContext);
 
   const handleSign = useCallback(() => {
@@ -50,6 +48,7 @@ export default function TransactionDetailScreen({
             ? result.request.derivationPath
             : undefined
         }
+        title={title}
       >
         <ScrollView
           style={styles.scrollView}
@@ -70,11 +69,7 @@ export default function TransactionDetailScreen({
               </Button>
             )}
             <PrimaryButton
-              label={
-                isBip322Message || result.kind === 'btc-sign-request'
-                  ? 'Sign message'
-                  : 'Sign transaction'
-              }
+              label={signLabel}
               onPress={handleSign}
               icon={Icons.nfcActivate}
             />

@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- An Ethereum message, typed data or bare hash is reviewed under "Review message" with "Sign message" or "Sign hash" instead of as a transaction, and a request that cannot be signed is titled "Review request" and named by no transaction type
 - On Android, a Keycard is read again after the app is left with back and reopened right away
 - An Ethereum sign request with an unknown data type is refused instead of signed as a bare digest
 - WalletConnect typed data is signed under its declared EIP712Domain, giving the same signature as over QR, and typed data that names no primaryType or that the signature would not fully cover is refused with the reason
