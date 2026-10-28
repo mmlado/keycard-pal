@@ -321,6 +321,10 @@ export function classifyEthPayload(
     );
   }
 
+  if (dataType !== undefined && dataType !== 0) {
+    return invalid(`Unknown data type ${dataType}.`);
+  }
+
   // dataType 0 or none: a QR request that carries the 32-byte digest itself.
   if (raw.length === DIGEST_BYTES) {
     return { kind: 'raw-digest', digest: `0x${hex.toLowerCase()}` };
