@@ -732,7 +732,9 @@ describe('EthSignRequestDetail — EIP-712 special renderers', () => {
     expect(screen.queryByText('Message Fields')).toBeNull();
   });
 
-  function usdcTransferAuthorization(): EthSignRequest {
+  function usdcTransferAuthorization(
+    verifyingContractType = 'address',
+  ): EthSignRequest {
     return {
       signData: typedDataHex({
         types: {
@@ -740,7 +742,7 @@ describe('EthSignRequestDetail — EIP-712 special renderers', () => {
             { name: 'name', type: 'string' },
             { name: 'version', type: 'string' },
             { name: 'chainId', type: 'uint256' },
-            { name: 'verifyingContract', type: 'address' },
+            { name: 'verifyingContract', type: verifyingContractType },
           ],
           TransferWithAuthorization: [
             { name: 'from', type: 'address' },
@@ -787,6 +789,18 @@ describe('EthSignRequestDetail — EIP-712 special renderers', () => {
     expect(screen.getByText('Authorize USDC transfer')).toBeTruthy();
     expect(screen.getByText('Reviewed by Cyfrin')).toBeTruthy();
     expect(screen.getByText('1 USDC')).toBeTruthy();
+  });
+
+  it('refuses a domain that types verifyingContract as a string, and shows no registry entry for it', () => {
+    renderDetail(usdcTransferAuthorization('string'));
+
+    expect(
+      screen.getByText(
+        /cannot be signed\. The EIP-712 domain declares verifyingContract as string instead of address/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText('Authorize USDC transfer')).toBeNull();
+    expect(screen.getByText('Message Fields')).toBeTruthy();
   });
 
   it('shows the registry descriptor for a WalletConnect request, which carries no chainId', () => {
@@ -955,7 +969,7 @@ describe('EthSignRequestDetail — EIP-712 special renderers', () => {
     expect(screen.getByText('hello')).toBeTruthy();
   });
 
-  it('shows a declared domain member named __proto__, which is signed', () => {
+  it('shows a declared domain member named __proto__, and refuses it as a field EIP-712 does not define', () => {
     renderDetail({
       signData: Buffer.from(
         '{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"__proto__","type":"string"}],"Note":[{"name":"text","type":"string"}]},"primaryType":"Note","domain":{"name":"Notes","__proto__":"hidden"},"message":{"text":"hello"}}',
@@ -965,7 +979,9 @@ describe('EthSignRequestDetail — EIP-712 special renderers', () => {
       derivationPath: "m/44'/60'/0'/0",
     });
 
-    expect(screen.queryByText(/This request cannot be signed/)).toBeNull();
+    expect(
+      screen.getByText(/declares __proto__, which EIP-712 does not define/),
+    ).toBeTruthy();
     expect(screen.getByText('__proto__')).toBeTruthy();
     expect(screen.getByText('hidden')).toBeTruthy();
   });

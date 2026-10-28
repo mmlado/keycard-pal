@@ -191,6 +191,110 @@ describe('classifyEthPayload', () => {
     });
   });
 
+  describe('a declared EIP712Domain other than the standard fields with their types', () => {
+    const STANDARD_DOMAIN = [
+      { name: 'name', type: 'string' },
+      { name: 'version', type: 'string' },
+      { name: 'chainId', type: 'uint256' },
+      { name: 'verifyingContract', type: 'address' },
+    ];
+    function declaring(retyped: Record<string, string>) {
+      return typedDataHex({
+        ...TYPED_DATA,
+        types: {
+          ...TYPED_DATA.types,
+          EIP712Domain: STANDARD_DOMAIN.map(m => ({
+            ...m,
+            type: retyped[m.name] ?? m.type,
+          })),
+        },
+      });
+    }
+
+    it.each([
+      ['verifyingContract', 'string', 'address'],
+      ['verifyingContract', 'bytes', 'address'],
+      ['chainId', 'string', 'uint256'],
+      ['version', 'uint256', 'string'],
+    ])('refuses %s declared as %s', (field, type, standard) => {
+      expect(classifyEthPayload(declaring({ [field]: type }), 2)).toEqual({
+        kind: 'invalid',
+        reason: `The EIP-712 domain declares ${field} as ${type} instead of ${standard}, so the signature would not be valid on the contract it names.`,
+      });
+    });
+
+    it('names every retyped field', () => {
+      const payload = classifyEthPayload(
+        declaring({ chainId: 'string', verifyingContract: 'string' }),
+        2,
+      );
+      expect(payload.kind === 'invalid' && payload.reason).toBe(
+        'The EIP-712 domain declares chainId as string instead of uint256, verifyingContract as string instead of address, so the signature would not be valid on the contract it names.',
+      );
+    });
+
+    function declaringMembers(members: unknown[], domain: object = {}) {
+      return typedDataHex({
+        ...TYPED_DATA,
+        domain: { ...TYPED_DATA.domain, ...domain },
+        types: { ...TYPED_DATA.types, EIP712Domain: members },
+      });
+    }
+
+    it.each([
+      [
+        'a standard field twice',
+        [...STANDARD_DOMAIN, { name: 'verifyingContract', type: 'address' }],
+        {},
+        'verifyingContract twice',
+      ],
+      [
+        'a field whose name is not a string',
+        [
+          ...STANDARD_DOMAIN.slice(0, 3),
+          { name: ['verifyingContract'], type: 'string' },
+        ],
+        {},
+        'a field without a name and a type',
+      ],
+      [
+        'a field EIP-712 does not define',
+        [...STANDARD_DOMAIN, { name: 'foo', type: 'string' }],
+        { foo: 'x' },
+        'foo, which EIP-712 does not define',
+      ],
+      [
+        'an EIP712Domain that is not a list',
+        {},
+        {},
+        'an EIP712Domain that is not a list',
+      ],
+    ])('refuses %s', (_, members, domain, declared) => {
+      const payload = classifyEthPayload(
+        declaringMembers(members as unknown[], domain),
+        2,
+      );
+      expect(payload).toEqual({
+        kind: 'invalid',
+        reason: `The EIP-712 domain declares ${declared}, so the signature would not be valid on the contract it names.`,
+      });
+    });
+
+    it('signs the standard fields in another order', () => {
+      expect(
+        classifyEthPayload(declaringMembers([...STANDARD_DOMAIN].reverse()), 2)
+          .kind,
+      ).toBe('eip712-json');
+    });
+
+    it('signs the standard types, declared or not', () => {
+      expect(classifyEthPayload(declaring({}), 2).kind).toBe('eip712-json');
+      expect(classifyEthPayload(TYPED_DATA_JSON_HEX, 2).kind).toBe(
+        'eip712-json',
+      );
+    });
+  });
+
   it('dataType=2 typed data whose domain is not an object → invalid, not an empty domain', () => {
     const typed = { ...TYPED_DATA, domain: 'x' };
     expect(classifyEthPayload(typedDataHex(typed), 2).kind).toBe('invalid');
