@@ -163,6 +163,68 @@ describe('describeMessage', () => {
     );
   });
 
+  // The signature would not be valid on the entry's contract, so its intent would mislead.
+  it.each([
+    ['verifyingContract', 'string'],
+    ['verifyingContract', 'bytes'],
+    ['chainId', 'string'],
+    ['version', 'uint256'],
+  ])('answers no entry when the domain declares %s as %s', (field, type) => {
+    const typed = transferWithAuthorization();
+    const retyped: Eip712RawTypedData = {
+      ...typed,
+      types: {
+        ...typed.types,
+        EIP712Domain: (
+          typed.types.EIP712Domain as { name: string; type: string }[]
+        ).map(m => (m.name === field ? { ...m, type } : m)),
+      },
+    };
+    const description = now(describeMessage(retyped, SIGNER));
+    expect(description.descriptor).toBeNull();
+    expect(description.rejected).toBe(false);
+    expect(mockLookupEip712).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'declares a standard field twice',
+      [{ name: 'verifyingContract', type: 'address' }],
+      {},
+    ],
+    [
+      'declares a field whose name is not a string',
+      [{ name: ['salt'], type: 'bytes32' }],
+      {},
+    ],
+    [
+      'declares a field EIP-712 does not define',
+      [{ name: 'foo', type: 'string' }],
+      { foo: 'x' },
+    ],
+  ])('answers no entry when the domain %s', (_, extra, domain) => {
+    const typed = transferWithAuthorization(domain);
+    const declared: Eip712RawTypedData = {
+      ...typed,
+      types: {
+        ...typed.types,
+        EIP712Domain: [...(typed.types.EIP712Domain as unknown[]), ...extra],
+      },
+    };
+    const description = now(describeMessage(declared, SIGNER));
+    expect(description.descriptor).toBeNull();
+    expect(mockLookupEip712).not.toHaveBeenCalled();
+  });
+
+  it('describes a message whose domain type is not declared', () => {
+    const typed = transferWithAuthorization();
+    delete typed.types.EIP712Domain;
+    const description = now(describeMessage(typed, SIGNER));
+    expect(description.descriptor?.format.intent).toBe(
+      'Authorize USDC transfer',
+    );
+  });
+
   it('answers no entry for a domain the entry does not name', () => {
     const description = now(
       describeMessage(transferWithAuthorization({ name: 'Fake Coin' }), SIGNER),

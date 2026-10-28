@@ -4,6 +4,7 @@ import { keccak_256 } from '@noble/hashes/sha3.js';
 import { getChainName } from './chainMetadata';
 
 import {
+  nonStandardDomainFields,
   oddLengthBytesPath,
   parseEip712Prehashed,
   parseEip712RawTypedData,
@@ -271,6 +272,12 @@ export function classifyEthPayload(
     if (typedData) {
       if (!typedData.primaryType) {
         return invalid('EIP-712 typed data names no primaryType.');
+      }
+      const nonStandard = nonStandardDomainFields(typedData).join(', ');
+      if (nonStandard) {
+        return invalid(
+          `The EIP-712 domain declares ${nonStandard}, so the signature would not be valid on the contract it names.`,
+        );
       }
       const uncovered = uncoveredDomainFields(typedData).join(', ');
       if (uncovered) {

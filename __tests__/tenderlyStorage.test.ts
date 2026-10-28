@@ -51,7 +51,7 @@ describe('tenderly.online storage', () => {
     });
 
     it('returns enabled=true and stored credentials', async () => {
-      mockAsyncGetItem.mockResolvedValue('true');
+      mockAsyncGetItem.mockResolvedValue('1');
       mockSecureGetItem
         .mockResolvedValueOnce('my-account')
         .mockResolvedValueOnce('my-project')
@@ -67,7 +67,7 @@ describe('tenderly.online storage', () => {
     });
 
     it('trims whitespace from credential values', async () => {
-      mockAsyncGetItem.mockResolvedValue('true');
+      mockAsyncGetItem.mockResolvedValue('1');
       mockSecureGetItem
         .mockResolvedValueOnce('  my-account  ')
         .mockResolvedValueOnce('  my-project  ')
@@ -80,14 +80,21 @@ describe('tenderly.online storage', () => {
       });
     });
 
-    it('returns enabled=false when flag is not "true"', async () => {
-      mockAsyncGetItem.mockResolvedValue('false');
+    it.each([
+      ['1', true],
+      ['true', true],
+      ['0', false],
+      ['false', false],
+      [null, false],
+      ['yes', false],
+    ])('reads the flag %p as enabled=%p', async (stored, enabled) => {
+      mockAsyncGetItem.mockResolvedValue(stored);
       mockSecureGetItem
         .mockResolvedValueOnce('acme')
         .mockResolvedValueOnce('proj')
         .mockResolvedValueOnce('key');
       const config = await loadTenderlyConfig();
-      expect(config.enabled).toBe(false);
+      expect(config.enabled).toBe(enabled);
     });
 
     it('returns defaults when storage throws', async () => {
@@ -101,20 +108,17 @@ describe('tenderly.online storage', () => {
   });
 
   describe('saveTenderlyEnabled', () => {
-    it('stores "true" in AsyncStorage when enabled', async () => {
+    it('stores "1" in AsyncStorage when enabled', async () => {
       mockAsyncSetItem.mockResolvedValue(undefined);
       await saveTenderlyEnabled(true);
-      expect(mockAsyncSetItem).toHaveBeenCalledWith('tenderly_enabled', 'true');
+      expect(mockAsyncSetItem).toHaveBeenCalledWith('tenderly_enabled', '1');
       expect(mockSecureSetItem).not.toHaveBeenCalled();
     });
 
-    it('stores "false" in AsyncStorage when disabled', async () => {
+    it('stores "0" in AsyncStorage when disabled', async () => {
       mockAsyncSetItem.mockResolvedValue(undefined);
       await saveTenderlyEnabled(false);
-      expect(mockAsyncSetItem).toHaveBeenCalledWith(
-        'tenderly_enabled',
-        'false',
-      );
+      expect(mockAsyncSetItem).toHaveBeenCalledWith('tenderly_enabled', '0');
       expect(mockSecureSetItem).not.toHaveBeenCalled();
     });
   });

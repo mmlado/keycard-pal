@@ -1,6 +1,7 @@
 import {
   eip712DomainChainId,
   encodeEip712Type,
+  nonStandardDomainFields,
   type Eip712RawTypedData,
 } from '@/utils/eip712';
 import { lookupEip712 } from '@/utils/eip7730/lookup';
@@ -37,6 +38,10 @@ export function describeMessage(
   };
   const encodedType = typed && encodeEip712Type(typed.primaryType, typed.types);
   if (!typed || chainId === undefined || !verifyingContract || !encodedType) {
+    return none;
+  }
+  // The entry's contract would not accept a signature under another domain type.
+  if (nonStandardDomainFields(typed).length > 0) {
     return none;
   }
 
