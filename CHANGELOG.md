@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- On Android, a Keycard is read again after the app is left with back and reopened right away
 - An Ethereum sign request with an unknown data type is refused instead of signed as a bare digest
 - WalletConnect typed data is signed under its declared EIP712Domain, giving the same signature as over QR, and typed data that names no primaryType or that the signature would not fully cover is refused with the reason
 - EIP-712 typed data whose declared EIP712Domain gives a domain field another type than EIP-712's, repeats one or adds one EIP-712 does not define is refused with the reason, and no clear-signing entry describes it
