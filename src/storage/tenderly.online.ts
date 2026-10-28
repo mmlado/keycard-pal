@@ -26,7 +26,8 @@ export async function loadTenderlyConfig(): Promise<TenderlyConfig> {
       EncryptedStorage.getItem(TENDERLY_API_KEY_KEY),
     ]);
     return {
-      enabled: enabled === 'true',
+      // 'true' is what versions before the '1' / '0' convention stored.
+      enabled: enabled === '1' || enabled === 'true',
       credentials: {
         accountSlug: accountSlug?.trim() ?? '',
         projectSlug: projectSlug?.trim() ?? '',
@@ -42,7 +43,7 @@ export async function loadTenderlyConfig(): Promise<TenderlyConfig> {
 }
 
 export async function saveTenderlyEnabled(value: boolean): Promise<void> {
-  await AsyncStorage.setItem(TENDERLY_ENABLED_KEY, value ? 'true' : 'false');
+  await AsyncStorage.setItem(TENDERLY_ENABLED_KEY, value ? '1' : '0');
 }
 
 export async function saveTenderlyCredentials(
