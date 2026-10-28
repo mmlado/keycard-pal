@@ -324,6 +324,16 @@ describe('classifyEthPayload', () => {
     });
   });
 
+  it.each([5, 99])(
+    'dataType=%i with a 32-byte payload → invalid, not a digest',
+    dataType => {
+      expect(classifyEthPayload(DIGEST_32_HEX, dataType)).toEqual({
+        kind: 'invalid',
+        reason: `Unknown data type ${dataType}.`,
+      });
+    },
+  );
+
   it('undefined dataType with a 32-byte digest → raw-digest', () => {
     expect(classifyEthPayload(DIGEST_32_HEX, undefined).kind).toBe(
       'raw-digest',
