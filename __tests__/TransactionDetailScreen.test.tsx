@@ -5,6 +5,8 @@ import TransactionDetailScreen from '../src/screens/TransactionDetailScreen';
 import type { EthSignRequest } from '../src/types';
 import { inspectBtcPsbt } from '../src/utils/btcPsbt';
 
+import { PAYLOAD_REQUESTS } from './ethPayloads.testUtils';
+
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(), setItem: jest.fn() },
@@ -360,10 +362,41 @@ describe('TransactionDetailScreen – eth-sign-request result', () => {
     expect(screen.getByText('Legacy Transaction')).toBeTruthy();
   });
 
-  it('falls back to "Unknown (N)" for an unrecognised data type', async () => {
-    const request = { ...fullRequest, dataType: 99 };
+  it('names no transaction type for a data type it cannot sign', async () => {
+    const request = { ...fullRequest, dataType: 99, signData: 'aabbcc' };
     renderScreen({ kind: 'eth-sign-request', request });
-    expect(screen.getByText('Unknown (99)')).toBeTruthy();
+    expect(screen.getByText('Ethereum request')).toBeTruthy();
+    expect(screen.queryByText('Legacy Transaction')).toBeNull();
+  });
+
+  it.each([
+    ['tx-legacy', 'Review transaction', 'Sign transaction'],
+    ['tx-eip2930', 'Review transaction', 'Sign transaction'],
+    ['tx-eip1559', 'Review transaction', 'Sign transaction'],
+    ['personal-message', 'Review message', 'Sign message'],
+    ['eip712-json', 'Review message', 'Sign message'],
+    ['eip712-prehashed', 'Review message', 'Sign message'],
+    ['raw-digest', 'Review message', 'Sign hash'],
+  ] as const)('%s: titled %s, with %s', async (kind, title, signLabel) => {
+    mockNavigation.setOptions.mockClear();
+    renderScreen({
+      kind: 'eth-sign-request',
+      request: { ...fullRequest, ...PAYLOAD_REQUESTS[kind] },
+    });
+    expect(mockNavigation.setOptions).toHaveBeenLastCalledWith({ title });
+    expect(screen.getByText(signLabel)).toBeTruthy();
+  });
+
+  it('titles a request it cannot sign as a request, with no Sign button', async () => {
+    mockNavigation.setOptions.mockClear();
+    renderScreen({
+      kind: 'eth-sign-request',
+      request: { ...fullRequest, ...PAYLOAD_REQUESTS.invalid },
+    });
+    expect(mockNavigation.setOptions).toHaveBeenLastCalledWith({
+      title: 'Review request',
+    });
+    expect(screen.queryByText(/^Sign /)).toBeNull();
   });
 
   it('shows the Sign transaction button', async () => {
@@ -455,9 +488,13 @@ describe('TransactionDetailScreen – crypto-psbt result', () => {
     expect(renderScreen(psbtResult(VALID_PSBT_HEX))).toBeDefined();
   });
 
-  it('shows the Sign transaction button', async () => {
+  it('shows the Sign transaction button under Review transaction', async () => {
+    mockNavigation.setOptions.mockClear();
     renderScreen(psbtResult(VALID_PSBT_HEX));
     expect(screen.getByText('Sign transaction')).toBeTruthy();
+    expect(mockNavigation.setOptions).toHaveBeenLastCalledWith({
+      title: 'Review transaction',
+    });
   });
 
   it('navigates to Keycard with PSBT signing params', async () => {
@@ -532,7 +569,11 @@ describe('TransactionDetailScreen – crypto-psbt result', () => {
   });
 
   it('shows BIP-322 requests as message signing', async () => {
+    mockNavigation.setOptions.mockClear();
     renderScreen(psbtResult(BIP322_PSBT_HEX));
+    expect(mockNavigation.setOptions).toHaveBeenLastCalledWith({
+      title: 'Review message',
+    });
     expect(screen.getByText('Bitcoin Message')).toBeTruthy();
     expect(screen.getByText('BIP-322 Message')).toBeTruthy();
     expect(screen.getByText('Sign message')).toBeTruthy();
@@ -541,6 +582,7 @@ describe('TransactionDetailScreen – crypto-psbt result', () => {
 
 describe('TransactionDetailScreen – btc-sign-request result', () => {
   it('shows message signing details and CTA', async () => {
+    mockNavigation.setOptions.mockClear();
     renderScreen({
       kind: 'btc-sign-request',
       request: {
@@ -556,6 +598,9 @@ describe('TransactionDetailScreen – btc-sign-request result', () => {
     expect(screen.getByText('btc-sign-request')).toBeTruthy();
     expect(screen.getByText('hello btc')).toBeTruthy();
     expect(screen.getByText('Sign message')).toBeTruthy();
+    expect(mockNavigation.setOptions).toHaveBeenLastCalledWith({
+      title: 'Review message',
+    });
   });
 
   it('navigates to Keycard with Bitcoin message signing params', async () => {

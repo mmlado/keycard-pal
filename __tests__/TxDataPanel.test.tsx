@@ -22,7 +22,10 @@ import type { SimulationResult } from '../src/utils/tenderly/client.online';
 // The panel reads the address op from the provider, so every render sits inside one.
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
-    <SimulationAddressProvider derivationPath="m/44'/60'/0'/0">
+    <SimulationAddressProvider
+      derivationPath="m/44'/60'/0'/0"
+      title="Review transaction"
+    >
       {children}
     </SimulationAddressProvider>
   );
