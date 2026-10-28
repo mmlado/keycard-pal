@@ -15,6 +15,8 @@ import type { EthSignRequest } from '../src/types';
 import { setSavedIndex } from '../src/utils/eip7730/lookup';
 import { wcRequestToScanResult } from '../src/utils/walletConnect/requestAdapter';
 
+import { PAYLOAD_REQUESTS } from './ethPayloads.testUtils';
+
 const mockNavigation = {
   goBack: jest.fn(),
   reset: jest.fn(),
@@ -178,7 +180,10 @@ function eip2930TxHex(value: bigint = 500_000_000_000_000_000n): string {
 
 function renderDetail(request: EthSignRequest) {
   return render(
-    <SimulationAddressProvider derivationPath={request.derivationPath}>
+    <SimulationAddressProvider
+      derivationPath={request.derivationPath}
+      title="Review transaction"
+    >
       <EthSignRequestDetail request={request} />
     </SimulationAddressProvider>,
   );
@@ -304,6 +309,37 @@ describe('EthSignRequestDetail — native currency symbol', () => {
 // ---------------------------------------------------------------------------
 
 describe('EthSignRequestDetail — transaction type labels', () => {
+  it.each([
+    ['tx-legacy', 'Legacy Transaction'],
+    ['tx-eip2930', 'EIP-2930 Transaction'],
+    ['tx-eip1559', 'EIP-1559 Transaction'],
+    ['personal-message', 'Personal Message'],
+    ['eip712-json', 'Mail'],
+    ['eip712-prehashed', 'EIP-712 Typed Data'],
+    ['raw-digest', 'Hash'],
+    ['invalid', 'Ethereum request'],
+  ] as const)('labels a %s payload %s', (kind, label) => {
+    renderDetail({
+      ...PAYLOAD_REQUESTS[kind],
+      derivationPath: "m/44'/60'/0'/0",
+      chainId: 1,
+    });
+    // An EIP-712 message also shows its primaryType below the chip.
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+  });
+
+  // The classification refuses dataType 1 bytes that start 0x02, so no transaction type is named.
+  it('names no transaction type for EIP-1559 bytes sent as dataType 1', () => {
+    renderDetail({
+      signData: PAYLOAD_REQUESTS['tx-eip1559'].signData,
+      dataType: 1,
+      derivationPath: "m/44'/60'/0'/0",
+      chainId: 1,
+    });
+    expect(screen.getByText('Ethereum request')).toBeTruthy();
+    expect(screen.queryByText('EIP-1559 Transaction')).toBeNull();
+  });
+
   it('shows "EIP-1559 Transaction" label for dataType=4', () => {
     renderDetail({
       signData: eip1559TxHex(1n),

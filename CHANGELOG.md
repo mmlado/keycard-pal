@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- An Ethereum message, typed data or bare hash is reviewed under "Review message" with "Sign message" or "Sign hash" instead of as a transaction, and a request that cannot be signed is titled "Review request" and named by no transaction type
 - WalletConnect typed data is signed under its declared EIP712Domain, giving the same signature as over QR, and typed data that names no primaryType or that the signature would not fully cover is refused with the reason
 - A legacy Ethereum transaction that is not an unsigned EIP-155 one, or a transaction whose recipient is not 20 bytes, is refused instead of signed, and a legacy transaction for a chain ID above 2^31 is signed with a `v` that names its chain
 - A WalletConnect request left by back, swipe or Go back is rejected, so the next request in the session is shown instead of refused as busy, and back on the success sheet after signing sends the dApp the signature instead of a rejection

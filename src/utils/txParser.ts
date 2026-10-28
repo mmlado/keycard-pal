@@ -8,7 +8,6 @@ import {
 } from 'viem';
 
 import selectorsData from '../data/selectors.json';
-import { DATA_TYPE_LABELS } from '../types';
 
 import type { TransactionFields } from './ethPayload';
 import { checksumEthAddress } from './ethereumAddress';
@@ -381,20 +380,4 @@ export function formatTx(
             gasLimit,
           },
   };
-}
-
-/**
- * Returns a human-readable label for the transaction type.
- * Distinguishes typed transaction envelopes by the first byte.
- */
-export function getTxLabel(signDataHex: string, dataType: number): string {
-  if (dataType === 1 || dataType === 4) {
-    const bytes = Buffer.from(signDataHex, 'hex');
-    if (bytes[0] === 0x01) return 'EIP-2930 Transaction';
-    if (bytes[0] === 0x02) return 'EIP-1559 Transaction';
-  }
-  if (dataType === 1) {
-    return 'Legacy Transaction';
-  }
-  return DATA_TYPE_LABELS[dataType] ?? `Unknown (${dataType})`;
 }

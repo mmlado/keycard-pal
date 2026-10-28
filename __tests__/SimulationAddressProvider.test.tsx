@@ -85,10 +85,10 @@ function Consumer() {
   return <Text onPress={() => op.start()}>consumer</Text>;
 }
 
-function providerTree(derivationPath?: string) {
+function providerTree(derivationPath?: string, title = 'Review transaction') {
   return (
     <View testID="root">
-      <SimulationAddressProvider derivationPath={derivationPath}>
+      <SimulationAddressProvider derivationPath={derivationPath} title={title}>
         <Consumer />
       </SimulationAddressProvider>
     </View>
@@ -149,9 +149,9 @@ describe('SimulationAddressProvider', () => {
     });
 
     mockOp.phase = 'idle';
-    view.rerender(providerTree(PATH));
+    view.rerender(providerTree(PATH, 'Review message'));
     expect(mockNavigation.setOptions).toHaveBeenLastCalledWith({
-      title: 'Review transaction',
+      title: 'Review message',
     });
   });
 

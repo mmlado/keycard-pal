@@ -29,6 +29,8 @@ export function useSimulationAddressOp(): SimulationAddressOp {
 
 type Props = {
   derivationPath: string | undefined;
+  /** The review screen's own title, which the header shows again after the PIN pad. */
+  title: string;
   children: React.ReactNode;
 };
 
@@ -49,6 +51,7 @@ async function exportAddress(
 // fills its nearest ancestor, so anything smaller clips it.
 export default function SimulationAddressProvider({
   derivationPath,
+  title,
   children,
 }: Props) {
   // Read-only key export: safe to re-run from SELECT on a re-tap.
@@ -63,11 +66,11 @@ export default function SimulationAddressProvider({
   );
 
   const navigation = useNavigation<KeycardScreenNavigation>();
-  // The review screen's own title; cancelling the tap keeps the review.
+  // Cancelling the tap keeps the review.
   const { sheet } = useKeycardScreen({
     keycard: op,
     navigation,
-    title: 'Review transaction',
+    title,
     stayOnCancel: true,
   });
 

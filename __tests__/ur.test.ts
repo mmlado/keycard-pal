@@ -10,7 +10,6 @@ import { EthSignRequest } from '@keystonehq/bc-ur-registry-eth';
 import { URDecoder } from '@ngraveio/bc-ur';
 
 import { encodeToUR, handleUR } from '../src/utils/ur';
-import { DATA_TYPE_LABELS } from '../src/types';
 
 const VALID_EIP1559_TX_HEX =
   '02e80180843b9aca008504a817c8008252089400000000000000000000000000000000000000010180c0';
@@ -362,18 +361,5 @@ describe('encodeToUR', () => {
     decoder.receivePart(encoded);
     expect(decoder.isComplete()).toBe(true);
     expect(decoder.resultUR().type).toBe('crypto-psbt');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// DATA_TYPE_LABELS
-// ---------------------------------------------------------------------------
-
-describe('DATA_TYPE_LABELS', () => {
-  it('has correct labels for all ERC-4527 data types', () => {
-    expect(DATA_TYPE_LABELS[1]).toBe('Legacy Transaction');
-    expect(DATA_TYPE_LABELS[2]).toBe('EIP-712 Typed Data');
-    expect(DATA_TYPE_LABELS[3]).toBe('Personal Message');
-    expect(DATA_TYPE_LABELS[4]).toBe('Typed Transaction');
   });
 });
