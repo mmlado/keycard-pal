@@ -75,10 +75,10 @@ On iOS there is one app, Keycard Pal, with the same opt-in online features; ther
 
 ## Getting the app
 
-Both Android variants, including Keycard Pal Offline, are attached to every GitHub release
-and served from the developer's F-Droid repository. Keycard Pal (`com.keycardpal`) is also
-on Google Play, and the iOS app is on the App Store. The same channels, with screenshots,
-are at [keycardpal.com](https://keycardpal.com).
+Both Android variants, including Keycard Pal Offline, are attached to every GitHub release,
+published on F-Droid and served from the developer's own F-Droid repository. Keycard Pal
+(`com.keycardpal`) is also on Google Play, and the iOS app is on the App Store. The same
+channels, with screenshots, are at [keycardpal.com](https://keycardpal.com).
 
 <p>
   <a href="https://github.com/mmlado/keycard-pal/releases/latest">
@@ -87,7 +87,7 @@ are at [keycardpal.com](https://keycardpal.com).
   <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/mmlado/keycard-pal">
     <img src="assets/badges/badge_obtainium.png" alt="Get it on Obtainium" height="70" />
   </a>
-  <a href="https://fdroid.keycardpal.com/repo?fingerprint=24EB891A8A617F8BF20892CB0CF9267709BA94056E64242AD9EDF638C2FED3D2">
+  <a href="https://f-droid.org/packages/com.keycardpal/">
     <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="70" />
   </a>
   <a href="https://play.google.com/store/apps/details?id=com.keycardpal">
@@ -123,6 +123,17 @@ Obtainium and either F-Droid repository the same way, without reinstalling.
 4. Select the universal APK from the latest release.
 
 ### Install via F-Droid
+
+Both variants are in the main F-Droid repository, which the F-Droid client includes by
+default: [Keycard Pal](https://f-droid.org/packages/com.keycardpal/) and
+[Keycard Pal Offline](https://f-droid.org/packages/com.keycardpal.offline/). F-Droid builds
+each release from source and publishes it only when its build matches the GitHub release APK
+byte for byte, so the APK it serves carries the certificate above.
+
+The developer's own repository serves the same APKs as soon as a release is tagged, without
+waiting for F-Droid's build cycle.
+[Add it on the phone](https://fdroid.keycardpal.com/repo?fingerprint=24EB891A8A617F8BF20892CB0CF9267709BA94056E64242AD9EDF638C2FED3D2),
+or enter it by hand:
 
 **Repository URL:**
 ```
