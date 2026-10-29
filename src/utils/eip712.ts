@@ -458,6 +458,24 @@ export function nonStandardDomainFields(data: Eip712RawTypedData): string[] {
   });
 }
 
+const STANDARD_DOMAIN_ORDER = Object.keys(STANDARD_DOMAIN_TYPES);
+
+/** The domain type hash covers the order, so a contract hashing EIP-712's order computes another separator. */
+export function domainFieldsInStandardOrder(data: Eip712RawTypedData): boolean {
+  const declared = data.types.EIP712Domain;
+  if (!Array.isArray(declared)) return true;
+  const positions = declared
+    .map(member =>
+      isJsonObject(member) && typeof member.name === 'string'
+        ? STANDARD_DOMAIN_ORDER.indexOf(member.name)
+        : -1,
+    )
+    .filter(position => position >= 0);
+  return positions.every(
+    (position, i) => i === 0 || positions[i - 1] < position,
+  );
+}
+
 /** Every declared `address` in EIP-55, which viem requires; the encoded 20 bytes stay the same. */
 export function checksumEip712Addresses(data: Eip712RawTypedData): {
   typedData: Eip712RawTypedData;

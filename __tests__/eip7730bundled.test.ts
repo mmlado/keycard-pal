@@ -33,6 +33,7 @@ import type {
   Eip7730Index,
 } from '../src/utils/eip7730/zip';
 import { checksumEthAddress } from '../src/utils/ethereumAddress';
+import { classifyEthPayload } from '../src/utils/ethPayload';
 import { describeMessage } from '../src/utils/messageDescription';
 
 // The bundled index answers at once; a promise here would make every review screen wait.
@@ -229,6 +230,24 @@ describe('bundled EIP-7730 descriptors', () => {
 
     it('does not match a message from another domain', () => {
       expect(describe({ ...domain, name: 'Fake Coin' }).descriptor).toBeNull();
+    });
+
+    // USDC hashes EIP-712's order, so it would not accept this signature.
+    it('signs the domain fields in another order, described by no entry', () => {
+      const typed = {
+        types: { ...types, EIP712Domain: [...types.EIP712Domain].reverse() },
+        primaryType: 'TransferWithAuthorization',
+        domain,
+        message,
+      };
+      const signData = Buffer.from(JSON.stringify(typed)).toString('hex');
+      expect(classifyEthPayload(signData, 2).kind).toBe('eip712-json');
+      expect(describeMessage(typed, undefined)).toEqual({
+        descriptor: null,
+        rejected: false,
+        chainId: 1,
+        verifyingContract: USDC,
+      });
     });
   });
 });

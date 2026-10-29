@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pairing slots lists the card's own number of slots on applet 3.1, 5 or 100, instead of always 10
 - WalletConnect typed data is signed under its declared EIP712Domain, giving the same signature as over QR, and typed data that names no primaryType or that the signature would not fully cover is refused with the reason
 - EIP-712 typed data whose declared EIP712Domain gives a domain field another type than EIP-712's, repeats one or adds one EIP-712 does not define is refused with the reason, and no clear-signing entry describes it
+- No clear-signing entry describes EIP-712 typed data whose declared EIP712Domain lists the standard fields in another order
 - A legacy Ethereum transaction that is not an unsigned EIP-155 one, or a transaction whose recipient is not 20 bytes, is refused instead of signed, and a legacy transaction for a chain ID above 2^31 is signed with a `v` that names its chain
 - A WalletConnect request left by back, swipe or Go back is rejected, so the next request in the session is shown instead of refused as busy, and back on the success sheet after signing sends the dApp the signature instead of a rejection
 - Cancel on Apple's NFC sheet leaves the signing, key export, key generation, Pairing slots and WalletConnect pairing screens and rejects the WalletConnect request or proposal it was for, and Cancel after a refused tap leaves Change PIN, Unblock PIN and Initialize instead of stepping back through the form
