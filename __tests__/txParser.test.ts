@@ -10,12 +10,7 @@ import {
   classifyEthPayload,
   payloadTransaction,
 } from '../src/utils/ethPayload';
-import {
-  decodeCalldata,
-  formatTx,
-  getTxLabel,
-  type ParsedTx,
-} from '../src/utils/txParser';
+import { decodeCalldata, formatTx, type ParsedTx } from '../src/utils/txParser';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -261,44 +256,6 @@ describe('formatTx', () => {
       const tx = reviewedTx(hex, 4, 'AVAX');
       expect(tx?.value).toBe('1 AVAX');
     });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getTxLabel
-// ---------------------------------------------------------------------------
-
-describe('getTxLabel', () => {
-  it('returns "EIP-2930 Transaction" for 0x01-prefixed dataType=1', () => {
-    expect(getTxLabel(buildEIP2930TxHex(), 1)).toBe('EIP-2930 Transaction');
-  });
-
-  it('returns "EIP-2930 Transaction" for 0x01-prefixed dataType=4', () => {
-    expect(getTxLabel(buildEIP2930TxHex(), 4)).toBe('EIP-2930 Transaction');
-  });
-
-  it('returns "Legacy Transaction" for plain dataType=1', () => {
-    expect(getTxLabel(buildLegacyTxHex(), 1)).toBe('Legacy Transaction');
-  });
-
-  it('returns "EIP-1559 Transaction" for dataType=4', () => {
-    expect(getTxLabel('02' + 'deadbeef', 4)).toBe('EIP-1559 Transaction');
-  });
-
-  it('returns the typed transaction fallback for unknown type bytes', () => {
-    expect(getTxLabel('03' + 'deadbeef', 4)).toBe('Typed Transaction');
-  });
-
-  it('returns "EIP-712 Typed Data" for dataType=2', () => {
-    expect(getTxLabel('deadbeef', 2)).toBe('EIP-712 Typed Data');
-  });
-
-  it('returns "Personal Message" for dataType=3', () => {
-    expect(getTxLabel('deadbeef', 3)).toBe('Personal Message');
-  });
-
-  it('returns fallback for unknown dataType', () => {
-    expect(getTxLabel('deadbeef', 99)).toBe('Unknown (99)');
   });
 });
 

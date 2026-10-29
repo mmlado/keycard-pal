@@ -18,6 +18,11 @@ jest.mock('@react-navigation/native', () => {
 
 jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
 
+const mockBlockNativeBack = jest.fn();
+jest.mock('../src/navigation/useBlockNativeBack', () => ({
+  useBlockNativeBack: (block: boolean) => mockBlockNativeBack(block),
+}));
+
 function makeNavigation() {
   return {
     goBack: jest.fn(),
@@ -442,6 +447,69 @@ describe('back guard', () => {
     expect(keycard.cancel).toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
     expect(stepBack).not.toHaveBeenCalled();
+  });
+
+  it.each(['nfc', 'pin_entry'])(
+    'the header back during %s on a screen that stays on cancel cancels and stays',
+    phase => {
+      const { navigation, left } = makeNavigationThatAsksFirst();
+      const keycard = makeKeycard(phase);
+      renderScreenHook({ keycard, navigation, title: 'T', stayOnCancel: true });
+
+      navigation.goBack();
+
+      expect(keycard.cancel).toHaveBeenCalled();
+      expect(left).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a second header back leaves once the cancelled tap is idle', () => {
+    const { navigation, left } = makeNavigationThatAsksFirst();
+    const keycard = makeKeycard('pin_entry');
+    const options = { keycard, navigation, title: 'T', stayOnCancel: true };
+    const view = renderScreenHook(options);
+    navigation.goBack();
+
+    view.rerender({ ...options, keycard: makeKeycard('idle') });
+    navigation.goBack();
+
+    expect(left).toHaveBeenCalledTimes(1);
+  });
+
+  it('the header back during a tap on a screen that leaves on cancel leaves', () => {
+    const { navigation, left } = makeNavigationThatAsksFirst();
+    const keycard = makeKeycard('pin_entry');
+    renderScreenHook({ keycard, navigation, title: 'T' });
+
+    navigation.goBack();
+
+    expect(keycard.cancel).toHaveBeenCalled();
+    expect(left).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks iOS's native back only during a tap on a screen that stays on cancel", () => {
+    const navigation = makeNavigation();
+    const options = {
+      keycard: makeKeycard('idle'),
+      navigation,
+      title: 'T',
+      stayOnCancel: true,
+    };
+    const view = renderScreenHook(options);
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+
+    view.rerender({ ...options, keycard: makeKeycard('pin_entry') });
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
+
+    view.rerender({ ...options, keycard: makeKeycard('nfc') });
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
+
+    view.rerender({
+      ...options,
+      keycard: makeKeycard('nfc'),
+      stayOnCancel: false,
+    });
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
   });
 
   it('beforeRemove when idle stays when the screen steps back', () => {

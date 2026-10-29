@@ -32,6 +32,11 @@ jest.mock('react-native-reanimated', () =>
   require('react-native-reanimated/mock'),
 );
 
+// usePreventRemove needs a navigator, and screens are tested without one; the hook's own beforeRemove listener is what tests drive.
+jest.mock('./src/navigation/useBlockNativeBack', () => ({
+  useBlockNativeBack: () => {},
+}));
+
 // Clear any pending fake timers between tests to prevent bleed-over.
 afterEach(() => {
   jest.clearAllTimers();

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { BackHandler } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
+import { useBlockNativeBack } from '@/navigation/useBlockNativeBack';
+
 import NFCBottomSheet, { type NFCOperation } from '@/components/NFCBottomSheet';
 
 type BeforeRemoveEvent = { preventDefault: () => void };
@@ -160,6 +162,10 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
       }
       if (keycardBusy()) {
         activeRef.current.cancel();
+        // Like hardware back: a screen that stays on cancel needs a second back to leave.
+        if (optionsRef.current.stayOnCancel) {
+          e.preventDefault();
+        }
         return;
       }
       if (held()) {
@@ -173,6 +179,11 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
     });
     return unsubscribe;
   }, [navigation, keycardBusy, held, leave]);
+
+  useBlockNativeBack(
+    options.stayOnCancel === true &&
+      (active.phase === 'nfc' || active.phase === 'pin_entry'),
+  );
 
   // Cancel on Apple's NFC sheet, the only one iOS gives during a tap.
   const userCancels = active.userCancels;

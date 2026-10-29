@@ -29,11 +29,3 @@ export type ScanResult =
   | { kind: 'btc-sign-request'; request: BtcSignRequest }
   | { kind: 'unsupported'; type: string }
   | { kind: 'error'; message: string };
-
-// ERC-4527 eth-sign-request data types
-export const DATA_TYPE_LABELS: Record<number, string> = {
-  1: 'Legacy Transaction',
-  2: 'EIP-712 Typed Data',
-  3: 'Personal Message',
-  4: 'Typed Transaction',
-};

@@ -22,7 +22,8 @@ import {
   payloadTransaction,
 } from '@/utils/ethPayload';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
-import { formatTx, getTxLabel } from '@/utils/txParser';
+import { ethTypeLabel } from '@/utils/reviewWording';
+import { formatTx } from '@/utils/txParser';
 
 export default function SignRequestDetail({
   request,
@@ -54,8 +55,7 @@ export default function SignRequestDetail({
     value: tx?.valueWei,
     depth: 0,
   });
-  const typeLabel =
-    eip712?.primaryType ?? getTxLabel(request.signData, request.dataType);
+  const typeLabel = ethTypeLabel(payload, eip712?.primaryType);
   const signer = request.address
     ? checksumEthAddress(request.address)
     : request.derivationPath;
