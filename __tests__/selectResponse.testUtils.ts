@@ -28,13 +28,17 @@ function versionBytes(version: number): number[] {
 /** An initialized 3.x card. */
 export function v3Select(
   version: number,
-  options: { instanceUID?: number[]; keyUID?: number[] } = {},
+  options: {
+    instanceUID?: number[];
+    keyUID?: number[];
+    freePairingSlots?: number;
+  } = {},
 ): ApplicationInfo {
   const body = [
     ...tlv(0x8f, options.instanceUID ?? filler(16)),
     ...tlv(0x80, filler(65)),
     ...tlv(0x02, versionBytes(version)),
-    ...tlv(0x02, [5]),
+    ...tlv(0x02, [options.freePairingSlots ?? 5]),
     ...tlv(0x8e, options.keyUID ?? []),
     ...tlv(0x8d, [0x1f]),
   ];

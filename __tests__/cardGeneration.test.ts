@@ -8,6 +8,7 @@ import {
   isBelowMinimumVersion,
   isNewerGeneration,
   MIN_SUPPORTED_APPLET_VERSION,
+  pairingSlotCount,
   parseGenerations,
   parseGenerationsInUse,
   secureChannelVersion,
@@ -180,5 +181,37 @@ describe('secureChannelVersion', () => {
 
   it('is V1 for an uninitialized 3.x card, which reports no version', () => {
     expect(secureChannelVersion(blankV3Select())).toBe('v1');
+  });
+});
+
+describe('pairingSlotCount', () => {
+  const card = (version: number, freePairingSlots: number) =>
+    v3Select(version, { freePairingSlots });
+
+  it.each([
+    [10, 0],
+    [10, 9],
+    [0, 3],
+  ])('is 10 on applet 3.2 with %i free', (free, own) => {
+    expect(pairingSlotCount(card(0x0302, free), own)).toBe(10);
+  });
+
+  it.each([
+    [5, null],
+    [0, 4],
+    [3, null],
+  ])(
+    'is 5 on applet 3.1 with %i free and this phone in slot index %p',
+    (free, own) => {
+      expect(pairingSlotCount(card(0x0301, free), own)).toBe(5);
+    },
+  );
+
+  it.each([
+    ['more than 5 free', 99, null],
+    ['6 free', 6, 0],
+    ["this phone's slot past the fifth", 2, 5],
+  ])('is 100 on applet 3.1 with %s', (_, free, own) => {
+    expect(pairingSlotCount(card(0x0301, free), own)).toBe(100);
   });
 });
