@@ -13,6 +13,11 @@ import { useKeycardOperation } from './useKeycardOperation';
 import { useNFCOperation } from './useNFCOperation';
 
 const TOTAL_SLOTS = 10;
+// Applet 3.1.0 has 5 slots and 3.1.1 has 100 under the same version number; the card refuses an index past its last.
+const SW_NO_SUCH_SLOT = 0x6a86;
+const MAX_SLOT_INDEX = 127;
+
+export const OTHERS_UNPAIRED = 'Every other device was unpaired';
 
 export interface SlotInfo {
   totalSlots: number;
@@ -34,6 +39,8 @@ export interface UsePairingSlots {
   dismissUnpaired: () => void;
   checkSlots: () => void;
   unpair: (slotIndex: number) => void;
+  /** Every slot the card has, except the one this phone's tap uses. */
+  unpairOthers: () => void;
 }
 
 export function usePairingSlots(): UsePairingSlots {
@@ -82,21 +89,23 @@ export function usePairingSlots(): UsePairingSlots {
   const { phase: unpairPhase, execute, reset: resetUnpair } = unpairOp;
   const rereadFailedRef = useRef(false);
 
-  const unpair = useCallback(
-    (slotIndex: number) => {
+  const runUnpair = useCallback(
+    (
+      unpairSlots: (cmdSet: Commandset, ownSlot?: number) => Promise<boolean>,
+      message: string,
+    ) => {
       if (!slotInfo) {
         return;
       }
       const { cardKey } = slotInfo;
-      const message = `Slot ${slotIndex + 1} was unpaired`;
       setUnpairing(true);
       execute(
-        async cmdSet => {
+        async (cmdSet, { setStatus }) => {
+          setStatus('Unpairing...');
           // The tap pairs the card when this phone had no pairing, so the read's own slot may be stale.
           const ownSlot = cmdSet.getPairing()?.pairingIndex;
-          const unpairResp = await cmdSet.unpair(slotIndex);
-          unpairResp.checkOK('Unpairing failed');
-          if (slotIndex === ownSlot) {
+          const ownSlotUnpaired = await unpairSlots(cmdSet, ownSlot);
+          if (ownSlotUnpaired) {
             try {
               await deletePairing(cardKey);
             } catch {
@@ -128,6 +137,37 @@ export function usePairingSlots(): UsePairingSlots {
       );
     },
     [slotInfo, execute, readSlotInfo],
+  );
+
+  const unpair = useCallback(
+    (slotIndex: number) =>
+      runUnpair(async (cmdSet, ownSlot) => {
+        const unpairResp = await cmdSet.unpair(slotIndex);
+        unpairResp.checkOK('Unpairing failed');
+        return slotIndex === ownSlot;
+      }, `Slot ${slotIndex + 1} was unpaired`),
+    [runUnpair],
+  );
+
+  const unpairOthers = useCallback(
+    () =>
+      runUnpair(async (cmdSet, ownSlot) => {
+        if (ownSlot === undefined) {
+          throw new Error("Could not tell which slot is this device's.");
+        }
+        for (let slot = 0; slot <= MAX_SLOT_INDEX; slot++) {
+          if (slot === ownSlot) {
+            continue;
+          }
+          const unpairResp = await cmdSet.unpair(slot);
+          if (unpairResp.sw === SW_NO_SUCH_SLOT) {
+            break;
+          }
+          unpairResp.checkOK('Unpairing failed');
+        }
+        return false;
+      }, OTHERS_UNPAIRED),
+    [runUnpair],
   );
 
   useEffect(() => {
@@ -176,5 +216,6 @@ export function usePairingSlots(): UsePairingSlots {
     dismissUnpaired,
     checkSlots,
     unpair,
+    unpairOthers,
   };
 }

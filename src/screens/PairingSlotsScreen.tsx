@@ -7,6 +7,7 @@ import { routeAbsence } from '@/navigation/generationBoundRoutes';
 import type { PairingSlotsScreenProps } from '@/navigation/types';
 import theme from '@/theme';
 
+import { Icons } from '@/assets/icons';
 import ConfirmPrompt from '@/components/ConfirmPropmpt';
 import Menu from '@/components/Menu';
 import PrimaryButton from '@/components/PrimaryButton';
@@ -18,7 +19,9 @@ export default function PairingSlotsScreen({
   navigation,
 }: PairingSlotsScreenProps) {
   const insets = useSafeAreaInsets();
-  const [pendingSlotIndex, setPendingSlotIndex] = useState<number | null>(null);
+  const [pendingUnpair, setPendingUnpair] = useState<number | 'others' | null>(
+    null,
+  );
 
   const {
     tap,
@@ -29,8 +32,17 @@ export default function PairingSlotsScreen({
     dismissUnpaired,
     checkSlots,
     unpair,
+    unpairOthers,
   } = usePairingSlots();
   const phase = tap.phase;
+
+  const stepBack = useCallback(() => {
+    if (pendingUnpair === null) {
+      return false;
+    }
+    setPendingUnpair(null);
+    return true;
+  }, [pendingUnpair]);
 
   const { sheet } = useKeycardScreen({
     keycard: tap,
@@ -38,6 +50,7 @@ export default function PairingSlotsScreen({
     title: 'Pairing slots',
     stayOnCancel: unpairing,
     showOnDone: unpairing,
+    stepBack,
   });
 
   // Once per mount, not on focus: Apple's Cancel puts the read back to 'idle'.
@@ -52,31 +65,42 @@ export default function PairingSlotsScreen({
     }
   }, [phase, slotInfo, noPairingSlots, checkSlots]);
 
-  const handleUnpairPress = useCallback((slotIndex: number) => {
-    setPendingSlotIndex(slotIndex);
-  }, []);
-
   const handleConfirmUnpair = useCallback(() => {
-    const slotIndex = pendingSlotIndex!;
-    setPendingSlotIndex(null);
-    unpair(slotIndex);
-  }, [pendingSlotIndex, unpair]);
+    const target = pendingUnpair;
+    setPendingUnpair(null);
+    if (target === 'others') {
+      unpairOthers();
+    } else if (target !== null) {
+      unpair(target);
+    }
+  }, [pendingUnpair, unpair, unpairOthers]);
 
   const handleCancelUnpairConfirm = useCallback(() => {
-    setPendingSlotIndex(null);
+    setPendingUnpair(null);
   }, []);
 
-  if (pendingSlotIndex !== null) {
+  if (pendingUnpair !== null) {
     return (
       <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
-        <ConfirmPrompt
-          title={`Unpair slot ${pendingSlotIndex + 1}?`}
-          description="The device paired to this slot will need to re-pair before it can use this card again."
-          yesLabel="Unpair"
-          noLabel="Cancel"
-          onYes={handleConfirmUnpair}
-          onNo={handleCancelUnpairConfirm}
-        />
+        {pendingUnpair === 'others' ? (
+          <ConfirmPrompt
+            title="Unpair every other device?"
+            description="Every device paired to this card except this one will need to re-pair before it can use this card again."
+            yesLabel="Unpair"
+            noLabel="Cancel"
+            onYes={handleConfirmUnpair}
+            onNo={handleCancelUnpairConfirm}
+          />
+        ) : (
+          <ConfirmPrompt
+            title={`Unpair slot ${pendingUnpair + 1}?`}
+            description="The device paired to this slot will need to re-pair before it can use this card again."
+            yesLabel="Unpair"
+            noLabel="Cancel"
+            onYes={handleConfirmUnpair}
+            onNo={handleCancelUnpairConfirm}
+          />
+        )}
       </View>
     );
   }
@@ -92,7 +116,7 @@ export default function PairingSlotsScreen({
         return {
           label: `Slot ${i + 1}`,
           detail: isOurSlot ? 'This device' : undefined,
-          onPress: () => handleUnpairPress(i),
+          onPress: () => setPendingUnpair(i),
         };
       })
     : [];
@@ -135,16 +159,25 @@ export default function PairingSlotsScreen({
           )}
 
           {slotInfo && (
-            <View style={styles.listContent}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Slots free</Text>
-                <Text style={styles.summaryValue}>
-                  {slotInfo.freeSlots} / {slotInfo.totalSlots}
-                </Text>
-              </View>
+            <>
+              <View style={styles.listContent}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Slots free</Text>
+                  <Text style={styles.summaryValue}>
+                    {slotInfo.freeSlots} / {slotInfo.totalSlots}
+                  </Text>
+                </View>
 
-              <Menu entries={menuEntries} />
-            </View>
+                <Menu entries={menuEntries} />
+              </View>
+              <View style={styles.footer}>
+                <PrimaryButton
+                  label="Unpair other devices"
+                  onPress={() => setPendingUnpair('others')}
+                  icon={Icons.nfcActivate}
+                />
+              </View>
+            </>
           )}
         </View>
       )}
