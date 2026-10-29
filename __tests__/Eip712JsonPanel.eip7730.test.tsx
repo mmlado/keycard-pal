@@ -105,8 +105,8 @@ function buildPayload(message: Record<string, unknown>) {
     types: {
       EIP712Domain: [
         { name: 'name', type: 'string' },
-        { name: 'verifyingContract', type: 'address' },
         { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' },
       ],
       PermitSingle: [
         { name: 'spender', type: 'address' },

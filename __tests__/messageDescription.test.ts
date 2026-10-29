@@ -216,6 +216,21 @@ describe('describeMessage', () => {
     expect(mockLookupEip712).not.toHaveBeenCalled();
   });
 
+  it('answers no entry when the domain declares its fields in another order', () => {
+    const typed = transferWithAuthorization();
+    const reordered: Eip712RawTypedData = {
+      ...typed,
+      types: {
+        ...typed.types,
+        EIP712Domain: [...(typed.types.EIP712Domain as unknown[])].reverse(),
+      },
+    };
+    const description = now(describeMessage(reordered, SIGNER));
+    expect(description.descriptor).toBeNull();
+    expect(description.rejected).toBe(false);
+    expect(mockLookupEip712).not.toHaveBeenCalled();
+  });
+
   it('describes a message whose domain type is not declared', () => {
     const typed = transferWithAuthorization();
     delete typed.types.EIP712Domain;

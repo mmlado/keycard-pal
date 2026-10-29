@@ -1,4 +1,5 @@
 import {
+  domainFieldsInStandardOrder,
   eip712FieldType,
   encodeEip712Type,
   parseEip712Prehashed,
@@ -619,5 +620,47 @@ describe('eip712FieldType', () => {
     expect(at('spender.[0]')).toBeNull();
     expect(at('missing')).toBeNull();
     expect(eip712FieldType(types, 'Nothing', 'spender')).toBeNull();
+  });
+});
+
+describe('domainFieldsInStandardOrder', () => {
+  const declaring = (names: unknown[]) => ({
+    types: {
+      EIP712Domain: names.map(name => ({ name, type: 'string' })),
+      Mail: [{ name: 'contents', type: 'string' }],
+    },
+    primaryType: 'Mail',
+    domain: {},
+    message: {},
+  });
+
+  it.each([
+    ['all five', ['name', 'version', 'chainId', 'verifyingContract', 'salt']],
+    ['a subset', ['name', 'chainId', 'salt']],
+    ['one', ['verifyingContract']],
+    ['none', []],
+  ])('accepts %s in EIP-712 order', (_, names) => {
+    expect(domainFieldsInStandardOrder(declaring(names))).toBe(true);
+  });
+
+  it.each([
+    ['reversed', ['verifyingContract', 'chainId', 'version', 'name']],
+    ['two swapped', ['name', 'chainId', 'version']],
+    ['salt first', ['salt', 'verifyingContract']],
+  ])('refuses the standard fields %s', (_, names) => {
+    expect(domainFieldsInStandardOrder(declaring(names))).toBe(false);
+  });
+
+  // nonStandardDomainFields answers for these.
+  it('judges only the standard fields', () => {
+    expect(
+      domainFieldsInStandardOrder(declaring(['foo', 'name', ['x'], 'chainId'])),
+    ).toBe(true);
+  });
+
+  it('accepts a domain type that is not declared', () => {
+    const data = declaring([]);
+    delete (data.types as Record<string, unknown>).EIP712Domain;
+    expect(domainFieldsInStandardOrder(data)).toBe(true);
   });
 });
