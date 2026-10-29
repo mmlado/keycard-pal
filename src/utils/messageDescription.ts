@@ -1,4 +1,5 @@
 import {
+  domainFieldsInStandardOrder,
   eip712DomainChainId,
   encodeEip712Type,
   nonStandardDomainFields,
@@ -41,7 +42,10 @@ export function describeMessage(
     return none;
   }
   // The entry's contract would not accept a signature under another domain type.
-  if (nonStandardDomainFields(typed).length > 0) {
+  if (
+    nonStandardDomainFields(typed).length > 0 ||
+    !domainFieldsInStandardOrder(typed)
+  ) {
     return none;
   }
 
