@@ -29,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Cancel on Apple's NFC sheet leaves the signing, key export, key generation, Pairing slots and WalletConnect pairing screens and rejects the WalletConnect request or proposal it was for, and Cancel after a refused tap leaves Change PIN, Unblock PIN and Initialize instead of stepping back through the form
 - Cancel during a tap no longer brings the error sheet back when the command already sent to the card fails afterwards
 - With a WalletConnect request or proposal open, Unblock PIN and Don't have a Keycard? from the NFC sheet stay open instead of returning to the Dashboard
-- Try again after the card refuses a PIN, PUK or pairing secret change, or after a refused or interrupted key pair load, sends the secret or the key pair again instead of an empty one or failing
+- Try again after the card refuses a PIN, PUK or pairing secret change, or after a refused or interrupted key pair load, sends the secret or the key pair again instead of an empty one or failing, and finishes when the interrupted load had already reached the card
 - The success sheet after signing, key export and unpairing names what was done instead of an empty line, and on iOS so does Apple's NFC sheet, after verifying too, instead of "Success"
 - The signing and key export screen's title reads "Enter Keycard PIN" only while the PIN pad is up
 - Pairing slots offers Open NFC Settings when NFC is off, and unpairing refuses a different Keycard than the one listed, no longer reports a slot the card refused as unpaired, and forgets this phone's pairing also when the list did not mark its slot

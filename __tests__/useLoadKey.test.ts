@@ -1,3 +1,4 @@
+import { sha256 } from '@noble/hashes/sha2.js';
 import { act, renderHook } from '@testing-library/react-native';
 import type { BIP32KeyPair } from 'keycard-sdk/dist/bip32key';
 
@@ -151,16 +152,33 @@ describe('useLoadKey', () => {
     expect(checkOK).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects cards that already have a master key', async () => {
-    renderHook(() => useLoadKey());
-    const loadBIP32KeyPair = jest.fn();
+  const keyPair = {
+    publicKey: Uint8Array.from({ length: 65 }, (_, i) => (i === 0 ? 4 : i)),
+  } as unknown as BIP32KeyPair;
 
-    await expect(
-      capturedOperation!(
-        { applicationInfo: { hasMasterKey: () => true }, loadBIP32KeyPair },
-        preparedKeyPair,
-      ),
-    ).rejects.toThrow(/already has a key/);
-    expect(loadBIP32KeyPair).not.toHaveBeenCalled();
+  function cardHolding(keyUID: Uint8Array) {
+    return {
+      applicationInfo: { hasMasterKey: () => true, keyUID },
+      loadBIP32KeyPair: jest.fn(),
+    };
+  }
+
+  it('rejects a card that holds another key', async () => {
+    renderHook(() => useLoadKey());
+    const cmdSet = cardHolding(new Uint8Array(32).fill(7));
+
+    await expect(capturedOperation!(cmdSet, keyPair)).rejects.toThrow(
+      /already has a key/,
+    );
+    expect(cmdSet.loadBIP32KeyPair).not.toHaveBeenCalled();
+  });
+
+  // A load lost after the card took the key: Try again finds it there.
+  it('ends done on a card that already holds the key pair being loaded', async () => {
+    renderHook(() => useLoadKey());
+    const cmdSet = cardHolding(sha256(keyPair.publicKey));
+
+    await expect(capturedOperation!(cmdSet, keyPair)).resolves.toBeUndefined();
+    expect(cmdSet.loadBIP32KeyPair).not.toHaveBeenCalled();
   });
 });
