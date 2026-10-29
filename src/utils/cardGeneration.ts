@@ -95,6 +95,24 @@ export type SecureChannelVersion = 'v1' | 'v2';
 /** The same threshold the SDK uses to pick its channel. */
 const SECURE_CHANNEL_V2_MIN_APPLET_VERSION = 0x0400;
 
+/** Applet 3.2 cut the pairing slots to 10. */
+const TEN_PAIRING_SLOTS_MIN_APPLET_VERSION = 0x0302;
+
+/** Applet 3.1.0 has 5 slots and 3.1.1 has 100 under the same version, so only how many are in use tells them apart. */
+export function pairingSlotCount(
+  appInfo: ApplicationInfo,
+  ownSlotIndex: number | null,
+): number {
+  const version = appletVersion(appInfo);
+  if (version !== null && version >= TEN_PAIRING_SLOTS_MIN_APPLET_VERSION) {
+    return 10;
+  }
+  const beyondFive =
+    appInfo.freePairingSlots > 5 ||
+    (ownSlotIndex !== null && ownSlotIndex >= 5);
+  return beyondFive ? 100 : 5;
+}
+
 /** A card that reports no version is a blank 3.x card, which speaks V1. */
 export function secureChannelVersion(
   appInfo: ApplicationInfo,

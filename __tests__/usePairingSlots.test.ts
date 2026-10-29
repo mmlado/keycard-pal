@@ -27,6 +27,7 @@ jest.mock(
 const mockSelect = jest.fn();
 const mockApplicationInfo = {
   instanceUID: new Uint8Array([0xab, 0xcd]),
+  appVersion: 0x0302,
   freePairingSlots: 7,
 };
 const mockCmdSet = {
@@ -104,6 +105,7 @@ function unpairCard({
   return {
     applicationInfo: {
       instanceUID: new Uint8Array([0xab, 0xcd]),
+      appVersion: 0x0302,
       freePairingSlots: freeSlotsAfter,
     },
     getPairing: () => ({ pairingIndex: ownSlot }),
@@ -176,6 +178,7 @@ describe('usePairingSlots', () => {
     mockUnpairPhase = 'idle';
     mockCmdSet.applicationInfo = {
       instanceUID: new Uint8Array([0xab, 0xcd]),
+      appVersion: 0x0302,
       freePairingSlots: 7,
     };
   });
@@ -231,6 +234,23 @@ describe('usePairingSlots', () => {
       });
       expect(mockLoadPairing).toHaveBeenCalledWith('abcd');
     });
+
+    it.each([
+      ['3.1', 0x0301, 3, 5],
+      ['3.1', 0x0301, 99, 100],
+      ['3.2', 0x0302, 9, 10],
+    ])(
+      'counts the slots of applet %s with %i free',
+      async (_, appVersion, freePairingSlots, totalSlots) => {
+        mockCmdSet.applicationInfo = {
+          instanceUID: new Uint8Array([0xab, 0xcd]),
+          appVersion,
+          freePairingSlots,
+        };
+        const { result } = await readSlots(null);
+        expect(result.current.slotInfo?.totalSlots).toBe(totalSlots);
+      },
+    );
 
     it('sets ourSlotIndex to null when no local pairing exists', async () => {
       const { result } = await readSlots(null);

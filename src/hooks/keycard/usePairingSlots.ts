@@ -6,14 +6,13 @@ import { cardHasRoute } from '@/navigation/generationBoundRoutes';
 import type { KeycardScreenKeycard } from '@/hooks/useKeycardScreen';
 
 import { deletePairing, loadPairing } from '@/storage/pairingStorage';
-import { cardGeneration } from '@/utils/cardGeneration';
+import { cardGeneration, pairingSlotCount } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
 import { UNREADABLE_CARD_STATUS } from './useIdentifyCard';
 import { useKeycardOperation } from './useKeycardOperation';
 import { useNFCOperation } from './useNFCOperation';
 
-const TOTAL_SLOTS = 10;
-// Applet 3.1.0 has 5 slots and 3.1.1 has 100 under the same version number; the card refuses an index past its last.
+// The slot count is only inferred; the card refuses an index past its last.
 const SW_NO_SUCH_SLOT = 0x6a86;
 const MAX_SLOT_INDEX = 127;
 
@@ -65,10 +64,11 @@ export function usePairingSlots(): UsePairingSlots {
       throw new Error('This Keycard is not initialized. Initialize it first.');
     }
     const existingPairing = await loadPairing(cardKey);
+    const ourSlotIndex = existingPairing?.pairingIndex ?? null;
     setSlotInfo({
-      totalSlots: TOTAL_SLOTS,
+      totalSlots: pairingSlotCount(appInfo, ourSlotIndex),
       freeSlots: appInfo.freePairingSlots,
-      ourSlotIndex: existingPairing?.pairingIndex ?? null,
+      ourSlotIndex,
       cardKey,
     });
   }, []);
