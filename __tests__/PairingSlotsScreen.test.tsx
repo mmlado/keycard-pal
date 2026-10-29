@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { routeAbsence } from '../src/navigation/generationBoundRoutes';
 import PairingSlotsScreen from '../src/screens/PairingSlotsScreen';
@@ -66,6 +66,8 @@ jest.mock('../src/components/ConfirmPropmpt', () => {
   );
 });
 
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
 jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
 const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
   typeof NFCBottomSheet
@@ -73,8 +75,17 @@ const MockNFCBottomSheet = NFCBottomSheet as jest.MockedFunction<
 
 jest.mock('../src/components/PrimaryButton', () => {
   const { Pressable, Text } = require('react-native');
-  return ({ label, onPress }: { label: string; onPress: () => void }) => (
+  return ({
+    label,
+    onPress,
+    icon: Icon,
+  }: {
+    label: string;
+    onPress: () => void;
+    icon?: React.ComponentType<{ testID: string }>;
+  }) => (
     <Pressable onPress={onPress}>
+      {Icon && <Icon testID={`${label} icon`} />}
       <Text>{label}</Text>
     </Pressable>
   );
@@ -82,6 +93,7 @@ jest.mock('../src/components/PrimaryButton', () => {
 
 const mockCheckSlots = jest.fn();
 const mockUnpair = jest.fn();
+const mockUnpairOthers = jest.fn();
 const mockDismissUnpaired = jest.fn();
 const mockReadCancel = jest.fn();
 const mockUnpairCancel = jest.fn();
@@ -157,6 +169,7 @@ function slots({
     dismissUnpaired: mockDismissUnpaired,
     checkSlots: mockCheckSlots,
     unpair: mockUnpair,
+    unpairOthers: mockUnpairOthers,
   };
 }
 
@@ -274,6 +287,90 @@ describe('PairingSlotsScreen', () => {
       fireEvent.press(screen.getByText('Cancel'));
       expect(mockUnpair).not.toHaveBeenCalled();
       expect(screen.getByText('Slots free')).toBeTruthy();
+    });
+  });
+
+  describe('unpair every other device', () => {
+    const ready = () => slots({ tap: readTap('done'), info: slotInfo });
+
+    it('offers it under the slot list, marked as a card tap', () => {
+      renderScreen(ready());
+      expect(screen.getByText('Unpair other devices')).toBeTruthy();
+      expect(screen.getByTestId('Unpair other devices icon')).toBeTruthy();
+    });
+
+    it.each([
+      ['before the slots are read', slots({ tap: readTap('idle') })],
+      ['after a failed read', slots({ tap: readTap('error') })],
+      [
+        'on a card without pairing slots',
+        slots({ tap: readTap('done'), noPairingSlots: true }),
+      ],
+    ])('is not offered %s', (_, state) => {
+      renderScreen(state);
+      expect(screen.queryByText('Unpair other devices')).toBeNull();
+    });
+
+    it('is not offered while an unpair runs', () => {
+      renderScreen(
+        slots({ tap: unpairTap('nfc'), unpairing: true, info: slotInfo }),
+      );
+      expect(screen.queryByText('Unpair other devices')).toBeNull();
+    });
+
+    it('asks first', () => {
+      renderScreen(ready());
+      fireEvent.press(screen.getByText('Unpair other devices'));
+      expect(screen.getByText('Unpair every other device?')).toBeTruthy();
+      expect(mockUnpairOthers).not.toHaveBeenCalled();
+    });
+
+    it('unpairs them once confirmed', () => {
+      renderScreen(ready());
+      fireEvent.press(screen.getByText('Unpair other devices'));
+      fireEvent.press(screen.getByText('Unpair'));
+      expect(mockUnpairOthers).toHaveBeenCalledTimes(1);
+      expect(mockUnpair).not.toHaveBeenCalled();
+    });
+
+    it('returns to the slot list when the confirmation is cancelled', () => {
+      renderScreen(ready());
+      fireEvent.press(screen.getByText('Unpair other devices'));
+      fireEvent.press(screen.getByText('Cancel'));
+      expect(mockUnpairOthers).not.toHaveBeenCalled();
+      expect(screen.getByText('Slots free')).toBeTruthy();
+    });
+  });
+
+  describe('back on a confirmation', () => {
+    const ready = () => slots({ tap: readTap('done'), info: slotInfo });
+    const removeScreen = () => {
+      const [, listener] = navigation.addListener.mock.calls
+        .filter((c: unknown[]) => c[0] === 'beforeRemove')
+        .at(-1);
+      const event = { preventDefault: jest.fn() };
+      act(() => listener(event));
+      return event;
+    };
+
+    it.each([
+      ['a slot', 'Slot 3'],
+      ['every other device', 'Unpair other devices'],
+    ])('closes the one for %s and stays', (_, button) => {
+      renderScreen(ready());
+      fireEvent.press(screen.getByText(button));
+
+      const event = removeScreen();
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(screen.getByText('Slots free')).toBeTruthy();
+      expect(mockUnpair).not.toHaveBeenCalled();
+      expect(mockUnpairOthers).not.toHaveBeenCalled();
+    });
+
+    it('leaves from the slot list', () => {
+      renderScreen(ready());
+      expect(removeScreen().preventDefault).not.toHaveBeenCalled();
     });
   });
 

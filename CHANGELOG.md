@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Derive with BIP85, under Keycard, for Keycards with applet 4.0 or later: a 12, 18 or 24-word BIP39 recovery phrase, a Bitcoin WIF or BIP32 XPRV private key, 32 or 64 bytes of hex entropy, or a Base64 password, by index
 - Both Android builds are on f-droid.org, signed with the same certificate as the GitHub release
+- Pairing slots can unpair every other device in one tap, after a confirmation
 
 ### Changed
 
@@ -25,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - An Ethereum message, typed data or bare hash is reviewed under "Review message" with "Sign message" or "Sign hash" instead of as a transaction, and a request that cannot be signed is titled "Review request" and named by no transaction type
 - On Android, a Keycard is read again after the app is left with back and reopened right away
 - An Ethereum sign request with an unknown data type is refused instead of signed as a bare digest
+- Back on an unpair confirmation in Pairing slots closes it instead of leaving the screen
 - WalletConnect typed data is signed under its declared EIP712Domain, giving the same signature as over QR, and typed data that names no primaryType or that the signature would not fully cover is refused with the reason
 - EIP-712 typed data whose declared EIP712Domain gives a domain field another type than EIP-712's, repeats one or adds one EIP-712 does not define is refused with the reason, and no clear-signing entry describes it
 - A legacy Ethereum transaction that is not an unsigned EIP-155 one, or a transaction whose recipient is not 20 bytes, is refused instead of signed, and a legacy transaction for a chain ID above 2^31 is signed with a `v` that names its chain

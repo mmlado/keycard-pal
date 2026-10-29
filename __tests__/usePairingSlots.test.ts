@@ -1,6 +1,9 @@
 import { act, renderHook } from '@testing-library/react-native';
 
-import { usePairingSlots } from '../src/hooks/keycard/usePairingSlots';
+import {
+  OTHERS_UNPAIRED,
+  usePairingSlots,
+} from '../src/hooks/keycard/usePairingSlots';
 
 import {
   insertCard,
@@ -109,6 +112,40 @@ function unpairCard({
   };
 }
 
+function lastOperation() {
+  const [run, options] = mockExecute.mock.calls.at(-1)!;
+  const setStatus = jest.fn();
+  const operation = (card: unknown) =>
+    run(card, { setStatus, discardInput: jest.fn() });
+  return { operation, options, setStatus };
+}
+
+/** A card with `slots` pairing slots, refusing any index past its last the way the applet does. */
+function cardWithSlots(slots: number, ownSlot: number | null = 3) {
+  const card = unpairCard();
+  card.getPairing = () =>
+    ownSlot === null ? undefined! : { pairingIndex: ownSlot };
+  card.unpair.mockImplementation(async (index: number) =>
+    apduResponse(index < slots ? 0x9000 : 0x6a86),
+  );
+  return card;
+}
+
+const unpairedIndices = (card: ReturnType<typeof unpairCard>) =>
+  card.unpair.mock.calls.map(([index]) => index);
+
+const range = (from: number, to: number) =>
+  Array.from({ length: to - from }, (_, i) => from + i);
+
+function startUnpairOthers(
+  result: ReturnType<
+    typeof renderHook<ReturnType<typeof usePairingSlots>, unknown>
+  >['result'],
+) {
+  act(() => result.current.unpairOthers());
+  return lastOperation();
+}
+
 function startUnpair(
   result: ReturnType<
     typeof renderHook<ReturnType<typeof usePairingSlots>, unknown>
@@ -116,8 +153,7 @@ function startUnpair(
   slotIndex: number,
 ) {
   act(() => result.current.unpair(slotIndex));
-  const [operation, options] = mockExecute.mock.calls.at(-1)!;
-  return { operation, options };
+  return lastOperation();
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +479,129 @@ describe('usePairingSlots', () => {
         expect(mockStartNFC).toHaveBeenCalled();
       },
     );
+  });
+
+  describe('unpairOthers', () => {
+    it('does nothing before the slots have been read', () => {
+      const { result } = renderHook(() => usePairingSlots());
+      act(() => result.current.unpairOthers());
+      expect(mockExecute).not.toHaveBeenCalled();
+      expect(result.current.unpairing).toBe(false);
+    });
+
+    it('asks for the PIN and binds the tap to the card that was read', async () => {
+      const { result } = await readSlots();
+      const { options } = startUnpairOthers(result);
+      expect(options).toEqual({
+        requiresPin: true,
+        requiresMasterKey: false,
+        requiresRoute: 'PairingSlots',
+        requiresCardKey: 'abcd',
+        successMessage: OTHERS_UNPAIRED,
+      });
+      expect(result.current.unpairing).toBe(true);
+    });
+
+    it("unpairs every slot up to the card's last except the tap's own, then re-reads", async () => {
+      const { result } = await readSlots(3);
+      const { operation } = startUnpairOthers(result);
+      const card = cardWithSlots(10, 3);
+      card.applicationInfo.freePairingSlots = 9;
+
+      await act(async () => {
+        await operation(card);
+      });
+
+      expect(unpairedIndices(card)).toEqual([0, 1, 2, ...range(4, 11)]);
+      expect(card.select).toHaveBeenCalledTimes(1);
+      expect(result.current.slotInfo?.freeSlots).toBe(9);
+      expect(result.current.unpaired).toBe(OTHERS_UNPAIRED);
+      expect(mockDeletePairing).not.toHaveBeenCalled();
+    });
+
+    it('says what it is doing on the sheet', async () => {
+      const { result } = await readSlots(3);
+      const { operation, setStatus } = startUnpairOthers(result);
+      await act(async () => {
+        await operation(cardWithSlots(10, 3));
+      });
+      expect(setStatus).toHaveBeenCalledWith('Unpairing...');
+    });
+
+    // A full applet 3.2 card pairs the tap in its ephemeral slot, outside the numbered ones.
+    it('unpairs every numbered slot when the tap holds the ephemeral one', async () => {
+      const { result } = await readSlots(null);
+      const { operation } = startUnpairOthers(result);
+      const card = cardWithSlots(10, 0xff);
+
+      await act(async () => {
+        await operation(card);
+      });
+
+      expect(unpairedIndices(card)).toEqual(range(0, 11));
+      expect(mockDeletePairing).not.toHaveBeenCalled();
+    });
+
+    it.each([5, 100])(
+      'reaches the last slot of a card with %i',
+      async slotCount => {
+        const { result } = await readSlots(3);
+        const { operation } = startUnpairOthers(result);
+        const card = cardWithSlots(slotCount, 3);
+
+        await act(async () => {
+          await operation(card);
+        });
+
+        expect(unpairedIndices(card)).toEqual([
+          0,
+          1,
+          2,
+          ...range(4, slotCount + 1),
+        ]);
+      },
+    );
+
+    // A card read without a stored pairing gets one from this tap.
+    it("skips the slot the tap paired, not the read's", async () => {
+      const { result } = await readSlots(null);
+      const { operation } = startUnpairOthers(result);
+      const card = cardWithSlots(10, 7);
+
+      await act(async () => {
+        await operation(card);
+      });
+
+      expect(unpairedIndices(card)).not.toContain(7);
+      expect(unpairedIndices(card)).toContain(3);
+      expect(mockDeletePairing).not.toHaveBeenCalled();
+    });
+
+    it('sends no UNPAIR when the tap names no slot of its own', async () => {
+      const { result } = await readSlots();
+      const { operation } = startUnpairOthers(result);
+      const card = cardWithSlots(10, null);
+
+      await expect(operation(card)).rejects.toThrow(
+        "Could not tell which slot is this device's.",
+      );
+      expect(card.unpair).not.toHaveBeenCalled();
+      expect(result.current.unpaired).toBeNull();
+    });
+
+    it('fails when the card refuses an UNPAIR, without re-reading', async () => {
+      const { result } = await readSlots(3);
+      const { operation } = startUnpairOthers(result);
+      const card = cardWithSlots(10, 3);
+      card.unpair.mockImplementation(async (index: number) =>
+        apduResponse(index === 1 ? 0x6985 : 0x9000),
+      );
+
+      await expect(operation(card)).rejects.toThrow('Unpairing failed');
+      expect(unpairedIndices(card)).toEqual([0, 1]);
+      expect(card.select).not.toHaveBeenCalled();
+      expect(result.current.unpaired).toBeNull();
+    });
   });
 
   describe('the tap under way', () => {
