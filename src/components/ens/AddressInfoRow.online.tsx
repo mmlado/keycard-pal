@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     color: theme.colors.onSurfaceVariant,
   },
   address: {
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     fontSize: 14,
     color: theme.colors.onSurface,
   },

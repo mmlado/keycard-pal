@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   },
   path: {
     color: theme.colors.onSurfaceVariant,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     fontSize: 12,
   },
 });

@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: theme.colors.onSurface,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     fontSize: 14,
   },
   error: {

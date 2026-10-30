@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   assetAddresses: {
     color: theme.colors.onSurfaceSubtle,
     fontSize: 11,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
   },
   traceLink: {
     color: theme.colors.primary,

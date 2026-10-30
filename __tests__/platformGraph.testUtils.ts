@@ -23,6 +23,11 @@ function walk(dir: string): string[] {
   });
 }
 
+/** Every source file under src/, all platform variants included. */
+export function sourceFiles(): string[] {
+  return walk(SRC);
+}
+
 /**
  * The files Metro would bundle for a platform: a `.ios` twin replaces its
  * plain sibling, and the twins of other platforms are left out.

@@ -53,6 +53,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: theme.colors.onSurfaceVariant,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
   },
 });

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
 import theme from '@/theme';
@@ -23,12 +23,6 @@ export const BIP85_RESULT_EXPLAINER =
 
 export const BIP85_INVALID_KEY =
   'This index gives an invalid key. Use the next index.';
-
-// iOS has no font named monospace; without this the secret renders in San Francisco.
-const MONOSPACE = Platform.select({
-  ios: 'ui-monospace',
-  default: 'monospace',
-});
 
 export default function Bip85Review({ format, index, entropy, onDone }: Props) {
   const { title, layout, encode } = bip85Format(format);
@@ -162,13 +156,13 @@ const styles = StyleSheet.create({
   },
   secretText: {
     color: theme.colors.onSurface,
-    fontFamily: MONOSPACE,
+    fontFamily: theme.monospace,
     fontSize: 16,
     lineHeight: 24,
   },
   path: {
     color: theme.colors.onSurfaceVariant,
-    fontFamily: MONOSPACE,
+    fontFamily: theme.monospace,
     fontSize: 12,
   },
   buttonArea: {

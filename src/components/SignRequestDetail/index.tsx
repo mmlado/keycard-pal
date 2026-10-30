@@ -67,6 +67,6 @@ const styles = StyleSheet.create({
   errorMessage: {
     color: theme.colors.onSurface,
     textAlign: 'center',
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
   },
 });

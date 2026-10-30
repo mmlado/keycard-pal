@@ -104,7 +104,7 @@ export default function AddressText({
 
 const styles = StyleSheet.create({
   address: {
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
   },
   activeGroup: {
     fontWeight: '600',

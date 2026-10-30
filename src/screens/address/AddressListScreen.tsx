@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   },
   address: {
     color: theme.colors.onSurface,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     textAlign: 'center',
   },
   metaRow: {
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   },
   path: {
     color: theme.colors.onSurfaceVariant,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     fontSize: 12,
   },
   footer: { paddingVertical: 16 },
