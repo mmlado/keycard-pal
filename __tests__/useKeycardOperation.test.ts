@@ -7,6 +7,7 @@ import { routeAbsence } from '../src/navigation/generationBoundRoutes';
 import { loadPairing } from '../src/storage/pairingStorage';
 
 import {
+  CARD_HAS_KEY_STATUS,
   DIFFERENT_CARD_STATUS,
   NOT_GENUINE_STATUS,
   PAIRING_PASSWORD_NEEDED_STATUS,
@@ -549,6 +550,51 @@ describe('useKeycardOperation', () => {
         result.current.execute(mockOp, {
           requiresPin: false,
           requiresMasterKey: false,
+        });
+      });
+      await triggerCardConnect(result.current);
+      expect(mockOp).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a card that already holds a key before pairing when refusesMasterKey is set', async () => {
+      const cmdSet = makeMockCmdSet();
+      mockCommandset.mockImplementation(() => cmdSet);
+
+      const mockOp = jest.fn().mockResolvedValue('ok');
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(mockOp, {
+          requiresPin: false,
+          requiresMasterKey: false,
+          refusesMasterKey: true,
+        });
+      });
+      await triggerCardConnect(result.current);
+      expect(result.current.phase).toBe('error');
+      expect(result.current.status).toBe(CARD_HAS_KEY_STATUS);
+      expect(cmdSet.autoPair).not.toHaveBeenCalled();
+      expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
+      expect(mockOp).not.toHaveBeenCalled();
+    });
+
+    it('runs on a card without a key when refusesMasterKey is set', async () => {
+      mockCommandset.mockImplementation(() => ({
+        ...makeMockCmdSet(),
+        applicationInfo: {
+          instanceUID: new Uint8Array([0xaa, 0xbb]),
+          initializedCard: true,
+          freePairingSlots: 5,
+          hasMasterKey: () => false,
+        },
+      }));
+
+      const mockOp = jest.fn().mockResolvedValue('ok');
+      const { result } = renderHook(() => useKeycardOperation<string>());
+      await act(async () => {
+        result.current.execute(mockOp, {
+          requiresPin: false,
+          requiresMasterKey: false,
+          refusesMasterKey: true,
         });
       });
       await triggerCardConnect(result.current);
