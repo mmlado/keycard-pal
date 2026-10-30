@@ -1,5 +1,6 @@
 package com.keycardpal
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
@@ -50,7 +51,13 @@ class MainActivity : ReactActivity() {
         splashScreen.setKeepOnScreenCondition { !jsMounted }
         // Nothing to animate out: the splash is the same background the first JS
         // frame paints. The system's exit would fade and zoom it for no reason.
-        splashScreen.setOnExitAnimationListener { splashView -> splashView.remove() }
+        splashScreen.setOnExitAnimationListener { splashView ->
+            splashView.remove()
+            // Android 12 to 14 put back the status bar colour the window had before React Native's
+            // edge-to-edge setup made it transparent: a black band in this dark theme.
+            @Suppress("DEPRECATION")
+            window.statusBarColor = Color.TRANSPARENT
+        }
 
         val release =
             Runnable {
