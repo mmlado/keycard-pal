@@ -56,6 +56,8 @@ export type KeycardOperationFn<T> = (
 export interface ExecuteOptions {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
+  /** Refuse a card that already holds a key. Checked right after SELECT. */
+  refusesMasterKey?: boolean;
   /**
    * The route this operation belongs to, when only some cards have it. Checked right after SELECT.
    */
@@ -98,6 +100,8 @@ export const DIFFERENT_CARD_STATUS =
   'This is a different Keycard. Tap the same one as before.';
 export const PIN_BLOCKED_STATUS =
   "This Keycard's PIN is blocked. Unblock it with your PUK.";
+export const CARD_HAS_KEY_STATUS =
+  'Card already has a key. Factory reset required.';
 
 export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [waitingForPin, setWaitingForPin] = useState(false);
@@ -132,6 +136,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const operationRef = useRef<KeycardOperationFn<T> | null>(null);
   const requiresPinRef = useRef(true);
   const requiresMasterKeyRef = useRef(true);
+  const refusesMasterKeyRef = useRef(false);
   const requiresRouteRef = useRef<GenerationBoundRoute | undefined>(undefined);
   const requiresCardKeyRef = useRef<string | undefined>(undefined);
   const operationRunningRef = useRef(false);
@@ -441,6 +446,9 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
           'This card has no master key. Generate or import a key first.',
         );
       }
+      if (refusesMasterKeyRef.current && appInfo.hasMasterKey()) {
+        throw new Error(CARD_HAS_KEY_STATUS);
+      }
 
       // A card with a certificate (ADR-0013): no pairing, no IDENTIFY CARD, and nothing but
       // SELECT outside the channel, so even the name waits for it.
@@ -524,6 +532,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       operationRef.current = op;
       requiresPinRef.current = options.requiresPin ?? true;
       requiresMasterKeyRef.current = options.requiresMasterKey ?? true;
+      refusesMasterKeyRef.current = options.refusesMasterKey ?? false;
       requiresRouteRef.current = options.requiresRoute;
       requiresCardKeyRef.current = options.requiresCardKey;
       retryOnTagLossRef.current = options.retryOnTagLoss ?? false;

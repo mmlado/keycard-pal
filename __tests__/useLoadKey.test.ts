@@ -21,6 +21,7 @@ let capturedOptions: {
 const mockStart = jest.fn();
 
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
+  CARD_HAS_KEY_STATUS: 'Card already has a key. Factory reset required.',
   useKeycardOp: (
     fn: OperationFn,
     opts: {

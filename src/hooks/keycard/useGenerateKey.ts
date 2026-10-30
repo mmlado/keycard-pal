@@ -22,6 +22,6 @@ export function useGenerateKey(size: 12 | 24) {
       },
       [checksum],
     ),
-    { requiresPin: false, requiresMasterKey: false },
+    { requiresPin: false, requiresMasterKey: false, refusesMasterKey: true },
   );
 }

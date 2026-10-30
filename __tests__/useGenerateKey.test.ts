@@ -8,6 +8,7 @@ let capturedOperation: OperationFn | null = null;
 let capturedOptions: {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
+  refusesMasterKey?: boolean;
 } | null = null;
 
 const mockStart = jest.fn();
@@ -15,7 +16,11 @@ const mockStart = jest.fn();
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
   useKeycardOp: (
     fn: OperationFn,
-    opts: { requiresPin?: boolean; requiresMasterKey?: boolean },
+    opts: {
+      requiresPin?: boolean;
+      requiresMasterKey?: boolean;
+      refusesMasterKey?: boolean;
+    },
   ) => {
     capturedOperation = fn;
     capturedOptions = opts;
@@ -58,7 +63,7 @@ describe('useGenerateKey', () => {
     capturedOptions = null;
   });
 
-  it('does not require PIN or master key', async () => {
+  it('needs no PIN and refuses a card that already holds a key', async () => {
     const { result } = renderHook(() => useGenerateKey(12));
     await act(async () => {
       result.current.start();
@@ -67,6 +72,7 @@ describe('useGenerateKey', () => {
     expect(capturedOptions).toEqual({
       requiresPin: false,
       requiresMasterKey: false,
+      refusesMasterKey: true,
     });
   });
 

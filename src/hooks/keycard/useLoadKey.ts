@@ -3,7 +3,7 @@ import { BIP32KeyPair } from 'keycard-sdk/dist/bip32key';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { deriveMnemonicSeed } from '@/utils/mnemonic';
-import { useKeycardOp } from './useKeycardOperation';
+import { CARD_HAS_KEY_STATUS, useKeycardOp } from './useKeycardOperation';
 
 // The card's key UID is the SHA-256 of its master public key.
 function holdsKeyPair(keyUID: Uint8Array, keyPair: BIP32KeyPair): boolean {
@@ -18,7 +18,7 @@ async function loadKeyPair(cmdSet: Commandset, keyPair: BIP32KeyPair) {
     if (holdsKeyPair(info.keyUID, keyPair)) {
       return;
     }
-    throw new Error('Card already has a key. Factory reset required.');
+    throw new Error(CARD_HAS_KEY_STATUS);
   }
   const response = await cmdSet.loadBIP32KeyPair(keyPair);
   response.checkOK();
