@@ -487,7 +487,7 @@ describe('back guard', () => {
     expect(left).toHaveBeenCalledTimes(1);
   });
 
-  it("blocks iOS's native back only during a tap on a screen that stays on cancel", () => {
+  it("blocks iOS's native back during a tap only on a screen that stays on cancel", () => {
     const navigation = makeNavigation();
     const options = {
       keycard: makeKeycard('idle'),
@@ -509,6 +509,22 @@ describe('back guard', () => {
       keycard: makeKeycard('nfc'),
       stayOnCancel: false,
     });
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+  });
+
+  it("holds iOS's native back on a held screen and while the form can step back", () => {
+    const navigation = makeNavigation();
+    const options = { keycard: makeKeycard('idle'), navigation, title: 'T' };
+    const view = renderScreenHook(options);
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+
+    view.rerender({ ...options, hold: true });
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
+
+    view.rerender({ ...options, stepBack: () => true, canStepBack: true });
+    expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
+
+    view.rerender({ ...options, stepBack: () => false, canStepBack: false });
     expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
   });
 

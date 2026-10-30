@@ -50,6 +50,8 @@ export type UseKeycardScreenOptions = {
   activeKeycard?: KeycardScreenKeycard;
   /** Steps the screen's own form back, for either back; false lets the screen go. */
   stepBack?: () => boolean;
+  /** stepBack would step back now: iOS's native back and swipe are then held for it. */
+  canStepBack?: boolean;
   /** onCancel only cancels the tap instead of also leaving the screen. */
   stayOnCancel?: boolean;
   /** Leaves after a cancel instead of going back. Navigate before awaiting: the sheet may navigate next. */
@@ -181,8 +183,10 @@ export function useKeycardScreen(options: UseKeycardScreenOptions): {
   }, [navigation, keycardBusy, held, leave]);
 
   useBlockNativeBack(
-    options.stayOnCancel === true &&
-      (active.phase === 'nfc' || active.phase === 'pin_entry'),
+    (options.stayOnCancel === true &&
+      (active.phase === 'nfc' || active.phase === 'pin_entry')) ||
+      options.hold === true ||
+      options.canStepBack === true,
   );
 
   // Cancel on Apple's NFC sheet, the only one iOS gives during a tap.

@@ -111,6 +111,7 @@ export default function ChangeSecretScreen({
     pinEntryTitle: 'Enter current PIN',
     done: {},
     stepBack: entry.goBack,
+    canStepBack: entry.step === 'confirm',
     // The identify tap's done is no outcome: the sheet steps aside for the input.
     showOnDone: !identifying,
   });

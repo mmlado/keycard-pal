@@ -133,6 +133,11 @@ async function reachPuk() {
 // Tests
 // ---------------------------------------------------------------------------
 
+const mockBlockNativeBack = jest.fn();
+jest.mock('../src/navigation/useBlockNativeBack', () => ({
+  useBlockNativeBack: (block: boolean) => mockBlockNativeBack(block),
+}));
+
 describe('UnblockPinScreen', () => {
   beforeEach(() => {
     mockStart.mockClear();
@@ -325,6 +330,16 @@ describe('UnblockPinScreen', () => {
         lastBeforeRemoveHandler()(e);
       });
       expect(e.preventDefault).not.toHaveBeenCalled();
+    });
+  });
+  describe("iOS's native back", () => {
+    it('is held on the confirmation and on the PUK step', async () => {
+      await renderScreen();
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+      await enterDigits(6, 0);
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
+      await enterDigits(6, 0);
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
     });
   });
 });

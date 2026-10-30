@@ -136,6 +136,11 @@ async function enterPin(keyIndex = 0) {
 // Tests
 // ---------------------------------------------------------------------------
 
+const mockBlockNativeBack = jest.fn();
+jest.mock('../src/navigation/useBlockNativeBack', () => ({
+  useBlockNativeBack: (block: boolean) => mockBlockNativeBack(block),
+}));
+
 describe('InitCardScreen', () => {
   beforeEach(() => {
     mockStart.mockClear();
@@ -617,6 +622,19 @@ describe('InitCardScreen', () => {
         routes: [{ name: 'Dashboard', params: { toast: 'Card initialized' } }],
       });
       expect(navigation.goBack).not.toHaveBeenCalled();
+    });
+  });
+  describe("iOS's native back", () => {
+    it('is held once the form is past its first PIN', async () => {
+      await renderScreen();
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+      await enterPin(0);
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
+    });
+
+    it('is held while the PUK is shown', async () => {
+      await renderScreen('done');
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
     });
   });
 });

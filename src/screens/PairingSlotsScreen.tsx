@@ -51,6 +51,7 @@ export default function PairingSlotsScreen({
     stayOnCancel: unpairing,
     showOnDone: unpairing,
     stepBack,
+    canStepBack: pendingUnpair !== null,
   });
 
   // Once per mount, not on focus: Apple's Cancel puts the read back to 'idle'.

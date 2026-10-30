@@ -63,6 +63,7 @@ export default function UnblockPinScreen({
     title,
     done: {},
     stepBack,
+    canStepBack: screenStep === 'puk_entry' || pinSetup.step === 'confirm',
     showOnDone: true,
   });
 
