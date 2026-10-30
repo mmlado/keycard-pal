@@ -154,6 +154,11 @@ async function enterDigits(count: number, keyIndex = 0) {
 // Tests
 // ---------------------------------------------------------------------------
 
+const mockBlockNativeBack = jest.fn();
+jest.mock('../src/navigation/useBlockNativeBack', () => ({
+  useBlockNativeBack: (block: boolean) => mockBlockNativeBack(block),
+}));
+
 describe('ChangeSecretScreen', () => {
   beforeEach(() => {
     mockStart.mockClear();
@@ -620,6 +625,14 @@ describe('ChangeSecretScreen', () => {
       });
 
       expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+  });
+  describe("iOS's native back", () => {
+    it('is held on the confirm step only', async () => {
+      await renderScreen('pin');
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+      await enterDigits(6, 0);
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
     });
   });
 });

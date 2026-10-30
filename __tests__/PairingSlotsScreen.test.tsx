@@ -196,6 +196,11 @@ const lastSheet = () => MockNFCBottomSheet.mock.calls.at(-1)?.[0];
 // Tests
 // ---------------------------------------------------------------------------
 
+const mockBlockNativeBack = jest.fn();
+jest.mock('../src/navigation/useBlockNativeBack', () => ({
+  useBlockNativeBack: (block: boolean) => mockBlockNativeBack(block),
+}));
+
 describe('PairingSlotsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -528,6 +533,16 @@ describe('PairingSlotsScreen', () => {
     it('shows nothing without an unpair', () => {
       renderScreen(slots({ tap: readTap('done'), info: slotInfo }));
       expect(screen.queryByText('Dismiss snackbar')).toBeNull();
+    });
+  });
+  describe("iOS's native back", () => {
+    it('is held while a confirmation is up', () => {
+      renderScreen(slots({ tap: readTap('done'), info: slotInfo }));
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+      fireEvent.press(screen.getByText('Slot 1'));
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
+      fireEvent.press(screen.getByText('Cancel'));
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
     });
   });
 });

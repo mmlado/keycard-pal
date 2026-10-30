@@ -133,6 +133,11 @@ function beforeRemove(): (e: { preventDefault: () => void }) => void {
 
 const hidden = { includeHiddenElements: true };
 
+const mockBlockNativeBack = jest.fn();
+jest.mock('../src/navigation/useBlockNativeBack', () => ({
+  useBlockNativeBack: (block: boolean) => mockBlockNativeBack(block),
+}));
+
 describe('Bip85Screen', () => {
   beforeEach(() => {
     mockStart.mockClear();
@@ -353,6 +358,17 @@ describe('Bip85Screen', () => {
       });
       expect(mockCancel).toHaveBeenCalledTimes(1);
       expect(navigation.goBack).toHaveBeenCalledTimes(1);
+    });
+  });
+  describe("iOS's native back", () => {
+    it('is not held on the form', () => {
+      renderScreen('words12');
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(false);
+    });
+
+    it('is held while a result is shown', () => {
+      derive('words12', '0');
+      expect(mockBlockNativeBack).toHaveBeenLastCalledWith(true);
     });
   });
 });

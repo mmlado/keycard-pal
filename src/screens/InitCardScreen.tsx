@@ -94,6 +94,7 @@ export default function InitCardScreen({ navigation }: InitCardScreenProps) {
     hold: showPuk,
     stayOnCancel: initSent,
     stepBack,
+    canStepBack: screenStep !== 'pin_setup' || pinSetup.step === 'confirm',
   });
 
   const activePinSetup =

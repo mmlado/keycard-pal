@@ -55,6 +55,7 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
       showForm();
       return true;
     },
+    canStepBack: phase === 'done',
   });
 
   // With a 3.x card ticked, say so before a PIN is typed for it.
