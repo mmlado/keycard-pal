@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
   },
   url: {
     color: theme.colors.onSurface,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     textAlign: 'center',
     paddingHorizontal: 8,
   },

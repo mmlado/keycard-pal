@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     color: theme.colors.onSurface,
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     fontSize: 14,
   },
 });

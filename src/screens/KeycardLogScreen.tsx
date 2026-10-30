@@ -12,6 +12,7 @@ import RNKeycard from 'react-native-keycard';
 import Keycard from 'keycard-sdk';
 
 import { APP_NAME } from '@/constants/app';
+import theme from '@/theme';
 
 function toHex(arr: Uint8Array): string {
   return Array.from(arr)
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   logEntry: {
-    fontFamily: 'monospace',
+    fontFamily: theme.monospace,
     fontSize: 12,
     marginBottom: 4,
   },

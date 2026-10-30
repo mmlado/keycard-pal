@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { MD3DarkTheme } from 'react-native-paper';
 
 const theme = {
@@ -32,6 +33,8 @@ const theme = {
     negative: '#cf6679',
     success: '#1C8A80',
   },
+  // iOS has no font named monospace and would fall back to San Francisco.
+  monospace: Platform.select({ ios: 'ui-monospace', default: 'monospace' }),
 };
 
 export default theme;
