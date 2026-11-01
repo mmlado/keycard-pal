@@ -60,6 +60,15 @@ describe('wcClient', () => {
     expect(client.pair).toHaveBeenCalledWith({ uri: 'wc:uri' });
   });
 
+  it("turns the SDK's telemetry off", async () => {
+    const wcClient = loadClient();
+    await wcClient.getClient();
+
+    expect(mockCore).toHaveBeenCalledWith(
+      expect.objectContaining({ telemetryEnabled: false }),
+    );
+  });
+
   it('refuses to start without a Project ID', async () => {
     mockLoadWCProjectId.mockResolvedValue('');
     const wcClient = loadClient();
