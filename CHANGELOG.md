@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The backup check of a generated key pair, and importing or verifying a recovery phrase, show a preparing step before the tap instead of pausing with nothing on screen
 - Screens that take typing move with the keyboard as it slides in and out, and keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
 - The store descriptions, the README and the F-Droid `NonFreeNet` reason list the clear-signing registry download among the optional network features
+- WalletConnect starts with the SDK's telemetry switched off
 
 ### Fixed
 
