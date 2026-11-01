@@ -35,6 +35,8 @@ async function createClient(): Promise<Client> {
   const memoryStorage = new Map<string, string>();
   const core = new Core({
     projectId,
+    // On by default; it posts each pairing's wc: URI to WalletConnect.
+    telemetryEnabled: false,
     storage: {
       getItem: async (key: string) => memoryStorage.get(key) ?? undefined,
       setItem: async (key: string, value: string) => {
