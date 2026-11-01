@@ -223,7 +223,7 @@ is unlocked, changed or promised in return.
 ## Security
 
 - Pairing data is stored in encrypted storage backed by the Android Keystore or the iOS Keychain
-- The Keycard's private key never leaves it; signing returns only the signature. A recovery phrase or SLIP-39 shares you generate, import or verify, and a BIP-85 secret you derive, are on the phone by design and are neither stored nor sent anywhere
+- The Keycard's private key never leaves it; signing returns only the signature. A recovery phrase or SLIP-39 shares you generate, import or verify, and a BIP-85 secret you derive, are on the phone by design: the app holds them in memory only, saves none of them and sends none of them off the phone. Generating or importing loads only the key derived from them onto the card
 - QR codes use [Blockchain Commons UR](https://github.com/BlockchainCommons/bc-ur) for structured binary encoding
 - Keycard Pal Offline (`com.keycardpal.offline`) has no `INTERNET` permission at the manifest level — no runtime flag can enable networking
 
