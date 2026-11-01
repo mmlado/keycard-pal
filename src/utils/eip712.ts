@@ -26,6 +26,8 @@ export type Eip712Summary = {
   /** `domain.<key>` and `message.<key>` of the rows that hold an address with a wrong checksum. */
   miscasedAddresses: string[];
   special?: Eip712SpecialReview;
+  /** The message carried values its signature does not cover; `message` and `special` leave them out. */
+  uncoveredValues: boolean;
 };
 
 export type Eip712Prehashed = {
@@ -200,10 +202,12 @@ export function eip712DomainChainId(
     : toChainId(value);
 }
 
-function parsePermit(parsed: JsonObject): Eip712SpecialReview | null {
-  if (parsed.primaryType !== 'Permit') return null;
-  const domain = isJsonObject(parsed.domain) ? parsed.domain : {};
-  const message = isJsonObject(parsed.message) ? parsed.message : {};
+function parsePermit({
+  primaryType,
+  domain,
+  message,
+}: Eip712RawTypedData): Eip712SpecialReview | null {
+  if (primaryType !== 'Permit') return null;
   const spender = toAddress(message.spender);
   const amount = toBigIntValue(message.value);
   if (!spender || amount === undefined) return null;
@@ -223,10 +227,12 @@ function parsePermit(parsed: JsonObject): Eip712SpecialReview | null {
   };
 }
 
-function parsePermitSingle(parsed: JsonObject): Eip712SpecialReview | null {
-  if (parsed.primaryType !== 'PermitSingle') return null;
-  const domain = isJsonObject(parsed.domain) ? parsed.domain : {};
-  const message = isJsonObject(parsed.message) ? parsed.message : {};
+function parsePermitSingle({
+  primaryType,
+  domain,
+  message,
+}: Eip712RawTypedData): Eip712SpecialReview | null {
+  if (primaryType !== 'PermitSingle') return null;
   const details = isJsonObject(message.details) ? message.details : {};
   const tokenContract = toAddress(details.token);
   const spender = toAddress(message.spender);
@@ -249,10 +255,12 @@ function parsePermitSingle(parsed: JsonObject): Eip712SpecialReview | null {
   };
 }
 
-function parseSafeTx(parsed: JsonObject): Eip712SpecialReview | null {
-  if (parsed.primaryType !== 'SafeTx') return null;
-  const domain = isJsonObject(parsed.domain) ? parsed.domain : {};
-  const message = isJsonObject(parsed.message) ? parsed.message : {};
+function parseSafeTx({
+  primaryType,
+  domain,
+  message,
+}: Eip712RawTypedData): Eip712SpecialReview | null {
+  if (primaryType !== 'SafeTx') return null;
   const to = toAddress(message.to);
   const data = toHexBytes(message.data);
   if (!to) return null;
@@ -288,31 +296,97 @@ function parseSafeTx(parsed: JsonObject): Eip712SpecialReview | null {
 }
 
 function parseSpecialReview(
-  parsed: JsonObject,
+  data: Eip712RawTypedData,
 ): Eip712SpecialReview | undefined {
   return (
-    parsePermit(parsed) ??
-    parsePermitSingle(parsed) ??
-    parseSafeTx(parsed) ??
+    parsePermit(data) ??
+    parsePermitSingle(data) ??
+    parseSafeTx(data) ??
     undefined
   );
 }
 
 export type Eip712RawTypedData = {
   domain: Record<string, unknown>;
+  /** Only the values the signature covers. */
   message: Record<string, unknown>;
   /** Empty when the request names none, which the classification refuses. */
   primaryType: string;
   types: Record<string, unknown>;
 };
 
-function toRawTypedData(parsed: JsonObject): Eip712RawTypedData {
+function signedValue(
+  types: Record<string, unknown>,
+  type: string,
+  value: unknown,
+  onUncovered: () => void,
+): unknown {
+  const array = /^(.*)\[\d*\]$/.exec(type);
+  if (array) {
+    return Array.isArray(value)
+      ? value.map(v => signedValue(types, array[1], v, onUncovered))
+      : value;
+  }
+  const members = structMembers(types, type);
+  return members && isJsonObject(value)
+    ? signedStruct(types, members, value, onUncovered)
+    : value;
+}
+
+function signedStruct(
+  types: Record<string, unknown>,
+  members: Eip712Member[],
+  value: Record<string, unknown>,
+  onUncovered: () => void,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(value)) {
+    const member = members.find(m => m.name === key);
+    if (!member) {
+      onUncovered();
+      continue;
+    }
+    // Not an assignment: a member named __proto__ would set the prototype.
+    Object.defineProperty(out, key, {
+      value: signedValue(types, member.type, value[key], onUncovered),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return out;
+}
+
+// viem hashes only the members the types declare, and no message under EIP712Domain.
+function signedMessage(
+  types: Record<string, unknown>,
+  primaryType: string,
+  message: Record<string, unknown>,
+  onUncovered: () => void,
+): Record<string, unknown> {
+  if (primaryType === 'EIP712Domain') {
+    if (Object.keys(message).length > 0) onUncovered();
+    return {};
+  }
+  const members = structMembers(types, primaryType);
+  // Only a request that names no primary type gets here, and the classification refuses it.
+  return members ? signedStruct(types, members, message, onUncovered) : message;
+}
+
+function toRawTypedData(
+  parsed: JsonObject,
+  onUncovered: () => void = () => {},
+): Eip712RawTypedData {
+  const primaryType =
+    typeof parsed.primaryType === 'string' ? parsed.primaryType : '';
+  const types = isJsonObject(parsed.types) ? parsed.types : {};
   return {
     domain: isJsonObject(parsed.domain) ? parsed.domain : {},
-    message: isJsonObject(parsed.message) ? parsed.message : {},
-    primaryType:
-      typeof parsed.primaryType === 'string' ? parsed.primaryType : '',
-    types: isJsonObject(parsed.types) ? parsed.types : {},
+    message: isJsonObject(parsed.message)
+      ? signedMessage(types, primaryType, parsed.message, onUncovered)
+      : {},
+    primaryType,
+    types,
   };
 }
 
@@ -624,9 +698,11 @@ export function parseEip712Summary(signDataHex: string): Eip712Summary | null {
       return null;
     }
 
-    const { typedData, miscased } = checksumEip712Addresses(
-      toRawTypedData(parsed),
-    );
+    let uncoveredValues = false;
+    const raw = toRawTypedData(parsed, () => {
+      uncoveredValues = true;
+    });
+    const { typedData, miscased } = checksumEip712Addresses(raw);
     // A request that names no primary type is refused, but its fields still show.
     validateTypedData({
       ...typedData,
@@ -640,7 +716,9 @@ export function parseEip712Summary(signDataHex: string): Eip712Summary | null {
       domain: toDisplayMap(typedData.domain),
       message: toDisplayMap(typedData.message),
       miscasedAddresses: miscased,
-      special: parseSpecialReview(parsed),
+      // As written, so a mis-cased address is still flagged.
+      special: parseSpecialReview(raw),
+      uncoveredValues,
     };
   } catch {
     return null;

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 
 import Eip712JsonPanel from '../src/components/SignRequestDetail/eth/DataTabPanel/Eip712JsonPanel';
+import { UNCOVERED_VALUES_WARNING } from '../src/constants/eip712';
 import type { Eip712Summary } from '../src/utils/eip712';
 import { classifyEthPayload } from '../src/utils/ethPayload';
 import type { EthSignRequest } from '../src/types';
@@ -24,6 +25,7 @@ function Panel(
 jest.mock('react-native-paper', () => {
   const { Text, TouchableOpacity, View } = require('react-native');
   return {
+    Icon: () => <View />,
     Text: ({ children, ...props }: any) => <Text {...props}>{children}</Text>,
     SegmentedButtons: ({
       buttons,
@@ -89,6 +91,7 @@ const RAW_JSON = JSON.stringify(PAYLOAD, null, 2);
 const eip712: Eip712Summary = {
   rawJson: RAW_JSON,
   miscasedAddresses: [],
+  uncoveredValues: false,
   primaryType: 'Mail',
   domain: { name: 'Ether Mail' },
   message: { from: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826' },
@@ -120,6 +123,21 @@ describe('Eip712JsonPanel', () => {
     render(<Panel request={request} eip712={eip712} chainId={1} />);
     fireEvent.press(screen.getByText('Raw'));
     expect(screen.getByText(new RegExp('Data:'))).toBeTruthy();
+  });
+
+  it('says when the request carries values its signature does not cover', () => {
+    render(<Panel request={request} eip712={eip712} chainId={1} />);
+    expect(screen.queryByText(UNCOVERED_VALUES_WARNING)).toBeNull();
+    screen.unmount();
+
+    render(
+      <Panel
+        request={request}
+        eip712={{ ...eip712, uncoveredValues: true }}
+        chainId={1}
+      />,
+    );
+    expect(screen.getByText(UNCOVERED_VALUES_WARNING)).toBeTruthy();
   });
 
   it('shows message fields when no special review', () => {

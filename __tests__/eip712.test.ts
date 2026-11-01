@@ -6,6 +6,7 @@ import {
   parseEip712RawTypedData,
   parseEip712Summary,
 } from '../src/utils/eip712';
+import { classifyEthPayload } from '../src/utils/ethPayload';
 
 function typedDataHex(payload: unknown): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('hex');
@@ -23,6 +24,7 @@ describe('parseEip712Summary', () => {
           Mail: [
             { name: 'from', type: 'address' },
             { name: 'contents', type: 'string' },
+            { name: 'tags', type: 'string[]' },
           ],
         },
         primaryType: 'Mail',
@@ -56,6 +58,7 @@ describe('parseEip712Summary', () => {
         tags: '["test","mail"]',
       },
       miscasedAddresses: [],
+      uncoveredValues: false,
     });
   });
 
@@ -107,6 +110,7 @@ describe('parseEip712Summary', () => {
       domain: {},
       message: {},
       miscasedAddresses: [],
+      uncoveredValues: false,
     });
   });
 
@@ -440,6 +444,113 @@ describe('parseEip712Summary', () => {
       primaryType: 'SafeTx',
       special: undefined,
     });
+  });
+});
+
+describe('values the signature does not cover', () => {
+  const types = {
+    EIP712Domain: [{ name: 'name', type: 'string' }],
+    Person: [
+      { name: 'name', type: 'string' },
+      { name: 'wallet', type: 'address' },
+    ],
+    Mail: [
+      { name: 'from', type: 'Person' },
+      { name: 'to', type: 'Person[]' },
+      { name: 'contents', type: 'string' },
+    ],
+  };
+  const cow = {
+    name: 'Cow',
+    wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+  };
+  const bob = {
+    name: 'Bob',
+    wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+  };
+  const mail = { from: cow, to: [bob], contents: 'Hello, Bob!' };
+
+  function hex(message: object, primaryType = 'Mail'): string {
+    return typedDataHex({
+      types,
+      primaryType,
+      domain: { name: 'Ether Mail' },
+      message,
+    });
+  }
+
+  it('says nothing when the types declare every value', () => {
+    expect(parseEip712Summary(hex(mail))?.uncoveredValues).toBe(false);
+  });
+
+  it('leaves out a key the primary type does not declare', () => {
+    const summary = parseEip712Summary(hex({ ...mail, note: 'Free mint' }));
+    expect(Object.keys(summary!.message).sort()).toEqual([
+      'contents',
+      'from',
+      'to',
+    ]);
+    expect(summary!.uncoveredValues).toBe(true);
+  });
+
+  it('leaves out a key a nested struct does not declare', () => {
+    const summary = parseEip712Summary(
+      hex({ ...mail, from: { ...cow, title: 'Admin' } }),
+    );
+    expect(summary!.message.from).toBe(JSON.stringify(cow));
+    expect(summary!.uncoveredValues).toBe(true);
+  });
+
+  it('leaves out a key an array element does not declare', () => {
+    const summary = parseEip712Summary(
+      hex({ ...mail, to: [{ ...bob, memo: 'Paid' }] }),
+    );
+    expect(summary!.message.to).toBe(JSON.stringify([bob]));
+    expect(summary!.uncoveredValues).toBe(true);
+  });
+
+  it('leaves out the whole message under primaryType EIP712Domain', () => {
+    const summary = parseEip712Summary(hex(mail, 'EIP712Domain'));
+    expect(summary!.message).toEqual({});
+    expect(summary!.uncoveredValues).toBe(true);
+  });
+
+  it('reads the Permit review from declared members only', () => {
+    const summary = parseEip712Summary(
+      typedDataHex({
+        types: {
+          EIP712Domain: [{ name: 'name', type: 'string' }],
+          Permit: [
+            { name: 'spender', type: 'address' },
+            { name: 'value', type: 'uint256' },
+          ],
+        },
+        primaryType: 'Permit',
+        domain: { name: 'USD Coin' },
+        message: {
+          spender: '0x1111111111111111111111111111111111111111',
+          value: '1',
+          deadline: '1712345678',
+        },
+      }),
+    );
+    expect(summary!.special).toMatchObject({ kind: 'permit', amount: 1n });
+    expect(summary!.special).not.toHaveProperty('deadline', '1712345678');
+    expect(summary!.uncoveredValues).toBe(true);
+  });
+
+  it('hands the descriptor lookup the signed message only', () => {
+    expect(
+      parseEip712RawTypedData(hex({ ...mail, note: 'Free mint' }))?.message,
+    ).toEqual(mail);
+  });
+
+  it('signs the same digest with or without them', () => {
+    const declared = classifyEthPayload(hex(mail), 2);
+    if (declared.kind !== 'eip712-json') throw new Error(declared.kind);
+    expect(
+      classifyEthPayload(hex({ ...mail, note: 'Free mint' }), 2),
+    ).toMatchObject({ kind: 'eip712-json', digest: declared.digest });
   });
 });
 

@@ -443,7 +443,10 @@ describe('TransactionDetailScreen – eth-sign-request result', () => {
     const typedDataJson = JSON.stringify({
       types: {
         EIP712Domain: [{ name: 'name', type: 'string' }],
-        Mail: [{ name: 'contents', type: 'string' }],
+        Mail: [
+          { name: 'contents', type: 'string' },
+          { name: 'account', type: 'string' },
+        ],
       },
       primaryType: 'Mail',
       domain: {

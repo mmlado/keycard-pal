@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - On Android 12 to 14, the status bar shows the app background instead of a black band
+- The EIP-712 review leaves out message values the signature does not cover, and says so, instead of showing them as signed
 - The header back arrow and iOS swipe-back during a tap on Pairing slots, the recovery phrase and SLIP39 screens, Settings and Initialize cancel the tap and keep the screen, like hardware back
 - On iOS, the header back arrow and swipe-back step a PIN form or confirmation back, like hardware back, instead of leaving a screen that then would not open again
 - On iOS, addresses, BIP85 passwords, license texts and the Keycard log are shown in a monospaced font instead of the system font

@@ -10,7 +10,10 @@ import {
 
 import SimulationAddressProvider from '../src/components/SignRequestDetail/SimulationAddressProvider';
 import EthSignRequestDetail from '../src/components/SignRequestDetail/eth/SignRequestDetail';
-import { MISCASED_ADDRESS_WARNING } from '../src/constants/eip712';
+import {
+  MISCASED_ADDRESS_WARNING,
+  UNCOVERED_VALUES_WARNING,
+} from '../src/constants/eip712';
 import type { EthSignRequest } from '../src/types';
 import { setSavedIndex } from '../src/utils/eip7730/lookup';
 import { wcRequestToScanResult } from '../src/utils/walletConnect/requestAdapter';
@@ -642,7 +645,7 @@ describe('EthSignRequestDetail — amount row visibility', () => {
 });
 
 describe('EthSignRequestDetail — EIP-712 special renderers', () => {
-  it('shows message fields for generic EIP-712 typed data', () => {
+  it('shows the message fields the signature covers, and says it left others out', () => {
     renderDetail({
       signData: typedDataHex({
         types: {
@@ -664,8 +667,8 @@ describe('EthSignRequestDetail — EIP-712 special renderers', () => {
     expect(screen.getByText('Message Fields')).toBeTruthy();
     expect(screen.getByText('contents')).toBeTruthy();
     expect(screen.getByText('Approve login')).toBeTruthy();
-    expect(screen.getByText('approved')).toBeTruthy();
-    expect(screen.getByText('true')).toBeTruthy();
+    expect(screen.queryByText('approved')).toBeNull();
+    expect(screen.getByText(UNCOVERED_VALUES_WARNING)).toBeTruthy();
   });
 
   // Descriptors bind USDC's Permit to "USD Coin" version 2 and Permit2 to "Permit2".
