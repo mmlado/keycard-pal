@@ -1,8 +1,10 @@
-Keycard Pal is a hardware wallet companion app. It works with a Keycard NFC smart card to sign Ethereum and Bitcoin transactions, and your private keys never leave the card.
+Keycard Pal is a hardware wallet companion app. It works with a Keycard NFC smart card to sign Ethereum and Bitcoin transactions, and the key on the card never leaves it.
 
 Requires a Keycard hardware smart card (keycard.tech). The app talks to the card over NFC: no USB, no Bluetooth.
 
 Your wallet and Keycard Pal talk through animated QR codes. The wallet shows a request, you review it in Keycard Pal, tap your card, and show the signature back. No network connection is needed for any of it.
+
+The phone handles key material only when you ask it to: a recovery phrase or SLIP-39 shares while you generate, import or verify them, and secrets you derive with BIP-85.
 
 Features:
 - Sign Ethereum transactions (legacy, EIP-1559, EIP-2930)
@@ -12,6 +14,7 @@ Features:
 - Sign Bitcoin messages (BIP-322)
 - Export wallet keys to MetaMask, Rabby, Ledger Live, Sparrow, BlueWallet, and Bitget via UR QR codes
 - Generate a key pair on the card, or import a recovery phrase (BIP-39) or SLIP-39 shares
+- Derive BIP-85 secrets from the card's key and show them on the phone: recovery phrases, WIF and XPRV keys, hex entropy and passwords (needs a Keycard with applet 4 or later)
 - Genuine Keycard check
 - No telemetry, no analytics, no account
 

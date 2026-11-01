@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Screens that take typing move with the keyboard as it slides in and out, and keep their button 24 above the keyboard and 16 above the bottom inset, the same on Android and iOS
 - The store descriptions, the README and the F-Droid `NonFreeNet` reason list the clear-signing registry download among the optional network features
 - WalletConnect starts with the SDK's telemetry switched off
+- The store descriptions, the README and the privacy policy describe BIP-85 derivation, and say that the key on the card never leaves it instead of that no private key ever reaches the phone
 
 ### Fixed
 

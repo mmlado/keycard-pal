@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/github/stars/mmlado/keycard-pal.svg?style=social" alt="Stars" />
 </p>
 
-Keycard Pal is an air-gapped companion app for [Status Keycard](https://keycard.tech), on Android and iOS. It lets you sign Ethereum and Bitcoin transactions over NFC, so your private keys never touch an internet-connected device.
+Keycard Pal is an air-gapped companion app for [Status Keycard](https://keycard.tech), on Android and iOS. It signs Ethereum and Bitcoin transactions with the key on the card, over NFC, and that key never leaves the card. The phone handles key material only when you ask it to: a recovery phrase or SLIP-39 shares while you generate, import or verify them, and secrets you derive with BIP-85.
 
 All communication with your watch-only wallet happens through animated QR codes using the [Blockchain Commons UR](https://github.com/BlockchainCommons/bc-ur) standard. No telemetry.
 
@@ -60,6 +60,7 @@ On iOS there is one app, Keycard Pal, with the same opt-in online features; ther
 - Generate and load key pairs directly onto the Keycard
 - Import a recovery phrase (BIP-39, 12 or 24 words, with optional passphrase)
 - Import SLIP-39 Shamir Secret Sharing shares
+- Derive BIP-85 secrets from the Keycard's key: recovery phrases, WIF and XPRV keys, hex entropy and passwords, shown on the phone (Keycard applet 4 or later)
 - Genuine Keycard verification before first pairing
 - Two Android variants: Keycard Pal Offline (no internet, manifest-level guarantee) and Keycard Pal (optional, opt-in online features: WalletConnect, ENS names, Tenderly transaction simulation, token images, clear-signing registry download); iOS ships Keycard Pal
 
@@ -222,7 +223,7 @@ is unlocked, changed or promised in return.
 ## Security
 
 - Pairing data is stored in encrypted storage backed by the Android Keystore or the iOS Keychain
-- Private keys never leave the Keycard; only the signature result is returned to the app
+- The Keycard's private key never leaves it; signing returns only the signature. A recovery phrase or SLIP-39 shares you generate, import or verify, and a BIP-85 secret you derive, are on the phone by design: the app holds them in memory only, saves none of them and sends none of them off the phone. Generating or importing loads only the key derived from them onto the card
 - QR codes use [Blockchain Commons UR](https://github.com/BlockchainCommons/bc-ur) for structured binary encoding
 - Keycard Pal Offline (`com.keycardpal.offline`) has no `INTERNET` permission at the manifest level — no runtime flag can enable networking
 
