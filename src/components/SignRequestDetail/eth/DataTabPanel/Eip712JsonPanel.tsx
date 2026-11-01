@@ -2,7 +2,10 @@ import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons } from 'react-native-paper';
 
-import { MISCASED_ADDRESS_WARNING } from '@/constants/eip712';
+import {
+  MISCASED_ADDRESS_WARNING,
+  UNCOVERED_VALUES_WARNING,
+} from '@/constants/eip712';
 import { DESCRIPTOR_CHECK_FAILED_WARNING } from '@/constants/eip7730';
 import { EIP712_DIGEST_EXPLAINER } from '@/constants/erc8213';
 import type { EthSignRequest } from '@/types';
@@ -74,6 +77,7 @@ export default function Eip712JsonPanel({
       {description?.rejected && (
         <WarningRow text={DESCRIPTOR_CHECK_FAILED_WARNING} />
       )}
+      {eip712.uncoveredValues && <WarningRow text={UNCOVERED_VALUES_WARNING} />}
       <SegmentedButtons
         value={tab}
         onValueChange={v => setTab(v as Tab)}

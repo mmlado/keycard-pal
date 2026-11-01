@@ -100,7 +100,10 @@ beforeEach(() => jest.clearAllMocks());
 
 const VERIFYING = '0x000000000022d473030f116ddee9f6b43ac78ba3';
 
-function buildPayload(message: Record<string, unknown>) {
+function buildPayload(
+  message: Record<string, unknown>,
+  members: { name: string; type: string }[] = [],
+) {
   return {
     types: {
       EIP712Domain: [
@@ -111,6 +114,7 @@ function buildPayload(message: Record<string, unknown>) {
       PermitSingle: [
         { name: 'spender', type: 'address' },
         { name: 'sigDeadline', type: 'uint256' },
+        ...members,
       ],
     },
     primaryType: 'PermitSingle',
@@ -135,6 +139,7 @@ function buildSummary(message: Record<string, string>): Eip712Summary {
   return {
     rawJson: JSON.stringify(buildPayload(message), null, 2),
     miscasedAddresses: [],
+    uncoveredValues: false,
     primaryType: 'PermitSingle',
     domain: {
       name: 'Permit2',
@@ -412,6 +417,7 @@ describe('Eip712JsonPanel EIP-7730 integration', () => {
     const eip712: Eip712Summary = {
       rawJson: JSON.stringify(payload),
       miscasedAddresses: [],
+      uncoveredValues: false,
       primaryType: 'Mail',
       domain: { name: 'NoContract' },
       message: {},
@@ -521,7 +527,12 @@ describe('Eip712JsonPanel EIP-7730 integration', () => {
     const message = { tokens: ['0x01', '0x02'], amounts: ['1'] } as any;
     render(
       <Panel
-        request={buildRequest(buildPayload(message))}
+        request={buildRequest(
+          buildPayload(message, [
+            { name: 'tokens', type: 'bytes[]' },
+            { name: 'amounts', type: 'uint256[]' },
+          ]),
+        )}
         eip712={buildSummary(message)}
         chainId={1}
       />,
