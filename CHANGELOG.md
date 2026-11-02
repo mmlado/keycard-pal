@@ -50,6 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A Settings text field that cannot be stored says so under the field instead of failing silently
 - The key pair sizes, Generate SLIP39 shares, WalletConnect's Confirm and the pairing secret's Continue show the NFC mark, like every other action that starts a Keycard tap
 - A WalletConnect pairing whose Project ID the relay refuses ends with the relay's reason instead of spinning
+- A WalletConnect Project ID saved in Settings is used by the next pairing without restarting the app
 
 ## [1.15.1] - 2026-10-20
 

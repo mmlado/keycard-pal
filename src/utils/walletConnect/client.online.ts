@@ -11,6 +11,7 @@ type ClientListener = (client: Client) => (() => void) | void;
 
 let _client: Client | null = null;
 let _initPromise: Promise<Client> | null = null;
+let _created = 0;
 const _listeners = new Set<ClientListener>();
 const _detach = new Map<ClientListener, () => void>();
 
@@ -35,6 +36,8 @@ async function createClient(): Promise<Client> {
   const memoryStorage = new Map<string, string>();
   const core = new Core({
     projectId,
+    // The SDK hands back its first Core for a prefix it has seen, old Project ID included.
+    customStoragePrefix: `keycardpal-${++_created}`,
     // On by default; it posts each pairing's wc: URI to WalletConnect.
     telemetryEnabled: false,
     storage: {
