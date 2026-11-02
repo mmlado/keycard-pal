@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import {
   fireEvent,
   render,
@@ -13,9 +14,9 @@ import TextEntry from '../src/components/TextEntry';
 // ---------------------------------------------------------------------------
 
 jest.mock('../src/components/BottomActionArea', () => {
-  const { View } = require('react-native');
+  const RN = require('react-native');
   return ({ children }: any) => (
-    <View testID="bottom-action-area">{children}</View>
+    <RN.View testID="bottom-action-area">{children}</RN.View>
   );
 });
 
@@ -76,6 +77,15 @@ describe('TextEntry', () => {
   it('renders a TextInput', () => {
     const { toJSON } = renderEntry();
     expect(getTextInputFromJSON(toJSON())).toBeTruthy();
+  });
+
+  it('draws the icon it is given on Continue', () => {
+    renderEntry({ icon: props => <View testID="continue-icon" {...props} /> });
+    expect(
+      within(screen.getByTestId('bottom-action-area')).getByTestId(
+        'continue-icon',
+      ),
+    ).toBeTruthy();
   });
 
   it('Continue button is disabled when value is empty', () => {

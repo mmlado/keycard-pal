@@ -3,9 +3,11 @@ import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { Button, RadioButton, Text } from 'react-native-paper';
 import { EdgeInsets } from 'react-native-safe-area-context';
 
-import theme from '@/theme';
-import PrimaryButton from '@/components/PrimaryButton';
+import { Icons } from '@/assets/icons';
 import type { VerifyValidation } from '@/providers/walletConnect/context';
+import theme from '@/theme';
+
+import PrimaryButton from '@/components/PrimaryButton';
 
 import styles from './styles';
 
@@ -238,6 +240,7 @@ export default function ProposalPhase({
         <PrimaryButton
           label="Confirm"
           onPress={onConfirm}
+          icon={Icons.nfcActivate}
           disabled={isScam || expired || !!proposalError}
         />
       </View>

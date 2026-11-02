@@ -506,6 +506,7 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
           <PrimaryButton
             label="Generate SLIP39 shares"
             onPress={handleGenerateShares}
+            icon={Icons.nfcActivate}
           />
         ) : mode === 'generate' &&
           backupStep === 'display' &&
