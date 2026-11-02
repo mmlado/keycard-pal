@@ -55,7 +55,7 @@
     "@scure/base": "^2.0.0",
     "@scure/bip32": "^2.0.1",
     "@scure/bip39": "^2.0.1",
-    "@walletconnect/core": "2.21.7",
+    "@walletconnect/core": "github:mmlado/walletconnect-core#2e1675b9f4cf828fea773f45915a2fd82103e03f",
     "@walletconnect/react-native-compat": "2.21.8",
     "bitcoinjs-lib": "^6.1.7",
     "fast-text-encoding": "1.0.6",
@@ -111,6 +111,7 @@
   "overrides": {
     "fast-xml-parser": "^5.8.0",
     "uuid": "^11.1.1",
+    "@walletconnect/core": "$@walletconnect/core",
     "@walletconnect/utils": {
       "viem": "$viem"
     }
