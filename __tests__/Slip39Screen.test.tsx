@@ -52,6 +52,8 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
 jest.mock('../src/components/NFCBottomSheet', () => jest.fn(() => null));
 
 jest.mock('../src/components/BottomActionArea', () => {
@@ -289,6 +291,15 @@ describe('Slip39Screen', () => {
         },
       ],
     });
+  });
+
+  it('marks Generate SLIP39 shares as starting a Keycard tap', () => {
+    renderScreen('generate');
+    expect(
+      within(screen.getByTestId('bottom-action-area')).getByTestId(
+        'icon-nfcActivate',
+      ),
+    ).toBeTruthy();
   });
 
   it('starts Keycard entropy generation before showing generated shares', async () => {

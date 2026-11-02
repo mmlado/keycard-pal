@@ -155,7 +155,11 @@ export default function PairingSlotsScreen({
                 Could not read pairing slot data. Make sure you are tapping the
                 correct card.
               </Text>
-              <PrimaryButton label="Try again" onPress={checkSlots} />
+              <PrimaryButton
+                label="Try again"
+                onPress={checkSlots}
+                icon={Icons.nfcActivate}
+              />
             </View>
           )}
 

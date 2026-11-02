@@ -1,11 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icons } from '../../assets/icons';
-import { KeySizeScreenProps } from '../../navigation/types';
-import theme from '../../theme';
+import { Icons } from '@/assets/icons';
+import { KeySizeScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import EntryList from '../../components/EntryList';
+import EntryList from '@/components/EntryList';
 
 export default function KeySizeScreen({ navigation }: KeySizeScreenProps) {
   const insets = useSafeAreaInsets();
@@ -14,6 +14,7 @@ export default function KeySizeScreen({ navigation }: KeySizeScreenProps) {
     {
       label: '12 word',
       icon: Icons.phraseShort,
+      requiresNfc: true,
       onPress: () =>
         navigation.navigate('GenerateKey', {
           size: 12,
@@ -22,6 +23,7 @@ export default function KeySizeScreen({ navigation }: KeySizeScreenProps) {
     {
       label: '12 word + passphrase',
       icon: Icons.phraseShort,
+      requiresNfc: true,
       onPress: () =>
         navigation.navigate('GenerateKey', {
           size: 12,
@@ -31,6 +33,7 @@ export default function KeySizeScreen({ navigation }: KeySizeScreenProps) {
     {
       label: '24 word',
       icon: Icons.phraseLong,
+      requiresNfc: true,
       onPress: () =>
         navigation.navigate('GenerateKey', {
           size: 24,
@@ -39,6 +42,7 @@ export default function KeySizeScreen({ navigation }: KeySizeScreenProps) {
     {
       label: '24 word + passphrase',
       icon: Icons.phraseLong,
+      requiresNfc: true,
       onPress: () =>
         navigation.navigate('GenerateKey', {
           size: 24,
