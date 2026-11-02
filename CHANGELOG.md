@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-02
+
 ### Added
 
 - Derive with BIP85, under Keycard, for Keycards with applet 4.0 or later: a 12, 18 or 24-word BIP39 recovery phrase, a Bitcoin WIF or BIP32 XPRV private key, 32 or 64 bytes of hex entropy, or a Base64 password, by index
@@ -520,7 +522,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.15.1...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.16.0...HEAD
+[1.16.0]: https://github.com/mmlado/keycard-pal/compare/v1.15.1...v1.16.0
 [1.15.1]: https://github.com/mmlado/keycard-pal/compare/v1.15.0...v1.15.1
 [1.15.0]: https://github.com/mmlado/keycard-pal/compare/v1.14.0...v1.15.0
 [1.14.0]: https://github.com/mmlado/keycard-pal/compare/v1.13.0...v1.14.0
