@@ -503,7 +503,7 @@ const UNSAFE_TEXT_RE =
   // eslint-disable-next-line no-control-regex
   /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]/;
 const MAX_INTERPOLATED_VALUE = 80;
-const MAX_INTERPOLATED_SENTENCE = 200;
+export const MAX_INTERPOLATED_SENTENCE = 200;
 
 const isSafeInterpolation = (text: string) =>
   text.length <= MAX_INTERPOLATED_VALUE && !UNSAFE_TEXT_RE.test(text);
