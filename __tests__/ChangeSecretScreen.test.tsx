@@ -312,6 +312,21 @@ describe('ChangeSecretScreen', () => {
       expect(screen.queryByText(/digits/)).toBeNull();
     });
 
+    it('marks Continue as starting a Keycard tap on the confirm step only', async () => {
+      await renderScreen('pairing');
+      expect(screen.queryByTestId('icon-nfcActivate')).toBeNull();
+      fireEvent.changeText(
+        screen.UNSAFE_getByType(TextInput),
+        'pairing-secret',
+      );
+      fireEvent.press(screen.getByText('Continue'));
+      expect(
+        within(screen.getByTestId('bottom-action-area')).getByTestId(
+          'icon-nfcActivate',
+        ),
+      ).toBeTruthy();
+    });
+
     it('calls start when pairing secret confirmation matches', async () => {
       await renderScreen('pairing');
       fireEvent.changeText(

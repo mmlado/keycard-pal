@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
+import type { IconComponent } from '@/assets/icons';
 import theme from '@/theme';
 
 import BottomActionArea from './BottomActionArea';
@@ -13,6 +14,7 @@ type TextEntryProps = {
   onType: () => void;
   /** A new value clears the field. */
   resetKey?: string | number;
+  icon?: IconComponent;
 };
 
 export default function TextEntry({
@@ -20,6 +22,7 @@ export default function TextEntry({
   error,
   onType,
   resetKey,
+  icon,
 }: TextEntryProps) {
   const [value, setValue] = useState('');
 
@@ -58,6 +61,7 @@ export default function TextEntry({
         <PrimaryButton
           label="Continue"
           onPress={handleSubmit}
+          icon={icon}
           disabled={!value}
         />
       </BottomActionArea>

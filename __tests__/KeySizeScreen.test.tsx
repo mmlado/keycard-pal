@@ -80,6 +80,13 @@ describe('KeySizeScreen', () => {
       expect(screen.getByText('24 word + passphrase')).toBeTruthy();
     });
 
+    it('marks every option as starting a Keycard tap', () => {
+      renderScreen();
+      for (const index of [0, 1, 2, 3]) {
+        expect(screen.getByTestId(`menu-nfc-indicator-${index}`)).toBeTruthy();
+      }
+    });
+
     it('shows a leading icon on every option', () => {
       renderScreen();
       for (const index of [0, 1, 2, 3]) {

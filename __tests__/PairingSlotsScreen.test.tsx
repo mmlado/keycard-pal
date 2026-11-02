@@ -237,6 +237,7 @@ describe('PairingSlotsScreen', () => {
       renderScreen(slots({ tap: readTap('error') }));
       expect(screen.getByText(/Could not read pairing slot data/)).toBeTruthy();
       expect(screen.getByText('Try again')).toBeTruthy();
+      expect(screen.getByTestId('Try again icon')).toBeTruthy();
     });
 
     it('calls checkSlots when Try again is pressed', () => {

@@ -58,11 +58,7 @@ jest.mock('react-native-paper', () => {
 
 jest.mock('react-native-svg', () => ({ SvgXml: () => null }));
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = () => require('react').createElement(View);
-  return { Icons: { nfcActivate: Icon } };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 jest.mock('../src/components/AddressText', () => {
   const { Text } = require('react-native');
@@ -72,10 +68,11 @@ jest.mock('../src/components/AddressText', () => {
 
 jest.mock('../src/components/PrimaryButton', () => {
   const { Pressable, Text } = require('react-native');
-  return ({ label, onPress, disabled }: any) =>
+  return ({ label, onPress, disabled, icon: Icon }: any) =>
     require('react').createElement(
       Pressable,
       { onPress, disabled },
+      Icon ? require('react').createElement(Icon) : null,
       require('react').createElement(Text, null, label),
     );
 });
@@ -315,6 +312,11 @@ describe('ProposalPhase', () => {
       <ProposalPhase {...baseProposalProps} activeSessionName="Uniswap" />,
     );
     expect(screen.getByText(/Uniswap/)).toBeTruthy();
+  });
+
+  it('marks Confirm as starting a Keycard tap', () => {
+    render(<ProposalPhase {...baseProposalProps} />);
+    expect(screen.getByTestId('icon-nfcActivate')).toBeTruthy();
   });
 
   it('calls onConfirm when Confirm pressed', () => {

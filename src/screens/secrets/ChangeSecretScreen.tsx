@@ -174,6 +174,7 @@ export default function ChangeSecretScreen({
           }
           error={entry.error}
           onType={entry.clearError}
+          icon={entry.step === 'confirm' ? Icons.nfcActivate : undefined}
         />
       )}
 

@@ -48,6 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The signing and key export screen's title reads "Enter Keycard PIN" only while the PIN pad is up
 - Pairing slots offers Open NFC Settings when NFC is off, and unpairing refuses a different Keycard than the one listed, no longer reports a slot the card refused as unpaired, and forgets this phone's pairing also when the list did not mark its slot
 - A Settings text field that cannot be stored says so under the field instead of failing silently
+- The key pair sizes, Generate SLIP39 shares, WalletConnect's Confirm, the pairing secret's Continue and Try again on Pairing slots show the NFC mark, like every other action that starts a Keycard tap
 
 ## [1.15.1] - 2026-10-20
 
