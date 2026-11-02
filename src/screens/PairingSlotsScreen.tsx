@@ -149,20 +149,6 @@ export default function PairingSlotsScreen({
             </View>
           )}
 
-          {phase === 'error' && (
-            <View style={styles.centeredContent}>
-              <Text style={styles.description}>
-                Could not read pairing slot data. Make sure you are tapping the
-                correct card.
-              </Text>
-              <PrimaryButton
-                label="Try again"
-                onPress={checkSlots}
-                icon={Icons.nfcActivate}
-              />
-            </View>
-          )}
-
           {slotInfo && (
             <>
               <View style={styles.listContent}>

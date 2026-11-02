@@ -233,17 +233,12 @@ describe('PairingSlotsScreen', () => {
   });
 
   describe('error state', () => {
-    it('renders error message and Try again button', () => {
+    it('leaves a failed read to the sheet, which reads again', () => {
       renderScreen(slots({ tap: readTap('error') }));
-      expect(screen.getByText(/Could not read pairing slot data/)).toBeTruthy();
-      expect(screen.getByText('Try again')).toBeTruthy();
-      expect(screen.getByTestId('Try again icon')).toBeTruthy();
-    });
-
-    it('calls checkSlots when Try again is pressed', () => {
-      renderScreen(slots({ tap: readTap('error') }));
-      fireEvent.press(screen.getByText('Try again'));
-      expect(mockCheckSlots).toHaveBeenCalled();
+      expect(screen.queryByText(/Could not read pairing slot data/)).toBeNull();
+      expect(screen.queryByText('Try again')).toBeNull();
+      expect(lastSheet()?.nfc.phase).toBe('error');
+      expect(lastSheet()?.nfc.retry).toBe(mockCheckSlots);
     });
   });
 
