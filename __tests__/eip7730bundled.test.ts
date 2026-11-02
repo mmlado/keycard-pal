@@ -19,6 +19,7 @@ import {
 import {
   formatEip7730Field,
   interpolateIntent,
+  MAX_INTERPOLATED_SENTENCE,
 } from '../src/utils/eip7730/format';
 import * as lookup from '../src/utils/eip7730/lookup';
 import {
@@ -253,6 +254,30 @@ describe('bundled EIP-7730 descriptors', () => {
 });
 
 // A value of any ABI type, so calldata can be built for every bundled signature.
+// The shortest a sentence can be once filled: its own text, a checksummed address per address field, a character per other field.
+function shortestFill(sentence: string, inputs: readonly AbiParameter[]) {
+  const typeAt = (path: string) => {
+    let params: readonly AbiParameter[] | undefined = inputs;
+    let type: string | undefined;
+    for (const name of path.replace(/^#\./, '').split('.')) {
+      const param: AbiParameter | undefined = params?.find(
+        p => p.name === name,
+      );
+      type = param?.type;
+      params = param && 'components' in param ? param.components : undefined;
+    }
+    return type;
+  };
+  const placeholders = sentence.match(/\{[^}]+\}/g) ?? [];
+  return (
+    sentence.replace(/\{[^}]+\}/g, '').length +
+    placeholders.reduce(
+      (sum, p) => sum + (typeAt(p.slice(1, -1)) === 'address' ? 42 : 1),
+      0,
+    )
+  );
+}
+
 function sample(param: AbiParameter, bytesLength = 400): unknown {
   const array = param.type.match(/^(.*)\[(\d*)\]$/);
   if (array) {
@@ -370,6 +395,13 @@ describe('sentences', () => {
       });
       // Slices and negative indices are not read yet.
       if (/\[-|\[\d*:/.test(JSON.stringify(format.fields))) continue;
+      if (
+        sentence === null &&
+        shortestFill(format.interpolatedIntent, item.inputs) >
+          MAX_INTERPOLATED_SENTENCE
+      ) {
+        continue;
+      }
       expect([format.interpolatedIntent, sentence]).not.toEqual([
         format.interpolatedIntent,
         null,

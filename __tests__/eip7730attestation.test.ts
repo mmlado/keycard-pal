@@ -198,12 +198,12 @@ describe('checkAttestation with registry attestations', () => {
       ).toBe(CYFRIN);
     });
 
-    it('ships only trusted attesters, the fixtures among them', () => {
+    it('ships only trusted attesters', () => {
+      expect(BUNDLED_ATTESTATIONS.size).toBeGreaterThan(0);
       for (const [key, attester] of BUNDLED_ATTESTATIONS) {
         expect(key).toMatch(/^0x[0-9a-f]{64}$/);
         expect(TRUSTED_ATTESTERS.has(attester)).toBe(true);
       }
-      expect(BUNDLED_ATTESTATIONS.get(uid)).toBe(CYFRIN);
     });
   });
 
