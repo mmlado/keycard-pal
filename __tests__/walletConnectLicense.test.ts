@@ -33,6 +33,13 @@ describe('WalletConnect packages stay on a free license', () => {
     ['@walletconnect/core', '2.21.7'],
     ['@walletconnect/react-native-compat', '2.21.8'],
   ])('%s is pinned to %s', (name, version) => {
-    expect(readJson('package.json').dependencies[name]).toBe(version);
+    const spec = readJson('package.json').dependencies[name];
+    expect(
+      spec === version || /^github:mmlado\/[\w.-]+#[0-9a-f]{40}$/.test(spec),
+    ).toBe(true);
+    const { packages } = readJson('package-lock.json');
+    const copies = lockedPaths.filter(path => SCOPED.exec(path)![1] === name);
+    expect(copies.length).toBeGreaterThan(0);
+    copies.forEach(path => expect(packages[path].version).toBe(version));
   });
 });
