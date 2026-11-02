@@ -1,6 +1,6 @@
 import '@walletconnect/react-native-compat';
 
-import { Core } from '@walletconnect/core';
+import { Core, RELAYER_EVENTS } from '@walletconnect/core';
 import { WalletKit, WalletKitTypes } from '@reown/walletkit';
 
 import { APP_NAME } from '@/constants/app';
@@ -85,6 +85,26 @@ function getClient(): Promise<Client> {
   return promise;
 }
 
+function refusalMessage(error: Error): string {
+  const reason = /\(([^)]+)\)\s*$/.exec(error.message)?.[1];
+  return `The WalletConnect relay refused the connection${
+    reason ? ` (${reason})` : ''
+  }. Check the Project ID in Settings.`;
+}
+
+// The relay refuses a Project ID by closing the socket with 3000, and the SDK's pair() then never settles.
+function unlessRefused<T>(client: Client, work: Promise<T>): Promise<T> {
+  const { relayer } = client.core;
+  return new Promise<T>((resolve, reject) => {
+    const onRefused = (error: Error) =>
+      reject(new Error(refusalMessage(error)));
+    relayer.once(RELAYER_EVENTS.error, onRefused);
+    work
+      .then(resolve, reject)
+      .finally(() => relayer.off(RELAYER_EVENTS.error, onRefused));
+  });
+}
+
 export type WCClientEventMap = WalletKitTypes.EventArguments;
 
 export const wcClient = {
@@ -103,7 +123,7 @@ export const wcClient = {
   },
   pair: async (uri: string) => {
     const client = await getClient();
-    await client.pair({ uri });
+    await unlessRefused(client, client.pair({ uri }));
   },
   respondSuccess: async (id: number, topic: string, result: string) => {
     const client = await getClient();

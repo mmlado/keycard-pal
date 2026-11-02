@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Pairing slots offers Open NFC Settings when NFC is off, and unpairing refuses a different Keycard than the one listed, no longer reports a slot the card refused as unpaired, and forgets this phone's pairing also when the list did not mark its slot
 - A Settings text field that cannot be stored says so under the field instead of failing silently
 - The key pair sizes, Generate SLIP39 shares, WalletConnect's Confirm and the pairing secret's Continue show the NFC mark, like every other action that starts a Keycard tap
+- A WalletConnect pairing whose Project ID the relay refuses ends with the relay's reason instead of spinning
 
 ## [1.15.1] - 2026-10-20
 

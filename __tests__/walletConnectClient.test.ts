@@ -1,3 +1,5 @@
+import { EventEmitter } from 'events';
+
 const mockInit = jest.fn();
 const mockCore = jest.fn();
 const mockLoadWCProjectId = jest.fn();
@@ -7,6 +9,7 @@ jest.mock('@walletconnect/core', () => ({
   Core: function Core(options: unknown) {
     mockCore(options);
   },
+  RELAYER_EVENTS: jest.requireActual('@walletconnect/core').RELAYER_EVENTS,
 }));
 jest.mock('@reown/walletkit', () => ({
   WalletKit: { init: (...args: unknown[]) => mockInit(...args) },
@@ -16,10 +19,16 @@ jest.mock('../src/storage/walletConnect', () => ({
 }));
 
 function makeClient() {
+  const relayerEvents = new EventEmitter();
   return {
     pair: jest.fn().mockResolvedValue(undefined),
     core: {
-      relayer: { transportClose: jest.fn().mockResolvedValue(undefined) },
+      relayer: {
+        transportClose: jest.fn().mockResolvedValue(undefined),
+        once: relayerEvents.once.bind(relayerEvents),
+        off: relayerEvents.off.bind(relayerEvents),
+        events: relayerEvents,
+      },
     },
   };
 }
@@ -77,6 +86,48 @@ describe('wcClient', () => {
       'WalletConnect needs a Project ID. Enter one in Settings.',
     );
     expect(mockInit).not.toHaveBeenCalled();
+  });
+
+  describe('a relay that refuses the Project ID', () => {
+    const refusal = (reason: string) =>
+      new Error(
+        `WebSocket connection closed abnormally with code: 3000 (${reason})`,
+      );
+
+    it('ends the pairing with its reason', async () => {
+      const client = makeClient();
+      client.pair.mockReturnValue(new Promise(() => {}));
+      mockInit.mockResolvedValue(client);
+      const wcClient = loadClient();
+
+      const pairing = wcClient.pair('wc:uri');
+      for (
+        let tick = 0;
+        tick < 50 &&
+        client.core.relayer.events.listenerCount('relayer_error') === 0;
+        tick++
+      ) {
+        await Promise.resolve();
+      }
+      client.core.relayer.events.emit(
+        'relayer_error',
+        refusal('Project not found'),
+      );
+
+      await expect(pairing).rejects.toThrow(
+        'The WalletConnect relay refused the connection (Project not found). Check the Project ID in Settings.',
+      );
+    });
+
+    it('stops listening once the pairing settles', async () => {
+      const client = makeClient();
+      mockInit.mockResolvedValue(client);
+      const wcClient = loadClient();
+
+      await wcClient.pair('wc:uri');
+
+      expect(client.core.relayer.events.listenerCount('relayer_error')).toBe(0);
+    });
   });
 
   it('creates one client for concurrent callers', async () => {

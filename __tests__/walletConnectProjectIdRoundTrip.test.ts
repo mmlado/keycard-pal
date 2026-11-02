@@ -22,13 +22,18 @@ jest.mock('@walletconnect/core', () => ({
   Core: function Core(options: unknown) {
     mockCore(options);
   },
+  RELAYER_EVENTS: jest.requireActual('@walletconnect/core').RELAYER_EVENTS,
 }));
 jest.mock('@reown/walletkit', () => ({
   WalletKit: {
     init: async () => ({
       pair: jest.fn().mockResolvedValue(undefined),
       core: {
-        relayer: { transportClose: jest.fn().mockResolvedValue(undefined) },
+        relayer: {
+          transportClose: jest.fn().mockResolvedValue(undefined),
+          once: jest.fn(),
+          off: jest.fn(),
+        },
       },
     }),
   },
