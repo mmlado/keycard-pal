@@ -6,19 +6,27 @@ import {
   CryptoCoinInfoType,
   CryptoHDKey,
   CryptoOutput,
+  DataItem,
   ScriptExpressions,
 } from '@keystonehq/bc-ur-registry';
-import { encodeToUR } from './ur';
 import { ripemd160 } from '@noble/hashes/legacy.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import Keycard from 'keycard-sdk';
 
 import { APP_NAME } from '@/constants/app';
+
 import {
   coinTypeFromPath,
   derivationPathToKeypath,
   numberToFingerprintBuffer,
 } from './hdKeyUtils';
+import { encodeToUR } from './ur';
+
+// bc-ur-registry drops a 0 network, which bitcoin-qr-tools reads as testnet.
+class ExplicitCoinInfo extends CryptoCoinInfo {
+  public toDataItem = () =>
+    new DataItem({ 1: this.getType(), 2: this.getNetwork() });
+}
 
 type ScriptType = 'wpkh' | 'sh-wpkh' | 'pkh' | 'wsh' | 'sh-wsh' | 'sh';
 
@@ -55,7 +63,7 @@ function buildHdKey(
       masterFingerprint,
     ),
     parentFingerprint: numberToFingerprintBuffer(descriptor.parentFingerprint),
-    useInfo: new CryptoCoinInfo(CryptoCoinInfoType.bitcoin, network),
+    useInfo: new ExplicitCoinInfo(CryptoCoinInfoType.bitcoin, network),
     name: APP_NAME,
   });
 }
