@@ -1,4 +1,10 @@
-import { URRegistryDecoder } from '@keystonehq/bc-ur-registry';
+import {
+  DataItem,
+  URRegistryDecoder,
+  decodeToDataItem,
+} from '@keystonehq/bc-ur-registry';
+import { URDecoder } from '@ngraveio/bc-ur';
+
 import {
   buildCryptoAccountUR,
   pubKeyFingerprint,
@@ -68,6 +74,40 @@ PUB_KEY_UNCOMPRESSED[32] = 0x01;
 
 const CHAIN_CODE = new Uint8Array(32).fill(0xaa);
 const EXPORT_DATA = buildExportKeyTLV(PUB_KEY_UNCOMPRESSED, CHAIN_CODE);
+
+const COIN_INFO_TAG = 305;
+
+function coinInfoMaps(ur: string): unknown[] {
+  const decoder = new URDecoder();
+  decoder.receivePart(ur);
+  const found: unknown[] = [];
+  const walk = (item: unknown): void => {
+    if (item instanceof DataItem) {
+      if (item.getTag() === COIN_INFO_TAG) {
+        found.push(item.getData());
+      }
+      walk(item.getData());
+    } else if (Array.isArray(item)) {
+      item.forEach(walk);
+    } else if (item && typeof item === 'object' && !Buffer.isBuffer(item)) {
+      Object.values(item).forEach(walk);
+    }
+  };
+  walk(decodeToDataItem(decoder.resultUR().cbor));
+  return found;
+}
+
+function accountUR(derivationPaths: string[]): string {
+  return buildCryptoAccountUR({
+    masterFingerprint: 0xaabbccdd,
+    descriptors: derivationPaths.map(derivationPath => ({
+      derivationPath,
+      exportRespData: EXPORT_DATA,
+      parentFingerprint: 0x11223344,
+      scriptType: 'wpkh',
+    })),
+  });
+}
 
 describe('buildCryptoAccountUR', () => {
   it('returns a ur:crypto-account string', () => {
@@ -165,6 +205,20 @@ describe('buildCryptoAccountUR', () => {
       expect.stringContaining('sh(wsh('),
       expect.stringContaining('sh('),
     ]);
+  });
+
+  it('writes the mainnet coin type and network explicitly', () => {
+    expect(
+      coinInfoMaps(accountUR(["m/84'/0'/0'", "m/48'/0'/0'/2'", "m/45'"])),
+    ).toEqual([
+      { 1: 0, 2: 0 },
+      { 1: 0, 2: 0 },
+      { 1: 0, 2: 0 },
+    ]);
+  });
+
+  it('writes the testnet network', () => {
+    expect(coinInfoMaps(accountUR(["m/84'/1'/0'"]))).toEqual([{ 1: 0, 2: 1 }]);
   });
 
   it('computes a public-key fingerprint', () => {

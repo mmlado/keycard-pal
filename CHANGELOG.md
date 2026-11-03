@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A Bitcoin export imports as a mainnet xpub in wallets that read a missing coin network as testnet, such as Bitcoin Safe
+
 ## [1.16.0] - 2026-11-02
 
 ### Added
