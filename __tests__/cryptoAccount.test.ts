@@ -221,6 +221,24 @@ describe('buildCryptoAccountUR', () => {
     expect(coinInfoMaps(accountUR(["m/84'/1'/0'"]))).toEqual([{ 1: 0, 2: 1 }]);
   });
 
+  it('encodes the compressed public key and the chain code', () => {
+    const decoder = new URRegistryDecoder();
+    decoder.receivePart(accountUR(["m/84'/0'/0'"]));
+    const hdKey = (decoder.resultRegistryType() as any)
+      .getOutputDescriptors()[0]
+      .getHDKey();
+
+    const compressed = new Uint8Array(33);
+    compressed[0] = 0x02;
+    compressed.set(PUB_KEY_UNCOMPRESSED.slice(1, 33), 1);
+    expect(hdKey.getKey().toString('hex')).toBe(
+      Buffer.from(compressed).toString('hex'),
+    );
+    expect(hdKey.getChainCode().toString('hex')).toBe(
+      Buffer.from(CHAIN_CODE).toString('hex'),
+    );
+  });
+
   it('computes a public-key fingerprint', () => {
     expect(pubKeyFingerprint(PUB_KEY_UNCOMPRESSED)).toBe(0xe01b06b9);
   });
