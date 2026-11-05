@@ -6,8 +6,6 @@ import { Icons } from '@/assets/icons';
 import { NO_CARD_EXIT_LABEL } from '@/constants/purchaseLink';
 import theme from '@/theme';
 
-import AffiliateDisclosure from '@/components/AffiliateDisclosure';
-
 import { displayKeycardName } from '@/utils/keycardName';
 import type { NFCVariant } from './index';
 
@@ -171,19 +169,16 @@ export default function NFCSheet({
       )}
 
       {showBuyKeycard && (
-        <>
-          <Pressable
-            style={styles.buyKeycardLink}
-            hitSlop={8}
-            accessibilityRole="link"
-            onPress={onBuyKeycard}
-          >
-            <Text variant="bodySmall" style={styles.buyKeycardText}>
-              {NO_CARD_EXIT_LABEL}
-            </Text>
-          </Pressable>
-          <AffiliateDisclosure short style={styles.buyKeycardDisclosure} />
-        </>
+        <Pressable
+          style={styles.buyKeycardLink}
+          hitSlop={8}
+          accessibilityRole="link"
+          onPress={onBuyKeycard}
+        >
+          <Text variant="bodySmall" style={styles.buyKeycardText}>
+            {NO_CARD_EXIT_LABEL}
+          </Text>
+        </Pressable>
       )}
     </>
   );
@@ -242,10 +237,5 @@ const styles = StyleSheet.create({
   buyKeycardText: {
     color: theme.colors.onSurfaceMuted,
     textDecorationLine: 'underline',
-  },
-  buyKeycardDisclosure: {
-    marginTop: 4,
-    textAlign: 'center',
-    paddingHorizontal: 24,
   },
 });

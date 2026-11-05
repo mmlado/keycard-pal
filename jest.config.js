@@ -1,11 +1,5 @@
-// Two projects, because the app now has two builds that differ in what they
-// ship, not just in what they do at runtime. `constants/purchaseLink` and
-// `components/AffiliateDisclosure` have `.ios` twins, and Metro — and Jest —
-// resolve them by platform, so a single run can only ever exercise one of
-// them. React Native's jest preset defaults to ios, which is left alone: the
-// whole existing suite is the iOS arm. Tests under `__tests__/android/` run
-// in a second project with android resolution, which is the only way to
-// assert that the affiliate link and its Advertisement labels are still there.
+// Two projects: React Native's preset resolves for iOS, and tests under
+// `__tests__/android/` need Android resolution and Platform.OS.
 const base = {
   preset: '@react-native/jest-preset',
   fakeTimers: { enableGlobally: true },

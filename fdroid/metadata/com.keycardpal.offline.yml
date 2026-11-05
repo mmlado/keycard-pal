@@ -1,7 +1,8 @@
 AntiFeatures:
   Ads:
-    en-US: Buy a Keycard entries show a QR code of an affiliate link to the Keycard
-      shop, and the developer earns a commission on purchases made through it.
+    en-US: Versions up to 1.16.0 show a QR code of an affiliate link to the Keycard
+      shop from their Buy a Keycard entries, and the developer earns a commission
+      on purchases made through it. Later versions show keycard.tech and earn nothing.
 Categories:
   - Money
   - Security
@@ -21,7 +22,5 @@ Description: |
   with watch-only wallets happens through animated QR codes (Blockchain Commons
   UR format); communication with the Keycard happens over NFC.
 
-  Advertisement: the Buy a Keycard entries in this app show a QR code of an
-  affiliate link. The developer earns a commission on purchases made through it.
-  No app feature depends on buying through it, and every feature of the app is
-  free. The Keycard team has also provided equipment for the app's development.
+  Keycard Pal Offline is made by an independent developer, not by Keycard. The
+  Keycard team has provided equipment for its development.

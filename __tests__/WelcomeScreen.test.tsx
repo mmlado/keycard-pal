@@ -70,15 +70,7 @@ async function pressBuy() {
   });
 }
 
-// This file runs in the ios project, where the screen's action block resolves
-// to WelcomeActions.ios.tsx and the purchase constants to purchaseLink.ios.ts.
-// Resolution, not Platform.OS, decides that, so there is nothing to pin and no
-// way to reach the affiliate wording from here: the Android action block is
-// asserted in the android project under __tests__/android/.
-//
-// The URL and the label are written out instead of imported. They are the
-// claim the App Store review turns on, and a constant would follow the source
-// it is meant to hold in place.
+// Literals, not the constants: a constant would follow the source it should hold in place.
 describe('WelcomeScreen', () => {
   beforeEach(() => {
     mockSetPreference.mockClear();
@@ -133,15 +125,6 @@ describe('WelcomeScreen', () => {
     ).toBe('link');
   });
 
-  // Nothing is earned on this build, so there is nothing to disclose and the
-  // Advertisement label would be a false statement rather than a safe extra.
-  it('shows no advertisement label', () => {
-    render(<WelcomeScreen navigation={navigation} route={route} />);
-
-    expect(screen.queryByTestId('affiliate-disclosure')).toBeNull();
-    expect(screen.queryByText(/Advertisement/i)).toBeNull();
-  });
-
   it('opens the product site in the browser when there is a network', async () => {
     render(<WelcomeScreen navigation={navigation} route={route} />);
 
@@ -158,12 +141,9 @@ describe('WelcomeScreen', () => {
 
     await pressBuy();
 
-    // No note under the QR code: the offline screen is the whole placement,
-    // and there is no commission behind it to admit to.
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
       url: 'https://keycard.tech',
       title: 'keycard.tech',
-      note: undefined,
     });
     expect(Linking.openURL).not.toHaveBeenCalled();
   });

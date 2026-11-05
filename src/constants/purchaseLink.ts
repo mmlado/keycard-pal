@@ -1,19 +1,11 @@
-// iOS bundles purchaseLink.ios.ts instead, which deliberately has no disclosure copy; do not add it there.
+import { APP_NAME } from './app';
 
-// Pays a commission, so every surface showing it renders <AffiliateDisclosure /> or it is hidden advertising.
-// Standing rules: these labels are never removed as tidy-up, and any benefit from Keycard is named in them.
-export const KEYCARD_PURCHASE_URL = 'https://get.keycard.tech/vuxxnf';
+// The Keycard team supports the app, so the pointer states a requirement and nothing that reads as an offer.
+export const KEYCARD_PURCHASE_URL = 'https://keycard.tech';
 
-export const BUY_KEYCARD_LABEL = 'Buy a Keycard';
+export const BUY_KEYCARD_LABEL = 'keycard.tech';
 
-export const NO_CARD_EXIT_LABEL = "Don't have a Keycard?";
-
-// "Advertisement" leads, and no price, percentage or currency appears: a price makes this an invitation to purchase.
-export const AFFILIATE_DISCLOSURE =
-  'Advertisement: affiliate link. The developer earns a commission if you buy a Keycard and has received equipment from the Keycard team.';
-
-export const AFFILIATE_DISCLOSURE_SHORT =
-  'Advertisement: affiliate link. Pays the developer a commission; the Keycard team has provided equipment.';
-
-// Offline the QR screen is the whole placement, so it carries the label.
-export const PURCHASE_QR_NOTE: string | undefined = AFFILIATE_DISCLOSURE;
+export const NO_CARD_EXIT_LABEL = `${APP_NAME} needs a Keycard: ${KEYCARD_PURCHASE_URL.replace(
+  'https://',
+  '',
+)}`;

@@ -29,7 +29,7 @@
     "generate": "npm run generate:tokens && npm run generate:chains && npm run generate:abi && npm run generate:selectors && npm run generate:eip7730",
     "check:offline-bundle": "node scripts/check-offline-bundle.js",
     "check:bundles": "node scripts/check-bundles.js",
-    "check:ios-bundle": "node scripts/check-ios-bundle.js",
+    "check:affiliate-markers": "node scripts/check-affiliate-markers.js",
     "check:offline-apk": "node scripts/check-offline-apk.js",
     "check:eip7730-vectors": "node scripts/check-eip7730-vectors.js"
   },

@@ -120,4 +120,4 @@ jobs:
             --reset-cache
 
       - name: Check the iOS bundle carries no affiliate marker
-        run: npm run check:ios-bundle -- --bundle /tmp/ios.bundle
+        run: npm run check:affiliate-markers -- --bundle /tmp/ios.bundle

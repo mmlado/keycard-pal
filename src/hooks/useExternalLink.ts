@@ -13,8 +13,6 @@ export type ExternalLink = {
   url: string;
   /** Header of the QR screen when there is no network. */
   title?: string;
-  /** Shown under the URL on the QR screen. */
-  note?: string;
 };
 
 /**
@@ -33,7 +31,7 @@ export function useExternalLink(link: ExternalLink): {
   open: () => Promise<void>;
   opensInBrowser: boolean;
 } {
-  const { url, title, note } = link;
+  const { url, title } = link;
   const opensInBrowser = useSyncExternalStore(
     subscribeNetworkConnected,
     getNetworkConnected,
@@ -49,9 +47,9 @@ export function useExternalLink(link: ExternalLink): {
       }
     }
     if (navigationRef.isReady()) {
-      navigationRef.navigate('UrlQR', { url, title, note });
+      navigationRef.navigate('UrlQR', { url, title });
     }
-  }, [url, title, note]);
+  }, [url, title]);
 
   return { open, opensInBrowser };
 }

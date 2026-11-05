@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Usage: node scripts/check-bundles.js
-// The offline bundle must carry no online-only marker, the online one all of them.
+// The offline bundle must carry no online-only marker, the online one all of them, and neither the affiliate link.
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -9,6 +9,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const CHECK = path.join(__dirname, 'check-offline-bundle.js');
+const AFFILIATE_CHECK = path.join(__dirname, 'check-affiliate-markers.js');
 
 function bundle(online, outDir) {
   const output = path.join(outDir, online ? 'online.bundle' : 'offline.bundle');
@@ -45,6 +46,9 @@ try {
   ];
   for (const [file, ...flags] of checks) {
     execFileSync(process.execPath, [CHECK, '--bundle', file, ...flags], {
+      stdio: 'inherit',
+    });
+    execFileSync(process.execPath, [AFFILIATE_CHECK, '--bundle', file], {
       stdio: 'inherit',
     });
   }

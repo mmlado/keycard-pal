@@ -50,12 +50,6 @@ async function pressRow() {
   });
 }
 
-// This file runs in the ios project, so `constants/purchaseLink` and
-// `components/AffiliateDisclosure` resolve to their `.ios` twins: the product
-// site with no referral parameter, and a disclosure that renders nothing.
-// That is resolution, not a runtime flag, so there is no platform to pin here
-// and no way to reach the affiliate wording from this file. The Android arm
-// of these same expectations lives under `__tests__/android/`.
 describe('KeycardSettingsSection', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
@@ -68,16 +62,11 @@ describe('KeycardSettingsSection', () => {
     jest.restoreAllMocks();
   });
 
-  it('names the destination and shows no disclosure beside it', () => {
+  it('names the destination', () => {
     render(<KeycardSettingsSection />);
 
-    // 'keycard.tech'. Naming where the hardware comes from is the whole of
-    // the row on this build: no imperative verb, and nothing to disclose
-    // because nothing is earned, so the label would be a claim about
-    // commercial status rather than a disclosure.
     expect(screen.getByText(BUY_KEYCARD_LABEL)).toBeTruthy();
     expect(screen.queryByText('Buy a Keycard')).toBeNull();
-    expect(screen.queryByTestId('affiliate-disclosure')).toBeNull();
   });
 
   describe('with a network connection (online build)', () => {
@@ -90,8 +79,6 @@ describe('KeycardSettingsSection', () => {
     it('opens the product site in the browser', async () => {
       render(<KeycardSettingsSection />);
       await pressRow();
-      // 'https://keycard.tech', the product site, never the shop the Android
-      // build points at.
       expect(Linking.openURL).toHaveBeenCalledWith(KEYCARD_PURCHASE_URL);
       expect(mockNavigate).not.toHaveBeenCalled();
     });
@@ -111,13 +98,9 @@ describe('KeycardSettingsSection', () => {
     it('shows the link as a QR code and never opens a browser', async () => {
       render(<KeycardSettingsSection />);
       await pressRow();
-      // The QR screen is the whole placement when there is no network, so on
-      // the build that pays a commission it carries the label through the
-      // route. Here there is no commission, hence no note to carry.
       expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
         url: KEYCARD_PURCHASE_URL,
         title: BUY_KEYCARD_LABEL,
-        note: undefined,
       });
       expect(Linking.openURL).not.toHaveBeenCalled();
     });

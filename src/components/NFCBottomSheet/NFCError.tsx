@@ -2,11 +2,9 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { Icons } from '../../assets/icons';
-import { NO_CARD_EXIT_LABEL } from '../../constants/purchaseLink';
-import theme from '../../theme';
-
-import AffiliateDisclosure from '../AffiliateDisclosure';
+import { Icons } from '@/assets/icons';
+import { NO_CARD_EXIT_LABEL } from '@/constants/purchaseLink';
+import theme from '@/theme';
 
 type Props = {
   status: string;
@@ -66,18 +64,11 @@ export default function NFCError({
         </Text>
       </Pressable>
       {onBuyKeycard && (
-        <>
-          <Pressable
-            hitSlop={8}
-            accessibilityRole="link"
-            onPress={onBuyKeycard}
-          >
-            <Text variant="bodySmall" style={styles.buyKeycardText}>
-              {NO_CARD_EXIT_LABEL}
-            </Text>
-          </Pressable>
-          <AffiliateDisclosure short style={styles.buyKeycardDisclosure} />
-        </>
+        <Pressable hitSlop={8} accessibilityRole="link" onPress={onBuyKeycard}>
+          <Text variant="bodySmall" style={styles.buyKeycardText}>
+            {NO_CARD_EXIT_LABEL}
+          </Text>
+        </Pressable>
       )}
     </View>
   );
@@ -126,9 +117,5 @@ const styles = StyleSheet.create({
   buyKeycardText: {
     color: theme.colors.onSurfaceMuted,
     textDecorationLine: 'underline',
-  },
-  buyKeycardDisclosure: {
-    marginTop: -8,
-    textAlign: 'center',
   },
 });

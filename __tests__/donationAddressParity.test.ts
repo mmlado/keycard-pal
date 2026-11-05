@@ -20,8 +20,7 @@ import {
  *
  * It also pins the two things FUNDING.yml may not carry: a GitHub Sponsors
  * entry (its terms forbid raising funds involving cryptocurrency) and the
- * Keycard purchase URL (an affiliate link, and GitHub excludes funding links
- * used for advertising).
+ * Keycard link (GitHub excludes funding links used for advertising).
  */
 
 const root = join(__dirname, '..');
@@ -128,12 +127,7 @@ describe('FUNDING.yml', () => {
     expect(funding).not.toMatch(/^\s*github:/m);
   });
 
-  // Spelled out rather than imported from `constants/purchaseLink`, which now
-  // resolves to a different URL per platform: importing it would only ever
-  // pin whichever twin this run happened to resolve, and a funding file is one
-  // file for every build. What has to be absent is any Keycard shop pointer at
-  // all, affiliate or bare, so all three spellings are named here.
-  it('carries no affiliate link', () => {
+  it('carries no Keycard link, affiliate or bare', () => {
     expect(funding).not.toContain('get.keycard.tech');
     expect(funding).not.toContain('vuxxnf');
     expect(funding).not.toContain('keycard.tech');

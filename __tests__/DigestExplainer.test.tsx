@@ -69,7 +69,6 @@ describe('DigestExplainer', () => {
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
       url: ERC8213_URL,
       title: ERC8213_QR_TITLE,
-      note: undefined,
     });
   });
 });
