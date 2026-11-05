@@ -101,7 +101,7 @@ describe('check-ios-bundle', () => {
       ['the referral code alone', `var u="/${sourceCode}";`],
       [
         'the disclosure copy',
-        'var t="Advertisement: affiliate link, pays the developer a commission.";',
+        'var t="Advertisement: affiliate link. Pays the developer a commission; the Keycard team has provided equipment.";',
       ],
       // Neither exact string, so only the bare word catches it.
       ['a relabelled disclosure', 'var t="Advertisement: sponsored link";'],
@@ -114,7 +114,7 @@ describe('check-ios-bundle', () => {
 
     it('names every marker it found, not just the first', () => {
       const { lines } = runOnBundle(
-        `var u="${sourceUrl}";var t="Advertisement: affiliate link. The developer earns a commission if you buy a Keycard.";`,
+        `var u="${sourceUrl}";var t="Advertisement: affiliate link. The developer earns a commission if you buy a Keycard and has received equipment from the Keycard team.";`,
       );
 
       const report = lines.join('\n');

@@ -10,7 +10,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icons } from '../assets/icons';
-import { APP_NAME, PROJECT_GITHUB_URL } from '@/constants/app';
+import {
+  APP_NAME,
+  KEYCARD_SUPPORT_STATEMENT,
+  PROJECT_GITHUB_URL,
+} from '@/constants/app';
 import type { LicenseEntry } from '../data/licenses';
 import type { AboutScreenProps, DashboardAction } from '../navigation/types';
 import theme from '../theme';
@@ -50,12 +54,11 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
       <AppIdentityHeader />
 
       <Text style={styles.description}>
-        {/* No other mobile platform may be named here: this string ships
-            inside the iOS binary, and App Store guideline 2.3.10 forbids it
-            in the app and its metadata alike. Neutral wording rather than a
-            build-flavour string, because the sentence needs neither. */}
+        {/* Ships in the iOS binary, so it names no other mobile platform (App Store guideline 2.3.10). */}
         {`${APP_NAME} is an open-source air-gapped hardware wallet companion. It communicates with a Keycard via NFC, scans and produces animated QR codes in UR format, and supports Ethereum and Bitcoin signing — keeping your private keys offline at all times.`}
       </Text>
+
+      <Text style={styles.description}>{KEYCARD_SUPPORT_STATEMENT}</Text>
 
       <View style={styles.projectLinkRow}>
         <Pressable

@@ -72,7 +72,8 @@ On iOS there is one app, Keycard Pal, with the same opt-in online features; ther
 > **Advertisement:** the purchase link above and the Buy a Keycard links in the Android app
 > are affiliate links. The developer earns a commission on purchases made through them. No app feature
 > depends on buying through them, and every feature of the app is free. The iOS app carries
-> no affiliate link and points at the product site instead.
+> no affiliate link and points at the product site instead. The Keycard team has also provided
+> equipment for developing the app.
 
 ## Getting the app
 

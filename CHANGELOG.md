@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The About screen, the Android affiliate labels, the README and the store listings say that the Keycard team has provided equipment for the app's development
+
 ### Fixed
 
 - A Bitcoin export imports as a mainnet xpub in wallets that read a missing coin network as testnet, such as Bitcoin Safe

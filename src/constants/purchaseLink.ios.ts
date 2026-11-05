@@ -1,10 +1,9 @@
 // Metro picks this over purchaseLink.ts, so the affiliate URL and the
 // disclosure copy are absent from the iOS bundle rather than unused in it.
 //
-// Rules for this pointer: keycard.tech, never the shop or a referral
-// parameter; no imperative verb in a label, so no "buy", "get", "shop" or
-// "order"; no price, currency or discount; no statement about commercial
-// status in either direction; and no non-monetary benefit attached to it.
+// Rules for this pointer: keycard.tech, never the shop or a referral parameter; no imperative verb in a label;
+// no price, currency or discount; no statement about commercial status. The Keycard team's support is
+// stated on the About screen, not here.
 
 import { APP_NAME } from './app';
 
