@@ -7,7 +7,10 @@ import {
   DONATION_STANDING_LINE,
   DONATION_TITLE,
 } from '../src/components/about/Donation/copy';
-import { PROJECT_GITHUB_URL } from '../src/constants/app';
+import {
+  KEYCARD_SUPPORT_STATEMENT,
+  PROJECT_GITHUB_URL,
+} from '../src/constants/app';
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 
@@ -100,6 +103,7 @@ describe('AboutScreen', () => {
     expect(screen.getByLabelText('Keycard Pal app icon')).toBeTruthy();
     expect(screen.getByText('GitHub project')).toBeTruthy();
     expect(screen.getByText(/Keycard required/)).toBeTruthy();
+    expect(screen.getByText(KEYCARD_SUPPORT_STATEMENT)).toBeTruthy();
     expect(screen.getByText(DONATION_TITLE)).toBeTruthy();
     // The line is rendered inside a longer sentence, so match it as a substring.
     expect(

@@ -109,10 +109,10 @@ describe('Android purchase surfaces', () => {
   it('carries the Advertisement copy and the imperative label', () => {
     expect(BUY_KEYCARD_LABEL).toBe('Buy a Keycard');
     expect(AFFILIATE_DISCLOSURE).toBe(
-      'Advertisement: affiliate link. The developer earns a commission if you buy a Keycard.',
+      'Advertisement: affiliate link. The developer earns a commission if you buy a Keycard and has received equipment from the Keycard team.',
     );
     expect(AFFILIATE_DISCLOSURE_SHORT).toBe(
-      'Advertisement: affiliate link, pays the developer a commission.',
+      'Advertisement: affiliate link. Pays the developer a commission; the Keycard team has provided equipment.',
     );
   });
 

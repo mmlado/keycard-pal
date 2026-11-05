@@ -57,6 +57,11 @@ describe('affiliate disclosure copy where the link pays a commission', () => {
     expect(copy).toMatch(/commission/i);
   });
 
+  it.each(forms)('names the Keycard team support in %s', (_label, copy) => {
+    expect(copy).toMatch(/Keycard team/);
+    expect(copy).toMatch(/equipment/);
+  });
+
   it.each(forms)(
     'quotes no price, percentage or currency in %s',
     (_label, copy) => {
