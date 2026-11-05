@@ -40,9 +40,9 @@ iterate, though it is not what CI measures.
 
 `check:bundles` is the Offline bundle check job. It takes under a minute and needs no Android
 toolchain, and it is the one that catches an online import reaching the offline build. CI also
-runs an iOS bundle check on every pull request, which builds an iOS bundle and fails if it
-carries any affiliate marker; `npm run check:ios-bundle -- --bundle <file>` is the same check
-against a bundle you have already built.
+runs an iOS bundle check on every pull request. Both fail a bundle that carries the retired
+affiliate link; `npm run check:affiliate-markers -- --bundle <file>` is the same check against a
+bundle you have already built.
 
 ## The rules that catch people out
 
@@ -75,10 +75,10 @@ left the field, never while the user is holding a card to the phone.
 Adding one touches `src/storage/preferencesStorage.ts` only. Do not read a single preference
 after startup or write to storage from a screen.
 
-**The iOS build carries no affiliate link and no advertisement wording**, and an iOS binary
-names no other mobile platform. Both are enforced by tests over the built bundle and the
-source graph. If a test about "Advertisement" or "Buy a Keycard" fails, read it before
-changing it: the wording is a legal constraint, not a style choice.
+**No build carries an affiliate link or advertisement wording**, and an iOS binary names no
+other mobile platform. Both are enforced by tests over the built bundle and the source graph.
+If a test about the Keycard link fails, read it before changing it: the wording is a legal
+constraint, not a style choice.
 
 ## Tests
 

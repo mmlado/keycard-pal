@@ -22,7 +22,6 @@ jest.mock('../src/navigation/navigationRef', () => ({
 const link = {
   url: 'https://example.test/spec',
   title: 'Spec',
-  note: 'A note',
 };
 
 describe('useExternalLink', () => {
@@ -63,7 +62,6 @@ describe('useExternalLink', () => {
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
       url: link.url,
       title: link.title,
-      note: link.note,
     });
   });
 
@@ -78,7 +76,6 @@ describe('useExternalLink', () => {
     expect(mockNavigate).toHaveBeenCalledWith('UrlQR', {
       url: link.url,
       title: link.title,
-      note: link.note,
     });
   });
 

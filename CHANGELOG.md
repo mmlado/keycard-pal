@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- The About screen, the Android affiliate labels, the README and the store listings say that the Keycard team has provided equipment for the app's development
+- The About screen, the README and the store listings say that the Keycard team has provided equipment for the app's development
+- The Android app's Keycard entries open keycard.tech and name it, as on iOS, instead of a "Buy a Keycard" link to the shop
+
+### Removed
+
+- The affiliate link and its Advertisement labels
 
 ### Fixed
 

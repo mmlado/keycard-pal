@@ -35,7 +35,7 @@ describe('metro blockList', () => {
 
   it.each([
     `${root}/src/App.tsx`,
-    `${root}/src/constants/purchaseLink.ios.ts`,
+    `${root}/src/constants/purchaseLink.ts`,
     `${root}/node_modules/react-native-svg/src/index.js`,
     `${root}/node_modules/@walletconnect/react-native-compat/index.js`,
     // A native module's Android *sources* are not its build output.

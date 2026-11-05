@@ -1,12 +1,11 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { Icons } from '../assets/icons';
+import { Icons } from '@/assets/icons';
 import { APP_NAME } from '@/constants/app';
-import { BUY_KEYCARD_LABEL } from '../constants/purchaseLink';
-import theme from '../theme';
+import { BUY_KEYCARD_LABEL } from '@/constants/purchaseLink';
+import theme from '@/theme';
 
-import AffiliateDisclosure from './AffiliateDisclosure';
 import PrimaryButton from './PrimaryButton';
 
 import { useBuyKeycard } from '@/hooks/useBuyKeycard';
@@ -25,10 +24,7 @@ export default function KeycardPurchaseCard({
   closeButtonTestID,
   onClose,
 }: KeycardPurchaseCardProps) {
-  // Through the hook, never Linking directly. openURL fires an external
-  // intent and needs no INTERNET permission of its own, so calling it here
-  // sent the offline build to a browser, which is what that flavour exists
-  // to avoid. The hook routes to the QR screen instead.
+  // Not Linking: it needs no INTERNET permission, so the offline build would open a browser.
   const { buyKeycard, opensInBrowser } = useBuyKeycard();
 
   return (
@@ -60,7 +56,6 @@ export default function KeycardPurchaseCard({
           testID={buttonTestID}
         />
       </View>
-      <AffiliateDisclosure style={styles.disclosure} />
     </View>
   );
 }
@@ -102,8 +97,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8,
     gap: 8,
-  },
-  disclosure: {
-    textAlign: 'center',
   },
 });

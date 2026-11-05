@@ -67,13 +67,12 @@ On iOS there is one app, Keycard Pal, with the same opt-in online features; ther
 ## Requirements
 
 - Android 7.0+ (API 24) with NFC, or an iPhone 7 or later on iOS 15.1+
-- A [Status Keycard](https://get.keycard.tech/vuxxnf) NFC smart card
+- A [Status Keycard](https://keycard.tech) NFC smart card
 
-> **Advertisement:** the purchase link above and the Buy a Keycard links in the Android app
-> are affiliate links. The developer earns a commission on purchases made through them. No app feature
-> depends on buying through them, and every feature of the app is free. The iOS app carries
-> no affiliate link and points at the product site instead. The Keycard team has also provided
-> equipment for developing the app.
+Keycard Pal is made by an independent developer, not by Keycard. The Keycard team has provided
+equipment for its development. Android releases up to 1.16.0 open an affiliate link to the Keycard
+shop from their Buy a Keycard entries, and the developer earns a commission on purchases made
+through it.
 
 ## Getting the app
 

@@ -81,8 +81,6 @@ export type RootStackParamList = {
   UrlQR: {
     url: string;
     title?: string;
-    /** Carries the affiliate disclosure: offline, the QR is the whole commercial surface. */
-    note?: string;
   };
   Settings: undefined;
 };

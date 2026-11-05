@@ -9,8 +9,9 @@
 
 AntiFeatures:
   Ads:
-    en-US: Buy a Keycard entries open an affiliate link to the Keycard shop, and the
-      developer earns a commission on purchases made through it.
+    en-US: Versions up to 1.16.0 open an affiliate link to the Keycard shop from their
+      Buy a Keycard entries, and the developer earns a commission on purchases made
+      through it. Later versions link to keycard.tech and earn nothing.
   NonFreeNet:
     en-US: Optional features, all disabled by default, connect to network services
       that are not free software. WalletConnect uses the Reown relay with a project
