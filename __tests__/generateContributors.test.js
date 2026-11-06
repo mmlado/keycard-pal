@@ -1,6 +1,12 @@
+const { execFileSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
 const {
   githubLogin,
   lookupLogin,
+  main,
   mergeContributors,
 } = require('../scripts/generate-contributors');
 
@@ -120,5 +126,74 @@ describe('mergeContributors', () => {
     expect(contributors).toEqual([
       { name: 'Mladen Milankovic', github: 'mmlado' },
     ]);
+  });
+});
+
+describe('main', () => {
+  let repo;
+  let warn;
+
+  const git = (args, env = {}) =>
+    execFileSync('git', ['-c', 'commit.gpgsign=false', ...args], {
+      cwd: repo,
+      env: { ...process.env, ...env },
+    })
+      .toString()
+      .trim();
+
+  const commit = (name, email) => {
+    git(['commit', '-q', '--allow-empty', '--no-verify', '-m', name], {
+      GIT_AUTHOR_NAME: name,
+      GIT_AUTHOR_EMAIL: email,
+      GIT_COMMITTER_NAME: name,
+      GIT_COMMITTER_EMAIL: email,
+    });
+    return git(['rev-parse', 'HEAD']);
+  };
+
+  beforeEach(() => {
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), 'contributors-'));
+    git(['init', '-q']);
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    fs.rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('writes every author, links what GitHub names and retries the rest', async () => {
+    commit('Alice', 'alice@users.noreply.github.com');
+    commit('Bob', 'bob@example.com');
+    const carol = commit('Carol', 'carol@example.com');
+    const bob = commit('Bob', 'bob@example.com');
+    const dave = commit('Dave', 'dave@example.com');
+    commit('helper[bot]', 'helper[bot]@users.noreply.github.com');
+
+    const logins = { [bob]: 'bobgh', [carol]: null };
+    const lookup = jest.fn(async sha => {
+      if (sha === dave) throw new Error('HTTP 403');
+      return logins[sha];
+    });
+    const out = path.join(repo, 'contributors.json');
+
+    await main({ out, lookup });
+
+    expect(JSON.parse(fs.readFileSync(out, 'utf8'))).toEqual([
+      { name: 'Dave' },
+      { name: 'Bob', github: 'bobgh' },
+      { name: 'Carol' },
+      { name: 'Alice', github: 'alice' },
+    ]);
+    expect(lookup.mock.calls.map(([sha]) => sha)).toEqual([dave, bob, carol]);
+    expect(warn).toHaveBeenCalledWith(
+      'GitHub lookup for Dave failed: HTTP 403',
+    );
+    expect(warn).toHaveBeenCalledWith("No GitHub account owns Carol's commits");
+
+    lookup.mockClear();
+    await main({ out, lookup });
+    expect(lookup.mock.calls.map(([sha]) => sha)).toEqual([dave, carol]);
   });
 });

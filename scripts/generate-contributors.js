@@ -97,10 +97,10 @@ async function mergeContributors(contributors, authors, resolveLogin) {
   return { added, linked };
 }
 
-async function main() {
-  const authors = readAuthors(path.dirname(OUT));
-  const contributors = fs.existsSync(OUT)
-    ? JSON.parse(fs.readFileSync(OUT, 'utf8'))
+async function main({ out = OUT, lookup = lookupLogin } = {}) {
+  const authors = readAuthors(path.dirname(out));
+  const contributors = fs.existsSync(out)
+    ? JSON.parse(fs.readFileSync(out, 'utf8'))
     : [];
 
   const { added, linked } = await mergeContributors(
@@ -108,7 +108,7 @@ async function main() {
     authors,
     async author => {
       try {
-        const login = await lookupLogin(author.sha);
+        const login = await lookup(author.sha);
         if (!login) {
           console.warn(`No GitHub account owns ${author.name}'s commits`);
         }
@@ -120,13 +120,13 @@ async function main() {
     },
   );
 
-  fs.writeFileSync(OUT, JSON.stringify(contributors, null, 2) + '\n');
+  fs.writeFileSync(out, JSON.stringify(contributors, null, 2) + '\n');
   console.log(
     `contributors.json: ${contributors.length} total, ${added} new, ${linked} linked`,
   );
 }
 
-module.exports = { githubLogin, lookupLogin, mergeContributors };
+module.exports = { githubLogin, lookupLogin, main, mergeContributors };
 
 if (require.main === module) {
   main().catch(err => {
