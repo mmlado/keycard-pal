@@ -138,8 +138,5 @@ async function main({ out = OUT, lookup = lookupLogin } = {}) {
 module.exports = { githubLogin, lookupLogin, main, mergeContributors };
 
 if (require.main === module) {
-  main().catch(err => {
-    console.error(err);
-    process.exit(1);
-  });
+  main();
 }
