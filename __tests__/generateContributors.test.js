@@ -74,7 +74,7 @@ describe('mergeContributors', () => {
     expect(contributors).toEqual([
       { name: 'earthdiver1', github: 'earthdiver' },
     ]);
-    expect(result).toEqual({ added: 0, linked: 1 });
+    expect(result).toEqual({ added: 0, linked: 1, merged: 0 });
   });
 
   it('adds a new author with the login GitHub names', async () => {
@@ -126,6 +126,27 @@ describe('mergeContributors', () => {
     expect(contributors).toEqual([
       { name: 'Mladen Milankovic', github: 'mmlado' },
     ]);
+  });
+
+  it('drops a name-only row whose login is already listed', async () => {
+    const contributors = [
+      { name: 'Jane', github: 'jane' },
+      { name: 'Jane Doe' },
+      { name: 'Other' },
+    ];
+    const result = await mergeContributors(
+      contributors,
+      [
+        author('Jane Doe', 'jane@example.com'),
+        author('Jane Doe', 'jane@work.example'),
+      ],
+      async () => 'jane',
+    );
+    expect(contributors).toEqual([
+      { name: 'Jane', github: 'jane' },
+      { name: 'Other' },
+    ]);
+    expect(result).toEqual({ added: 0, linked: 0, merged: 1 });
   });
 });
 

@@ -68,14 +68,23 @@ async function mergeContributors(contributors, authors, resolveLogin) {
 
   let added = 0;
   let linked = 0;
+  let merged = 0;
   for (const author of authors) {
     const noreply = githubLogin(author.email);
-    if (noreply && byGithub.has(key(noreply))) continue;
     const named = byName.get(key(author.name));
     if (!noreply && named?.github) continue;
 
     const login = noreply ?? (await resolveLogin(author));
-    if (login && byGithub.has(key(login))) continue;
+    const listed = login && byGithub.get(key(login));
+    if (listed) {
+      // A name-only row left by a failed lookup would stay as a duplicate.
+      if (named && !named.github) {
+        contributors.splice(contributors.indexOf(named), 1);
+        byName.set(key(author.name), listed);
+        merged++;
+      }
+      continue;
+    }
 
     if (named && !named.github) {
       if (login) {
@@ -94,7 +103,7 @@ async function mergeContributors(contributors, authors, resolveLogin) {
     byName.set(key(author.name), entry);
     added++;
   }
-  return { added, linked };
+  return { added, linked, merged };
 }
 
 async function main({ out = OUT, lookup = lookupLogin } = {}) {
@@ -103,7 +112,7 @@ async function main({ out = OUT, lookup = lookupLogin } = {}) {
     ? JSON.parse(fs.readFileSync(out, 'utf8'))
     : [];
 
-  const { added, linked } = await mergeContributors(
+  const { added, linked, merged } = await mergeContributors(
     contributors,
     authors,
     async author => {
@@ -122,7 +131,7 @@ async function main({ out = OUT, lookup = lookupLogin } = {}) {
 
   fs.writeFileSync(out, JSON.stringify(contributors, null, 2) + '\n');
   console.log(
-    `contributors.json: ${contributors.length} total, ${added} new, ${linked} linked`,
+    `contributors.json: ${contributors.length} total, ${added} new, ${linked} linked, ${merged} merged`,
   );
 }
 
