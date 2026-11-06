@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Keycard from 'keycard-sdk';
 import {
   APDUException,
@@ -82,7 +82,12 @@ export interface UseKeycardOperation<T> {
   /** The card has no PIN attempts left; the error offers the unblock flow. */
   pinBlocked: boolean;
   pairingPasswordError: string | null;
-  execute: (op: KeycardOperationFn<T>, options?: ExecuteOptions) => void;
+  /** `release` runs once the runner drops the operation. */
+  execute: (
+    op: KeycardOperationFn<T>,
+    options?: ExecuteOptions,
+    release?: () => void,
+  ) => void;
   submitPin: (pin: string) => void;
   submitPairingPassword: (password: string) => void;
   cancel: () => void;
@@ -134,6 +139,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   /** The card accepted this PIN in this session, so replaying it is safe. */
   const pinVerifiedRef = useRef(false);
   const operationRef = useRef<KeycardOperationFn<T> | null>(null);
+  const releaseRef = useRef<(() => void) | undefined>(undefined);
   const requiresPinRef = useRef(true);
   const requiresMasterKeyRef = useRef(true);
   const refusesMasterKeyRef = useRef(false);
@@ -144,6 +150,14 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const successMessageRef = useRef<string | undefined>(undefined);
   // The session's retryUnsafeRef, assigned each render because it only exists further down.
   const retryUnsafeHolderRef = useRef<{ current: boolean } | null>(null);
+
+  const dropOperation = useCallback(() => {
+    const release = releaseRef.current;
+    operationRef.current = null;
+    releaseRef.current = undefined;
+    release?.();
+  }, []);
+  useEffect(() => dropOperation, [dropOperation]);
 
   const verifyPin = useCallback(
     async (
@@ -335,21 +349,21 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
         });
         // No retry may resend a finished operation, and the next one asks for the PIN.
         if (operationRef.current === operation) {
-          operationRef.current = null;
+          dropOperation();
           pinRef.current = '';
           pinVerifiedRef.current = false;
         }
         return value;
       } catch (e) {
         if (inputDiscarded && operationRef.current === operation) {
-          operationRef.current = null;
+          dropOperation();
         }
         throw e;
       } finally {
         operationRunningRef.current = false;
       }
     },
-    [handshakeSucceeded, readCardName, verifyPin],
+    [dropOperation, handshakeSucceeded, readCardName, verifyPin],
   );
 
   // Cards without a certificate: pair or reuse the pairing, then the shared part.
@@ -528,8 +542,14 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     : nfcPhase;
 
   const execute = useCallback(
-    (op: KeycardOperationFn<T>, options: ExecuteOptions = {}) => {
+    (
+      op: KeycardOperationFn<T>,
+      options: ExecuteOptions = {},
+      release?: () => void,
+    ) => {
+      dropOperation();
       operationRef.current = op;
+      releaseRef.current = release;
       requiresPinRef.current = options.requiresPin ?? true;
       requiresMasterKeyRef.current = options.requiresMasterKey ?? true;
       refusesMasterKeyRef.current = options.refusesMasterKey ?? false;
@@ -558,10 +578,10 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
           }
         })
         .catch(() => {
-          setWaitingForPin(true); // can't check — fall back to PIN entry
+          setWaitingForPin(true); // can't check, fall back to PIN entry
         });
     },
-    [startNFC],
+    [dropOperation, startNFC],
   );
 
   const submitPin = useCallback(
@@ -624,7 +644,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     setCardFingerprint(null);
     pinRef.current = '';
     pinVerifiedRef.current = false;
-    operationRef.current = null;
+    dropOperation();
     operationRunningRef.current = false;
     setShowGenuineWarning(false);
     pendingGenuineCardKeyRef.current = null;
@@ -632,7 +652,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
     setWaitingForPairingPassword(false);
     setPairingPasswordError(null);
     customPairingPasswordRef.current = null;
-  }, []);
+  }, [dropOperation]);
 
   const cancel = useCallback(() => {
     nfcCancel();
@@ -666,6 +686,11 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   };
 }
 
+export type KeycardOpOptions<I> = ExecuteOptions & {
+  /** Runs with the input once the runner drops it, so a secret can be zeroed; start() then needs a fresh input each time. */
+  releaseInput?: (input: I) => void;
+};
+
 export type KeycardOp<T, I = void> = Omit<UseKeycardOperation<T>, 'execute'> & {
   start: (input: I) => void;
   /** The operation's one success wording: Apple's sheet, the success sheet and the done toast. */
@@ -679,7 +704,7 @@ export function useKeycardOp<T, I = void>(
     input: I,
     helpers: KeycardOperationHelpers,
   ) => Promise<T>,
-  options: ExecuteOptions = {},
+  options: KeycardOpOptions<I> = {},
 ): KeycardOp<T, I> {
   const { execute, ...rest } = useKeycardOperation<T>();
   const opRef = useRef(op);
@@ -691,9 +716,11 @@ export function useKeycardOp<T, I = void>(
   const start = useCallback(
     (input: I) => {
       const run = opRef.current;
+      const { releaseInput, ...executeOptions } = optionsRef.current;
       execute(
         (cmdSet, helpers) => run(cmdSet, input, helpers),
-        optionsRef.current,
+        executeOptions,
+        releaseInput && (() => releaseInput(input)),
       );
     },
     [execute],

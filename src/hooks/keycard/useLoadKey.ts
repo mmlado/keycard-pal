@@ -3,6 +3,7 @@ import { BIP32KeyPair } from 'keycard-sdk/dist/bip32key';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
 import { deriveMnemonicSeed } from '@/utils/mnemonic';
+import { zeroKeyPair } from '@/utils/zeroize';
 import { CARD_HAS_KEY_STATUS, useKeycardOp } from './useKeycardOperation';
 
 // The card's key UID is the SHA-256 of its master public key.
@@ -29,6 +30,7 @@ export function useLoadKey() {
     requiresPin: true,
     requiresMasterKey: false,
     successMessage: 'Key pair has been added to Keycard',
+    releaseInput: zeroKeyPair,
   });
 }
 
@@ -37,5 +39,9 @@ export function deriveMnemonicKeyPair(
   passphrase?: string,
 ): BIP32KeyPair {
   const seed = deriveMnemonicSeed(words, passphrase);
-  return BIP32KeyPair.fromBinarySeed(seed);
+  try {
+    return BIP32KeyPair.fromBinarySeed(seed);
+  } finally {
+    seed.fill(0);
+  }
 }

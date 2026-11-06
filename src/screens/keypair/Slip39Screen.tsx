@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { BIP32KeyPair } from 'keycard-sdk/dist/bip32key';
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -40,6 +41,7 @@ import {
   slip39SecretToKeyPair,
 } from '@/utils/slip39';
 import { enteredWords, invalidWordError } from '@/utils/wordEntry';
+import { zeroKeyPair } from '@/utils/zeroize';
 
 function parseCount(value: string): number {
   return Number.parseInt(value, 10);
@@ -163,14 +165,24 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
       setTimeout(() => {
         try {
           const secret = recoverSlip39Secret(sharesToRecover, passphrase ?? '');
-          const keyPair = slip39SecretToKeyPair(secret);
-          secret.fill(0);
+          let keyPair: BIP32KeyPair;
+          try {
+            keyPair = slip39SecretToKeyPair(secret);
+          } finally {
+            secret.fill(0);
+          }
 
           setShareInput('');
           setShareError(null);
 
           if (mode === 'verify') {
-            verifyFingerprint.start(pubKeyFingerprint(keyPair.publicKey));
+            let fingerprint: number;
+            try {
+              fingerprint = pubKeyFingerprint(keyPair.publicKey);
+            } finally {
+              zeroKeyPair(keyPair);
+            }
+            verifyFingerprint.start(fingerprint);
           } else {
             loadKey.start(keyPair);
           }
@@ -213,6 +225,22 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
       setShareError(e.message);
     }
   }, [generateSlip39]);
+
+  // The share effect re-runs on every render, so entropy it never used is zeroed here: when replaced, and at unmount.
+  const entropyRef = useRef<Uint8Array | null>(null);
+  useEffect(() => {
+    const previous = entropyRef.current;
+    if (previous && previous !== generateSlip39.result) {
+      previous.fill(0);
+    }
+    entropyRef.current = generateSlip39.result;
+  }, [generateSlip39.result]);
+  useEffect(
+    () => () => {
+      entropyRef.current?.fill(0);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (
