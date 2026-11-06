@@ -9,12 +9,14 @@ export function deriveMnemonicFingerprint(
   passphrase = '',
 ): number {
   const seed = deriveMnemonicSeed(words, passphrase);
+  let keyPair: BIP32KeyPair | undefined;
   try {
-    const keyPair = BIP32KeyPair.fromBinarySeed(seed);
-    const fingerprint = pubKeyFingerprint(keyPair.publicKey);
-    zeroKeyPair(keyPair);
-    return fingerprint;
+    keyPair = BIP32KeyPair.fromBinarySeed(seed);
+    return pubKeyFingerprint(keyPair.publicKey);
   } finally {
     seed.fill(0);
+    if (keyPair) {
+      zeroKeyPair(keyPair);
+    }
   }
 }

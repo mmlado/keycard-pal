@@ -48,6 +48,31 @@ describe('deriveMnemonicFingerprint', () => {
     );
   });
 
+  it('zeroes the seed when the derivation throws', () => {
+    mockFromBinarySeed.mockImplementationOnce(() => {
+      throw new Error('derivation failed');
+    });
+
+    expect(() => deriveMnemonicFingerprint(WORDS)).toThrow('derivation failed');
+    const seed: Buffer = mockToBinarySeed.mock.results[0].value;
+    expect(seed.every(b => b === 0)).toBe(true);
+  });
+
+  it('zeroes the seed and the key pair when the fingerprint throws', () => {
+    mockPubKeyFingerprint.mockImplementationOnce(() => {
+      throw new Error('fingerprint failed');
+    });
+
+    expect(() => deriveMnemonicFingerprint(WORDS)).toThrow(
+      'fingerprint failed',
+    );
+    const seed: Buffer = mockToBinarySeed.mock.results[0].value;
+    const keyPair = mockFromBinarySeed.mock.results[0].value;
+    expect(seed.every(b => b === 0)).toBe(true);
+    expect(keyPair.privateKey).toEqual(new Uint8Array(32));
+    expect(keyPair.chainCode).toEqual(new Uint8Array(32));
+  });
+
   it('zeroes the seed and the derived key pair', () => {
     deriveMnemonicFingerprint(WORDS);
 

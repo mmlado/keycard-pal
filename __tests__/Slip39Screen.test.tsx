@@ -9,6 +9,7 @@ import {
 
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import Slip39Screen from '../src/screens/keypair/Slip39Screen';
+import { pubKeyFingerprint } from '../src/utils/cryptoAccount';
 
 const SHARE_1 =
   'very graduate academic acid best smith recall exclude apart company amount junior alive believe withdraw alien company hospital payroll lend';
@@ -455,6 +456,28 @@ describe('Slip39Screen', () => {
     expect(mockGenerateSlip39SharesFromKeycardEntropy).not.toHaveBeenCalled();
   });
 
+  it('zeroes card entropy that a newer result replaces before it is used', async () => {
+    const first = new Uint8Array([1, 2, 3]);
+    const second = new Uint8Array([4, 5, 6]);
+    const { rerender } = renderScreen('generate', 'idle', null, 'done', first);
+
+    mockUseGenerateSlip39Shares.mockReturnValue({
+      ...hookMock(mockStartGenerate, 'done', second as any),
+      reset: mockResetGenerate,
+    });
+    rerender(
+      <Slip39Screen navigation={navigation} route={route('generate')} />,
+    );
+
+    expect(first).toEqual(new Uint8Array(3));
+    expect(second).toEqual(new Uint8Array([4, 5, 6]));
+    await flushTimers();
+    expect(mockGenerateSlip39SharesFromKeycardEntropy).toHaveBeenCalledWith(
+      second,
+      { shareCount: 3, threshold: 2 },
+    );
+  });
+
   async function enterBothShares(button: string) {
     await act(async () => {
       fireEvent.changeText(getTextInputs()[0], SHARE_1);
@@ -476,9 +499,16 @@ describe('Slip39Screen', () => {
 
     await enterBothShares('Verify');
 
+    const { recoverSlip39Secret } = jest.requireActual(
+      '../src/utils/slip39',
+    ) as typeof import('../src/utils/slip39');
+    const expected = pubKeyFingerprint(
+      realSlip39SecretToKeyPair(recoverSlip39Secret([SHARE_1, SHARE_2]))
+        .publicKey,
+    );
     const [secret] = mockSlip39SecretToKeyPair.mock.calls[0];
     const keyPair = mockSlip39SecretToKeyPair.mock.results[0].value;
-    expect(mockStartVerify).toHaveBeenCalledWith(expect.any(Number));
+    expect(mockStartVerify).toHaveBeenCalledWith(expected);
     expect(secret).toEqual(new Uint8Array(16));
     expect(keyPair.privateKey).toEqual(new Uint8Array(32));
     expect(keyPair.chainCode).toEqual(new Uint8Array(32));

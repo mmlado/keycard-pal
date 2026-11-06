@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Constants } from 'keycard-sdk/dist/constants';
 
 import { validateSlip39GenerationArgs } from '@/utils/slip39';
@@ -7,6 +7,15 @@ import { useKeycardOp } from './useKeycardOperation';
 const SHELL_SLIP39_ENTROPY_WORD_COUNT = Constants.GENERATE_MNEMONIC_18_WORDS;
 
 export function useGenerateSlip39Shares(shareCount: number, threshold: number) {
+  // Entropy that arrives after unmount reaches no screen, so nothing else would zero it.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const { start: startOp, ...rest } = useKeycardOp<Uint8Array>(
     useCallback(async (cmdSet, _input, { setStatus }) => {
       setStatus('Reading Keycard entropy...');
@@ -14,6 +23,9 @@ export function useGenerateSlip39Shares(shareCount: number, threshold: number) {
         SHELL_SLIP39_ENTROPY_WORD_COUNT,
       );
       response.checkOK();
+      if (!mountedRef.current) {
+        response.data.fill(0);
+      }
       return response.data;
     }, []),
     { requiresPin: false, requiresMasterKey: false, refusesMasterKey: true },

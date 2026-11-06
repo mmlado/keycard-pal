@@ -176,8 +176,12 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
           setShareError(null);
 
           if (mode === 'verify') {
-            const fingerprint = pubKeyFingerprint(keyPair.publicKey);
-            zeroKeyPair(keyPair);
+            let fingerprint: number;
+            try {
+              fingerprint = pubKeyFingerprint(keyPair.publicKey);
+            } finally {
+              zeroKeyPair(keyPair);
+            }
             verifyFingerprint.start(fingerprint);
           } else {
             loadKey.start(keyPair);
@@ -222,9 +226,15 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     }
   }, [generateSlip39]);
 
-  // The effect below re-runs on every render, so only an unmount may zero entropy it has not used.
+  // The share effect re-runs on every render, so entropy it never used is zeroed here: when replaced, and at unmount.
   const entropyRef = useRef<Uint8Array | null>(null);
-  entropyRef.current = generateSlip39.result;
+  useEffect(() => {
+    const previous = entropyRef.current;
+    if (previous && previous !== generateSlip39.result) {
+      previous.fill(0);
+    }
+    entropyRef.current = generateSlip39.result;
+  }, [generateSlip39.result]);
   useEffect(
     () => () => {
       entropyRef.current?.fill(0);
