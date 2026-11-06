@@ -34,6 +34,7 @@ const mockUseGenerateSlip39Shares = jest.fn();
 const mockUseLoadKey = jest.fn();
 const mockUseVerifyFingerprint = jest.fn();
 const mockGenerateSlip39SharesFromKeycardEntropy = jest.fn();
+const mockSlip39SecretToKeyPair = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
@@ -85,8 +86,13 @@ jest.mock('../src/utils/slip39', () => {
     ...actual,
     generateSlip39SharesFromKeycardEntropy: (...args: any[]) =>
       mockGenerateSlip39SharesFromKeycardEntropy(...args),
+    slip39SecretToKeyPair: (...args: any[]) =>
+      mockSlip39SecretToKeyPair(...args),
   };
 });
+const { slip39SecretToKeyPair: realSlip39SecretToKeyPair } = jest.requireActual(
+  '../src/utils/slip39',
+) as typeof import('../src/utils/slip39');
 
 const navigation = {
   addListener: jest.fn(() => jest.fn()),
@@ -170,6 +176,8 @@ describe('Slip39Screen', () => {
       SHARE_1,
       SHARE_2,
     ]);
+    mockSlip39SecretToKeyPair.mockReset();
+    mockSlip39SecretToKeyPair.mockImplementation(realSlip39SecretToKeyPair);
     MockNFCBottomSheet.mockClear();
     mockUseGenerateSlip39Shares.mockReturnValue(hookMock(mockStartGenerate));
     mockUseLoadKey.mockReturnValue(hookMock());
@@ -435,6 +443,58 @@ describe('Slip39Screen', () => {
     await flushTimers();
 
     expect(screen.getByText('entropy error')).toBeTruthy();
+  });
+
+  it('zeroes the card entropy when the screen leaves before the shares are created', async () => {
+    const entropy = new Uint8Array([1, 2, 3]);
+    const { unmount } = renderScreen('generate', 'idle', null, 'done', entropy);
+
+    unmount();
+
+    expect(entropy).toEqual(new Uint8Array([0, 0, 0]));
+    expect(mockGenerateSlip39SharesFromKeycardEntropy).not.toHaveBeenCalled();
+  });
+
+  async function enterBothShares(button: string) {
+    await act(async () => {
+      fireEvent.changeText(getTextInputs()[0], SHARE_1);
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByText('Next share'));
+    });
+    await act(async () => {
+      fireEvent.changeText(getTextInputs()[0], SHARE_2);
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByText(button));
+    });
+    await flushTimers();
+  }
+
+  it('verifies with the fingerprint and zeroes the secret and the key pair', async () => {
+    renderScreen('verify');
+
+    await enterBothShares('Verify');
+
+    const [secret] = mockSlip39SecretToKeyPair.mock.calls[0];
+    const keyPair = mockSlip39SecretToKeyPair.mock.results[0].value;
+    expect(mockStartVerify).toHaveBeenCalledWith(expect.any(Number));
+    expect(secret).toEqual(new Uint8Array(16));
+    expect(keyPair.privateKey).toEqual(new Uint8Array(32));
+    expect(keyPair.chainCode).toEqual(new Uint8Array(32));
+  });
+
+  it('zeroes the recovered secret when the key pair cannot be derived', async () => {
+    mockSlip39SecretToKeyPair.mockImplementation(() => {
+      throw new Error('derivation failed');
+    });
+    renderScreen('import');
+
+    await enterBothShares('Import to Keycard');
+
+    const [secret] = mockSlip39SecretToKeyPair.mock.calls[0];
+    expect(secret).toEqual(new Uint8Array(16));
+    expect(mockStartLoad).not.toHaveBeenCalled();
   });
 
   it('handles handleGenerateShares error', async () => {

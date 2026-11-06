@@ -1,9 +1,16 @@
 import { deriveMnemonicFingerprint } from '../src/hooks/keycard/useVerifyMnemonic';
 
-const mockToBinarySeed = jest.fn().mockReturnValue(Buffer.from('seed'));
-const mockFromBinarySeed = jest
-  .fn()
-  .mockReturnValue({ publicKey: new Uint8Array([4, 1, 2]) });
+const mockToBinarySeed = jest.fn<Buffer, any[]>(() => Buffer.from('seed'));
+// Copies, because the seed and the key pair are zeroed once the fingerprint is taken.
+let seedAtDerivation: Buffer | null = null;
+const mockFromBinarySeed = jest.fn<unknown, any[]>((seed: Uint8Array) => {
+  seedAtDerivation = Buffer.from(seed);
+  return {
+    privateKey: new Uint8Array(32).fill(1),
+    chainCode: new Uint8Array(32).fill(2),
+    publicKey: new Uint8Array([4, 1, 2]),
+  };
+});
 const mockPubKeyFingerprint = jest.fn().mockReturnValue(0xdeadbeef);
 jest.mock('keycard-sdk/dist/mnemonic', () => ({
   Mnemonic: { toBinarySeed: (...args: any[]) => mockToBinarySeed(...args) },
@@ -15,7 +22,7 @@ jest.mock('keycard-sdk/dist/bip32key', () => ({
   },
 }));
 
-jest.mock('../src/utils/cryptoAccount', () => ({
+jest.mock('@/utils/cryptoAccount', () => ({
   pubKeyFingerprint: (...args: any[]) => mockPubKeyFingerprint(...args),
 }));
 
@@ -25,6 +32,7 @@ describe('deriveMnemonicFingerprint', () => {
   beforeEach(() => {
     mockToBinarySeed.mockClear();
     mockFromBinarySeed.mockClear();
+    seedAtDerivation = null;
     mockPubKeyFingerprint.mockClear();
     mockPubKeyFingerprint.mockReturnValue(0xdeadbeef);
   });
@@ -34,10 +42,20 @@ describe('deriveMnemonicFingerprint', () => {
 
     expect(fingerprint).toBe(0xdeadbeef);
     expect(mockToBinarySeed).toHaveBeenCalledWith(WORDS.join(' '), 'secret');
-    expect(mockFromBinarySeed).toHaveBeenCalledWith(Buffer.from('seed'));
+    expect(seedAtDerivation).toEqual(Buffer.from('seed'));
     expect(mockPubKeyFingerprint).toHaveBeenCalledWith(
       new Uint8Array([4, 1, 2]),
     );
+  });
+
+  it('zeroes the seed and the derived key pair', () => {
+    deriveMnemonicFingerprint(WORDS);
+
+    const seed: Buffer = mockToBinarySeed.mock.results[0].value;
+    const keyPair = mockFromBinarySeed.mock.results[0].value;
+    expect(seed.every(b => b === 0)).toBe(true);
+    expect(keyPair.privateKey).toEqual(new Uint8Array(32));
+    expect(keyPair.chainCode).toEqual(new Uint8Array(32));
   });
 
   it('normalizes Unicode before deriving the seed', () => {
