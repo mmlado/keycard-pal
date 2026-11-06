@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The About screen, the README and the store listings say that the Keycard team has provided equipment for the app's development
 - The Android app's Keycard entries open keycard.tech and name it, as on iOS, instead of a "Buy a Keycard" link to the shop
+- Seeds, SLIP39 secrets and key pairs prepared for the card are zeroed in memory once they are used or abandoned
 
 ### Removed
 

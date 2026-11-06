@@ -7,29 +7,29 @@ import {
   useLoadKey,
 } from '../src/hooks/keycard/useLoadKey';
 
-const mockToBinarySeed = jest.fn().mockReturnValue(Buffer.from('seed'));
-const mockFromBinarySeed = jest.fn().mockReturnValue({ type: 'keypair' });
+const mockToBinarySeed = jest.fn<Buffer, any[]>(() => Buffer.from('seed'));
+// A copy, because the seed is zeroed once the key pair is derived.
+let seedAtDerivation: Buffer | null = null;
+const mockFromBinarySeed = jest.fn<unknown, any[]>((seed: Uint8Array) => {
+  seedAtDerivation = Buffer.from(seed);
+  return { type: 'keypair' };
+});
 type OperationFn = (cmdSet: any, keyPair: BIP32KeyPair) => Promise<void>;
 
 let capturedOperation: OperationFn | null = null;
-let capturedOptions: {
+type Options = {
   requiresPin?: boolean;
   requiresMasterKey?: boolean;
   successMessage?: string;
-} | null = null;
+  releaseInput?: (keyPair: BIP32KeyPair) => void;
+};
+let capturedOptions: Options | null = null;
 
 const mockStart = jest.fn();
 
 jest.mock('../src/hooks/keycard/useKeycardOperation', () => ({
   CARD_HAS_KEY_STATUS: 'Card already has a key. Factory reset required.',
-  useKeycardOp: (
-    fn: OperationFn,
-    opts: {
-      requiresPin?: boolean;
-      requiresMasterKey?: boolean;
-      successMessage?: string;
-    },
-  ) => {
+  useKeycardOp: (fn: OperationFn, opts: Options) => {
     capturedOperation = fn;
     capturedOptions = opts;
     return {
@@ -75,17 +75,36 @@ describe('deriveMnemonicKeyPair', () => {
     mockStart.mockClear();
     mockToBinarySeed.mockClear();
     mockFromBinarySeed.mockClear();
-    mockFromBinarySeed.mockReturnValue({ type: 'keypair' });
+    seedAtDerivation = null;
     capturedOperation = null;
     capturedOptions = null;
   });
+
+  function derivedSeed(): Buffer {
+    return mockToBinarySeed.mock.results[0].value;
+  }
 
   it('derives a BIP32 key pair from words', () => {
     const keyPair = deriveMnemonicKeyPair(WORDS);
 
     expect(keyPair).toEqual({ type: 'keypair' });
     expect(mockToBinarySeed).toHaveBeenCalledWith(WORDS.join(' '), undefined);
-    expect(mockFromBinarySeed).toHaveBeenCalledWith(Buffer.from('seed'));
+    expect(seedAtDerivation).toEqual(Buffer.from('seed'));
+  });
+
+  it('zeroes the seed once the key pair is derived', () => {
+    deriveMnemonicKeyPair(WORDS);
+
+    expect(derivedSeed().every(b => b === 0)).toBe(true);
+  });
+
+  it('zeroes the seed when the derivation throws', () => {
+    mockFromBinarySeed.mockImplementationOnce(() => {
+      throw new Error('derivation failed');
+    });
+
+    expect(() => deriveMnemonicKeyPair(WORDS)).toThrow('derivation failed');
+    expect(derivedSeed().every(b => b === 0)).toBe(true);
   });
 
   it('normalizes Unicode before deriving the seed', () => {
@@ -127,7 +146,24 @@ describe('useLoadKey', () => {
       requiresPin: true,
       requiresMasterKey: false,
       successMessage: 'Key pair has been added to Keycard',
+      releaseInput: expect.any(Function),
     });
+  });
+
+  it('zeroes the private key and chain code the runner releases', () => {
+    renderHook(() => useLoadKey());
+    const publicKey = new Uint8Array([4, 1, 2]);
+    const released = {
+      privateKey: new Uint8Array(32).fill(1),
+      chainCode: new Uint8Array(32).fill(2),
+      publicKey,
+    } as unknown as BIP32KeyPair;
+
+    capturedOptions!.releaseInput!(released);
+
+    expect(released.privateKey).toEqual(new Uint8Array(32));
+    expect(released.chainCode).toEqual(new Uint8Array(32));
+    expect(released.publicKey).toEqual(new Uint8Array([4, 1, 2]));
   });
 
   it('hands the key pair to the runner', async () => {

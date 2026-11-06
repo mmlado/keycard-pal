@@ -191,15 +191,16 @@ export function recoverSlip39Secret(
     );
   }
 
-  const secret = new Uint8Array(
-    Slip39.recoverSecret(
-      progress.acceptedShares.slice(0, progress.requiredShares),
-      // SLIP-0039 requires NFKD; the slip39 package encodes the string as given.
-      passphrase.normalize('NFKD'),
-    ),
+  const recovered = Slip39.recoverSecret(
+    progress.acceptedShares.slice(0, progress.requiredShares),
+    // SLIP-0039 requires NFKD; the slip39 package encodes the string as given.
+    passphrase.normalize('NFKD'),
   );
+  const secret = new Uint8Array(recovered);
+  recovered.fill(0);
 
   if (secret.length !== SLIP39_SECRET_BYTES) {
+    secret.fill(0);
     throw new Error('Unsupported SLIP39 secret length.');
   }
 
@@ -237,21 +238,31 @@ function createSlip39Shares(
     throw new Error('Unsupported SLIP39 secret length.');
   }
 
-  const slip = Slip39.fromArray(Array.from(secret), {
-    passphrase: '',
-    threshold: SLIP39_GROUP_THRESHOLD,
-    groups: [[args.threshold, args.shareCount]],
-    iterationExponent: SLIP39_ITERATION_EXPONENT,
-    extendableBackupFlag: SLIP39_EXTENDABLE_BACKUP_FLAG,
-  });
+  const masterSecret = Array.from(secret);
+  try {
+    const slip = Slip39.fromArray(masterSecret, {
+      passphrase: '',
+      threshold: SLIP39_GROUP_THRESHOLD,
+      groups: [[args.threshold, args.shareCount]],
+      iterationExponent: SLIP39_ITERATION_EXPONENT,
+      extendableBackupFlag: SLIP39_EXTENDABLE_BACKUP_FLAG,
+    });
 
-  return slip.fromPath('r/0').mnemonics.map(normalizeSlip39Share);
+    return slip.fromPath('r/0').mnemonics.map(normalizeSlip39Share);
+  } finally {
+    masterSecret.fill(0);
+  }
 }
 
 export function slip39SecretFromKeycardEntropy(
   entropy: Uint8Array,
 ): Uint8Array {
-  return sha256(entropy).slice(0, SLIP39_SECRET_BYTES);
+  const digest = sha256(entropy);
+  try {
+    return digest.slice(0, SLIP39_SECRET_BYTES);
+  } finally {
+    digest.fill(0);
+  }
 }
 
 export function generateSlip39SharesFromKeycardEntropy(

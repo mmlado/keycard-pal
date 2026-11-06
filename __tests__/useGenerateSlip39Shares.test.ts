@@ -77,6 +77,25 @@ describe('useGenerateSlip39Shares', () => {
     expect(setStatus).toHaveBeenCalledWith('Reading Keycard entropy...');
     expect(checkOK).toHaveBeenCalledTimes(1);
     expect(opResult).toBe(entropy);
+    expect(entropy).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  it('zeroes entropy that arrives after the screen is gone', async () => {
+    const { unmount } = renderHook(() => useGenerateSlip39Shares(3, 2));
+    const entropy = new Uint8Array([1, 2, 3]);
+    unmount();
+
+    await capturedOperation!(
+      {
+        generateMnemonic: jest
+          .fn()
+          .mockResolvedValue({ data: entropy, checkOK: jest.fn() }),
+      },
+      undefined,
+      { setStatus: jest.fn() },
+    );
+
+    expect(entropy).toEqual(new Uint8Array(3));
   });
 
   it('validates generation settings before requesting NFC', () => {

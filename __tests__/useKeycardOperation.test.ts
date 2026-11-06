@@ -2250,4 +2250,107 @@ describe('the operation input', () => {
     expect(cmdSet.verifyPIN).not.toHaveBeenCalled();
     expect(op).toHaveBeenCalledTimes(1);
   });
+
+  describe('releaseInput', () => {
+    function releasing(op: Op) {
+      const releaseInput = jest.fn();
+      const hook = renderHook(() =>
+        useKeycardOp(op, { requiresPin: false, releaseInput }),
+      );
+      return { ...hook, releaseInput };
+    }
+
+    it('releases the input once the operation succeeds', async () => {
+      const { result, releaseInput } = releasing(
+        jest.fn().mockResolvedValue('done'),
+      );
+      await startAndTap(result, { pin: false });
+
+      expect(result.current.phase).toBe('done');
+      expect(releaseInput).toHaveBeenCalledTimes(1);
+      expect(releaseInput).toHaveBeenCalledWith('input');
+    });
+
+    it('keeps the input for Try again after a failure', async () => {
+      const op: Op = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('refused'))
+        .mockResolvedValueOnce('done');
+      const { result, releaseInput } = releasing(op);
+      await startAndTap(result, { pin: false });
+      expect(result.current.phase).toBe('error');
+      expect(releaseInput).not.toHaveBeenCalled();
+
+      await act(async () => {
+        result.current.retry();
+      });
+      await tap();
+
+      expect(op.mock.calls.map(call => call[1])).toEqual(['input', 'input']);
+      expect(releaseInput).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['cancel', 'reset'] as const)(
+      'releases the input on %s',
+      async ending => {
+        const { result, releaseInput } = releasing(
+          jest.fn().mockRejectedValue(new Error('refused')),
+        );
+        await startAndTap(result, { pin: false });
+
+        await act(async () => {
+          result.current[ending]();
+        });
+
+        expect(releaseInput).toHaveBeenCalledTimes(1);
+        expect(releaseInput).toHaveBeenCalledWith('input');
+      },
+    );
+
+    it('releases a discarded input', async () => {
+      const { result, releaseInput } = releasing(discarding());
+      await startAndTap(result, { pin: false });
+
+      expect(releaseInput).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases the previous input when started again', async () => {
+      const { result, releaseInput } = releasing(
+        jest.fn().mockRejectedValue(new Error('refused')),
+      );
+      await startAndTap(result, { pin: false });
+
+      await act(async () => {
+        result.current.start('next');
+      });
+
+      expect(releaseInput).toHaveBeenCalledTimes(1);
+      expect(releaseInput).toHaveBeenCalledWith('input');
+    });
+
+    it('releases the input on unmount', async () => {
+      const { result, releaseInput, unmount } = releasing(
+        jest.fn().mockRejectedValue(new Error('refused')),
+      );
+      await startAndTap(result, { pin: false });
+
+      unmount();
+
+      expect(releaseInput).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases an input only once', async () => {
+      const { result, releaseInput, unmount } = releasing(
+        jest.fn().mockResolvedValue('done'),
+      );
+      await startAndTap(result, { pin: false });
+      await act(async () => {
+        result.current.reset();
+      });
+
+      unmount();
+
+      expect(releaseInput).toHaveBeenCalledTimes(1);
+    });
+  });
 });
