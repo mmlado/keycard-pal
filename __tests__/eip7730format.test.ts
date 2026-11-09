@@ -161,14 +161,27 @@ describe('formatEip7730Field', () => {
       ).toBe((2n ** 256n - 1n).toString());
     });
 
-    it('reads no empty value as 0', () => {
+    it('reads no empty or blank value as 0', () => {
       expect(formatEip7730Field(f, '', FORMAT, ctx()).text).toBe('');
+      expect(formatEip7730Field(f, '  ', FORMAT, ctx()).text).toBe('  ');
+      expect(formatEip7730Field(f, ' 1 ', FORMAT, ctx()).text).toBe(' 1 ');
     });
 
-    it('keeps the value without a $ref', () => {
+    it('shows the value in decimal without a $ref or an enum to resolve it', () => {
       expect(formatEip7730Field(field('enum'), '0', FORMAT, ctx()).text).toBe(
         '0',
       );
+      expect(
+        formatEip7730Field(field('enum'), '0x05', FORMAT, ctx()).text,
+      ).toBe('5');
+      expect(
+        formatEip7730Field(
+          field('enum', { $ref: '$.metadata.enums.missing' }),
+          '0x05',
+          FORMAT,
+          ctx(),
+        ).text,
+      ).toBe('5');
     });
   });
 
