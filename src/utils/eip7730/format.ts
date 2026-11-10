@@ -51,6 +51,8 @@ export const ENCRYPTED_TEXT = '[Encrypted]';
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const WORD_RE = /^0x[0-9a-fA-F]{64}$/;
+const PADDED_WORD_RE = /^0x0{24}/;
+const INTEGER_RE = /^(-?\d+|0x[0-9a-fA-F]+)$/;
 const ENUM_REF_PREFIX = '$.metadata.enums.';
 const NATIVE_DECIMALS = 18;
 // Spending permissions; "All" and "Max" withdraw the user's own funds.
@@ -74,10 +76,15 @@ function literalAddresses(value: unknown): string[] {
     .map(v => v.toLowerCase());
 }
 
-/** An address, or the last 20 bytes of a 32-byte word, where the ABI puts one. */
+/** An address, a zero-padded 32-byte word holding one, or the low 20 bytes of a uint256. */
 export function asAddress(value: string): string | null {
   if (ADDRESS_RE.test(value)) return checksumEthAddress(value);
-  if (WORD_RE.test(value)) return checksumEthAddress(`0x${value.slice(-40)}`);
+  // A word with other leading bytes is another chain's address (a Solana key), not a padded one.
+  if (WORD_RE.test(value)) {
+    return PADDED_WORD_RE.test(value)
+      ? checksumEthAddress(`0x${value.slice(-40)}`)
+      : null;
+  }
   if (!/^\d+$/.test(value)) return null;
   const n = BigInt(value);
   return n < 2n ** 256n
@@ -469,25 +476,22 @@ function formatEnum(
   format: Eip7730DisplayFormat,
   params: Params,
 ): string {
+  // Keys are decimal and a slice of bytes arrives as hex; BigInt alone reads '' and spaces as 0.
+  const decimal = INTEGER_RE.test(value) ? BigInt(value).toString() : value;
   const ref = typeof params?.$ref === 'string' ? params.$ref : undefined;
-  if (!ref) return value;
+  if (!ref) return decimal;
   const id = ref.startsWith(ENUM_REF_PREFIX)
     ? ref.slice(ENUM_REF_PREFIX.length)
     : ref;
   const labels = format.metadata?.enums?.[id];
-  if (!labels) return value;
-  // Keys are decimal; a slice of bytes arrives as hex.
-  const n = toBigInt(value);
+  if (!labels) return decimal;
   const key = Object.prototype.hasOwnProperty.call(labels, value)
     ? value
-    : n !== null
-    ? n.toString()
+    : decimal;
+  const label = Object.prototype.hasOwnProperty.call(labels, key)
+    ? labels[key]
     : null;
-  const label =
-    key !== null && Object.prototype.hasOwnProperty.call(labels, key)
-      ? labels[key]
-      : null;
-  return typeof label === 'string' ? label : value;
+  return typeof label === 'string' ? label : decimal;
 }
 
 export function formatEip7730Field(
