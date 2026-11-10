@@ -23,6 +23,10 @@ import UrlQRScreen from '../screens/UrlQRScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 
+// Custom token screens
+import CustomTokenScreen from '../screens/customTokens/CustomTokenScreen';
+import CustomTokensScreen from '../screens/customTokens/CustomTokensScreen';
+
 // Address screens
 import AddressDetailScreen from '../screens/address/AddressDetailScreen';
 import AddressListScreen from '../screens/address/AddressListScreen';
@@ -216,6 +220,16 @@ export const routes: Route[] = [
     name: 'Settings',
     component: SettingsScreen,
     options: { ...defaultHeaderOptions, title: 'Settings' },
+  },
+  {
+    name: 'CustomTokens',
+    component: CustomTokensScreen,
+    options: { ...defaultHeaderOptions, title: 'Custom tokens' },
+  },
+  {
+    name: 'CustomToken',
+    component: CustomTokenScreen,
+    options: defaultHeaderOptions,
   },
 
   ...onlineRoutes,

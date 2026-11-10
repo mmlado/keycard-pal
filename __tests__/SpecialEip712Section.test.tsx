@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 
 import SpecialEip712Section from '../src/components/SignRequestDetail/eth/DataTabPanel/SpecialEip712Section';
+import { CUSTOM_TOKEN_CAPTION } from '../src/constants/customTokens';
 import { MISCASED_ADDRESS_WARNING } from '../src/constants/eip712';
 import type { Eip712SpecialReview } from '../src/utils/eip712';
 
@@ -42,10 +43,30 @@ jest.mock(
   },
 );
 
+const mockLookupToken = jest.fn((..._args: unknown[]): unknown => null);
+
 jest.mock('../src/utils/tokenMetadata', () => ({
-  lookupToken: () => null,
-  formatTokenAmount: (amount: bigint) => amount.toString(),
+  lookupToken: (...args: unknown[]) => mockLookupToken(...args),
+  formatTokenAmount: (amount: bigint, token: { symbol: string }) =>
+    `${amount} ${token.symbol}`,
+  bundledSymbolOnChain: () => false,
 }));
+
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
+
+const mockNavigate = jest.fn();
+
+jest.mock('../src/navigation/navigationRef', () => ({
+  navigationRef: {
+    isReady: () => true,
+    navigate: (...args: unknown[]) => mockNavigate(...args),
+  },
+}));
+
+beforeEach(() => {
+  mockLookupToken.mockReset().mockReturnValue(null);
+  mockNavigate.mockReset();
+});
 
 const SPENDER = '0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const TOKEN = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
@@ -54,6 +75,37 @@ const GAS_TOKEN = '0xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
 const REFUND = '0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE';
 
 describe('SpecialEip712Section — permit', () => {
+  const permit: Eip712SpecialReview = {
+    kind: 'permit',
+    tokenContract: TOKEN,
+    spender: SPENDER,
+    amount: 1000n,
+    unlimited: false,
+    miscased: [],
+  };
+
+  it('offers to add a permit token nothing knows, on the chain of the message', () => {
+    render(<SpecialEip712Section special={permit} fallbackChainId={1} />);
+    fireEvent.press(screen.getByText('Add token'));
+    expect(mockNavigate).toHaveBeenCalledWith('CustomToken', {
+      mode: 'add',
+      chainId: 1,
+      address: TOKEN,
+    });
+  });
+
+  it('captions the allowance of a custom token and offers nothing', () => {
+    mockLookupToken.mockReturnValue({
+      symbol: 'FOO',
+      decimals: 0,
+      custom: true,
+    });
+    render(<SpecialEip712Section special={permit} fallbackChainId={1} />);
+    expect(screen.getByText('Allowance: 1000 FOO')).toBeTruthy();
+    expect(screen.getByText(CUSTOM_TOKEN_CAPTION)).toBeTruthy();
+    expect(screen.queryByText('Add token')).toBeNull();
+  });
+
   it('shows spender, allowance, and deadline', () => {
     const special: Eip712SpecialReview = {
       kind: 'permit',

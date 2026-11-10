@@ -6,9 +6,15 @@ import theme from '@/theme';
 
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
 import InfoRow from '@/components/InfoRow';
+import WithAddToken from '@/components/WithAddToken';
 
+import { customTokenRemarks } from '@/utils/customTokenChecks';
 import { type Eip712SpecialReview } from '@/utils/eip712';
-import { formatTokenAmount, lookupToken } from '@/utils/tokenMetadata';
+import {
+  formatTokenAmount,
+  lookupToken,
+  type TokenMetadata,
+} from '@/utils/tokenMetadata';
 
 import { SectionHeader, WarningRow } from '../shared';
 
@@ -16,9 +22,8 @@ function formatPermitAmount(
   special:
     | Extract<Eip712SpecialReview, { kind: 'permit' }>
     | Extract<Eip712SpecialReview, { kind: 'permit-single' }>,
-  chainId: number | undefined,
+  token: TokenMetadata | null,
 ): string {
-  const token = lookupToken(chainId, special.tokenContract);
   if (special.unlimited) {
     return token ? `Unlimited ${token.symbol}` : 'Unlimited';
   }
@@ -36,15 +41,21 @@ export default function PermitReviewSection({
     | Extract<Eip712SpecialReview, { kind: 'permit-single' }>;
   chainId: number | undefined;
 }) {
+  const { tokenContract } = special;
+  const token = lookupToken(chainId, tokenContract);
+  const remarks = tokenContract
+    ? customTokenRemarks(token, chainId, tokenContract)
+    : { warnings: [] };
   return (
     <>
       <SectionHeader title="EIP-712 Permit" />
-      {special.tokenContract && (
+      {tokenContract && (
         <View style={styles.row}>
-          <AddressInfoRow
-            label="Token contract"
-            value={special.tokenContract}
-          />
+          <WithAddToken
+            place={token ? undefined : { chainId, address: tokenContract }}
+          >
+            <AddressInfoRow label="Token contract" value={tokenContract} />
+          </WithAddToken>
           {special.miscased.includes('tokenContract') && (
             <WarningRow text={MISCASED_ADDRESS_WARNING} />
           )}
@@ -57,10 +68,15 @@ export default function PermitReviewSection({
         )}
       </View>
       <View style={styles.row}>
-        <InfoRow
-          label="Allowance"
-          value={formatPermitAmount(special, chainId)}
-        />
+        <InfoRow label="Allowance" value={formatPermitAmount(special, token)} />
+        {remarks.caption && (
+          <Text variant="labelSmall" style={styles.caption}>
+            {remarks.caption}
+          </Text>
+        )}
+        {remarks.warnings.map(warning => (
+          <WarningRow key={warning} text={warning} />
+        ))}
       </View>
       {special.deadline && (
         <View style={styles.row}>
@@ -87,6 +103,10 @@ export default function PermitReviewSection({
 const styles = StyleSheet.create({
   row: {
     paddingVertical: 8,
+  },
+  caption: {
+    color: theme.colors.onSurfaceVariant,
+    paddingTop: 4,
   },
   warningRow: {
     flexDirection: 'row',

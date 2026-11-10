@@ -7,6 +7,7 @@ import theme from '@/theme';
 
 import { Icons } from '@/assets/icons';
 import KeyboardAwareScrollView from '@/components/KeyboardAwareScrollView';
+import CustomTokensSettingsSection from '@/components/settings/CustomTokensSettingsSection';
 import DashboardLayoutSettingsSection from '@/components/settings/DashboardLayoutSettingsSection';
 import Eip7730SettingsSection from '@/components/settings/eip7730/Eip7730SettingsSection.online';
 import EnsSettingsSection from '@/components/settings/ens/EnsSettingsSection.online';
@@ -77,6 +78,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           <WalletConnectSettingsSection />
           <TenderlySettingsSection />
           <Eip7730SettingsSection />
+          <CustomTokensSettingsSection
+            onOpen={() => navigation.navigate('CustomTokens')}
+          />
         </View>
       </KeyboardAwareScrollView>
 

@@ -1,4 +1,10 @@
-import { formatTokenAmount, lookupToken } from '../src/utils/tokenMetadata';
+import { setCustomTokens } from '../src/utils/customTokens';
+import {
+  bundledSymbolOnChain,
+  formatTokenAmount,
+  lookupBundledToken,
+  lookupToken,
+} from '../src/utils/tokenMetadata';
 
 // Real addresses from the bundled token list (lowercased)
 const USDC_ADDRESS = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
@@ -118,9 +124,66 @@ describe('formatTokenAmount', () => {
     expect(result).toBe('0.001 USDC');
   });
 
+  it('writes every digit, never rounds and adds no separators', () => {
+    expect(formatTokenAmount(1_234_567_891n, usdc)).toBe('1234.567891 USDC');
+    expect(formatTokenAmount(123_456_789_012_345_678n, dai)).toBe(
+      '0.123456789012345678 DAI',
+    );
+    expect(formatTokenAmount(10n ** 30n, usdc)).toBe(
+      '1000000000000000000000000 USDC',
+    );
+  });
+
+  it('formats a token with no decimals', () => {
+    expect(formatTokenAmount(42n, { symbol: 'NFT', decimals: 0 })).toBe(
+      '42 NFT',
+    );
+  });
+
   it('includes the symbol from the token metadata', () => {
     const token = lookupToken(MAINNET, DAI_ADDRESS)!;
     const result = formatTokenAmount(5_000_000_000_000_000_000n, token);
     expect(result).toContain('DAI');
+  });
+});
+
+describe('custom tokens in the lookup', () => {
+  const OTHER = '0x000000000000000000000000000000000000dead';
+
+  afterEach(() => setCustomTokens([]));
+
+  it('answers a gap with the custom token, marked as custom', () => {
+    setCustomTokens([
+      { chainId: MAINNET, address: OTHER, symbol: 'FOO', decimals: 9 },
+    ]);
+    expect(
+      lookupToken(MAINNET, OTHER.toUpperCase().replace('0X', '0x')),
+    ).toEqual({ symbol: 'FOO', decimals: 9, custom: true });
+    expect(lookupToken(POLYGON, OTHER)).toBeNull();
+  });
+
+  it('never lets a custom token override the bundled list', () => {
+    setCustomTokens([
+      { chainId: MAINNET, address: USDC_ADDRESS, symbol: 'FAKE', decimals: 18 },
+    ]);
+    const token = lookupToken(MAINNET, USDC_ADDRESS);
+    expect(token?.symbol).toBe('USDC');
+    expect(token?.decimals).toBe(6);
+    expect(token?.custom).toBeUndefined();
+  });
+
+  it('keeps the bundled lookup free of custom tokens', () => {
+    setCustomTokens([
+      { chainId: MAINNET, address: OTHER, symbol: 'FOO', decimals: 9 },
+    ]);
+    expect(lookupBundledToken(MAINNET, OTHER)).toBeNull();
+  });
+});
+
+describe('bundledSymbolOnChain', () => {
+  it('matches a bundled symbol on its chain, without case', () => {
+    expect(bundledSymbolOnChain(MAINNET, 'usdc')).toBe(true);
+    expect(bundledSymbolOnChain(MAINNET, 'NOT-A-TOKEN')).toBe(false);
+    expect(bundledSymbolOnChain(987654321, 'USDC')).toBe(false);
   });
 });

@@ -758,12 +758,17 @@ describe('WalletConnectProvider — leaving a request', () => {
     expect(result.current.pendingRequest).toBeNull();
   });
 
-  it('keeps the request while its review or Keycard screen is up', async () => {
+  it('keeps the request while its review or Keycard screen is in the stack', async () => {
     const { result } = await renderWithRequest();
 
     await navigateTo([
       { name: 'Dashboard' },
       { name: 'TransactionDetail', params: { wcContext: CONTEXT } },
+    ]);
+    await navigateTo([
+      { name: 'Dashboard' },
+      { name: 'TransactionDetail', params: { wcContext: CONTEXT } },
+      { name: 'CustomToken', params: { mode: 'add', chainId: 1 } },
     ]);
     await navigateTo([
       { name: 'Dashboard' },

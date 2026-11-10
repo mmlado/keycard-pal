@@ -83,6 +83,11 @@ export type RootStackParamList = {
     title?: string;
   };
   Settings: undefined;
+  CustomTokens: undefined;
+  // Add takes what the review already knows; edit names a saved token.
+  CustomToken:
+    | { mode: 'add'; chainId?: number; address?: string }
+    | { mode: 'edit'; chainId: number; address: string };
 };
 
 export type WelcomeScreenProps = NativeStackScreenProps<
@@ -228,6 +233,16 @@ export type LicenseDetailScreenProps = NativeStackScreenProps<
 export type UrlQRScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'UrlQR'
+>;
+
+export type CustomTokensScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'CustomTokens'
+>;
+
+export type CustomTokenScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'CustomToken'
 >;
 
 export type SettingsScreenProps = NativeStackScreenProps<

@@ -8,6 +8,8 @@ import {
   KEYCARD_PURCHASE_URL,
 } from '../src/constants/purchaseLink';
 
+import { setCustomTokens } from '../src/utils/customTokens';
+
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
 
 // Mocks: every other section is a stub.
@@ -21,11 +23,7 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return { Icons: { openInBrowser: Icon, qr: Icon } };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // A stub that keeps the two props the screen's tap goes through.
 jest.mock('../src/components/settings/KeycardsInUseSettingsSection', () => {
@@ -186,6 +184,22 @@ describe('SettingsScreen', () => {
     expect(rendered.indexOf(BUY_KEYCARD_LABEL)).toBeLessThan(
       rendered.indexOf('Layout'),
     );
+  });
+
+  it('opens the custom tokens from their row, which counts them', () => {
+    setCustomTokens([
+      {
+        chainId: 1,
+        address: '0xd3cda913deb6f4967b2ef3aa68f5a843da74c4ef',
+        symbol: 'FOO',
+        decimals: 6,
+      },
+    ]);
+    renderScreen();
+    expect(screen.getByText('1')).toBeTruthy();
+    fireEvent.press(screen.getByText('Custom tokens'));
+    expect(navigation.navigate).toHaveBeenCalledWith('CustomTokens');
+    setCustomTokens([]);
   });
 
   // For the user who would rather tap a card than read applet versions.

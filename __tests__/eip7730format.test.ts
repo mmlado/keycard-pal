@@ -24,6 +24,7 @@ import type {
 } from '../src/utils/eip7730/zip';
 
 jest.mock('../src/utils/tokenMetadata', () => ({
+  ...jest.requireActual('../src/utils/tokenMetadata'),
   lookupToken: jest.fn(),
 }));
 
@@ -321,7 +322,7 @@ describe('formatEip7730Field', () => {
       ).toEqual({
         text: '1500000',
         warnings: [UNKNOWN_TOKEN_WARNING],
-        unknownTokenAddress: OTHER,
+        tokenContract: { address: OTHER, chainId: 1, custom: false },
       });
     });
 
@@ -336,7 +337,7 @@ describe('formatEip7730Field', () => {
       ).toEqual({
         text: '1500000',
         warnings: [UNKNOWN_TOKEN_WARNING],
-        unknownTokenAddress: OTHER,
+        tokenContract: { address: OTHER, chainId: 1, custom: false },
       });
     });
 
@@ -380,7 +381,7 @@ describe('formatEip7730Field', () => {
       ).toEqual({
         text: '2000000000000000',
         warnings: [UNKNOWN_TOKEN_WARNING],
-        unknownTokenAddress: NATIVE,
+        tokenContract: { address: NATIVE, chainId: 1, custom: false },
       });
     });
 
@@ -469,7 +470,7 @@ describe('formatEip7730Field', () => {
         ).toEqual({
           text: 'Unlimited',
           warnings: [UNLIMITED_APPROVAL_WARNING, UNKNOWN_TOKEN_WARNING],
-          unknownTokenAddress: OTHER,
+          tokenContract: { address: OTHER, chainId: 1, custom: false },
         });
       });
 
