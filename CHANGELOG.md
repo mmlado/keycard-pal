@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The Android app's Keycard entries open keycard.tech and name it, as on iOS, instead of a "Buy a Keycard" link to the shop
 - Seeds, SLIP39 secrets and key pairs prepared for the card are zeroed in memory once they are used or abandoned
 - Updated vulnerable dependencies flagged by Dependabot and npm audit (brace-expansion, qs, shell-quote, pbkdf2, source-map-js, launch-editor, sharp, joi, body-parser, zod)
+- The bundled clear-signing registry is updated: Rocket Pool and Livepeer, Safe 1.5.0, and the ERC-8128 delegation message
 
 ### Removed
 
