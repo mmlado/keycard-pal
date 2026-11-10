@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A Bitcoin export imports as a mainnet xpub in wallets that read a missing coin network as testnet, such as Bitcoin Safe
 - Every contributor on the About screen links to their GitHub profile, including those who committed under a personal email
+- A clear-signing review shows another chain's 32-byte address, such as a Solana token in an Across deposit, as written instead of as a shortened Ethereum address
+- A clear-signing value the descriptor's list of names does not cover shows as a decimal number instead of hex
 
 ## [1.16.0] - 2026-11-02
 
