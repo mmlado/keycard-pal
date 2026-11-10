@@ -1,4 +1,10 @@
-import { act, render, screen, within } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native';
 import React from 'react';
 import { encodeFunctionData, parseAbiItem, type AbiFunction } from 'viem';
 
@@ -37,6 +43,15 @@ jest.mock('../src/components/ens/AddressInfoRow.online', () => {
 });
 
 jest.mock('../src/utils/buildConfig', () => ({ INTERNET_ENABLED: false }));
+
+const mockNavigate = jest.fn();
+
+jest.mock('../src/navigation/navigationRef', () => ({
+  navigationRef: {
+    isReady: () => true,
+    navigate: (...args: unknown[]) => mockNavigate(...args),
+  },
+}));
 
 jest.mock('../src/hooks/useTokenImagesEnabled.online', () => ({
   __esModule: true,
@@ -102,7 +117,7 @@ describe('Eip7730Display', () => {
       { kind: 'item', title: 'Item 1 of 2', nodes: [row('First')] },
       { kind: 'item', nodes: [row('Second')] },
       { kind: 'warning', text: 'The entry does not fit' },
-      { kind: 'token', token: { symbol: 'USDT', decimals: 6 } },
+      { kind: 'token', token: { symbol: 'USDT', decimals: 6 }, warnings: [] },
       {
         kind: 'group',
         rows: [
@@ -130,6 +145,49 @@ describe('Eip7730Display', () => {
     ]) {
       expect(screen.getByText(text)).toBeTruthy();
     }
+  });
+
+  it('offers to add a token beside its contract and opens the editor with its chain and address', () => {
+    render(
+      <DisplayNodes
+        nodes={[
+          {
+            kind: 'address',
+            label: 'Token contract',
+            value: USDT,
+            ens: true,
+            warnings: [],
+            addToken: { chainId: 10, address: USDT },
+          },
+          { kind: 'text', label: 'Amount', value: '7', warnings: [] },
+        ]}
+      />,
+    );
+    expect(screen.getAllByText('Add token')).toHaveLength(1);
+    fireEvent.press(screen.getByText('Add token'));
+    expect(mockNavigate).toHaveBeenCalledWith('CustomToken', {
+      mode: 'add',
+      chainId: 10,
+      address: USDT,
+    });
+  });
+
+  it("draws a custom token's caption and warnings under its symbol", () => {
+    render(
+      <DisplayNodes
+        nodes={[
+          {
+            kind: 'token',
+            token: { symbol: 'FOO', decimals: 6, custom: true },
+            caption: 'Symbol and decimals added by you',
+            warnings: ['Another token uses FOO'],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText('FOO')).toBeTruthy();
+    expect(screen.getByText('Symbol and decimals added by you')).toBeTruthy();
+    expect(screen.getByText('Another token uses FOO')).toBeTruthy();
   });
 
   it('heads an entry, says where it came from at the top level, and follows a change of registry', () => {

@@ -2,6 +2,7 @@ import { UNLIMITED_APPROVAL_WARNING } from '../src/constants/approval';
 import {
   asAddress,
   describeAddress,
+  describeFieldValue,
   describeInteroperable,
   describeTokenTicker,
   ENCRYPTED_TEXT,
@@ -23,6 +24,7 @@ import type {
 } from '../src/utils/eip7730/zip';
 
 jest.mock('../src/utils/tokenMetadata', () => ({
+  ...jest.requireActual('../src/utils/tokenMetadata'),
   lookupToken: jest.fn(),
 }));
 
@@ -34,6 +36,9 @@ const TOKEN = '0x000000000000000000000000000000000000feed';
 const CONTRACT = '0x000000000000000000000000000000000000c0de';
 const OTHER = '0x000000000000000000000000000000000000beef';
 const NATIVE = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+// A Solana mint as Across passes it: 32 bytes, none of them padding.
+const SOLANA_KEY =
+  '0xc6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61';
 
 const FORMAT: Eip7730DisplayFormat = {
   fields: [],
@@ -147,14 +152,37 @@ describe('formatEip7730Field', () => {
 
     it('finds a decimal key from the hex a slice gives', () => {
       expect(formatEip7730Field(f, '0x01', FORMAT, ctx()).text).toBe('SELL');
-      expect(formatEip7730Field(f, '0x05', FORMAT, ctx()).text).toBe('0x05');
       expect(formatEip7730Field(f, 'x', FORMAT, ctx()).text).toBe('x');
     });
 
-    it('keeps the value without a $ref', () => {
+    it('shows a value the enum does not list in decimal, as its keys are', () => {
+      expect(formatEip7730Field(f, '0x05', FORMAT, ctx()).text).toBe('5');
+      expect(
+        formatEip7730Field(f, `0x${'f'.repeat(64)}`, FORMAT, ctx()).text,
+      ).toBe((2n ** 256n - 1n).toString());
+    });
+
+    it('reads no empty or blank value as 0', () => {
+      expect(formatEip7730Field(f, '', FORMAT, ctx()).text).toBe('');
+      expect(formatEip7730Field(f, '  ', FORMAT, ctx()).text).toBe('  ');
+      expect(formatEip7730Field(f, ' 1 ', FORMAT, ctx()).text).toBe(' 1 ');
+    });
+
+    it('shows the value in decimal without a $ref or an enum to resolve it', () => {
       expect(formatEip7730Field(field('enum'), '0', FORMAT, ctx()).text).toBe(
         '0',
       );
+      expect(
+        formatEip7730Field(field('enum'), '0x05', FORMAT, ctx()).text,
+      ).toBe('5');
+      expect(
+        formatEip7730Field(
+          field('enum', { $ref: '$.metadata.enums.missing' }),
+          '0x05',
+          FORMAT,
+          ctx(),
+        ).text,
+      ).toBe('5');
     });
   });
 
@@ -294,7 +322,7 @@ describe('formatEip7730Field', () => {
       ).toEqual({
         text: '1500000',
         warnings: [UNKNOWN_TOKEN_WARNING],
-        unknownTokenAddress: OTHER,
+        tokenContract: { address: OTHER, chainId: 1, custom: false },
       });
     });
 
@@ -309,7 +337,7 @@ describe('formatEip7730Field', () => {
       ).toEqual({
         text: '1500000',
         warnings: [UNKNOWN_TOKEN_WARNING],
-        unknownTokenAddress: OTHER,
+        tokenContract: { address: OTHER, chainId: 1, custom: false },
       });
     });
 
@@ -353,7 +381,7 @@ describe('formatEip7730Field', () => {
       ).toEqual({
         text: '2000000000000000',
         warnings: [UNKNOWN_TOKEN_WARNING],
-        unknownTokenAddress: NATIVE,
+        tokenContract: { address: NATIVE, chainId: 1, custom: false },
       });
     });
 
@@ -442,7 +470,7 @@ describe('formatEip7730Field', () => {
         ).toEqual({
           text: 'Unlimited',
           warnings: [UNLIMITED_APPROVAL_WARNING, UNKNOWN_TOKEN_WARNING],
-          unknownTokenAddress: OTHER,
+          tokenContract: { address: OTHER, chainId: 1, custom: false },
         });
       });
 
@@ -870,10 +898,39 @@ describe('asAddress', () => {
     expect(asAddress(ADDRESS.toLowerCase())).toBe(ADDRESS);
   });
 
-  it('takes the last 20 bytes of a 32-byte word, in hex or decimal', () => {
+  it('takes an address from a zero-padded 32-byte word', () => {
+    expect(asAddress(`0x${'0'.repeat(24)}${ADDRESS.slice(2)}`)).toBe(ADDRESS);
+  });
+
+  it('takes the low 20 bytes of a uint256, as 1inch orders keep addresses', () => {
     const packed = 0x80n * 2n ** 248n + BigInt(ADDRESS);
-    expect(asAddress(`0x${packed.toString(16)}`)).toBe(ADDRESS);
     expect(asAddress(packed.toString())).toBe(ADDRESS);
+  });
+
+  it("gives null for a 32-byte word that is another chain's address", () => {
+    expect(asAddress(SOLANA_KEY)).toBeNull();
+  });
+
+  it("shows another chain's address as written, in every address format", () => {
+    for (const format of ['addressName', 'tokenTicker'] as const) {
+      expect(
+        describeFieldValue(field(format), SOLANA_KEY, FORMAT, ctx()),
+      ).toMatchObject({ kind: 'text', text: SOLANA_KEY });
+    }
+    expect(lookupToken).not.toHaveBeenCalled();
+  });
+
+  it("finds no token at another chain's address through tokenPath", () => {
+    lookupToken.mockReturnValue({ symbol: 'WETH', decimals: 18 });
+    expect(
+      formatEip7730Field(
+        field('tokenAmount', { tokenPath: 'asset' }),
+        '1500000',
+        FORMAT,
+        ctx({ asset: SOLANA_KEY }, { chainId: 1 }),
+      ),
+    ).toMatchObject({ text: '1500000', warnings: [UNKNOWN_TOKEN_WARNING] });
+    expect(lookupToken).not.toHaveBeenCalled();
   });
 
   it('gives null for anything else', () => {

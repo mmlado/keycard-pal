@@ -20,6 +20,10 @@ jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 const mockLoadPreferences = jest.fn();
 const mockSavePreference = jest.fn();
 
+jest.mock('../src/storage/customTokensStorage', () => ({
+  restoreCustomTokens: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock('../src/storage/preferencesStorage', () => ({
   loadPreferences: () => mockLoadPreferences(),
   savePreference: (...args: unknown[]) => mockSavePreference(...args),

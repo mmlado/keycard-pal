@@ -14,6 +14,12 @@ import type { Preferences } from '../src/storage/preferencesStorage';
 const mockLoad = jest.fn();
 const mockSave = jest.fn();
 
+const mockRestoreTokens = jest.fn(() => Promise.resolve());
+
+jest.mock('../src/storage/customTokensStorage', () => ({
+  restoreCustomTokens: () => mockRestoreTokens(),
+}));
+
 jest.mock('../src/storage/preferencesStorage', () => ({
   loadPreferences: () => mockLoad(),
   savePreference: (...args: unknown[]) => mockSave(...args),
@@ -71,6 +77,7 @@ function failedSave() {
 }
 
 beforeEach(() => {
+  mockRestoreTokens.mockClear();
   mockLoad.mockReset();
   mockSave.mockReset();
   mockLoad.mockResolvedValue({ ...STORED });
@@ -104,6 +111,30 @@ describe('PreferencesProvider', () => {
         resolveLoad({ ...STORED });
       });
       expect(screen.getByText('layout:list')).toBeTruthy();
+    });
+
+    // The token lookup runs inside rendering, so a review must never see the list half read.
+    it('holds children until the custom tokens are read too', async () => {
+      let resolveTokens!: () => void;
+      mockRestoreTokens.mockReturnValueOnce(
+        new Promise<void>(resolve => {
+          resolveTokens = resolve;
+        }),
+      );
+
+      render(
+        <PreferencesProvider>
+          <Probe />
+        </PreferencesProvider>,
+      );
+      await act(async () => {});
+      expect(screen.queryByText(/layout:/)).toBeNull();
+
+      await act(async () => {
+        resolveTokens();
+      });
+      expect(screen.getByText('layout:list')).toBeTruthy();
+      expect(mockRestoreTokens).toHaveBeenCalledTimes(1);
     });
 
     // The loading screen stays mounted until its fade ends.

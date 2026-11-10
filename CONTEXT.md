@@ -133,8 +133,25 @@ _Avoid_: sign hash, prepared hash
 - A payload classified `invalid` is never signable: the review explains why and no Sign button is offered.
 - Signature `v` derives from the payload kind, never from re-inspecting raw bytes.
 
+**Token metadata**:
+The symbol and decimals that turn a token contract's raw amount into a readable one. Convenience metadata, never the **Signing source of truth**.
+_Avoid_: Token info, token details
+
+**Bundled token list**:
+The token metadata shipped with each release, taken from a published token list.
+_Avoid_: Default tokens, token database
+
+**Custom token**:
+Token metadata the user entered for a contract that no other source describes. Kept on the phone and reviewed by nobody else.
+_Avoid_: User token, imported token, added token
+
+## Token metadata relationships
+
+- A descriptor's own **Token metadata** for its own contract comes first, then the **Bundled token list**, then a **Custom token**.
+- A **Custom token** never overrides another source of **Token metadata**.
+
 **Stateless session**:
-The current design stance: each NFC tap session is self-contained. Settings, pairings, approved non-genuine cards, and the descriptor index still persist, but the app keeps no remembered per-card identity store and no remembered wallet/address list across sessions. Trust decisions are the one deliberate exception: a card the user approved despite a failed genuineness check is remembered, because re-asking on every tap trains the user to dismiss the warning.
+The current design stance: each NFC tap session is self-contained. Settings, pairings, approved non-genuine cards, the descriptor index and custom tokens still persist, but the app keeps no remembered per-card identity store and no remembered wallet/address list across sessions. Trust decisions are the one deliberate exception: a card the user approved despite a failed genuineness check is remembered, because re-asking on every tap trains the user to dismiss the warning.
 _Avoid_: No storage, no persistence
 
 **Card identity**:

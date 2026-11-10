@@ -13,6 +13,7 @@ import PersonalMessagePanel from './DataTabPanel/PersonalMessagePanel';
 import TxDataPanel from './DataTabPanel/TxDataPanel';
 
 import { useCallDescription } from '@/hooks/useCallDescription';
+import { useCustomTokens } from '@/hooks/useCustomTokens';
 
 import { getChainName, getNativeCurrencySymbol } from '@/utils/chainMetadata';
 import { parseEip712Summary } from '@/utils/eip712';
@@ -30,6 +31,8 @@ export default function SignRequestDetail({
 }: {
   request: EthSignRequest;
 }) {
+  // Every row below reads the user's tokens while it renders.
+  useCustomTokens();
   const payload = useMemo(
     () =>
       classifyEthPayload(request.signData, request.dataType, request.chainId),

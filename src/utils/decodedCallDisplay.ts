@@ -1,5 +1,6 @@
 import { UNLIMITED_APPROVAL_WARNING } from '@/constants/approval';
 
+import { customTokenRemarks } from '@/utils/customTokenChecks';
 import type { DisplayNode, DisplayRow } from '@/utils/eip7730/display';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
 import {
@@ -39,12 +40,25 @@ const amountText = (amount: bigint, token: TokenMetadata | null) =>
 export function tokenContractRows(
   token: TokenMetadata | null,
   tokenContract: string | undefined,
+  chainId: number | undefined,
 ): DisplayNode[] {
+  if (!tokenContract) {
+    return token ? [{ kind: 'token', token, warnings: [] }] : [];
+  }
+  const address = checksumEthAddress(tokenContract);
+  const contractRow: DisplayNode = {
+    kind: 'address',
+    label: 'Token contract',
+    value: address,
+    ens: true,
+    warnings: [],
+    ...(!token && { addToken: { chainId, address } }),
+  };
+  if (!token) return [contractRow];
+  const { caption, warnings } = customTokenRemarks(token, chainId, address);
   return [
-    ...(token ? [{ kind: 'token' as const, token }] : []),
-    ...(tokenContract
-      ? [addressRow('Token contract', checksumEthAddress(tokenContract))]
-      : []),
+    { kind: 'token', token, ...(caption && { caption }), warnings },
+    contractRow,
   ];
 }
 
@@ -58,7 +72,7 @@ export function displayDecodedCall(
       const token = lookupToken(chainId, tokenContract);
       return [
         { kind: 'section', title: 'ERC-20 Transfer' },
-        ...tokenContractRows(token, tokenContract),
+        ...tokenContractRows(token, tokenContract, chainId),
         addressRow('Recipient', call.to),
         textRow(
           token ? 'Amount' : 'Amount (raw units)',
@@ -70,7 +84,7 @@ export function displayDecodedCall(
       const token = lookupToken(chainId, tokenContract);
       return [
         { kind: 'section', title: 'ERC-20 Transfer From' },
-        ...tokenContractRows(token, tokenContract),
+        ...tokenContractRows(token, tokenContract, chainId),
         addressRow('From', call.from),
         addressRow('Recipient', call.to),
         textRow(
@@ -89,7 +103,7 @@ export function displayDecodedCall(
         : amountText(call.amount, token);
       return [
         { kind: 'section', title: 'ERC-20 Approve' },
-        ...tokenContractRows(token, tokenContract),
+        ...tokenContractRows(token, tokenContract, chainId),
         addressRow('Spender', call.spender),
         {
           ...textRow('Allowance', allowance),
