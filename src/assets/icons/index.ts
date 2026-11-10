@@ -108,6 +108,8 @@ export const Icons = {
   checkboxOn: mdi('checkbox-marked', onSurface),
   checkboxOff: mdi('checkbox-blank-outline', onSurface),
 
+  addToken: mdi('plus-circle-outline', onSurface),
+
   // Layout picker. Custom SVGs: MDI has no two-squares glyph.
   layoutTiles: LayoutTilesIcon,
   layoutList: LayoutListIcon,

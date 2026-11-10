@@ -15,6 +15,7 @@ import {
   UNCOVERED_VALUES_WARNING,
 } from '../src/constants/eip712';
 import type { EthSignRequest } from '../src/types';
+import { setCustomTokens } from '../src/utils/customTokens';
 import { setSavedIndex } from '../src/utils/eip7730/lookup';
 import { wcRequestToScanResult } from '../src/utils/walletConnect/requestAdapter';
 
@@ -1441,6 +1442,33 @@ describe('EthSignRequestDetail — destination', () => {
     renderDetail(callTx(data));
     expect(screen.queryByText('To')).toBeNull();
     expect(screen.getAllByText('Token contract')).toHaveLength(1);
+  });
+
+  it('names a token the moment the user adds it, and offers it again once deleted', () => {
+    renderDetail(
+      callTx(
+        encode('function transfer(address to, uint256 amount)', 'transfer', [
+          ACCOUNT,
+          1_234_567n,
+        ]),
+      ),
+    );
+    expect(screen.getByText('Add token')).toBeTruthy();
+    expect(screen.getByText('Amount (raw units)')).toBeTruthy();
+    expect(screen.getByText('1234567')).toBeTruthy();
+
+    act(() =>
+      setCustomTokens([
+        { chainId: 1, address: DEST, symbol: 'FOO', decimals: 6 },
+      ]),
+    );
+    expect(screen.queryByText('Add token')).toBeNull();
+    expect(screen.getByText('FOO')).toBeTruthy();
+    expect(screen.getByText('Symbol and decimals added by you')).toBeTruthy();
+    expect(screen.getByText('1.234567 FOO')).toBeTruthy();
+
+    act(() => setCustomTokens([]));
+    expect(screen.getByText('Add token')).toBeTruthy();
   });
 });
 

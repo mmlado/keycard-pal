@@ -8,6 +8,7 @@ import React, {
 
 import LoadingScreen from '@/components/LoadingScreen';
 
+import { restoreCustomTokens } from '@/storage/customTokensStorage';
 import {
   loadPreferences,
   Preferences,
@@ -59,7 +60,8 @@ export function PreferencesProvider({
 
   useEffect(() => {
     let active = true;
-    loadPreferences().then(loaded => {
+    // The token lookup cannot wait, so the user's tokens arrive with the preferences.
+    Promise.all([loadPreferences(), restoreCustomTokens()]).then(([loaded]) => {
       if (active) {
         confirmedRef.current = loaded;
         commit(loaded);

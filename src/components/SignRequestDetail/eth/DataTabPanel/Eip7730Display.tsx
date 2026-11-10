@@ -5,6 +5,7 @@ import theme from '@/theme';
 
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
 import InfoRow from '@/components/InfoRow';
+import WithAddToken from '@/components/WithAddToken';
 
 import { useCallDescription } from '@/hooks/useCallDescription';
 import { useDescriptorSource } from '@/hooks/useDescriptorSource';
@@ -27,26 +28,32 @@ function Row({ row, padded = true }: { row: DisplayRow; padded?: boolean }) {
   return (
     <>
       <View style={padded ? styles.row : undefined}>
-        {row.kind === 'address' ? (
-          <AddressInfoRow
-            label={row.label}
-            value={row.value}
-            ens={row.ens}
-            name={token}
-          />
-        ) : (
-          <InfoRow label={row.label} value={row.value} name={token} />
-        )}
-        {row.caption && (
-          <Text variant="labelSmall" style={styles.caption}>
-            {row.caption}
-          </Text>
-        )}
+        <WithAddToken place={row.addToken}>
+          {row.kind === 'address' ? (
+            <AddressInfoRow
+              label={row.label}
+              value={row.value}
+              ens={row.ens}
+              name={token}
+            />
+          ) : (
+            <InfoRow label={row.label} value={row.value} name={token} />
+          )}
+        </WithAddToken>
+        {row.caption && <Caption text={row.caption} />}
       </View>
       {row.warnings.map(warning => (
         <WarningRow key={warning} text={warning} />
       ))}
     </>
+  );
+}
+
+function Caption({ text }: { text: string }) {
+  return (
+    <Text variant="labelSmall" style={styles.caption}>
+      {text}
+    </Text>
   );
 }
 
@@ -82,7 +89,15 @@ function Node({ node }: { node: DisplayNode }) {
     case 'call':
       return <InnerCall request={node.request} />;
     case 'token':
-      return <TokenSymbolRow token={node.token} />;
+      return (
+        <>
+          <TokenSymbolRow token={node.token} />
+          {node.caption && <Caption text={node.caption} />}
+          {node.warnings.map(warning => (
+            <WarningRow key={warning} text={warning} />
+          ))}
+        </>
+      );
     case 'entry':
       return <Eip7730Display display={node.display} />;
   }

@@ -15,6 +15,10 @@ export function getChainName(chainId: number): string {
   return chainMap.get(chainId)?.name ?? `Chain ${chainId}`;
 }
 
+export function isKnownChain(chainId: number): boolean {
+  return chainMap.has(chainId);
+}
+
 export function getNativeCurrencySymbol(chainId: number): string {
   return chainMap.get(chainId)?.nativeCurrency.symbol ?? 'ETH';
 }

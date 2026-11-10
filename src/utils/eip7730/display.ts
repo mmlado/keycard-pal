@@ -25,6 +25,7 @@ import {
   SENDER_TEXT,
   type Eip7730FieldContext,
   type FieldValue,
+  type TokenPlace,
 } from './format';
 import { descriptorReview } from './source';
 import { isFieldShown, shownFields } from './visibility';
@@ -45,6 +46,8 @@ type Row = {
   token?: TokenMetadata;
   caption?: string;
   warnings: string[];
+  /** The value is a token contract no source knows; the review offers to add it. */
+  addToken?: TokenPlace;
 };
 
 export type DisplayRow =
@@ -61,7 +64,12 @@ export type DisplayNode =
   | { kind: 'group'; rows: DisplayRow[] }
   // Its entry may wait for a saved slice, so the review describes it on its own.
   | { kind: 'call'; request: CallRequest }
-  | { kind: 'token'; token: TokenMetadata }
+  | {
+      kind: 'token';
+      token: TokenMetadata;
+      caption?: string;
+      warnings: string[];
+    }
   | { kind: 'entry'; display: DescriptorDisplay };
 
 export type DescriptorDisplay = {
@@ -219,8 +227,16 @@ function addressNameRow(
   warnings: string[],
 ): DisplayNode {
   const token = shown.token ? { token: shown.token } : {};
+  const caption = shown.caption ? { caption: shown.caption } : {};
   if (shown.name && !shown.sender) {
-    return { kind: 'text', label, value: shown.name, ...token, warnings };
+    return {
+      kind: 'text',
+      label,
+      value: shown.name,
+      ...token,
+      ...caption,
+      warnings,
+    };
   }
   if (!shown.address) {
     return { kind: 'text', label, value: SENDER_TEXT, warnings };
@@ -231,7 +247,8 @@ function addressNameRow(
     value: shown.address,
     ens: shown.ens,
     ...token,
-    ...(shown.sender && { caption: SIGNER_CAPTION }),
+    ...(shown.sender ? { caption: SIGNER_CAPTION } : caption),
+    ...(shown.addToken && { addToken: shown.addToken }),
     warnings,
   };
 }
@@ -255,15 +272,26 @@ function fieldRows(field: Eip7730Field, s: Scope): DisplayNode[] {
       kind: 'text',
       label: field.label,
       value: shown.text,
+      ...(shown.caption && { caption: shown.caption }),
       warnings: [...(shown.warnings ?? []), ...miscased],
     },
   ];
   if (shown.encryptedValue !== undefined) {
     rows.push(textRow(ENCRYPTED_VALUE_LABEL, shown.encryptedValue));
   }
-  const unknown = shown.unknownTokenAddress;
-  if (unknown && unknown !== s.shownContract?.toLowerCase()) {
-    rows.push(addressRow(TOKEN_CONTRACT_LABEL, checksumEthAddress(unknown)));
+  const contract = shown.tokenContract;
+  if (contract && contract.address !== s.shownContract?.toLowerCase()) {
+    const address = checksumEthAddress(contract.address);
+    rows.push({
+      kind: 'address',
+      label: TOKEN_CONTRACT_LABEL,
+      value: address,
+      ens: true,
+      warnings: [],
+      ...(!contract.custom && {
+        addToken: { chainId: contract.chainId, address },
+      }),
+    });
   }
   return rows;
 }
@@ -386,6 +414,7 @@ export function displayCallSection(
         ? tokenContractRows(
             lookupToken(place.chainId, place.contract),
             place.contract,
+            place.chainId,
           )
         : []),
       {

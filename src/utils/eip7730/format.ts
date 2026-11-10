@@ -3,9 +3,15 @@ import { formatUnits, keccak256 } from 'viem';
 import { UNLIMITED_APPROVAL_WARNING } from '@/constants/approval';
 
 import { getChainName, getNativeCurrencySymbol } from '@/utils/chainMetadata';
+import { customTokenRemarks } from '@/utils/customTokenChecks';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
 import { rfc3339 } from '@/utils/rfc3339';
-import { lookupToken, type TokenMetadata } from '@/utils/tokenMetadata';
+import {
+  formatTokenAmount,
+  lookupToken,
+  trimDecimal,
+  type TokenMetadata,
+} from '@/utils/tokenMetadata';
 
 import { arrayIndices, bindField, firstArraySelector } from './arrays';
 import {
@@ -24,10 +30,15 @@ export type Eip7730FieldContext = {
   resolveEach?: (path: string) => string[];
 };
 
+/** A token contract the review names, and the chain it lives on. */
+export type TokenPlace = { chainId: number | undefined; address: string };
+
 export type Eip7730FieldDisplay = {
   text: string;
   warnings?: string[];
-  unknownTokenAddress?: string;
+  caption?: string;
+  /** A token no source knows, or one only the user's list knows: its contract is shown. */
+  tokenContract?: TokenPlace & { custom: boolean };
   /** The ciphertext or its handle, shown beside the placeholder. */
   encryptedValue?: string;
 };
@@ -46,7 +57,7 @@ const NATIVE_DECIMALS = 18;
 const UNLIMITED_MESSAGES = new Set(['Unlimited', 'Any amount']);
 
 type Params = Record<string, unknown> | undefined;
-type TokenInfo = { decimals: number; symbol: string };
+type TokenInfo = Pick<TokenMetadata, 'decimals' | 'symbol' | 'custom'>;
 
 function toBigInt(value: string): bigint | null {
   try {
@@ -81,6 +92,9 @@ export type AddressNameDisplay = {
   token: TokenMetadata | null;
   warnings: string[];
   ens: boolean;
+  caption?: string;
+  /** A token no source knows. */
+  addToken?: TokenPlace;
 };
 
 function strings(value: unknown): string[] {
@@ -111,9 +125,18 @@ export function describeAddress(
   }
   const warnings: string[] = [];
   let token: TokenMetadata | null = null;
+  let caption: string | undefined;
+  let addToken: TokenPlace | undefined;
   if (types.includes('token')) {
+    const chainId = tokenChain(params, ctx);
     token = knownToken(format, ctx, params, lower);
-    if (!token && types.length === 1) warnings.push(UNKNOWN_TOKEN_WARNING);
+    const remarks = customTokenRemarks(token, chainId, lower);
+    caption = remarks.caption;
+    warnings.push(...remarks.warnings);
+    if (!token && types.length === 1) {
+      warnings.push(UNKNOWN_TOKEN_WARNING);
+      addToken = { chainId, address };
+    }
   }
   if (
     types.length === 1 &&
@@ -123,7 +146,15 @@ export function describeAddress(
   ) {
     warnings.push(NOT_SIGNER_WARNING);
   }
-  return { address, sender: false, token, warnings, ens };
+  return {
+    address,
+    sender: false,
+    token,
+    warnings,
+    ens,
+    ...(caption && { caption }),
+    ...(addToken && { addToken }),
+  };
 }
 
 function encryptedLabel(field: Eip7730Field): string | null {
@@ -192,9 +223,27 @@ export function describeTokenTicker(
 ): AddressNameDisplay | null {
   const address = asAddress(raw);
   if (!address) return null;
+  const chainId = tokenChain(field.params, ctx);
   const token = knownToken(format, ctx, field.params, address.toLowerCase());
-  const warnings = token ? [] : [UNKNOWN_TOKEN_WARNING];
-  return { address, sender: false, token, warnings, ens: true };
+  if (!token) {
+    return {
+      address,
+      sender: false,
+      token,
+      warnings: [UNKNOWN_TOKEN_WARNING],
+      ens: true,
+      addToken: { chainId, address },
+    };
+  }
+  const { caption, warnings } = customTokenRemarks(token, chainId, address);
+  return {
+    address,
+    sender: false,
+    token,
+    warnings,
+    ens: true,
+    ...(caption && { caption }),
+  };
 }
 
 function nativeToken(chainId: number | undefined): TokenInfo | null {
@@ -261,9 +310,7 @@ function knownToken(
   // An entry's own token metadata describes its own chain only.
   const own =
     chainId === ctx.chainId ? descriptorToken(format, address, ctx) : null;
-  return own
-    ? { symbol: own.symbol, decimals: own.decimals }
-    : lookupToken(chainId, address);
+  return own ?? lookupToken(chainId, address);
 }
 
 function resolveToken(
@@ -277,7 +324,13 @@ function resolveToken(
     return nativeToken(tokenChain(params, ctx));
   }
   const known = knownToken(format, ctx, params, address);
-  return known ? { decimals: known.decimals, symbol: known.symbol } : null;
+  return (
+    known && {
+      decimals: known.decimals,
+      symbol: known.symbol,
+      ...(known.custom && { custom: true }),
+    }
+  );
 }
 
 function reachesThreshold(amount: bigint, threshold: unknown): boolean {
@@ -288,20 +341,11 @@ function reachesThreshold(amount: bigint, threshold: unknown): boolean {
   return limit !== null && amount >= limit;
 }
 
-function trimAmount(raw: string): string {
-  if (!raw.includes('.')) return raw;
-  return raw.replace(/0+$/, '').replace(/\.$/, '');
-}
-
-function amountText(amount: bigint, token: TokenInfo): string {
-  return `${trimAmount(formatUnits(amount, token.decimals))} ${token.symbol}`;
-}
-
 function message(params: Params, fallback: string): string {
   return typeof params?.message === 'string' ? params.message : fallback;
 }
 
-function formatTokenAmount(
+function tokenAmountField(
   value: string,
   format: Eip7730DisplayFormat,
   ctx: Eip7730FieldContext,
@@ -311,22 +355,38 @@ function formatTokenAmount(
   if (amount === null) return { text: value };
   const address = tokenAddress(params, ctx);
   const token = resolveToken(format, ctx, params, address);
-  // Without a ticker the address is the only way to tell which token this is.
-  const unknown = !token && address ? { unknownTokenAddress: address } : {};
+  const chainId = tokenChain(params, ctx);
+  // Without a ticker, or with only the user's, the address is what tells the token apart.
+  const contract =
+    address && (!token || token.custom)
+      ? { tokenContract: { address, chainId, custom: Boolean(token) } }
+      : {};
+  const remarks = address
+    ? customTokenRemarks(token, chainId, address)
+    : { warnings: [] };
+  const caption = remarks.caption ? { caption: remarks.caption } : {};
   if (!reachesThreshold(amount, params?.threshold)) {
-    return token
-      ? { text: amountText(amount, token) }
-      : { text: value, warnings: [UNKNOWN_TOKEN_WARNING], ...unknown };
+    if (!token) {
+      return { text: value, warnings: [UNKNOWN_TOKEN_WARNING], ...contract };
+    }
+    return {
+      text: formatTokenAmount(amount, token),
+      ...(remarks.warnings.length > 0 && { warnings: remarks.warnings }),
+      ...caption,
+      ...contract,
+    };
   }
   const text = message(params, 'Unlimited');
   const warnings = UNLIMITED_MESSAGES.has(text)
     ? [UNLIMITED_APPROVAL_WARNING]
     : [];
   if (!token) warnings.push(UNKNOWN_TOKEN_WARNING);
+  warnings.push(...remarks.warnings);
   return {
     text: token ? `${text} ${token.symbol}` : text,
     ...(warnings.length > 0 && { warnings }),
-    ...unknown,
+    ...caption,
+    ...contract,
   };
 }
 
@@ -341,7 +401,7 @@ function formatAmount(
     return { text: message(params, 'All') };
   }
   const native = nativeToken(ctx.chainId);
-  return { text: native ? amountText(amount, native) : value };
+  return { text: native ? formatTokenAmount(amount, native) : value };
 }
 
 // A maximum value means "never expires"; it is past any date RFC 3339 can write.
@@ -379,7 +439,7 @@ const SI_PREFIXES: Record<number, string> = {
 // The value over 10^shift; formatUnits takes no negative shift.
 function shifted(n: bigint, shift: number): string {
   return shift >= 0
-    ? trimAmount(formatUnits(n, shift))
+    ? trimDecimal(formatUnits(n, shift))
     : (n * 10n ** BigInt(-shift)).toString();
 }
 
@@ -442,7 +502,7 @@ export function formatEip7730Field(
   try {
     switch (field.format) {
       case 'tokenAmount':
-        return formatTokenAmount(value, format, ctx, field.params);
+        return tokenAmountField(value, format, ctx, field.params);
       case 'amount':
         return formatAmount(value, ctx, field.params);
       case 'date':
