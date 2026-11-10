@@ -109,8 +109,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Ends in 0: the ABI splits take the last digit (#432).
-        versionCode 116000
-        versionName "1.16.0"
+        versionCode 117000
+        versionName "1.17.0"
     }
     flavorDimensions "distribution"
     productFlavors {
