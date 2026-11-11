@@ -7,10 +7,12 @@ function read(...parts: string[]): string {
   return readFileSync(join(ROOT, ...parts), 'utf8');
 }
 
-// The recipe's Description block only: its Ads anti-feature names the releases that carried the link.
+// The Description block only: the per-version Ads entries name the releases that carried the link.
 function fdroidDescription(appId: string): string {
   const yml = read('fdroid', 'metadata', `${appId}.yml`);
-  return yml.slice(yml.indexOf('Description: |'));
+  const block = yml.slice(yml.indexOf('Description: |'));
+  const end = block.search(/\n\S/);
+  return end === -1 ? block : block.slice(0, end);
 }
 
 const LISTINGS: [string, string][] = [
