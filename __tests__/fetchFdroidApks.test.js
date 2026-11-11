@@ -5,7 +5,8 @@ const os = require('os');
 const path = require('path');
 
 const {
-  APK_ASSET,
+  ABIS,
+  APK_NAMES,
   APKS_PER_RELEASE,
   ARCHIVE_BUDGET_BYTES,
   DOWNLOAD_ATTEMPTS,
@@ -24,30 +25,39 @@ const WORKFLOWS = [
   '.github/workflows/publish-pages.yml',
   '.github/workflows/android-release.yml',
 ];
-const APK_NAMES = [
-  'keycard-pal-full-release-universal.apk',
+const SPLITS = [
   'keycard-pal-full-release-arm64-v8a.apk',
   'keycard-pal-full-release-armeabi-v7a.apk',
-  'keycard-pal-offline-release-universal.apk',
   'keycard-pal-offline-release-arm64-v8a.apk',
   'keycard-pal-offline-release-armeabi-v7a.apk',
 ];
+const UNIVERSALS = [
+  'keycard-pal-full-release-universal.apk',
+  'keycard-pal-offline-release-universal.apk',
+];
+const PUBLISHED = [...SPLITS, ...UNIVERSALS].sort();
 
 const read = file => fs.readFileSync(path.join(ROOT, file), 'utf8');
 const tags = releases => releases.map(r => r.tag);
 const digest = data =>
   `sha256:${crypto.createHash('sha256').update(data).digest('hex')}`;
 const contents = (tag, name) => Buffer.from(`${tag} ${name}`);
+const stored = (names, tag) =>
+  names.map(n => n.replace(/\.apk$/, `-${tag}.apk`)).sort();
 
+// The splits total exactly totalMib; the universal APKs must not count.
 function release(tag, totalMib, extra = {}) {
   return {
     tag,
     draft: false,
     prerelease: false,
-    assets: APK_NAMES.map((name, i) => ({
-      name,
-      size: i === 0 ? totalMib * MIB - (APK_NAMES.length - 1) : 1,
-    })),
+    assets: PUBLISHED.map(name => {
+      if (UNIVERSALS.includes(name)) {
+        return { name, size: 99 * MIB };
+      }
+      const first = name === SPLITS[0];
+      return { name, size: first ? totalMib * MIB - (SPLITS.length - 1) : 1 };
+    }),
     ...extra,
   };
 }
@@ -57,7 +67,7 @@ function smallRelease(tag) {
     tag,
     draft: false,
     prerelease: false,
-    assets: APK_NAMES.map(name => ({
+    assets: PUBLISHED.map(name => ({
       name,
       size: contents(tag, name).length,
       digest: digest(contents(tag, name)),
@@ -65,8 +75,8 @@ function smallRelease(tag) {
   };
 }
 
-const writeRelease = (tag, dir) =>
-  APK_NAMES.forEach(name =>
+const writeSplits = (tag, dir) =>
+  SPLITS.forEach(name =>
     fs.writeFileSync(path.join(dir, name), contents(tag, name)),
   );
 
@@ -150,7 +160,7 @@ describe('selectReleases', () => {
     expect(plan.archive).toEqual([]);
   });
 
-  it('leaves out drafts, pre-releases, non-version tags and releases without APKs', () => {
+  it('leaves out drafts, pre-releases, non-version tags and releases without splits', () => {
     const plan = selectReleases([
       release('v2.0.0', 10, { draft: true }),
       release('v1.99.0', 10, { prerelease: true }),
@@ -162,6 +172,7 @@ describe('selectReleases', () => {
         assets: [
           { name: 'SHA256SUMS.txt', size: 500 },
           { name: 'app-full-release.aab', size: 50 * MIB },
+          { name: UNIVERSALS[0], size: 50 * MIB },
         ],
       },
       { tag: 'v0.1.0', draft: false, prerelease: false, assets: [] },
@@ -172,25 +183,34 @@ describe('selectReleases', () => {
     expect(plan.left).toEqual([]);
   });
 
-  it('counts only the APKs the repository is built from', () => {
+  it('counts only the split APKs the repository is built from', () => {
     const r = release('v1.0.0', 10);
     r.assets.push({ name: 'SHA256SUMS.txt', size: 1000 });
     r.assets.push({ name: 'keycard-pal-full-release.aab', size: 1000 });
     expect(selectReleases([r]).repo[0].bytes).toBe(10 * MIB);
-    expect(apkAssets(r)).toHaveLength(APK_NAMES.length);
+    expect(apkAssets(r).map(a => a.name)).toEqual(SPLITS);
+  });
+
+  it('skips a release that lacks a split, so every kept release serves both application ids', () => {
+    const partial = release('v1.3.0', 10);
+    partial.assets = partial.assets.filter(a => a.name !== SPLITS[2]);
+    const plan = selectReleases([
+      release('v1.4.0', 10),
+      partial,
+      release('v1.2.0', 10),
+      release('v1.1.0', 10),
+      release('v1.0.0', 10),
+    ]);
+    expect(tags(plan.repo)).toEqual(['v1.4.0', 'v1.2.0', 'v1.1.0']);
+    expect(tags(plan.archive)).toEqual(['v1.0.0']);
+    expect(tags(plan.incomplete)).toEqual(['v1.3.0']);
   });
 });
 
-describe('APK_ASSET', () => {
-  it('matches the release APKs of both flavors and nothing else', () => {
-    APK_NAMES.forEach(name => expect(APK_ASSET.test(name)).toBe(true));
-    [
-      'SHA256SUMS.txt',
-      'keycard-pal-full-release.aab',
-      'keycard-pal-full-debug-universal.apk',
-      'keycard-pal-full-release-universal.apk.idsig',
-      'keycard-pal-full-releaseXuniversal.apk',
-    ].forEach(name => expect(APK_ASSET.test(name)).toBe(false));
+describe('APK_NAMES', () => {
+  it('is the two ABI splits of both flavors, without the universal APKs', () => {
+    expect([...APK_NAMES].sort()).toEqual(SPLITS);
+    UNIVERSALS.forEach(name => expect(APK_NAMES).not.toContain(name));
   });
 });
 
@@ -212,15 +232,13 @@ describe('parseReleaseLines', () => {
 });
 
 describe('fetchRelease', () => {
-  it('stores every APK as <asset>-<tag>.apk once size and digest match', () => {
+  it('stores every split as <asset>-<tag>.apk once size and digest match', () => {
     const dest = destIn();
     fetchRelease(selected('v1.2.0'), dest, {
-      download: writeRelease,
+      download: writeSplits,
       log: () => {},
     });
-    expect(fs.readdirSync(dest).sort()).toEqual(
-      APK_NAMES.map(n => n.replace(/\.apk$/, '-v1.2.0.apk')).sort(),
-    );
+    expect(fs.readdirSync(dest).sort()).toEqual(stored(SPLITS, 'v1.2.0'));
     expect(
       fs.readFileSync(
         path.join(dest, 'keycard-pal-offline-release-arm64-v8a-v1.2.0.apk'),
@@ -236,17 +254,17 @@ describe('fetchRelease', () => {
     fetchRelease(selected('v1.2.0'), dest, {
       download: (tag, dir) => {
         calls += 1;
-        writeRelease(tag, dir);
+        writeSplits(tag, dir);
         if (calls === 1) {
-          fs.truncateSync(path.join(dir, APK_NAMES[3]), 4);
+          fs.truncateSync(path.join(dir, SPLITS[3]), 4);
         }
       },
       log: line => log.push(line),
     });
     expect(calls).toBe(2);
-    expect(fs.readdirSync(dest)).toHaveLength(APK_NAMES.length);
+    expect(fs.readdirSync(dest)).toHaveLength(SPLITS.length);
     expect(log.join('\n')).toMatch(
-      /v1\.2\.0, attempt 1 of 3: keycard-pal-offline-release-universal\.apk is 4 bytes, not \d+/,
+      /v1\.2\.0, attempt 1 of 3: keycard-pal-offline-release-armeabi-v7a\.apk is 4 bytes, not \d+/,
     );
   });
 
@@ -260,13 +278,13 @@ describe('fetchRelease', () => {
         if (calls === 1) {
           throw new Error('connection reset by peer');
         }
-        writeRelease(tag, dir);
+        writeSplits(tag, dir);
       },
       log: line => log.push(line),
     });
     expect(calls).toBe(2);
     expect(log[0]).toContain('connection reset by peer');
-    expect(fs.readdirSync(dest)).toHaveLength(APK_NAMES.length);
+    expect(fs.readdirSync(dest)).toHaveLength(SPLITS.length);
   });
 
   it('gives up after the last attempt and stores nothing', () => {
@@ -274,8 +292,8 @@ describe('fetchRelease', () => {
     let calls = 0;
     const corrupt = (tag, dir) => {
       calls += 1;
-      writeRelease(tag, dir);
-      const file = path.join(dir, APK_NAMES[0]);
+      writeSplits(tag, dir);
+      const file = path.join(dir, SPLITS[0]);
       const data = fs.readFileSync(file);
       data[0] = data[0] === 0x41 ? 0x42 : 0x41;
       fs.writeFileSync(file, data);
@@ -296,18 +314,21 @@ describe('fetchRelease', () => {
     const log = [];
     const r = selected('v1.2.0');
     r.assets[1] = { ...r.assets[1], digest: null };
+    const [, noDigest, missing] = r.assets;
     expect(() =>
       fetchRelease(r, dest, {
         download: (tag, dir) => {
-          writeRelease(tag, dir);
-          fs.rmSync(path.join(dir, APK_NAMES[2]));
+          writeSplits(tag, dir);
+          fs.rmSync(path.join(dir, missing.name));
         },
         attempts: 1,
         log: line => log.push(line),
       }),
     ).toThrow();
-    expect(log[0]).toContain(`${APK_NAMES[1]} has no SHA-256 digest on GitHub`);
-    expect(log[0]).toContain(`${APK_NAMES[2]} is missing`);
+    expect(log[0]).toContain(
+      `${noDigest.name} has no SHA-256 digest on GitHub`,
+    );
+    expect(log[0]).toContain(`${missing.name} is missing`);
   });
 });
 
@@ -338,17 +359,21 @@ describe('main', () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it('with --dir fetches every kept release into the folder', () => {
+  it('with --dir fetches the splits of every kept release into the folder', () => {
     const dest = path.join(tmp, 'fdroid', 'repo');
     const log = [];
     const code = main(['--dir', dest], {
       fetch: () => lines(five),
-      download: writeRelease,
+      download: writeSplits,
       log: line => log.push(line),
     });
     expect(code).toBe(0);
-    expect(fs.readdirSync(dest)).toHaveLength(5 * APK_NAMES.length);
-    expect(log.join('\n')).toContain('fetched 30 APKs from 5 releases');
+    expect(fs.readdirSync(dest).sort()).toEqual(
+      tags(five)
+        .flatMap(tag => stored(SPLITS, tag))
+        .sort(),
+    );
+    expect(log.join('\n')).toContain('fetched 20 APKs from 5 releases');
   });
 
   it('fails when a release cannot be fetched', () => {
@@ -364,13 +389,31 @@ describe('main', () => {
     );
   });
 
-  it('fails when no release carries APKs', () => {
+  it('fails when no release carries all the splits', () => {
+    const partial = release('v1.1.0', 10);
+    partial.assets = partial.assets.filter(a => a.name !== SPLITS[0]);
+    const log = [];
     const code = main(['--dry-run'], {
-      fetch: () => lines([{ tag: 'v1.0.0', assets: [] }]),
+      fetch: () => lines([partial, { tag: 'v1.0.0', assets: [] }]),
       out: () => {},
-      log: () => {},
+      log: line => log.push(line),
     });
     expect(code).toBe(1);
+    expect(log[0]).toBe(`skipped  v1.1.0  lacks ${SPLITS[0]}`);
+  });
+
+  it('refuses a folder that already holds APKs, before asking GitHub', () => {
+    const dest = destIn();
+    fs.writeFileSync(path.join(dest, 'stale-v1.0.0.apk'), 'old');
+    const fetch = jest.fn();
+    const log = [];
+    expect(main(['--dir', dest], { fetch, log: line => log.push(line) })).toBe(
+      1,
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    expect(log[0]).toBe(
+      `${dest} already holds APKs; fetch into an empty folder.`,
+    );
   });
 
   it('needs --dir or --dry-run', () => {
@@ -388,11 +431,14 @@ describe('the repository settings around the script', () => {
     expect(archiveOlder).toBe(REPO_RELEASES * APKS_PER_RELEASE);
   });
 
-  it('APKS_PER_RELEASE is the ABI splits plus the universal APK', () => {
+  it('ABIS are the splits build.gradle makes and all a universal APK holds', () => {
     const gradle = read('android/app/build.gradle');
-    const abis = /^\s*include\s+(.+)$/m.exec(gradle)[1].match(/"[^"]+"/g);
-    expect(gradle).toMatch(/^\s*universalApk true$/m);
-    expect(APKS_PER_RELEASE).toBe(abis.length + 1);
+    const quoted = line => line.match(/"([^"]+)"/g).map(s => s.slice(1, -1));
+    const splits = quoted(/^\s*include\s+(.+)$/m.exec(gradle)[1]);
+    const filters = quoted(/^\s*abiFilters\s+(.+)$/m.exec(gradle)[1]);
+    expect([...splits].sort()).toEqual([...ABIS].sort());
+    expect([...filters].sort()).toEqual([...ABIS].sort());
+    expect(APKS_PER_RELEASE).toBe(ABIS.length);
   });
 
   it.each(WORKFLOWS)(

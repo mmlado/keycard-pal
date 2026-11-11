@@ -11,18 +11,14 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_RELEASES = 3;
-// Universal plus two ABI splits per application id; fdroid/config.yml's archive_older is REPO_RELEASES times this.
-const APKS_PER_RELEASE = 3;
 const ARCHIVE_BUDGET_BYTES = 800 * 1024 * 1024;
 const DOWNLOAD_ATTEMPTS = 3;
-const APK_PATTERNS = [
-  'keycard-pal-offline-release-*.apk',
-  'keycard-pal-full-release-*.apk',
-];
-const APK_ASSET = new RegExp(
-  `^(${APK_PATTERNS.map(p =>
-    p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*'),
-  ).join('|')})$`,
+// No universal APK: it holds these same two ABIs, so the F-Droid client never needs it.
+const ABIS = ['arm64-v8a', 'armeabi-v7a'];
+// fdroid/config.yml's archive_older is REPO_RELEASES times this: it counts APKs per application id.
+const APKS_PER_RELEASE = ABIS.length;
+const APK_NAMES = ['offline', 'full'].flatMap(flavor =>
+  ABIS.map(abi => `keycard-pal-${flavor}-release-${abi}.apk`),
 );
 const RELEASE_FIELDS =
   '.[] | {tag: .tag_name, draft, prerelease, assets: [.assets[] | {name, size, digest}]}';
@@ -37,7 +33,7 @@ function compareVersions(a, b) {
 }
 
 function apkAssets(release) {
-  return (release.assets || []).filter(asset => APK_ASSET.test(asset.name));
+  return (release.assets || []).filter(asset => APK_NAMES.includes(asset.name));
 }
 
 function selectReleases(
@@ -47,7 +43,7 @@ function selectReleases(
     archiveBudgetBytes = ARCHIVE_BUDGET_BYTES,
   } = {},
 ) {
-  const candidates = releases
+  const published = releases
     .filter(r => !r.draft && !r.prerelease && parseVersion(r.tag))
     .map(r => {
       const assets = apkAssets(r);
@@ -56,6 +52,11 @@ function selectReleases(
     })
     .filter(r => r.assets.length > 0)
     .sort((a, b) => compareVersions(parseVersion(b.tag), parseVersion(a.tag)));
+  // A release without every split would leave an application id short of releases in repo/.
+  const candidates = published.filter(
+    r => r.assets.length === APK_NAMES.length,
+  );
+  const incomplete = published.filter(r => r.assets.length < APK_NAMES.length);
   const repo = candidates.slice(0, repoReleases);
   const archive = [];
   let archivedBytes = 0;
@@ -71,6 +72,7 @@ function selectReleases(
     repo,
     archive,
     left: candidates.slice(repo.length + archive.length),
+    incomplete,
     archivedBytes,
   };
 }
@@ -112,7 +114,7 @@ function ghDownload(tag, dir) {
       'download',
       tag,
       ...repoArgs(),
-      ...APK_PATTERNS.flatMap(pattern => ['--pattern', pattern]),
+      ...APK_NAMES.flatMap(name => ['--pattern', name]),
       '--dir',
       dir,
     ],
@@ -227,9 +229,22 @@ function main(
     log('Usage: fetch-fdroid-apks.js --dir <folder> | --dry-run');
     return 2;
   }
+  // APKs left from an earlier run would end up in the repository outside the plan.
+  if (
+    !dryRun &&
+    fs.existsSync(dir) &&
+    fs.readdirSync(dir).some(name => name.endsWith('.apk'))
+  ) {
+    log(`${dir} already holds APKs; fetch into an empty folder.`);
+    return 1;
+  }
   const plan = selectReleases(parseReleaseLines(fetch()));
+  plan.incomplete.forEach(r => {
+    const missing = APK_NAMES.filter(n => !r.assets.some(a => a.name === n));
+    log(`skipped  ${r.tag}  lacks ${missing.join(', ')}`);
+  });
   if (plan.repo.length === 0) {
-    log('No published release carries F-Droid APKs.');
+    log('No published release carries all the split APKs.');
     return 1;
   }
   plan.repo.forEach(r => log(`repo     ${r.tag}  ${mib(r.bytes)}`));
@@ -256,7 +271,8 @@ function main(
 }
 
 module.exports = {
-  APK_ASSET,
+  ABIS,
+  APK_NAMES,
   APKS_PER_RELEASE,
   ARCHIVE_BUDGET_BYTES,
   DOWNLOAD_ATTEMPTS,

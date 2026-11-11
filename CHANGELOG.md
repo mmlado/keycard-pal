@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- The F-Droid repository at fdroid.keycardpal.com archives older releases only up to 800 MiB of APKs
+- The F-Droid repository at fdroid.keycardpal.com serves the ABI split APKs only and archives older releases up to 800 MiB
 
 ## [1.17.0] - 2026-11-10
 
