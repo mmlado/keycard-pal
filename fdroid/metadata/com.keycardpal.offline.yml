@@ -1,8 +1,3 @@
-AntiFeatures:
-  Ads:
-    en-US: Versions up to 1.16.0 show a QR code of an affiliate link to the Keycard
-      shop from their Buy a Keycard entries, and the developer earns a commission
-      on purchases made through it. Later versions show keycard.tech and earn nothing.
 Categories:
   - Money
   - Security
@@ -24,3 +19,53 @@ Description: |
 
   Keycard Pal Offline is made by an independent developer, not by Keycard. The
   Keycard team has provided equipment for its development.
+
+Builds:
+  - versionCode: 10800
+    antifeatures: &ads
+      Ads:
+        en-US: This version shows a QR code of an affiliate link to the Keycard shop from
+          its Buy a Keycard entries, and the developer earns a commission on purchases
+          made through it.
+  - versionCode: 10900
+    antifeatures: *ads
+  - versionCode: 10901
+    antifeatures: *ads
+  - versionCode: 10902
+    antifeatures: *ads
+  - versionCode: 10903
+    antifeatures: *ads
+  - versionCode: 11000
+    antifeatures: *ads
+  - versionCode: 11100
+    antifeatures: *ads
+  - versionCode: 11101
+    antifeatures: *ads
+  - versionCode: 11200
+    antifeatures: *ads
+  - versionCode: 11300
+    antifeatures: *ads
+  - versionCode: 114000
+    antifeatures: *ads
+  - versionCode: 114001
+    antifeatures: *ads
+  - versionCode: 114002
+    antifeatures: *ads
+  - versionCode: 115000
+    antifeatures: *ads
+  - versionCode: 115001
+    antifeatures: *ads
+  - versionCode: 115002
+    antifeatures: *ads
+  - versionCode: 115010
+    antifeatures: *ads
+  - versionCode: 115011
+    antifeatures: *ads
+  - versionCode: 115012
+    antifeatures: *ads
+  - versionCode: 116000
+    antifeatures: *ads
+  - versionCode: 116001
+    antifeatures: *ads
+  - versionCode: 116002
+    antifeatures: *ads

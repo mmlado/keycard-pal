@@ -6,11 +6,6 @@
 # Two build entries, armeabi-v7a then arm64-v8a: checkupdates assigns codes in that order.
 # Remove all comments before submitting.
 
-AntiFeatures:
-  Ads:
-    en-US: Versions up to 1.16.0 show a QR code of an affiliate link to the Keycard
-      shop from their Buy a Keycard entries, and the developer earns a commission
-      on purchases made through it. Later versions show keycard.tech and earn nothing.
 Categories:
   - Security
   - Wallet
