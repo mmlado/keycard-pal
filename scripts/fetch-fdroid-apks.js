@@ -36,6 +36,12 @@ function apkAssets(release) {
   return (release.assets || []).filter(asset => APK_NAMES.includes(asset.name));
 }
 
+function missingApks(release) {
+  return APK_NAMES.filter(
+    name => !release.assets.some(asset => asset.name === name),
+  );
+}
+
 function selectReleases(
   releases,
   {
@@ -50,13 +56,11 @@ function selectReleases(
       const bytes = assets.reduce((sum, asset) => sum + asset.size, 0);
       return { tag: r.tag, bytes, assets };
     })
-    .filter(r => r.assets.length > 0)
     .sort((a, b) => compareVersions(parseVersion(b.tag), parseVersion(a.tag)));
+  const withApks = published.filter(r => r.assets.length > 0);
   // A release without every split would leave an application id short of releases in repo/.
-  const candidates = published.filter(
-    r => r.assets.length === APK_NAMES.length,
-  );
-  const incomplete = published.filter(r => r.assets.length < APK_NAMES.length);
+  const candidates = withApks.filter(r => r.assets.length === APK_NAMES.length);
+  const incomplete = withApks.filter(r => r.assets.length < APK_NAMES.length);
   const repo = candidates.slice(0, repoReleases);
   const archive = [];
   let archivedBytes = 0;
@@ -69,6 +73,7 @@ function selectReleases(
     archive.push(release);
   }
   return {
+    newest: published[0] || null,
     repo,
     archive,
     left: candidates.slice(repo.length + archive.length),
@@ -239,14 +244,23 @@ function main(
     return 1;
   }
   const plan = selectReleases(parseReleaseLines(fetch()));
-  plan.incomplete.forEach(r => {
-    const missing = APK_NAMES.filter(n => !r.assets.some(a => a.name === n));
-    log(`skipped  ${r.tag}  lacks ${missing.join(', ')}`);
-  });
-  if (plan.repo.length === 0) {
-    log('No published release carries all the split APKs.');
+  if (!plan.newest) {
+    log('No published release.');
     return 1;
   }
+  // The repository must carry the newest release, so it is never skipped.
+  const missing = missingApks(plan.newest);
+  if (missing.length > 0) {
+    log(
+      `${plan.newest.tag} is the newest release and lacks ${missing.join(
+        ', ',
+      )}.`,
+    );
+    return 1;
+  }
+  plan.incomplete.forEach(r =>
+    log(`skipped  ${r.tag}  lacks ${missingApks(r).join(', ')}`),
+  );
   plan.repo.forEach(r => log(`repo     ${r.tag}  ${mib(r.bytes)}`));
   plan.archive.forEach(r => log(`archive  ${r.tag}  ${mib(r.bytes)}`));
   plan.left.forEach(r => log(`left out ${r.tag}  ${mib(r.bytes)}`));

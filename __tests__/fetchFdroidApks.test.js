@@ -166,7 +166,7 @@ describe('selectReleases', () => {
       release('v1.99.0', 10, { prerelease: true }),
       release('nightly', 10),
       {
-        tag: 'v1.98.0',
+        tag: 'v1.16.0',
         draft: false,
         prerelease: false,
         assets: [
@@ -181,6 +181,8 @@ describe('selectReleases', () => {
     expect(tags(plan.repo)).toEqual(['v1.17.0']);
     expect(plan.archive).toEqual([]);
     expect(plan.left).toEqual([]);
+    expect(plan.incomplete).toEqual([]);
+    expect(plan.newest).toBe(plan.repo[0]);
   });
 
   it('counts only the split APKs the repository is built from', () => {
@@ -389,17 +391,66 @@ describe('main', () => {
     );
   });
 
-  it('fails when no release carries all the splits', () => {
+  it('fails before downloading anything when the newest release lacks a split', () => {
     const partial = release('v1.1.0', 10);
     partial.assets = partial.assets.filter(a => a.name !== SPLITS[0]);
+    const dest = path.join(tmp, 'repo');
+    const download = jest.fn();
+    const log = [];
+    const code = main(['--dir', dest], {
+      fetch: () => lines([partial, release('v1.0.0', 10)]),
+      download,
+      log: line => log.push(line),
+    });
+    expect(code).toBe(1);
+    expect(log).toEqual([
+      `v1.1.0 is the newest release and lacks ${SPLITS[0]}.`,
+    ]);
+    expect(download).not.toHaveBeenCalled();
+    expect(fs.existsSync(dest)).toBe(false);
+  });
+
+  it('fails when the newest release carries no split yet', () => {
     const log = [];
     const code = main(['--dry-run'], {
-      fetch: () => lines([partial, { tag: 'v1.0.0', assets: [] }]),
+      fetch: () =>
+        lines([
+          { tag: 'v1.1.0', draft: false, prerelease: false, assets: [] },
+          release('v1.0.0', 10),
+        ]),
       out: () => {},
       log: line => log.push(line),
     });
     expect(code).toBe(1);
-    expect(log[0]).toBe(`skipped  v1.1.0  lacks ${SPLITS[0]}`);
+    expect(log).toEqual([
+      `v1.1.0 is the newest release and lacks ${APK_NAMES.join(', ')}.`,
+    ]);
+  });
+
+  it('skips an older release that lacks a split and says so', () => {
+    const partial = release('v1.0.0', 10);
+    partial.assets = partial.assets.filter(a => a.name !== SPLITS[3]);
+    const out = [];
+    const log = [];
+    const code = main(['--dry-run'], {
+      fetch: () => lines([release('v1.1.0', 10), partial]),
+      out: line => out.push(line),
+      log: line => log.push(line),
+    });
+    expect(code).toBe(0);
+    expect(out).toEqual(['v1.1.0']);
+    expect(log[0]).toBe(`skipped  v1.0.0  lacks ${SPLITS[3]}`);
+  });
+
+  it('fails when there is no published release', () => {
+    const log = [];
+    const code = main(['--dry-run'], {
+      fetch: () => lines([release('v1.0.0', 10, { draft: true })]),
+      out: () => {},
+      log: line => log.push(line),
+    });
+    expect(code).toBe(1);
+    expect(log).toEqual(['No published release.']);
   });
 
   it('refuses a folder that already holds APKs, before asking GitHub', () => {
