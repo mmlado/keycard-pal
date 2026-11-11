@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- The F-Droid repository at fdroid.keycardpal.com archives older releases only up to 800 MiB of APKs
+
 ## [1.17.0] - 2026-11-10
 
 ### Added

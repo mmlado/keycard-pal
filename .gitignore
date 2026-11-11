@@ -75,6 +75,7 @@ fdroid/repo/
 fdroid/archive/
 fdroid/tmp/
 fdroid/icon.png
+fdroid/.fdroid-download-*/
 
 # Agent / local tooling
 .claude/

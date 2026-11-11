@@ -28,26 +28,11 @@ jobs:
       - name: Restore keystore
         run: echo "${{ secrets.FDROID_KEYSTORE_B64 }}" | base64 -d > fdroid/keystore.p12
 
-      - name: Download APKs from all releases
+      - name: Download APKs of the releases the repository keeps
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # The release assets share one name across releases, so each tag's APKs
-          # get the tag appended; otherwise every download overwrites the last.
-          mkdir -p fdroid/repo
-          gh release list --limit 100 --json tagName --jq '.[].tagName' \
-            | while read tag; do
-                rm -rf release-apks && mkdir release-apks
-                gh release download "$tag" \
-                  --pattern "keycard-pal-offline-release-*.apk" \
-                  --pattern "keycard-pal-full-release-*.apk" \
-                  --dir release-apks/ 2>/dev/null || true
-                for apk in release-apks/*.apk; do
-                  [ -e "$apk" ] || continue
-                  mv "$apk" "fdroid/repo/$(basename "$apk" .apk)-$tag.apk"
-                done
-              done
-          rm -rf release-apks
+          node scripts/fetch-fdroid-apks.js --dir fdroid/repo
           count=$(find fdroid/repo -maxdepth 1 -name "*.apk" | wc -l)
           if [ "$count" -eq 0 ]; then
             echo "No release APKs found, refusing to deploy an empty F-Droid repo."
