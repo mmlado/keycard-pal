@@ -1,4 +1,5 @@
 const { Buffer } = require('buffer');
+const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -18,6 +19,11 @@ const {
   parseVersion,
   selectReleases,
 } = require('../scripts/fetch-fdroid-apks');
+
+jest.mock('child_process', () => ({
+  ...jest.requireActual('child_process'),
+  execFileSync: jest.fn(),
+}));
 
 const ROOT = path.join(__dirname, '..');
 const MIB = 1024 * 1024;
@@ -471,6 +477,67 @@ describe('main', () => {
     const fetch = jest.fn();
     expect(main([], { fetch, log: () => {} })).toBe(2);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  describe('through gh', () => {
+    const RELEASE_FIELDS =
+      '.[] | {tag: .tag_name, draft, prerelease, assets: [.assets[] | {name, size, digest}]}';
+    const REPOSITORY = 'octocat/hello-world';
+    const saved = process.env.GITHUB_REPOSITORY;
+    const ghCalls = () =>
+      execFileSync.mock.calls.map(([command, args]) => [command, ...args]);
+    const expectedCalls = (repo, flags) => [
+      [
+        'gh',
+        'api',
+        '--paginate',
+        `repos/${repo}/releases?per_page=100`,
+        '--jq',
+        RELEASE_FIELDS,
+      ],
+      ...tags(five).map(tag => [
+        'gh',
+        'release',
+        'download',
+        tag,
+        ...flags,
+        ...APK_NAMES.flatMap(name => ['--pattern', name]),
+        '--dir',
+        path.join(tmp, `.fdroid-download-${tag}`),
+      ]),
+    ];
+
+    beforeEach(() => {
+      execFileSync.mockReset();
+      execFileSync.mockImplementation((command, args) => {
+        if (args[0] === 'api') {
+          return lines(five);
+        }
+        writeSplits(args[2], args[args.indexOf('--dir') + 1]);
+        return null;
+      });
+    });
+    afterEach(() => {
+      if (saved === undefined) {
+        delete process.env.GITHUB_REPOSITORY;
+      } else {
+        process.env.GITHUB_REPOSITORY = saved;
+      }
+    });
+
+    it('asks GITHUB_REPOSITORY for the fields the plan and the digest check read, and downloads from it', () => {
+      process.env.GITHUB_REPOSITORY = REPOSITORY;
+      const dest = path.join(tmp, 'repo');
+      expect(main(['--dir', dest], { log: () => {} })).toBe(0);
+      expect(ghCalls()).toEqual(expectedCalls(REPOSITORY, ['-R', REPOSITORY]));
+    });
+
+    it('without GITHUB_REPOSITORY leaves the repository to gh, which reads it from the checkout', () => {
+      delete process.env.GITHUB_REPOSITORY;
+      const dest = path.join(tmp, 'repo');
+      expect(main(['--dir', dest], { log: () => {} })).toBe(0);
+      expect(ghCalls()).toEqual(expectedCalls('{owner}/{repo}', []));
+    });
   });
 });
 
