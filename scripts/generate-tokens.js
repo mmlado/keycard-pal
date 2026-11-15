@@ -42,16 +42,19 @@ async function main() {
     name: list.name,
     version: list.version,
     timestamp: list.timestamp,
-    tokens: list.tokens.map(t => {
-      const entry = {
-        chainId: t.chainId,
-        address: t.address.toLowerCase(),
-        symbol: t.symbol,
-        decimals: t.decimals,
-      };
-      if (t.logoURI) entry.logoURI = t.logoURI;
-      return entry;
-    }),
+    // Other chains' addresses (Solana's base58 mints) break when lowercased.
+    tokens: list.tokens
+      .filter(t => /^0x[0-9a-fA-F]{40}$/.test(t.address))
+      .map(t => {
+        const entry = {
+          chainId: t.chainId,
+          address: t.address.toLowerCase(),
+          symbol: t.symbol,
+          decimals: t.decimals,
+        };
+        if (t.logoURI) entry.logoURI = t.logoURI;
+        return entry;
+      }),
   };
 
   fs.writeFileSync(OUT, JSON.stringify(trimmed, null, 2) + '\n');

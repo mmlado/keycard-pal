@@ -15,19 +15,14 @@ export type BundledTokenSection = {
   data: BundledToken[];
 };
 
-const EVM_ADDRESS = /^0x[0-9a-f]{40}$/;
-
-// Only an Ethereum address can reach a review.
 const TOKENS: readonly BundledToken[] = (
   tokensData as { tokens: BundledToken[] }
-).tokens
-  .filter(token => EVM_ADDRESS.test(token.address))
-  .map(({ chainId, address, symbol, decimals }) => ({
-    chainId,
-    address,
-    symbol,
-    decimals,
-  }));
+).tokens.map(({ chainId, address, symbol, decimals }) => ({
+  chainId,
+  address,
+  symbol,
+  decimals,
+}));
 
 const SECTIONS: readonly BundledTokenSection[] = (() => {
   const groups = new Map<number, BundledTokenSection>();
