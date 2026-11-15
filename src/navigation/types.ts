@@ -83,6 +83,7 @@ export type RootStackParamList = {
     title?: string;
   };
   Settings: undefined;
+  BundledTokens: undefined;
   CustomTokens: undefined;
   // Add takes what the review already knows; edit names a saved token.
   CustomToken:
@@ -233,6 +234,11 @@ export type LicenseDetailScreenProps = NativeStackScreenProps<
 export type UrlQRScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'UrlQR'
+>;
+
+export type BundledTokensScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'BundledTokens'
 >;
 
 export type CustomTokensScreenProps = NativeStackScreenProps<
