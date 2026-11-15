@@ -10,6 +10,7 @@
  * - Skips IPFS and data URIs.
  * - Skips SVG (React Native Image cannot render SVG via file:// URI).
  * - Skips entries already present in the generated index (idempotent).
+ * - Drops the logo of a token no longer in tokens.json, file and entry.
  * - Fetch errors are silently skipped; those tokens fall back to remote URL.
  *
  * The output is a function of the downloaded bytes alone, so a second run over
@@ -146,6 +147,17 @@ async function main() {
       ? JSON.parse(fs.readFileSync(INDEX_FILE, 'utf8'))
       : {};
 
+  const bundled = new Set(tokens.map(t => `${t.chainId}:${t.address}`));
+  let dropped = 0;
+  for (const [key, ext] of Object.entries(index)) {
+    if (bundled.has(key)) continue;
+    fs.rmSync(path.join(ASSETS_DIR, `${key.replace(':', '-')}.${ext}`), {
+      force: true,
+    });
+    delete index[key];
+    dropped++;
+  }
+
   const candidates = tokens.filter(t => {
     if (!t.logoURI) return false;
     if (t.logoURI.startsWith('ipfs://') || t.logoURI.startsWith('data:'))
@@ -156,7 +168,7 @@ async function main() {
   });
 
   console.log(
-    `${Object.keys(index).length} already cached, ${
+    `${Object.keys(index).length} already cached, ${dropped} dropped, ${
       candidates.length
     } to fetch`,
   );
