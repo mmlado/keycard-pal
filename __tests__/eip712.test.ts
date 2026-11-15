@@ -429,6 +429,60 @@ describe('parseEip712Summary', () => {
     });
   });
 
+  it('decodes a SafeTx that delegate calls a MultiSend batch', () => {
+    const transfer =
+      'a9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604500000000000000000000000000000000000000000000000000000000000f4240';
+    const transactions =
+      '00' +
+      'a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' +
+      '0'.repeat(64) +
+      (transfer.length / 2).toString(16).padStart(64, '0') +
+      transfer;
+    const payload = {
+      types: {
+        EIP712Domain: [
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        SafeTx: [
+          { name: 'to', type: 'address' },
+          { name: 'data', type: 'bytes' },
+          { name: 'operation', type: 'uint8' },
+        ],
+      },
+      primaryType: 'SafeTx',
+      domain: {
+        chainId: 1,
+        verifyingContract: '0x3333333333333333333333333333333333333333',
+      },
+      message: {
+        to: '0x38869bf66a61cf6bdb996a6ae40d5853fd43b526',
+        data:
+          '0x8d80ff0a' +
+          '20'.padStart(64, '0') +
+          (transactions.length / 2).toString(16).padStart(64, '0') +
+          transactions.padEnd(Math.ceil(transactions.length / 64) * 64, '0'),
+        operation: 1,
+      },
+    };
+
+    expect(parseEip712Summary(typedDataHex(payload))?.special).toMatchObject({
+      kind: 'safe-tx',
+      operation: 'Delegate call',
+      decodedCall: {
+        kind: 'multi-send',
+        calls: [
+          {
+            operation: 'call',
+            to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+            value: 0n,
+            data: `0x${transfer}`,
+          },
+        ],
+      },
+    });
+  });
+
   it('does not treat SafeTx typed data without a target as a special review', () => {
     const payload = {
       types: {

@@ -2,6 +2,7 @@ import { RLP } from '@ethereumjs/rlp';
 import {
   encodeAbiParameters,
   encodeFunctionData,
+  encodePacked,
   parseAbi,
   parseAbiParameters,
 } from 'viem';
@@ -652,5 +653,90 @@ describe('decodeCalldata on data that is not whole bytes', () => {
       '0xa9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604500000000000000000000000000000000000000000000000000000000000f4240';
     expect(decodeCalldata(transfer)).not.toBeNull();
     expect(decodeCalldata(transfer.slice(0, -1))).toBeNull();
+  });
+});
+
+describe('decodeCalldata on a Safe MultiSend batch', () => {
+  const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+  const SOME_CONTRACT = '0x000000000000000000000000000000000000c0DE';
+  const RECIPIENT = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+  const TRANSFER =
+    '0xa9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604500000000000000000000000000000000000000000000000000000000000f4240';
+
+  const packed = (operation: number, to: string, value: bigint, data: string) =>
+    encodePacked(
+      ['uint8', 'address', 'uint256', 'uint256', 'bytes'],
+      [
+        operation,
+        to as `0x${string}`,
+        value,
+        BigInt((data.length - 2) / 2),
+        data as `0x${string}`,
+      ],
+    ).slice(2);
+  const multiSend = (transactions: string) =>
+    encodeFunctionData({
+      abi: parseAbi(['function multiSend(bytes transactions)']),
+      args: [`0x${transactions}`],
+    });
+
+  it('splits the batch into its calls', () => {
+    const data = multiSend(
+      packed(0, USDC, 0n, TRANSFER) +
+        packed(1, SOME_CONTRACT, 0n, '0xdeadbeef') +
+        packed(0, RECIPIENT.toLowerCase(), 10n ** 18n, '0x'),
+    );
+    expect(decodeCalldata(data)).toEqual({
+      kind: 'multi-send',
+      calls: [
+        { operation: 'call', to: USDC, value: 0n, data: TRANSFER },
+        {
+          operation: 'delegatecall',
+          to: SOME_CONTRACT,
+          value: 0n,
+          data: '0xdeadbeef',
+        },
+        { operation: 'call', to: RECIPIENT, value: 10n ** 18n, data: '0x' },
+      ],
+    });
+  });
+
+  it('decodes an empty batch to no calls', () => {
+    expect(decodeCalldata(multiSend(''))).toEqual({
+      kind: 'multi-send',
+      calls: [],
+    });
+  });
+
+  it('keeps a batch that does not split into whole calls as written', () => {
+    const first = packed(0, USDC, 0n, TRANSFER);
+    expect(decodeCalldata(multiSend(`${first}00`))).toEqual({
+      kind: 'multi-send',
+      calls: [],
+      malformed: {
+        error: 'The batch ends inside call 2',
+        rawInput: `0x${first}00`,
+      },
+    });
+    expect(decodeCalldata(multiSend(first.slice(0, -2)))).toMatchObject({
+      calls: [],
+      malformed: { error: 'The batch ends inside call 1' },
+    });
+  });
+
+  it('refuses an operation other than call and delegate call', () => {
+    expect(
+      decodeCalldata(multiSend(packed(2, USDC, 0n, TRANSFER))),
+    ).toMatchObject({
+      calls: [],
+      malformed: { error: 'Call 1 has an unknown operation (2)' },
+    });
+  });
+
+  it('names only the selector when the argument is not bytes', () => {
+    expect(decodeCalldata(`0x8d80ff0a${'ff'.repeat(32)}`)).toEqual({
+      kind: 'unknown-call',
+      selector: '0x8d80ff0a',
+    });
   });
 });

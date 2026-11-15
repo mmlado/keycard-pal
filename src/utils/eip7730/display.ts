@@ -427,7 +427,7 @@ export function displayCallSection(
     ];
   }
   return view === 'decoded' && decoded
-    ? displayDecodedCall(decoded, place.contract, place.chainId)
+    ? displayDecodedCall(decoded, place.contract, place.chainId, place.depth)
     : [];
 }
 

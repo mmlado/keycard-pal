@@ -1,8 +1,18 @@
-import { encodeFunctionData, parseAbiItem, type AbiFunction } from 'viem';
+import {
+  encodeFunctionData,
+  encodePacked,
+  parseAbiItem,
+  type AbiFunction,
+} from 'viem';
 
 import { UNLIMITED_APPROVAL_WARNING } from '../src/constants/approval';
 import { MISCASED_ADDRESS_WARNING } from '../src/constants/eip712';
 import { DESCRIPTOR_CHECK_FAILED_WARNING } from '../src/constants/eip7730';
+import {
+  DELEGATE_CALL_WARNING,
+  UNKNOWN_MULTI_SEND_WARNING,
+  ZERO_ADDRESS_CALL_WARNING,
+} from '../src/constants/safe';
 
 import {
   describeCall,
@@ -1257,6 +1267,127 @@ describe('displayDecodedCall', () => {
         ),
       ),
     ).toEqual(['Contract call: 0xdeadbeef']);
+  });
+});
+
+describe('a Safe MultiSend batch', () => {
+  const MULTI_SEND_1_3_0 = '0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761';
+  const MULTI_SEND_1_4_1 = '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526';
+  const MULTI_SEND_1_5_0 = '0x218543288004CD07832472D464648173c77D7eB7';
+
+  type Sub = [operation: number, to: string, value: bigint, data: string];
+  const batch = (calls: Sub[]) =>
+    encode('multiSend(bytes transactions)', [
+      `0x${calls
+        .map(([operation, to, value, data]) =>
+          encodePacked(
+            ['uint8', 'address', 'uint256', 'uint256', 'bytes'],
+            [
+              operation,
+              to as `0x${string}`,
+              value,
+              BigInt((data.length - 2) / 2),
+              data as `0x${string}`,
+            ],
+          ).slice(2),
+        )
+        .join('')}`,
+    ]);
+  const review = (contract: string, data: string) => {
+    const place = { chainId: 1, contract, depth: 0 };
+    return outline(
+      displayCallSection(now(describeCall({ ...place, data })), place),
+    );
+  };
+
+  it('describes every call on its own, a delegate call with a warning', () => {
+    const data = batch([
+      [
+        0,
+        UNKNOWN,
+        0n,
+        encode('transfer(address to, uint256 amount)', [RECIPIENT, 7n]),
+      ],
+      [1, SOME_CONTRACT, 0n, '0xdeadbeef'],
+      [0, RECIPIENT, 10n ** 18n, '0x'],
+    ]);
+    expect(review(MULTI_SEND_1_4_1, data)).toEqual([
+      '# Safe MultiSend',
+      'Call 1 of 3',
+      '  Operation: Call',
+      '  Value: 0',
+      '  # ERC-20 Transfer',
+      `  Token contract: ${UNKNOWN}`,
+      `  Recipient: ${RECIPIENT}`,
+      '  Amount (raw units): 7',
+      'Call 2 of 3',
+      '  Operation: Delegate call',
+      `    ! ${DELEGATE_CALL_WARNING}`,
+      `  Contract: ${SOME_CONTRACT}`,
+      '  Contract call: 0xdeadbeef',
+      '  Data: 0xdeadbeef',
+      'Call 3 of 3',
+      '  Operation: Call',
+      '  Value: 1 ETH',
+      `  Contract: ${RECIPIENT}`,
+      '  Data: —',
+    ]);
+  });
+
+  it('warns on a contract that is not a known MultiSend', () => {
+    expect(review(SOME_CONTRACT, batch([]))).toEqual([
+      '# Safe MultiSend',
+      `! ${UNKNOWN_MULTI_SEND_WARNING}`,
+      'Calls: None',
+    ]);
+  });
+
+  it('warns on a call to the zero address where MultiSend may redirect it', () => {
+    const data = batch([[0, ZERO, 0n, '0x']]);
+    const zeroWarning = `  ! ${ZERO_ADDRESS_CALL_WARNING}`;
+    expect(review(MULTI_SEND_1_5_0, data)).toContain(zeroWarning);
+    expect(review(SOME_CONTRACT, data)).toContain(zeroWarning);
+    expect(review(MULTI_SEND_1_3_0, data)).not.toContain(zeroWarning);
+  });
+
+  it('shows a batch that does not split into whole calls as written', () => {
+    const data = encode('multiSend(bytes transactions)', ['0x00']);
+    expect(review(MULTI_SEND_1_4_1, data)).toEqual([
+      '# Safe MultiSend',
+      '! The batch ends inside call 1',
+      'Transactions: 0x00',
+    ]);
+  });
+
+  it('falls back to ETH and the unknown-contract warning when the place names no chain or contract', () => {
+    const lines = outline(
+      displayDecodedCall(
+        {
+          kind: 'multi-send',
+          calls: [
+            { operation: 'call', to: RECIPIENT, value: 10n ** 18n, data: '0x' },
+          ],
+        },
+        undefined,
+        undefined,
+      ),
+    );
+    expect(lines).toContain(`! ${UNKNOWN_MULTI_SEND_WARNING}`);
+    expect(lines).toContain('  Value: 1 ETH');
+  });
+
+  it('stops decoding nested batches at the call depth limit', () => {
+    let data = batch([[0, RECIPIENT, 1n, '0x']]);
+    for (let i = 0; i < 4; i++) {
+      data = batch([[0, MULTI_SEND_1_4_1, 0n, data]]);
+    }
+    const lines = review(MULTI_SEND_1_4_1, data);
+    expect(
+      lines.filter(line => line.endsWith('# Safe MultiSend')),
+    ).toHaveLength(4);
+    expect(
+      lines.filter(line => line.endsWith('Contract call: 0x8d80ff0a')),
+    ).toHaveLength(1);
   });
 });
 
