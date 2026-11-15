@@ -9,7 +9,7 @@ import { ALL_GENERATIONS } from '../src/utils/cardGeneration';
 
 // Routes 4.0 took away. BIP85, which 4.0 added, has its own block below.
 const ROUTES = ['PairingSlots', 'ChangePairingSecret'] as const;
-const ALL_ROUTES = [...ROUTES, 'Bip85'] as const;
+const ALL_ROUTES = [...ROUTES, 'Bip85', 'InstallLock'] as const;
 
 // What the user said about their cards. Only ever decides what a menu draws.
 describe('isRouteHidden', () => {
@@ -63,26 +63,30 @@ describe('cardHasRoute', () => {
 });
 
 // The first destination a generation added rather than took away.
-describe('Bip85', () => {
+describe.each(['Bip85', 'InstallLock'] as const)('%s', route => {
   it('is hidden when only 3.x cards are ticked', () => {
-    expect(isRouteHidden('Bip85', ['3.1'])).toBe(true);
+    expect(isRouteHidden(route, ['3.1'])).toBe(true);
   });
 
   it('shows as long as a 4.x card is ticked', () => {
-    expect(isRouteHidden('Bip85', ['4.0'])).toBe(false);
-    expect(isRouteHidden('Bip85', ['3.1', '4.0'])).toBe(false);
-    expect(isRouteHidden('Bip85', [])).toBe(false);
+    expect(isRouteHidden(route, ['4.0'])).toBe(false);
+    expect(isRouteHidden(route, ['3.1', '4.0'])).toBe(false);
+    expect(isRouteHidden(route, [])).toBe(false);
   });
 
   it('is on every card in use only when only 4.x cards are ticked', () => {
-    expect(everyCardInUseHasRoute('Bip85', ['4.0'])).toBe(true);
-    expect(everyCardInUseHasRoute('Bip85', ['3.1', '4.0'])).toBe(false);
-    expect(everyCardInUseHasRoute('Bip85', ['3.1'])).toBe(false);
+    expect(everyCardInUseHasRoute(route, ['4.0'])).toBe(true);
+    expect(everyCardInUseHasRoute(route, ['3.1', '4.0'])).toBe(false);
+    expect(everyCardInUseHasRoute(route, ['3.1'])).toBe(false);
   });
 
   it('is on a 4.0 card and not on a 3.1 card', () => {
-    expect(cardHasRoute('Bip85', '4.0')).toBe(true);
-    expect(cardHasRoute('Bip85', '3.1')).toBe(false);
+    expect(cardHasRoute(route, '4.0')).toBe(true);
+    expect(cardHasRoute(route, '3.1')).toBe(false);
+  });
+
+  it('sends a 3.1 card to a newer one', () => {
+    expect(cardPredatesRoute(route, '3.1')).toBe(true);
   });
 });
 
