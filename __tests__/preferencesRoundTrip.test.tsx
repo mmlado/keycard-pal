@@ -54,6 +54,11 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
+// The ios project resolves the iOS file, where the switch is not drawn.
+jest.mock('../src/utils/installLockSupport', () => ({
+  INSTALL_LOCK_SUPPORTED: true,
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

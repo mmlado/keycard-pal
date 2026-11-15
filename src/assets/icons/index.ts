@@ -75,6 +75,11 @@ export const Icons = {
   secrets: mdi('shield-lock-outline', onSurface),
   pairingSlots: mdi('cellphone-link', onSurface),
   factoryReset: mdi('restore', onSurface),
+  developerCards: mdi('developer-board', onSurface),
+  lockInstalls: mdi('lock-outline', onSurface),
+  unlockInstalls: mdi('lock-open-outline', onSurface),
+  radioOn: mdi('radiobox-marked', theme.colors.primary),
+  radioOff: mdi('radiobox-blank', onSurface),
   bip85: mdi('file-tree-outline', onSurface),
 
   // Key pair menu. The phrase icons mark length only.

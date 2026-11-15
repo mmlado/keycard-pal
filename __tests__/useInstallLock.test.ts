@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 import { readFileSync } from 'fs';
 import { APDUCommand } from 'keycard-sdk/dist/apdu-command';
 import { APDUResponse } from 'keycard-sdk/dist/apdu-response';

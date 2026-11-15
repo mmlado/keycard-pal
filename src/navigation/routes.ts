@@ -44,6 +44,9 @@ import Slip39Screen from '../screens/keypair/Slip39Screen';
 
 // BIP85 screens
 import Bip85MenuScreen from '../screens/bip85/Bip85MenuScreen';
+import DeveloperCardsMenuScreen from '../screens/developerCards/DeveloperCardsMenuScreen';
+import LockInstallsScreen from '../screens/developerCards/LockInstallsScreen';
+import UnlockInstallsScreen from '../screens/developerCards/UnlockInstallsScreen';
 import Bip85Screen from '../screens/bip85/Bip85Screen';
 
 // Secrets screens
@@ -135,6 +138,23 @@ export const routes: Route[] = [
   {
     name: 'Slip39',
     component: Slip39Screen,
+    options: defaultHeaderOptions,
+  },
+
+  // Developer cards (ADR-0018)
+  {
+    name: 'DeveloperCardsMenu',
+    component: DeveloperCardsMenuScreen,
+    options: { ...defaultHeaderOptions, title: 'Developer cards' },
+  },
+  {
+    name: 'LockInstalls',
+    component: LockInstallsScreen,
+    options: defaultHeaderOptions,
+  },
+  {
+    name: 'UnlockInstalls',
+    component: UnlockInstallsScreen,
     options: defaultHeaderOptions,
   },
 

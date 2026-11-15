@@ -7,6 +7,10 @@ import theme from '@/theme';
 
 import EntryList, { EntryListItem } from '@/components/EntryList';
 
+import { usePreferences } from '@/hooks/usePreferences';
+
+import { INSTALL_LOCK_SUPPORTED } from '@/utils/installLockSupport';
+
 export const dashboardEntry: DashboardAction = {
   label: 'Keycard',
   icon: Icons.keycard,
@@ -17,6 +21,7 @@ export default function KeycardMenuScreen({
   navigation,
 }: KeycardMenuScreenProps) {
   const insets = useSafeAreaInsets();
+  const { preferences } = usePreferences();
   const entries: EntryListItem[] = [
     {
       label: 'Initialize',
@@ -58,6 +63,14 @@ export default function KeycardMenuScreen({
       onPress: () => navigation.navigate('FactoryReset'),
     },
   ];
+  if (INSTALL_LOCK_SUPPORTED && preferences.developerCardOptions === 'shown') {
+    entries.push({
+      label: 'Developer cards',
+      icon: Icons.developerCards,
+      generationBoundRoute: 'InstallLock',
+      onPress: () => navigation.navigate('DeveloperCardsMenu'),
+    });
+  }
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>

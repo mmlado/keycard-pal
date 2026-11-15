@@ -11,6 +11,13 @@ jest.mock('react-native-paper', () => {
   return { MD3DarkTheme: { colors: {} }, Text };
 });
 
+let mockInstallLockSupported = true;
+jest.mock('../src/utils/installLockSupport', () => ({
+  get INSTALL_LOCK_SUPPORTED() {
+    return mockInstallLockSupported;
+  },
+}));
+
 const mockLoadPreferences = jest.fn();
 const mockSavePreference = jest.fn();
 
@@ -31,6 +38,7 @@ function stored(developerCardOptions: DeveloperCardOptions) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockInstallLockSupported = true;
   stored('unset');
   mockSavePreference.mockResolvedValue(undefined);
 });
@@ -83,5 +91,12 @@ describe('DeveloperCardsSettingsSection', () => {
       'developerCardOptions',
       'hidden',
     );
+  });
+
+  it('renders nothing where the install lock is not supported', async () => {
+    mockInstallLockSupported = false;
+    stored('shown');
+    await renderSection();
+    expect(screen.queryByRole('switch')).toBeNull();
   });
 });

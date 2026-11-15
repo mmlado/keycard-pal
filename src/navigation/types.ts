@@ -64,6 +64,9 @@ export type RootStackParamList = {
   Bip85Menu: undefined;
   Bip85: { format: Bip85Format };
   FactoryReset: undefined;
+  DeveloperCardsMenu: undefined;
+  LockInstalls: undefined;
+  UnlockInstalls: undefined;
   PairingSlots: undefined;
   AddressMenu: undefined;
   AddressList: { coin: 'btc' | 'eth' };
@@ -195,6 +198,21 @@ export type AddressListScreenProps = NativeStackScreenProps<
 export type AddressDetailScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'AddressDetail'
+>;
+
+export type DeveloperCardsMenuScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'DeveloperCardsMenu'
+>;
+
+export type LockInstallsScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'LockInstalls'
+>;
+
+export type UnlockInstallsScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'UnlockInstalls'
 >;
 
 export type Bip85MenuScreenProps = NativeStackScreenProps<
