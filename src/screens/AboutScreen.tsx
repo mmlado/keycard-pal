@@ -60,6 +60,20 @@ export default function AboutScreen({ navigation }: AboutScreenProps) {
 
       <Text style={styles.description}>{KEYCARD_SUPPORT_STATEMENT}</Text>
 
+      <Pressable
+        style={styles.howItWorks}
+        accessibilityRole="button"
+        onPress={() => navigation.navigate('HowItWorks')}
+        testID="about-how-it-works"
+      >
+        <Text style={styles.projectLinkText}>How it works</Text>
+        <Icons.chevronRight
+          width={20}
+          height={20}
+          color={theme.colors.onSurface}
+        />
+      </Pressable>
+
       <View style={styles.projectLinkRow}>
         <Pressable
           style={styles.projectLink}
@@ -124,6 +138,14 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: theme.colors.onSurfaceVariant,
     textAlign: 'center',
+  },
+  howItWorks: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   projectLinkRow: {
     alignSelf: 'center',

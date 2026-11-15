@@ -1,6 +1,8 @@
 import React from 'react';
 import { Linking } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 import WelcomeScreen from '../src/screens/WelcomeScreen';
 
@@ -22,18 +24,7 @@ jest.mock('react-native-paper', () => {
   };
 });
 
-jest.mock('../src/assets/icons', () => {
-  const { View } = require('react-native');
-  const Icon = (props: any) => <View {...props} />;
-  return {
-    Icons: {
-      keycardPal: Icon,
-      nfcActivate: Icon,
-      openInBrowser: Icon,
-      qr: Icon,
-    },
-  };
-});
+jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // Get started writes the flag through the preferences context.
 const mockSetPreference = jest.fn().mockResolvedValue(undefined);
@@ -97,7 +88,51 @@ describe('WelcomeScreen', () => {
     ).toBeTruthy();
     expect(screen.getByText('Keys stay in hardware')).toBeTruthy();
     expect(screen.getByText('Air-gapped by design')).toBeTruthy();
-    expect(screen.getByText('Sign with a tap')).toBeTruthy();
+  });
+
+  it('follows the introduction with the three steps, each with its position', () => {
+    render(<WelcomeScreen navigation={navigation} route={route} />);
+
+    expect(screen.getByText('Step 1 of 3')).toBeTruthy();
+    expect(screen.getByText('Set up your Keycard')).toBeTruthy();
+    expect(
+      screen.getByText(/In Keycard, Initialize sets its PIN, and Key pair/),
+    ).toBeTruthy();
+    expect(screen.getByText('Step 2 of 3')).toBeTruthy();
+    expect(screen.getByText('Connect your wallet')).toBeTruthy();
+    expect(screen.getByText(/In Connect software wallet, pick/)).toBeTruthy();
+    expect(screen.getByText('Step 3 of 3')).toBeTruthy();
+    expect(screen.getAllByText('Sign with a tap')).toHaveLength(2);
+    expect(screen.getByText(/press Scan\. Check what you are/)).toBeTruthy();
+  });
+
+  it('gives the pager one dot per slide, named for a screen reader', () => {
+    render(<WelcomeScreen navigation={navigation} route={route} />);
+
+    expect(screen.getByLabelText('Welcome')).toBeTruthy();
+    expect(screen.getByLabelText('Step 1 of 3')).toBeTruthy();
+    expect(screen.getByLabelText('Step 3 of 3')).toBeTruthy();
+    expect(screen.queryByTestId('slide-dot-4')).toBeNull();
+  });
+
+  // Literals: a step must name each entry exactly as its menu shows it.
+  it('names entries that exist under those labels', () => {
+    const source = (file: string) =>
+      readFileSync(join(__dirname, '..', 'src', file), 'utf8');
+
+    expect(source('screens/KeycardMenuScreen.tsx')).toContain(
+      "label: 'Keycard'",
+    );
+    expect(source('screens/KeycardMenuScreen.tsx')).toContain(
+      "label: 'Initialize'",
+    );
+    expect(source('screens/KeycardMenuScreen.tsx')).toContain(
+      "label: 'Key pair'",
+    );
+    expect(source('screens/ExportKeyScreen.tsx')).toContain(
+      "label: 'Connect software wallet'",
+    );
+    expect(source('screens/DashboardScreen.tsx')).toContain('label="Scan"');
   });
 
   it('marks welcome as seen and replaces with Dashboard on Get started', () => {

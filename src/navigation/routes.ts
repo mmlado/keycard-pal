@@ -11,6 +11,7 @@ import BundledTokensScreen from '../screens/BundledTokensScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import ExportKeyScreen from '../screens/ExportKeyScreen';
 import FactoryResetScreen from '../screens/FactoryResetScreen';
+import HowItWorksScreen from '../screens/HowItWorksScreen';
 import InitCardScreen from '../screens/InitCardScreen';
 import KeycardMenuScreen from '../screens/KeycardMenuScreen';
 import KeycardScreen from '../screens/KeycardScreen';
@@ -206,6 +207,11 @@ export const routes: Route[] = [
     name: 'About',
     component: AboutScreen,
     options: { ...defaultHeaderOptions, title: 'About' },
+  },
+  {
+    name: 'HowItWorks',
+    component: HowItWorksScreen,
+    options: { ...defaultHeaderOptions, title: 'How it works' },
   },
   {
     name: 'LicenseDetail',
