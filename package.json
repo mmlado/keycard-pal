@@ -57,7 +57,7 @@
     "@scure/bip39": "^2.0.1",
     "@walletconnect/core": "github:mmlado/walletconnect-core#2e1675b9f4cf828fea773f45915a2fd82103e03f",
     "@walletconnect/react-native-compat": "2.21.8",
-    "bitcoinjs-lib": "^6.1.7",
+    "bitcoinjs-lib": "^6.1.10",
     "fast-text-encoding": "1.0.6",
     "fflate": "^0.8.3",
     "keycard-sdk": "^4.0.1",
