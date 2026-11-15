@@ -198,7 +198,25 @@ _Avoid_: Card public key, device key
 - **Card key** is used for trust decisions. The key UID, not the **Card key**, identifies the key material on a card, so anything about derived keys is keyed on the key UID.
 - A card's **Generation** is knowable from the first SELECT of a tap, before any PIN, which is what lets an operation a card does not support fail before asking for anything.
 
+**Card manager key**:
+The secret a card's card manager asks for before it installs, replaces or removes an applet. One per card, apart from the PIN, the PUK and anything the applet holds.
+_Avoid_: ISD key, GP key, SCP key
+
+**Developer card**:
+A Keycard whose **Card manager key** its owner holds: a published key, as on a card sold to load applets onto, or one set by **Install lock**. A card stays a Developer card while it is locked. A retail Keycard, whose card manager key only the manufacturer holds, is not one.
+_Avoid_: Dev card, test card, unfused card, unverified card
+
+**Install lock**:
+The state of a card whose **Card manager key** has been replaced by one derived from the key pair the card holds, so that only someone with the card's PIN can install, replace or remove an applet. Shown to the user as "Lock applet installs" and "Unlock applet installs".
+_Avoid_: ISD lock, card lock, applet lock
+
+## Developer card relationships
+
+- **Install lock** is a state of a **Developer card**; a retail Keycard never enters it.
+- Being a **Developer card** and being genuine are separate questions: one is about the **Card manager key**, the other about the certificate.
+
 ## Flagged ambiguities
 
 - "online version" means **Online build** when discussing implementation and packaging boundaries.
 - "stateless" does not mean zero storage — see **Stateless session**. Settings and pairings persist; per-card identity does not.
+- "lock" on a card means **Install lock**. It is never a **Blocked PIN**, and never GlobalPlatform's locked card state, which stops every applet on the card.
