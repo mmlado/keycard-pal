@@ -65,8 +65,7 @@ export type DecodedCall =
   | {
       kind: 'multi-send';
       calls: MultiSendCall[];
-      error?: string;
-      rawInput?: string;
+      malformed?: { error: string; rawInput: string };
     }
   | { kind: 'unknown-call'; selector: string };
 
@@ -261,8 +260,7 @@ function decodeMultiSend(transactions: string): DecodedCall {
   const malformed = (error: string): DecodedCall => ({
     kind: 'multi-send',
     calls: [],
-    error,
-    rawInput: transactions,
+    malformed: { error, rawInput: transactions },
   });
   const calls: MultiSendCall[] = [];
   for (let i = 0; i < bytes.length; ) {

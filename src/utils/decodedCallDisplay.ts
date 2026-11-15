@@ -130,10 +130,10 @@ function displayMultiSend(
   if (!version) {
     nodes.push({ kind: 'warning', text: UNKNOWN_MULTI_SEND_WARNING });
   }
-  if (call.error) {
+  if (call.malformed) {
     nodes.push(
-      { kind: 'warning', text: call.error },
-      textRow('Transactions', call.rawInput ?? '—'),
+      { kind: 'warning', text: call.malformed.error },
+      textRow('Transactions', call.malformed.rawInput),
     );
     return nodes;
   }

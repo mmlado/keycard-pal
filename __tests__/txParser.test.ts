@@ -713,12 +713,14 @@ describe('decodeCalldata on a Safe MultiSend batch', () => {
     expect(decodeCalldata(multiSend(`${first}00`))).toEqual({
       kind: 'multi-send',
       calls: [],
-      error: 'The batch ends inside call 2',
-      rawInput: `0x${first}00`,
+      malformed: {
+        error: 'The batch ends inside call 2',
+        rawInput: `0x${first}00`,
+      },
     });
     expect(decodeCalldata(multiSend(first.slice(0, -2)))).toMatchObject({
       calls: [],
-      error: 'The batch ends inside call 1',
+      malformed: { error: 'The batch ends inside call 1' },
     });
   });
 
@@ -727,7 +729,7 @@ describe('decodeCalldata on a Safe MultiSend batch', () => {
       decodeCalldata(multiSend(packed(2, USDC, 0n, TRANSFER))),
     ).toMatchObject({
       calls: [],
-      error: 'Call 1 has an unknown operation (2)',
+      malformed: { error: 'Call 1 has an unknown operation (2)' },
     });
   });
 

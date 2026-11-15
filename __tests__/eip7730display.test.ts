@@ -1359,6 +1359,23 @@ describe('a Safe MultiSend batch', () => {
     ]);
   });
 
+  it('falls back to ETH and the unknown-contract warning when the place names no chain or contract', () => {
+    const lines = outline(
+      displayDecodedCall(
+        {
+          kind: 'multi-send',
+          calls: [
+            { operation: 'call', to: RECIPIENT, value: 10n ** 18n, data: '0x' },
+          ],
+        },
+        undefined,
+        undefined,
+      ),
+    );
+    expect(lines).toContain(`! ${UNKNOWN_MULTI_SEND_WARNING}`);
+    expect(lines).toContain('  Value: 1 ETH');
+  });
+
   it('stops decoding nested batches at the call depth limit', () => {
     let data = batch([[0, RECIPIENT, 1n, '0x']]);
     for (let i = 0; i < 4; i++) {
