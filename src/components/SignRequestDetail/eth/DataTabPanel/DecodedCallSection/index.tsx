@@ -7,12 +7,16 @@ export default function DecodedCallSection({
   call,
   tokenContract,
   chainId,
+  depth = 0,
 }: {
   call: DecodedCall;
   tokenContract?: string;
   chainId?: number;
+  depth?: number;
 }) {
   return (
-    <DisplayNodes nodes={displayDecodedCall(call, tokenContract, chainId)} />
+    <DisplayNodes
+      nodes={displayDecodedCall(call, tokenContract, chainId, depth)}
+    />
   );
 }

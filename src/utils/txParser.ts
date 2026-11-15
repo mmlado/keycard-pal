@@ -62,9 +62,25 @@ export type DecodedCall =
       highRisk?: boolean;
       risk?: string;
     }
+  | {
+      kind: 'multi-send';
+      calls: MultiSendCall[];
+      error?: string;
+      rawInput?: string;
+    }
   | { kind: 'unknown-call'; selector: string };
 
+export type MultiSendCall = {
+  operation: 'call' | 'delegatecall';
+  to: string;
+  value: bigint;
+  data: string;
+};
+
 const selectors = (selectorsData as SelectorsData).selectors;
+
+const MULTI_SEND_SELECTOR = '0x8d80ff0a';
+const MULTI_SEND_HEADER = 1 + 20 + 32 + 32;
 
 const UNIVERSAL_ROUTER_COMMAND_MASK = 0x1f;
 const UNIVERSAL_ROUTER_ALLOW_REVERT = 0x80;
@@ -237,6 +253,46 @@ function decodeUniversalRouterExecute(
   };
 }
 
+// The contract checks none of this framing and reads past the end of a short batch.
+function decodeMultiSend(transactions: string): DecodedCall {
+  const bytes = Buffer.from(transactions.slice(2), 'hex');
+  const word = (at: number) =>
+    BigInt(`0x${bytes.subarray(at, at + 32).toString('hex')}`);
+  const malformed = (error: string): DecodedCall => ({
+    kind: 'multi-send',
+    calls: [],
+    error,
+    rawInput: transactions,
+  });
+  const calls: MultiSendCall[] = [];
+  for (let i = 0; i < bytes.length; ) {
+    const n = calls.length + 1;
+    if (bytes.length - i < MULTI_SEND_HEADER) {
+      return malformed(`The batch ends inside call ${n}`);
+    }
+    const operation = bytes[i];
+    if (operation > 1) {
+      return malformed(`Call ${n} has an unknown operation (${operation})`);
+    }
+    const start = i + MULTI_SEND_HEADER;
+    const dataLength = word(i + 53);
+    if (dataLength > BigInt(bytes.length - start)) {
+      return malformed(`The batch ends inside call ${n}`);
+    }
+    const end = start + Number(dataLength);
+    calls.push({
+      operation: operation === 0 ? 'call' : 'delegatecall',
+      to: checksumEthAddress(
+        `0x${bytes.subarray(i + 1, i + 21).toString('hex')}`,
+      ),
+      value: word(i + 21),
+      data: `0x${bytes.subarray(start, end).toString('hex')}`,
+    });
+    i = end;
+  }
+  return { kind: 'multi-send', calls };
+}
+
 function toSpecializedDecodedCall(
   entry: SelectorEntry,
   decodedArgs: readonly unknown[],
@@ -276,12 +332,24 @@ export function decodeCalldata(dataHex: string): DecodedCall | null {
   if (!isWholeBytes(dataHex)) return null;
 
   const selector = dataHex.slice(0, 10).toLowerCase();
+  const encodedArgs = `0x${dataHex.slice(10)}` as `0x${string}`;
+  if (selector === MULTI_SEND_SELECTOR) {
+    try {
+      const [transactions] = decodeAbiParameters(
+        [{ type: 'bytes' }],
+        encodedArgs,
+      );
+      return decodeMultiSend(transactions);
+    } catch {
+      return { kind: 'unknown-call', selector };
+    }
+  }
+
   const entries = selectors[selector];
   if (!entries) {
     return { kind: 'unknown-call', selector };
   }
 
-  const encodedArgs = `0x${dataHex.slice(10)}` as `0x${string}`;
   for (const entry of entries) {
     try {
       const decodedArgs = decodeAbiParameters(entry.args, encodedArgs);
@@ -333,7 +401,7 @@ function bufToHex(b: Uint8Array): string {
   return '0x' + Buffer.from(b).toString('hex');
 }
 
-function weiToNative(wei: bigint, symbol: string): string {
+export function weiToNative(wei: bigint, symbol: string): string {
   if (wei === 0n) {
     return '0';
   }

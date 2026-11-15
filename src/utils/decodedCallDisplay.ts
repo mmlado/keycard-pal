@@ -1,14 +1,30 @@
 import { UNLIMITED_APPROVAL_WARNING } from '@/constants/approval';
+import {
+  DELEGATE_CALL_WARNING,
+  SAFE_MULTI_SEND_VERSIONS,
+  UNKNOWN_MULTI_SEND_WARNING,
+  ZERO_ADDRESS_CALL_WARNING,
+} from '@/constants/safe';
 
+import { getNativeCurrencySymbol } from '@/utils/chainMetadata';
 import { customTokenRemarks } from '@/utils/customTokenChecks';
-import type { DisplayNode, DisplayRow } from '@/utils/eip7730/display';
+import type {
+  CallPlace,
+  DisplayNode,
+  DisplayRow,
+} from '@/utils/eip7730/display';
 import { checksumEthAddress } from '@/utils/ethereumAddress';
 import {
   formatTokenAmount,
   lookupToken,
   type TokenMetadata,
 } from '@/utils/tokenMetadata';
-import type { DecodedCall, DecodedCallArg } from '@/utils/txParser';
+import {
+  weiToNative,
+  type DecodedCall,
+  type DecodedCallArg,
+  type MultiSendCall,
+} from '@/utils/txParser';
 
 const UINT256_MAX = 2n ** 256n - 1n;
 
@@ -62,10 +78,83 @@ export function tokenContractRows(
   ];
 }
 
+function multiSendItem(
+  sub: MultiSendCall,
+  index: number,
+  count: number,
+  place: CallPlace,
+  zeroIsSafe: boolean,
+): DisplayNode {
+  const isCall = sub.operation === 'call';
+  const symbol =
+    place.chainId === undefined
+      ? 'ETH'
+      : getNativeCurrencySymbol(place.chainId);
+  return {
+    kind: 'item',
+    title: `Call ${index + 1} of ${count}`,
+    nodes: [
+      isCall
+        ? textRow('Operation', 'Call')
+        : {
+            ...textRow('Operation', 'Delegate call'),
+            warnings: [DELEGATE_CALL_WARNING],
+          },
+      // A delegate call carries no value.
+      ...(isCall ? [textRow('Value', weiToNative(sub.value, symbol))] : []),
+      ...(zeroIsSafe && /^0x0{40}$/.test(sub.to)
+        ? [{ kind: 'warning' as const, text: ZERO_ADDRESS_CALL_WARNING }]
+        : []),
+      {
+        kind: 'call',
+        request: {
+          chainId: place.chainId,
+          contract: sub.to,
+          data: sub.data,
+          ...(isCall && { value: sub.value.toString() }),
+          depth: place.depth + 1,
+        },
+      },
+    ],
+  };
+}
+
+function displayMultiSend(
+  call: Extract<DecodedCall, { kind: 'multi-send' }>,
+  place: CallPlace,
+): DisplayNode[] {
+  const version = place.contract
+    ? SAFE_MULTI_SEND_VERSIONS.get(place.contract.toLowerCase())
+    : undefined;
+  const nodes: DisplayNode[] = [{ kind: 'section', title: 'Safe MultiSend' }];
+  if (!version) {
+    nodes.push({ kind: 'warning', text: UNKNOWN_MULTI_SEND_WARNING });
+  }
+  if (call.error) {
+    nodes.push(
+      { kind: 'warning', text: call.error },
+      textRow('Transactions', call.rawInput ?? '—'),
+    );
+    return nodes;
+  }
+  if (call.calls.length === 0) {
+    nodes.push(textRow('Calls', 'None'));
+  }
+  // Before 1.5.0 the zero address is called as written.
+  const zeroIsSafe = !version || version === '1.5.0';
+  return [
+    ...nodes,
+    ...call.calls.map((sub, i) =>
+      multiSendItem(sub, i, call.calls.length, place, zeroIsSafe),
+    ),
+  ];
+}
+
 export function displayDecodedCall(
   call: DecodedCall,
   tokenContract: string | undefined,
   chainId: number | undefined,
+  depth = 0,
 ): DisplayNode[] {
   switch (call.kind) {
     case 'erc20-transfer': {
@@ -149,6 +238,12 @@ export function displayDecodedCall(
           }),
         ),
       ];
+    case 'multi-send':
+      return displayMultiSend(call, {
+        chainId,
+        contract: tokenContract,
+        depth,
+      });
     case 'unknown-call':
       return [textRow('Contract call', call.selector)];
   }

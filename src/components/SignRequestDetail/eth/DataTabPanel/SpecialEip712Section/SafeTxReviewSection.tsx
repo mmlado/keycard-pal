@@ -66,6 +66,7 @@ export default function SafeTxReviewSection({
           call={special.decodedCall}
           tokenContract={special.to}
           chainId={chainId}
+          depth={1}
         />
       ) : (
         special.data && (

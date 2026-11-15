@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react-native';
 import React from 'react';
 
+import { DELEGATE_CALL_WARNING } from '../src/constants/safe';
+
 import DecodedCallSection from '../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection';
 
 import { checksumEthAddress } from '../src/utils/ethereumAddress';
@@ -276,6 +278,38 @@ describe('DecodedCallSection', () => {
       };
       render(<DecodedCallSection call={call} />);
       expect(screen.getByText('Failed to decode commands')).toBeTruthy();
+    });
+  });
+
+  describe('multi-send', () => {
+    it('describes each call of the batch below the Safe it runs in', () => {
+      const call: DecodedCall = {
+        kind: 'multi-send',
+        calls: [
+          {
+            operation: 'delegatecall',
+            to: ADDR_A,
+            value: 0n,
+            data: '0xdeadbeef',
+          },
+        ],
+      };
+      render(
+        <DecodedCallSection
+          call={call}
+          tokenContract="0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
+          chainId={MAINNET}
+          depth={1}
+        />,
+      );
+      expect(screen.getByText('Safe MultiSend')).toBeTruthy();
+      expect(screen.getByText('Call 1 of 1')).toBeTruthy();
+      expect(screen.getByText('Operation: Delegate call')).toBeTruthy();
+      expect(screen.getByText(DELEGATE_CALL_WARNING)).toBeTruthy();
+      expect(
+        screen.getByText(`Contract: ${checksumEthAddress(ADDR_A)}`),
+      ).toBeTruthy();
+      expect(screen.getByText('Data: 0xdeadbeef')).toBeTruthy();
     });
   });
 
