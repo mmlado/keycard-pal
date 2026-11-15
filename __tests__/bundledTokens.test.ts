@@ -10,13 +10,9 @@ const all = () => bundledTokenSections('', null);
 const tokens = () => all().flatMap(section => section.data);
 
 describe('bundledTokenSections', () => {
-  it('holds every bundled token with an Ethereum address', () => {
-    const evm = tokensData.tokens.filter(t =>
-      /^0x[0-9a-f]{40}$/.test(t.address),
-    );
-    expect(tokens()).toHaveLength(evm.length);
-    expect(BUNDLED_TOKEN_COUNT).toBe(evm.length);
-    expect(tokens().every(t => /^0x[0-9a-f]{40}$/.test(t.address))).toBe(true);
+  it('holds every bundled token', () => {
+    expect(tokens()).toHaveLength(tokensData.tokens.length);
+    expect(BUNDLED_TOKEN_COUNT).toBe(tokensData.tokens.length);
   });
 
   it('groups by chain name and sorts symbols within each chain', () => {
