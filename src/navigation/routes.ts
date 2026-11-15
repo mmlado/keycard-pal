@@ -7,6 +7,7 @@ import { onlineRoutes } from './onlineRoutes.online';
 
 // Top-level screens
 import AboutScreen from '../screens/AboutScreen';
+import BundledTokensScreen from '../screens/BundledTokensScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import ExportKeyScreen from '../screens/ExportKeyScreen';
 import FactoryResetScreen from '../screens/FactoryResetScreen';
@@ -220,6 +221,11 @@ export const routes: Route[] = [
     name: 'Settings',
     component: SettingsScreen,
     options: { ...defaultHeaderOptions, title: 'Settings' },
+  },
+  {
+    name: 'BundledTokens',
+    component: BundledTokensScreen,
+    options: { ...defaultHeaderOptions, title: 'Bundled tokens' },
   },
   {
     name: 'CustomTokens',

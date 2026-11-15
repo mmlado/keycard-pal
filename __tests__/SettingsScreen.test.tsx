@@ -8,6 +8,7 @@ import {
   KEYCARD_PURCHASE_URL,
 } from '../src/constants/purchaseLink';
 
+import { BUNDLED_TOKEN_COUNT } from '../src/utils/bundledTokens';
 import { setCustomTokens } from '../src/utils/customTokens';
 
 import { testPreferences as mockTestPreferences } from './preferences.testUtils';
@@ -200,6 +201,15 @@ describe('SettingsScreen', () => {
     fireEvent.press(screen.getByText('Custom tokens'));
     expect(navigation.navigate).toHaveBeenCalledWith('CustomTokens');
     setCustomTokens([]);
+  });
+
+  it('opens the bundled tokens from their row, which counts them', () => {
+    renderScreen();
+    expect(
+      screen.getByLabelText(`Bundled tokens, ${BUNDLED_TOKEN_COUNT}`),
+    ).toBeTruthy();
+    fireEvent.press(screen.getByText('Bundled tokens'));
+    expect(navigation.navigate).toHaveBeenCalledWith('BundledTokens');
   });
 
   // For the user who would rather tap a card than read applet versions.
