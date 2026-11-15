@@ -74,6 +74,7 @@ export type RootStackParamList = {
     description?: string; // explanatory copy rendered above the QR code
   };
   About: undefined;
+  HowItWorks: undefined;
   LicenseDetail: {
     packageName: string;
     licenseType: string;
