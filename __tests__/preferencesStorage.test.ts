@@ -27,6 +27,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 const KEYS = {
   dashboardLayout: 'preference_dashboard_layout',
+  developerCardOptions: 'preference_developer_card_options',
   generationsInUse: 'preference_generations_in_use',
   generationRemindersDismissed: 'preference_generation_reminders_dismissed',
   pinPadScramble: 'preference_pinpad_scramble',
@@ -70,6 +71,7 @@ describe('loadPreferences', () => {
   it('decodes every stored value', async () => {
     stored({
       [KEYS.dashboardLayout]: 'list',
+      [KEYS.developerCardOptions]: 'hidden',
       [KEYS.generationsInUse]: '4.0',
       [KEYS.generationRemindersDismissed]: '3.1',
       [KEYS.pinPadScramble]: '1',
@@ -79,6 +81,7 @@ describe('loadPreferences', () => {
     });
     expect(await loadPreferences()).toEqual({
       dashboardLayout: 'list',
+      developerCardOptions: 'hidden',
       generationsInUse: ['4.0'],
       generationRemindersDismissed: ['3.1'],
       pinPadScramble: true,
@@ -99,6 +102,16 @@ describe('loadPreferences', () => {
   it('reads anything but "list" as tiles', async () => {
     stored({ [KEYS.dashboardLayout]: 'grid' });
     expect((await loadPreferences()).dashboardLayout).toBe('tiles');
+  });
+
+  it.each([
+    ['shown', 'shown'],
+    ['hidden', 'hidden'],
+    ['1', 'unset'],
+    ['', 'unset'],
+  ])('reads the developer card options %p as %p', async (value, expected) => {
+    stored({ [KEYS.developerCardOptions]: value });
+    expect((await loadPreferences()).developerCardOptions).toBe(expected);
   });
 
   // An unrecognised selection leaves nothing out.
@@ -178,6 +191,14 @@ describe('savePreference', () => {
 
     await savePreference('dashboardLayout', 'tiles');
     expect(mockSetItem).toHaveBeenCalledWith(KEYS.dashboardLayout, 'tiles');
+  });
+
+  it('stores the developer card options verbatim', async () => {
+    await savePreference('developerCardOptions', 'hidden');
+    expect(mockSetItem).toHaveBeenCalledWith(
+      KEYS.developerCardOptions,
+      'hidden',
+    );
   });
 
   it('stores a list of generations comma-separated', async () => {

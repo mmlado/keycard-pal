@@ -10,6 +10,7 @@ import KeyboardAwareScrollView from '@/components/KeyboardAwareScrollView';
 import BundledTokensSettingsSection from '@/components/settings/BundledTokensSettingsSection';
 import CustomTokensSettingsSection from '@/components/settings/CustomTokensSettingsSection';
 import DashboardLayoutSettingsSection from '@/components/settings/DashboardLayoutSettingsSection';
+import DeveloperCardsSettingsSection from '@/components/settings/DeveloperCardsSettingsSection';
 import Eip7730SettingsSection from '@/components/settings/eip7730/Eip7730SettingsSection.online';
 import EnsSettingsSection from '@/components/settings/ens/EnsSettingsSection.online';
 import KeycardSettingsSection from '@/components/settings/KeycardSettingsSection';
@@ -85,6 +86,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           <CustomTokensSettingsSection
             onOpen={() => navigation.navigate('CustomTokens')}
           />
+          <DeveloperCardsSettingsSection />
         </View>
       </KeyboardAwareScrollView>
 

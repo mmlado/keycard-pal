@@ -13,6 +13,7 @@ import { OnlineProviders } from '@/providers/onlineProviders.online';
 import { PreferencesProvider } from '@/providers/preferences/Provider';
 import theme from '@/theme';
 
+import { useDeveloperCardOptionsAutoOn } from '@/hooks/useDeveloperCardOptionsAutoOn';
 import { usePreferences } from '@/hooks/usePreferences';
 
 import { restorePersistedIndex } from '@/utils/eip7730/lookup';
@@ -50,6 +51,7 @@ export default function App() {
  */
 function Navigator() {
   const { preferences } = usePreferences();
+  useDeveloperCardOptionsAutoOn();
   // Read once: the initial route only matters at mount, and Get started
   // flipping the flag afterwards must not change anything here.
   const [initialRouteName] = useState<'Welcome' | 'Dashboard'>(() =>

@@ -3,9 +3,11 @@ import { Text } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import DashboardLayoutSettingsSection from '../src/components/settings/DashboardLayoutSettingsSection';
+import DeveloperCardsSettingsSection from '../src/components/settings/DeveloperCardsSettingsSection';
 import KeycardsInUseSettingsSection from '../src/components/settings/KeycardsInUseSettingsSection';
 import PinPadSettingsSection from '../src/components/settings/PinPadSettingsSection';
 import TokenImagesSettingsSection from '../src/components/settings/TokenImagesSettingsSection.online';
+import { useDeveloperCardOptionsAutoOn } from '../src/hooks/useDeveloperCardOptionsAutoOn';
 import { usePreferences } from '../src/hooks/usePreferences';
 import useTokenImagesEnabled from '../src/hooks/useTokenImagesEnabled.online';
 import { PreferencesProvider } from '../src/providers/preferences/Provider';
@@ -15,6 +17,10 @@ import {
   noteTappedGeneration,
   resetLastTappedGeneration,
 } from '../src/utils/lastTappedGeneration';
+import {
+  clearUnverifiedCardApproval,
+  noteUnverifiedCardApproved,
+} from '../src/utils/unverifiedCardApproval';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -127,7 +133,24 @@ async function flush() {
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  clearUnverifiedCardApproval();
 });
+
+/** The Settings switch with the app-level hook that turns it on after an approval. */
+function DeveloperCards() {
+  useDeveloperCardOptionsAutoOn();
+  return <DeveloperCardsSettingsSection />;
+}
+
+async function renderDeveloperCards() {
+  const view = render(
+    <PreferencesProvider>
+      <DeveloperCards />
+    </PreferencesProvider>,
+  );
+  await act(async () => {});
+  return view;
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -327,5 +350,30 @@ describe('changing a setting', () => {
     expect(
       screen.getByText('layout:list scramble:true images:true'),
     ).toBeTruthy();
+  });
+});
+
+describe('developer card options', () => {
+  const toggle = () => screen.getByRole('switch');
+
+  it('an approved unverified card turns them on, and that survives a remount', async () => {
+    const first = await renderDeveloperCards();
+    expect(toggle().props.value).toBe(false);
+    await act(async () => noteUnverifiedCardApproved());
+    expect(toggle().props.value).toBe(true);
+    first.unmount();
+
+    await renderDeveloperCards();
+    expect(toggle().props.value).toBe(true);
+  });
+
+  it('a later approval leaves them off once the user turned them off', async () => {
+    await renderDeveloperCards();
+    await act(async () => noteUnverifiedCardApproved());
+    await act(async () => {
+      fireEvent(toggle(), 'valueChange', false);
+    });
+    await act(async () => noteUnverifiedCardApproved());
+    expect(toggle().props.value).toBe(false);
   });
 });

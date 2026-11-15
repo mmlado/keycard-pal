@@ -1,6 +1,10 @@
 import { act, renderHook } from '@testing-library/react-native';
 
 import { useCertificateApprovals } from '../src/hooks/keycard/useCertificateApprovals';
+import {
+  clearUnverifiedCardApproval,
+  isUnverifiedCardApprovalPending,
+} from '../src/utils/unverifiedCardApproval';
 
 const mockLoadApprovedCardKeys = jest.fn();
 const mockApproveCardKey = jest.fn();
@@ -21,6 +25,7 @@ async function flush() {
 beforeEach(() => {
   mockLoadApprovedCardKeys.mockReset().mockResolvedValue([]);
   mockApproveCardKey.mockReset().mockResolvedValue(undefined);
+  clearUnverifiedCardApproval();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -69,6 +74,30 @@ describe('useCertificateApprovals', () => {
     result.current.handshakeSucceeded(KEY_A);
     await flush();
     expect(mockApproveCardKey).toHaveBeenCalledWith(KEY_A);
+  });
+
+  it('reports a kept approval to the developer card options', async () => {
+    const { result } = renderHook(() => useCertificateApprovals());
+    result.current.approve(KEY_A);
+    result.current.handshakeSucceeded(KEY_A);
+    await flush();
+    expect(isUnverifiedCardApprovalPending()).toBe(true);
+  });
+
+  it('reports nothing when the approval could not be kept', async () => {
+    mockApproveCardKey.mockRejectedValue(new Error('storage full'));
+    const { result } = renderHook(() => useCertificateApprovals());
+    result.current.approve(KEY_A);
+    result.current.handshakeSucceeded(KEY_A);
+    await flush();
+    expect(isUnverifiedCardApprovalPending()).toBe(false);
+  });
+
+  it('reports nothing for a card nobody approved', async () => {
+    const { result } = renderHook(() => useCertificateApprovals());
+    result.current.handshakeSucceeded(KEY_A);
+    await flush();
+    expect(isUnverifiedCardApprovalPending()).toBe(false);
   });
 
   it('keeps nothing for a card nobody approved', async () => {

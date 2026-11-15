@@ -5,6 +5,7 @@ import {
   loadApprovedCardKeys,
 } from '@/storage/approvedCardsStorage';
 import { fromHex } from '@/utils/hex';
+import { noteUnverifiedCardApproved } from '@/utils/unverifiedCardApproval';
 
 export interface UseCertificateApprovals {
   /** For the session's `whitelistedCardKeys` option. */
@@ -43,7 +44,10 @@ export function useCertificateApprovals(): UseCertificateApprovals {
     }
     // Not awaited: the write must not hold the card on the antenna.
     approveCardKey(cardKey)
-      .then(() => unprovenRef.current.delete(cardKey))
+      .then(() => {
+        unprovenRef.current.delete(cardKey);
+        noteUnverifiedCardApproved();
+      })
       .catch(e => console.warn('[Keycard] approval not saved', e));
   }, []);
 
