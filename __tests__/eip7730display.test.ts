@@ -1342,7 +1342,7 @@ describe('a Safe MultiSend batch', () => {
     ]);
   });
 
-  it('says a call to the zero address reaches the Safe where MultiSend may send it there', () => {
+  it('warns on a call to the zero address where MultiSend may redirect it', () => {
     const data = batch([[0, ZERO, 0n, '0x']]);
     const zeroWarning = `  ! ${ZERO_ADDRESS_CALL_WARNING}`;
     expect(review(MULTI_SEND_1_5_0, data)).toContain(zeroWarning);

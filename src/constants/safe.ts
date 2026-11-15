@@ -21,4 +21,4 @@ export const DELEGATE_CALL_WARNING =
   "Delegate call: this contract's code runs as the Safe, with access to all its funds and settings";
 
 export const ZERO_ADDRESS_CALL_WARNING =
-  'MultiSend 1.5.0 sends a call to the zero address to the Safe itself';
+  'MultiSend 1.5.0 calls the Safe that delegate calls it, or itself, in place of the zero address';
