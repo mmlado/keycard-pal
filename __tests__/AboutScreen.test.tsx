@@ -172,6 +172,12 @@ describe('AboutScreen', () => {
     });
   });
 
+  it('opens the welcome slides again from How it works', () => {
+    renderScreen();
+    fireEvent.press(screen.getByText('How it works'));
+    expect(navigation.navigate).toHaveBeenCalledWith('HowItWorks');
+  });
+
   it('shows QR for the GitHub project link', () => {
     renderScreen();
     fireEvent.press(screen.getByLabelText('Show GitHub project QR code'));
