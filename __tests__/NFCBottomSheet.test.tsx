@@ -322,6 +322,38 @@ describe('NFCBottomSheet — Android sheet', () => {
     });
   });
 
+  describe('phase done without showOnDone', () => {
+    const tapping = makeNfc('nfc', {
+      cardPresence: 'connected',
+      status: 'Opening secure channel...',
+    });
+    const done = makeNfc('done', {
+      cardPresence: 'connected',
+      status: 'Applet installs locked',
+    });
+
+    it('leaves with the last tap state, never the success state', () => {
+      const { rerender } = renderSheet(tapping);
+      rerender(<NFCBottomSheet nfc={done} onCancel={onCancel} />);
+      expect(screen.getByText('Opening secure channel...')).toBeTruthy();
+      expect(screen.queryByText('Applet installs locked')).toBeNull();
+    });
+
+    it('takes no touch while it leaves', () => {
+      const { rerender } = renderSheet(tapping);
+      rerender(<NFCBottomSheet nfc={done} onCancel={onCancel} />);
+      fireEvent.press(screen.getByText('Cancel'));
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it('shows the success state when the screen asks for it', () => {
+      const { rerender } = renderSheet(tapping, true);
+      rerender(<NFCBottomSheet nfc={done} onCancel={onCancel} showOnDone />);
+      expect(screen.getByText('Applet installs locked')).toBeTruthy();
+      expect(screen.queryByText('Cancel')).toBeNull();
+    });
+  });
+
   describe('Cancel button — phase done with showOnDone', () => {
     it('hides the Cancel button (success variant)', () => {
       renderSheet(makeNfc('done'), true);

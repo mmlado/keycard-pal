@@ -203,6 +203,18 @@ export default function NFCBottomSheet({
       ? 'connected'
       : 'scanning';
 
+  // Without showOnDone the success state is never drawn: the sheet leaves as it last was, inert.
+  const leavingWithoutSuccess = phase === 'done' && showOnDone !== true;
+  const lastShownRef = useRef({ variant, status });
+  useEffect(() => {
+    if (!leavingWithoutSuccess) {
+      lastShownRef.current = { variant, status };
+    }
+  });
+  const shown = leavingWithoutSuccess
+    ? lastShownRef.current
+    : { variant, status };
+
   return (
     <>
       {/* Deliberately not a Modal: a Modal covers the navigator's own header,
@@ -256,7 +268,10 @@ export default function NFCBottomSheet({
             onCancel={onCancel}
           />
         ) : (
-          <View style={styles.overlay}>
+          <View
+            style={styles.overlay}
+            pointerEvents={leavingWithoutSuccess ? 'none' : 'auto'}
+          >
             <Animated.View
               style={[
                 styles.sheet,
@@ -268,8 +283,8 @@ export default function NFCBottomSheet({
             >
               <View style={styles.handle} />
               <NFCSheet
-                variant={variant}
-                status={status}
+                variant={shown.variant}
+                status={shown.status}
                 cardName={cardName}
                 cardFingerprint={cardFingerprint}
                 onCancel={onCancel}
