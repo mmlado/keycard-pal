@@ -12,10 +12,12 @@ reversible only for whoever stored those keys. Keycard Pal stores nothing per ca
 so the Install lock takes its card manager key from the card itself: EXPORT BIP85
 at `m/83696968'/128169'/16'/1196444747'` (BIP85 HEX, 16 bytes, the index spelling
 "GPLK" in ASCII), used as ENC, MAC and DEK alike, behind the main PIN. Lock writes
-that key and, on the first lock, moves the card to SECURED; unlock writes back the
-published key the user picks. Every tap reads the card's state from one INITIALIZE
-UPDATE whose cryptogram the phone checks against each candidate key, so no tap ever
-authenticates with a guessed key.
+that key over the keyset the card answered with, at that keyset's own version (a
+card still on the initial keyset, version FF, gets version 1 added instead, as the
+SDK's own key upgrade does), and moves the card through INITIALIZED to SECURED;
+unlock writes back the published key the user picks. Every tap reads the card's
+state from one INITIALIZE UPDATE whose cryptogram the phone checks against each
+candidate key, so no tap ever authenticates with a guessed key.
 
 ## Considered options
 
@@ -44,7 +46,11 @@ authenticates with a guessed key.
 - Selecting the card manager by its AID, SET STATUS, and one INITIALIZE UPDATE
   checked against several keys are missing from keycard-sdk, so they come from the
   SDK fork pinned by commit, with the same change offered upstream (ADR-0008).
-- iOS waits on a device test: Core NFC may refuse a SELECT of the card manager.
-- Revisit if Keycard ships a way to keep a card's identity across an update, or if
-  the read-only checks on a spare card show that PUT KEY adds a keyset beside the
-  published one instead of replacing it.
+- The lock replaces only the keyset the card answers INITIALIZE UPDATE with. A
+  second keyset under a published key, which only someone already holding a card
+  manager key could have added, stays open, and the app reports the card as locked
+  until it reads the card's key information template (#616).
+- iOS waits on a device test and on its Core NFC select list, which does not name
+  the card manager.
+- Revisit if Keycard ships a way to keep a card's identity across an update, or if a
+  Developer card's PUT KEY turns out to add a keyset beside the one it replaces.
