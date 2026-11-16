@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { usePreferences } from '@/hooks/usePreferences';
 
@@ -18,12 +18,15 @@ export function useDeveloperCardOptionsAutoOn(): void {
     isUnverifiedCardApprovalPending,
   );
   const choice = preferences.developerCardOptions;
+  // Once per mount: a failed save rolls the choice back to unset, which would read again.
+  const storedApprovalsRead = useRef(false);
 
   // An approval kept before this switch existed counts too.
   useEffect(() => {
-    if (choice !== 'unset') {
+    if (choice !== 'unset' || storedApprovalsRead.current) {
       return;
     }
+    storedApprovalsRead.current = true;
     loadApprovedCardKeys()
       .then(keys => {
         if (keys.length > 0) {

@@ -98,6 +98,19 @@ describe('useDeveloperCardOptionsAutoOn', () => {
       },
     );
 
+    it('reads the store once per mount, even when a failed save rolls the choice back', async () => {
+      mockLoadApprovedCardKeys.mockResolvedValue(['02'.repeat(33)]);
+      const { rerender } = renderHook(() => useDeveloperCardOptionsAutoOn());
+      await flush();
+      mockChoice = 'shown';
+      rerender({});
+      mockChoice = 'unset';
+      rerender({});
+      await flush();
+      expect(mockLoadApprovedCardKeys).toHaveBeenCalledTimes(1);
+      expect(mockSetPreference).toHaveBeenCalledTimes(1);
+    });
+
     it('survives a store that cannot be read', async () => {
       mockLoadApprovedCardKeys.mockRejectedValue(new Error('keystore'));
       renderHook(() => useDeveloperCardOptionsAutoOn());
