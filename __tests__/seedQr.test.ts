@@ -1,8 +1,12 @@
 import {
   decodeCompactSeedQr,
   decodeSeedQr,
+  encodeCompactSeedQr,
+  encodeStandardSeedQr,
+  hasSeedQr,
   isCompactSeedQrBytes,
   isSeedQrPayload,
+  seedQrSegments,
 } from '../src/utils/seedQr';
 
 // The nine published SeedQR test vectors: the Standard digit stream, the
@@ -230,5 +234,94 @@ describe('isCompactSeedQrBytes', () => {
 
   it.each([0, 15, 20, 24, 28, 48, 96])('rejects %i bytes', length => {
     expect(isCompactSeedQrBytes(new Uint8Array(length))).toBe(false);
+  });
+});
+
+// 18 words: a valid phrase the specification gives no SeedQR.
+const EIGHTEEN_WORDS = `${'abandon '.repeat(17)}agent`.split(' ');
+
+describe('hasSeedQr', () => {
+  it.each(VECTORS)('takes published vector $n', ({ words }) => {
+    expect(hasSeedQr(words.split(' '))).toBe(true);
+  });
+
+  it.each([0, 15, 18, 21, 25])('refuses %i words', count => {
+    expect(hasSeedQr(Array(count).fill('abandon'))).toBe(false);
+  });
+});
+
+describe('encodeStandardSeedQr', () => {
+  it.each(VECTORS)(
+    'writes the digits of published vector $n',
+    ({ digits, words }) => {
+      expect(encodeStandardSeedQr(words.split(' '))).toBe(digits);
+    },
+  );
+
+  it.each(VECTORS)('vector $n decodes back to its phrase', ({ words }) => {
+    expect(decodeSeedQr(encodeStandardSeedQr(words.split(' ')))).toEqual({
+      kind: 'success',
+      words: words.split(' '),
+    });
+  });
+
+  it('throws for 18 words', () => {
+    expect(() => encodeStandardSeedQr(EIGHTEEN_WORDS)).toThrow(
+      'No SeedQR for this 18-word phrase',
+    );
+  });
+
+  it('throws for a phrase that fails its checksum', () => {
+    const words = VECTORS[3].words.split(' ');
+    words[0] = 'forward';
+    expect(() => encodeStandardSeedQr(words)).toThrow(
+      'No SeedQR for this 12-word phrase',
+    );
+  });
+
+  it('throws for a word outside the wordlist', () => {
+    const words = VECTORS[3].words.split(' ');
+    words[0] = 'forums';
+    expect(() => encodeStandardSeedQr(words)).toThrow(
+      'No SeedQR for this 12-word phrase',
+    );
+  });
+});
+
+describe('encodeCompactSeedQr', () => {
+  it.each(VECTORS)(
+    'writes the entropy of published vector $n',
+    ({ hex, words }) => {
+      expect(encodeCompactSeedQr(words.split(' '))).toEqual(bytesOf(hex));
+    },
+  );
+
+  it.each(VECTORS)('vector $n decodes back to its phrase', ({ words }) => {
+    expect(decodeCompactSeedQr(encodeCompactSeedQr(words.split(' ')))).toEqual({
+      kind: 'success',
+      words: words.split(' '),
+    });
+  });
+
+  it('throws for 18 words', () => {
+    expect(() => encodeCompactSeedQr(EIGHTEEN_WORDS)).toThrow(
+      'No SeedQR for this 18-word phrase',
+    );
+  });
+});
+
+describe('seedQrSegments', () => {
+  const { words, digits, hex } = VECTORS[3];
+
+  it('writes Standard as one numeric segment', () => {
+    expect(seedQrSegments(words.split(' '), 'standard')).toEqual([
+      { data: digits, mode: 'numeric' },
+    ]);
+  });
+
+  it('writes Compact as one byte segment', () => {
+    expect(seedQrSegments(words.split(' '), 'compact')).toEqual([
+      { data: bytesOf(hex), mode: 'byte' },
+    ]);
   });
 });

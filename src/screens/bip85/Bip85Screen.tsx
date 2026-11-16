@@ -32,6 +32,7 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
   const [index, setIndex] = useState('0');
   // The field stays editable until the PIN pad opens; the result shows this one.
   const [derivedIndex, setDerivedIndex] = useState<number | null>(null);
+  const formatTitle = bip85Format(format).title;
   const keycard = useDeriveBip85();
   const { phase, result, start, reset } = keycard;
 
@@ -47,9 +48,10 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
   const { sheet } = useKeycardScreen({
     keycard,
     navigation,
-    title: bip85Format(format).title,
+    title: formatTitle,
     stepBack: () => {
-      if (phase !== 'done') {
+      // The SeedQR screen's Done removes this screen too, and is no back step.
+      if (phase !== 'done' || !navigation.isFocused()) {
         return false;
       }
       showForm();
@@ -65,6 +67,17 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
   );
 
   const tooHigh = Number(index) > BIP85_MAX_INDEX;
+
+  const showSeedQr = useCallback(
+    (words: string[]) => {
+      navigation.navigate('QRResult', {
+        title: 'SeedQR',
+        description: `The ${formatTitle} as a SeedQR. Anyone who scans it can use it.`,
+        seedWords: words,
+      });
+    },
+    [formatTitle, navigation],
+  );
 
   const handleDerive = useCallback(() => {
     const requested = Number(index);
@@ -115,6 +128,7 @@ export default function Bip85Screen({ navigation, route }: Bip85ScreenProps) {
           index={derivedIndex}
           entropy={result}
           onDone={showForm}
+          onShowSeedQr={showSeedQr}
         />
       )}
 

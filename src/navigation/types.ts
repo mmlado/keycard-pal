@@ -71,11 +71,10 @@ export type RootStackParamList = {
   AddressMenu: undefined;
   AddressList: { coin: 'btc' | 'eth' };
   AddressDetail: { address: string; derivationPath?: string; title?: string };
-  QRResult: {
-    urString: string; // fully encoded UR string, ready for QR display
-    title: string;
-    description?: string; // explanatory copy rendered above the QR code
-  };
+  QRResult: { title: string; description?: string } & (
+    | { urString: string }
+    | { seedWords: string[] }
+  );
   About: undefined;
   HowItWorks: undefined;
   LicenseDetail: {

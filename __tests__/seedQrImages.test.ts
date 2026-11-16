@@ -9,6 +9,8 @@ import {
   decodeSeedQr,
   isCompactSeedQrBytes,
   isSeedQrPayload,
+  SEED_QR_ERROR_CORRECTION,
+  seedQrSegments,
 } from '../src/utils/seedQr';
 
 // The reference SeedQRs published alongside the format specification, decoded here as
@@ -105,4 +107,68 @@ describe('CompactSeedQR reference images', () => {
       expect(compact).toEqual(standard);
     }
   });
+});
+
+// The other direction: what the app draws, against the same images.
+describe('SeedQR generation against the reference images', () => {
+  const genMatrix: (value: unknown, ecl: string) => number[][] =
+    require('react-native-qrcode-svg/src/genMatrix').default;
+  // react-native-qrcode-svg's encoder, which can also take a given mask.
+  const qrcode: {
+    create: (
+      value: unknown,
+      options: { errorCorrectionLevel: string; maskPattern: number },
+    ) => { modules: { data: Uint8Array } };
+  } = require('qrcode');
+
+  /** The image's modules, read at each module's centre from the corners jsQR found. */
+  async function modulesOf(file: string) {
+    const { data, info } = await sharp(readFileSync(join(FIXTURES, file)))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const code = jsQR(new Uint8ClampedArray(data), info.width, info.height)!;
+    const n = 17 + 4 * code.version;
+    const {
+      topLeftCorner: tl,
+      topRightCorner: tr,
+      bottomLeftCorner: bl,
+    } = code.location;
+    let modules = '';
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const u = (x + 0.5) / n;
+        const v = (y + 0.5) / n;
+        const px = Math.floor(tl.x + u * (tr.x - tl.x) + v * (bl.x - tl.x));
+        const py = Math.floor(tl.y + u * (tr.y - tl.y) + v * (bl.y - tl.y));
+        modules += data[(py * info.width + px) * 4] < 128 ? '1' : '0';
+      }
+    }
+    return { n, modules };
+  }
+
+  it.each([
+    ...STANDARD.map(v => ({ ...v, format: 'standard' as const })),
+    ...COMPACT.map(v => ({ ...v, format: 'compact' as const })),
+  ])(
+    'vector $n $format is the published code, mask aside',
+    async ({ n, file, format }) => {
+      const segments = seedQrSegments(WORDS[n].split(' '), format);
+      const reference = await modulesOf(file);
+      expect(genMatrix(segments, SEED_QR_ERROR_CORRECTION)).toHaveLength(
+        reference.n,
+      );
+      // The mask is each encoder's own choice; under the reference's, nothing may differ.
+      const masks = [0, 1, 2, 3, 4, 5, 6, 7].filter(
+        maskPattern =>
+          qrcode
+            .create(segments, {
+              errorCorrectionLevel: SEED_QR_ERROR_CORRECTION,
+              maskPattern,
+            })
+            .modules.data.join('') === reference.modules,
+      );
+      expect(masks).toHaveLength(1);
+    },
+  );
 });

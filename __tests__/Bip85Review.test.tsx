@@ -22,8 +22,16 @@ jest.mock('../src/components/BottomActionArea', () => {
 });
 
 jest.mock('react-native-paper', () => {
-  const { Text } = require('react-native');
-  return { MD3DarkTheme: { colors: {} }, Text };
+  const { Pressable, Text } = require('react-native');
+  return {
+    MD3DarkTheme: { colors: {} },
+    Text,
+    Button: ({ children, onPress }: any) => (
+      <Pressable onPress={onPress}>
+        <Text>{children}</Text>
+      </Pressable>
+    ),
+  };
 });
 
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
@@ -33,6 +41,7 @@ jest.mock('@react-native-community/blur', () => ({
 }));
 
 const onDone = jest.fn();
+const onShowSeedQr = jest.fn();
 
 function renderReview(format: Bip85Format, entropy: Uint8Array, index = 0) {
   return render(
@@ -41,6 +50,7 @@ function renderReview(format: Bip85Format, entropy: Uint8Array, index = 0) {
       index={index}
       entropy={entropy}
       onDone={onDone}
+      onShowSeedQr={onShowSeedQr}
     />,
   );
 }
@@ -56,6 +66,7 @@ const hidden = { includeHiddenElements: true };
 describe('Bip85Review', () => {
   beforeEach(() => {
     onDone.mockClear();
+    onShowSeedQr.mockClear();
   });
 
   it('keeps its button above the bottom inset in the bottom action area', () => {
@@ -84,6 +95,37 @@ describe('Bip85Review', () => {
       expect(screen.UNSAFE_queryAllByType('BlurView' as any)).toHaveLength(0);
     });
 
+    it('offers the SeedQR once the words are revealed', async () => {
+      renderReview('words12', entropy);
+      expect(screen.queryByText('Show SeedQR')).toBeNull();
+
+      await reveal();
+      fireEvent.press(
+        within(screen.getByTestId('bottom-action-area')).getByText(
+          'Show SeedQR',
+        ),
+      );
+
+      expect(onShowSeedQr).toHaveBeenCalledWith(
+        Array(11).fill('abandon').concat('about'),
+      );
+      expect(onDone).not.toHaveBeenCalled();
+    });
+
+    it('offers it for 24 words', async () => {
+      renderReview('words24', new Uint8Array(32));
+      await reveal();
+      expect(screen.getByText('Show SeedQR')).toBeTruthy();
+    });
+
+    // The SeedQR specification defines 12 and 24 words only.
+    it('offers none for 18 words', async () => {
+      renderReview('words18', new Uint8Array(24));
+      await reveal();
+      expect(screen.getByText('Done')).toBeTruthy();
+      expect(screen.queryByText('Show SeedQR')).toBeNull();
+    });
+
     it('numbers the words across two columns', () => {
       renderReview('words12', entropy);
       expect(screen.getAllByText('abandon', hidden)).toHaveLength(11);
@@ -99,6 +141,12 @@ describe('Bip85Review', () => {
       const secret = screen.getByTestId('bip85-secret');
       expect(secret.props.children).toBe('A'.repeat(21));
       expect(secret.props.selectable).toBeFalsy();
+    });
+
+    it('offers no SeedQR', async () => {
+      renderReview('hex32', new Uint8Array(32));
+      await reveal();
+      expect(screen.queryByText('Show SeedQR')).toBeNull();
     });
 
     it('shows hex as it came from the card', async () => {

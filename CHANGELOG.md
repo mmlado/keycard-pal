@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - About opens the Welcome slides again under How it works
 - The review decodes a Safe MultiSend batch call by call, with a warning on each delegate call and on a contract that is not a known MultiSend
 - Settings can show developer card options, which lock and unlock applet installs on a Developer card with a key the card derives (Android, applet 4.0)
+- A 12- or 24-word BIP85 phrase can be shown as a Standard or Compact SeedQR
 
 ### Changed
 
