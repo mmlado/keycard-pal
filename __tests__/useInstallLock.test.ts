@@ -37,6 +37,7 @@ const OTHER_KEY = fromHex('11'.repeat(16));
 const INS_SELECT = 0xa4;
 const INS_INITIALIZE_UPDATE = 0x50;
 const INS_EXTERNAL_AUTHENTICATE = 0x82;
+const INS_GET_DATA = 0xca;
 const INS_PUT_KEY = 0xd8;
 const INS_SET_STATUS = 0xf0;
 
@@ -49,30 +50,49 @@ const ok = (data: number[] = []) =>
 const sw = (code: number) =>
   new APDUResponse(new Uint8Array([code >> 8, code & 0xff]));
 
-type FakeOptions = { kvn?: number; lifeCycle?: number };
+const desKeyset = (kvn: number) =>
+  [1, 2, 3].flatMap(id => [0xc0, 0x04, id, kvn, 0x80, 0x10]);
 
-/**
- * The card's half of SCP02: answers with a cryptogram from its one keyset and learns a new key by
- * its KCV. PUT KEY must name its keyset (or add version 1 over the initial one), and the life
- * cycle only moves OP_READY, INITIALIZED, SECURED, one step at a time.
- */
+type FakeOptions = {
+  kvn?: number;
+  lifeCycle?: number;
+  otherKeys?: number[];
+  keepsInitialKeyset?: boolean;
+};
+
+/** The card's half of SCP02, as strict as GP 2.3.1, so a lock that breaks a rule fails here. */
 class FakeCardManager {
   key: Uint8Array;
   kvn: number;
   lifeCycle: number;
+  otherKeys: number[];
+  keepsInitialKeyset: boolean;
   refuseSelect?: number;
+  refuseSecondSelect?: number;
   refuseInitializeUpdate?: number;
+  refuseGetData?: number;
+  refusePutKey?: number;
+  template?: number[];
   loseOnInitializeUpdate = false;
+  loseOnGetData = false;
+  sessionOpen = false;
   readonly commands: APDUCommand[] = [];
   putKeys: { p1: number; newKvn: number; kcvs: string[] }[] = [];
 
   constructor(
     key: Uint8Array,
-    { kvn = 0x01, lifeCycle = SECURED }: FakeOptions = {},
+    {
+      kvn = 0x01,
+      lifeCycle = SECURED,
+      otherKeys = [],
+      keepsInitialKeyset = false,
+    }: FakeOptions = {},
   ) {
     this.key = key;
     this.kvn = kvn;
     this.lifeCycle = lifeCycle;
+    this.otherKeys = otherKeys;
+    this.keepsInitialKeyset = keepsInitialKeyset;
   }
 
   sent(ins: number): APDUCommand[] {
@@ -83,21 +103,23 @@ class FakeCardManager {
 
   send = async (cmd: APDUCommand): Promise<APDUResponse> => {
     this.commands.push(cmd);
+    if (this.sessionOpen && cmd.ins !== INS_SELECT && !(cmd.cla & 0x04)) {
+      this.sessionOpen = false;
+      return sw(0x6982);
+    }
     switch (cmd.ins) {
       case INS_SELECT:
-        if (this.refuseSelect) {
-          return sw(this.refuseSelect);
-        }
-        return toHex(cmd.data) === toHex(CARD_MANAGER_AID)
-          ? ok([0x6f, 0x10, 0x84, 0x08, ...CARD_MANAGER_AID])
-          : sw(0x6a82);
+        return this.select(cmd);
       case INS_INITIALIZE_UPDATE:
         if (this.loseOnInitializeUpdate) {
           throw new Error('Tag was lost.');
         }
         return this.initializeUpdate(cmd.data);
       case INS_EXTERNAL_AUTHENTICATE:
+        this.sessionOpen = true;
         return ok();
+      case INS_GET_DATA:
+        return this.getData(cmd);
       case INS_PUT_KEY:
         return this.putKey(cmd);
       case INS_SET_STATUS:
@@ -106,6 +128,38 @@ class FakeCardManager {
         return sw(0x6d00);
     }
   };
+
+  private select(cmd: APDUCommand): APDUResponse {
+    this.sessionOpen = false;
+    const refusal =
+      this.sent(INS_SELECT).length > 1
+        ? this.refuseSecondSelect ?? this.refuseSelect
+        : this.refuseSelect;
+    if (refusal) {
+      return sw(refusal);
+    }
+    return toHex(cmd.data) === toHex(CARD_MANAGER_AID)
+      ? ok([0x6f, 0x10, 0x84, 0x08, ...CARD_MANAGER_AID])
+      : sw(0x6a82);
+  }
+
+  private getData(cmd: APDUCommand): APDUResponse {
+    if (this.loseOnGetData) {
+      throw new Error('Tag was lost.');
+    }
+    if (this.refuseGetData) {
+      return sw(this.refuseGetData);
+    }
+    if (cmd.p1 !== 0x00 || cmd.p2 !== 0xe0) {
+      return sw(0x6a88);
+    }
+    const entries = this.template ?? [
+      ...desKeyset(this.kvn),
+      ...(this.keepsInitialKeyset && this.kvn !== 0xff ? desKeyset(0xff) : []),
+      ...this.otherKeys,
+    ];
+    return ok([0xe0, entries.length, ...entries]);
+  }
 
   private initializeUpdate(hostChallenge: Uint8Array): APDUResponse {
     if (this.refuseInitializeUpdate) {
@@ -136,6 +190,9 @@ class FakeCardManager {
   }
 
   private putKey(cmd: APDUCommand): APDUResponse {
+    if (this.refusePutKey) {
+      return sw(this.refusePutKey);
+    }
     // Data: new KVN, three times (80 10 <key> 03 <KCV>), then the C-MAC.
     const data = cmd.data.subarray(0, cmd.data.length - 8);
     const newKvn = data[0];
@@ -340,6 +397,22 @@ describe('runInstallLock', () => {
     },
   );
 
+  it.each([
+    ['lock', DEV_KEY, { action: 'lock' }],
+    ['unlock', LOCK_KEY, { action: 'unlock', restore: 'gpDefault' }],
+  ] as const)(
+    'reports a refused PUT KEY on %s plainly and sends nothing more',
+    async (_, key, request) => {
+      const card = new FakeCardManager(key);
+      card.refusePutKey = 0x6a80;
+      const { cmdSet } = fakeKeycard(card);
+      await expect(runInstallLock(cmdSet, request)).rejects.toThrow(
+        CARD_MANAGER_REFUSED_STATUS,
+      );
+      expect(card.sent(INS_SET_STATUS)).toEqual([]);
+    },
+  );
+
   // The session classifies a lost card by its own message; a rewritten one would read as refused.
   it('passes a card lost during INITIALIZE UPDATE through untouched', async () => {
     const card = new FakeCardManager(DEV_KEY);
@@ -380,6 +453,115 @@ describe('runInstallLock', () => {
       expect(response.data.every(b => b === 0)).toBe(true);
       expect(response.apdu.every(b => b === 0)).toBe(true);
     }
+  });
+});
+
+describe('the key list after a lock', () => {
+  const lock = (card: FakeCardManager) =>
+    runInstallLock(fakeKeycard(card).cmdSet, { action: 'lock' });
+
+  it('reads it in plain after selecting the card manager again', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    await expect(lock(card)).resolves.toEqual({
+      outcome: 'locked',
+      cardManagerKey: 'lock',
+    });
+    const lastSetStatus = card.commands.lastIndexOf(
+      card.sent(INS_SET_STATUS).at(-1)!,
+    );
+    expect(
+      card.commands.slice(lastSetStatus + 1).map(cmd => [cmd.cla, cmd.ins]),
+    ).toEqual([
+      [0x00, INS_SELECT],
+      [0x80, INS_GET_DATA],
+    ]);
+    expect(card.sent(INS_GET_DATA)[0].serialize()).toEqual(
+      fromHex('80ca00e000'),
+    );
+  });
+
+  it.each([
+    ['another keyset', [0x02], desKeyset(0x02)],
+    [
+      'two more keysets',
+      [0x02, 0x30],
+      [...desKeyset(0x02), ...desKeyset(0x30)],
+    ],
+    ['a private key', [0x20], [0xc0, 0x04, 0x01, 0x20, 0xb1, 0x20]],
+    [
+      'a key type it cannot read',
+      [0x20],
+      [0xc0, 0x05, 0x01, 0x20, 0x80, 0x10, 0x01],
+    ],
+  ])(
+    'does not report a card as locked while it keeps %s',
+    async (_, versions, otherKeys) => {
+      const card = new FakeCardManager(DEV_KEY, { otherKeys });
+      await expect(lock(card)).resolves.toEqual({
+        outcome: 'otherKeysets',
+        cardManagerKey: 'lock',
+        otherKeyVersions: versions,
+      });
+      expect(card.key).toEqual(LOCK_KEY);
+      expect(card.lifeCycle).toBe(SECURED);
+    },
+  );
+
+  it('reports a card already locked the same way', async () => {
+    const card = new FakeCardManager(LOCK_KEY, { otherKeys: desKeyset(0x02) });
+    await expect(lock(card)).resolves.toMatchObject({
+      outcome: 'otherKeysets',
+      otherKeyVersions: [0x02],
+    });
+  });
+
+  it('counts an initial keyset the card keeps beside version 1', async () => {
+    const card = new FakeCardManager(GP_DEFAULT, {
+      kvn: 0xff,
+      keepsInitialKeyset: true,
+    });
+    await expect(lock(card)).resolves.toMatchObject({
+      outcome: 'otherKeysets',
+      otherKeyVersions: [0xff],
+    });
+  });
+
+  it('passes over a key version that holds only a public key', async () => {
+    const card = new FakeCardManager(DEV_KEY, {
+      otherKeys: [0xc0, 0x06, 0x01, 0x73, 0xa0, 0x03, 0xa1, 0x80],
+    });
+    await expect(lock(card)).resolves.toEqual({
+      outcome: 'locked',
+      cardManagerKey: 'lock',
+    });
+  });
+
+  it.each([
+    ['refuses it', { refuseGetData: 0x6a88 }],
+    ['answers what does not parse', { template: [0xc0, 0x04, 1, 1, 0x80] }],
+    ['lists no key at the version just written', { template: desKeyset(0x02) }],
+    ['refuses the second SELECT', { refuseSecondSelect: 0x6a82 }],
+  ])('says the keys went unchecked when the card %s', async (_, fields) => {
+    const card = Object.assign(new FakeCardManager(DEV_KEY), fields);
+    await expect(lock(card)).resolves.toEqual({
+      outcome: 'keysetsUnchecked',
+      cardManagerKey: 'lock',
+    });
+    expect(card.key).toEqual(LOCK_KEY);
+  });
+
+  it('passes a card lost during the read through untouched', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    card.loseOnGetData = true;
+    const error = await lock(card).catch(e => e);
+    expect(isTagLostError(error)).toBe(true);
+  });
+
+  it('is not read on unlock', async () => {
+    const card = new FakeCardManager(LOCK_KEY);
+    const { cmdSet } = fakeKeycard(card);
+    await runInstallLock(cmdSet, { action: 'unlock', restore: 'gpDefault' });
+    expect(card.sent(INS_GET_DATA)).toEqual([]);
   });
 });
 

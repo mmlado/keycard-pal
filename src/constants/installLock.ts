@@ -17,6 +17,31 @@ export const LOCK_INSTALLS_POINTS = [
 
 export const ALREADY_LOCKED_TOAST = 'Applet installs were already locked';
 
+export const OTHER_KEYSETS_HEADING = 'Applet installs may not be locked';
+
+function keysetsAt(versions: number[]): string {
+  const names = versions.map(
+    version => `0x${version.toString(16).toUpperCase().padStart(2, '0')}`,
+  );
+  const last = names.pop();
+  return names.length === 0
+    ? `a keyset at key version ${last}`
+    : `keysets at key versions ${names.join(', ')} and ${last}`;
+}
+
+export function otherKeysetsDetail(versions: number[]): string {
+  const keysets = keysetsAt(versions);
+  return `The card manager also has ${keysets}, which the lock did not replace. Whoever holds those keys may still be able to replace or remove the Keycard applet.`;
+}
+
+export const otherKeysetsToast = (versions: number[]) =>
+  `Lock not confirmed: the card also has ${keysetsAt(versions)}`;
+
+export const KEYSETS_UNCHECKED_HEADING =
+  'Applet installs locked, keys not checked';
+export const KEYSETS_UNCHECKED_DETAIL =
+  "Keycard Pal couldn't read a key list from the card manager that shows the lock's key, so it couldn't check whether another keyset can still replace or remove the Keycard applet.";
+
 export const UNLOCK_INSTALLS_INTRO =
   'Unlocking puts a published key back, so any tool can replace or remove the Keycard applet. Pick the key your install tool expects.';
 

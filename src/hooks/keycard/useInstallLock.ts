@@ -13,6 +13,7 @@ import {
   PUBLISHED_CARD_MANAGER_KEYS,
   PublishedCardManagerKey,
 } from '@/utils/installLock';
+import { keysetVersions } from '@/utils/keyInformationTemplate';
 import { isTagLostError } from '@/utils/keycardErrors';
 import { useKeycardOp } from './useKeycardOperation';
 
@@ -20,20 +21,25 @@ export type InstallLockRequest =
   | { action: 'lock' }
   | { action: 'unlock'; restore: PublishedCardManagerKey };
 
-export type InstallLockOutcome =
-  | 'locked'
-  | 'alreadyLocked'
-  | 'unlocked'
-  | 'notLocked';
-
 /** 'lock' is the key derived from the card; the others are published. */
 export type CardManagerKey = 'lock' | PublishedCardManagerKey;
 
-export type InstallLockResult = {
-  outcome: InstallLockOutcome;
-  /** The key the card manager answers to once the tap is over. */
-  cardManagerKey: CardManagerKey;
-};
+export type InstallLockResult =
+  | {
+      outcome:
+        | 'locked'
+        | 'alreadyLocked'
+        | 'keysetsUnchecked'
+        | 'unlocked'
+        | 'notLocked';
+      /** The key the card manager answers to once the tap is over. */
+      cardManagerKey: CardManagerKey;
+    }
+  | {
+      outcome: 'otherKeysets';
+      cardManagerKey: 'lock';
+      otherKeyVersions: number[];
+    };
 
 export const NO_CHAIN_CODE_STATUS =
   "This Keycard's key cannot derive the lock key, so nothing was changed.";
@@ -147,6 +153,39 @@ async function secureCardManager(gp: GlobalPlatformCommandset): Promise<void> {
   }
 }
 
+/** A refused PUT KEY changed nothing, so it gets the refusal wording too. */
+async function putKey(
+  gp: GlobalPlatformCommandset,
+  [oldKvn, newKvn]: [number, number],
+  key: Uint8Array,
+): Promise<void> {
+  try {
+    (await gp.putSCP02Keys(oldKvn, newKvn, key)).checkOK();
+  } catch (e) {
+    throw cardManagerRefusal(e);
+  }
+}
+
+async function otherKeysets(
+  gp: GlobalPlatformCommandset,
+  lockKvn: number,
+): Promise<number[] | null> {
+  // A new SELECT ends the session first: a plain command inside it would abort it.
+  if ((await gp.select(CARD_MANAGER_AID)).sw !== Constants.SW_OK) {
+    return null;
+  }
+  const response = await gp.getData(
+    GlobalPlatformConstants.GET_DATA_KEY_INFORMATION_TEMPLATE,
+  );
+  const versions =
+    response.sw === Constants.SW_OK ? keysetVersions(response.data) : null;
+  // A list without the key just written does not describe this card manager.
+  if (!versions?.includes(lockKvn)) {
+    return null;
+  }
+  return versions.filter(version => version !== lockKvn);
+}
+
 export async function runInstallLock(
   cmdSet: Commandset,
   request: InstallLockRequest,
@@ -157,14 +196,26 @@ export async function runInstallLock(
       cmdSet,
       keyset(lockKey),
     );
-    const [oldKvn, newKvn] = putKeyVersions(kvn);
+    const putVersions = putKeyVersions(kvn);
+    const [, newKvn] = putVersions;
 
     if (request.action === 'lock') {
       const locked = cardManagerKey === 'lock';
       if (!locked) {
-        (await gp.putSCP02Keys(oldKvn, newKvn, lockKey)).checkOK();
+        await putKey(gp, putVersions, lockKey);
       }
       await secureCardManager(gp);
+      const others = await otherKeysets(gp, locked ? kvn : newKvn);
+      if (others === null) {
+        return { outcome: 'keysetsUnchecked', cardManagerKey: 'lock' };
+      }
+      if (others.length > 0) {
+        return {
+          outcome: 'otherKeysets',
+          cardManagerKey: 'lock',
+          otherKeyVersions: others,
+        };
+      }
       return {
         outcome: locked ? 'alreadyLocked' : 'locked',
         cardManagerKey: 'lock',
@@ -175,7 +226,7 @@ export async function runInstallLock(
       return { outcome: 'notLocked', cardManagerKey };
     }
     const published = fromHex(PUBLISHED_CARD_MANAGER_KEYS[request.restore]);
-    (await gp.putSCP02Keys(oldKvn, newKvn, published)).checkOK();
+    await putKey(gp, putVersions, published);
     return { outcome: 'unlocked', cardManagerKey: request.restore };
   } finally {
     lockKey.fill(0);
