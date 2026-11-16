@@ -2,6 +2,8 @@
 import { readFileSync } from 'fs';
 import { APDUCommand } from 'keycard-sdk/dist/apdu-command';
 import { APDUResponse } from 'keycard-sdk/dist/apdu-response';
+import { GlobalPlatformCommandset } from 'keycard-sdk/dist/global-platform-commandset';
+import { GlobalPlatformConstants } from 'keycard-sdk/dist/global-platform-constants';
 import { GlobalPlatformCrypto } from 'keycard-sdk/dist/global-platform-crypto';
 
 import {
@@ -15,11 +17,13 @@ import {
   useLockInstalls,
   useUnlockInstalls,
 } from '../src/hooks/keycard/useInstallLock';
+import type { ManagementPrivilege } from '../src/utils/gpRegistry';
 import { fromHex, toHex } from '../src/utils/hex';
 import {
   CARD_MANAGER_AID,
   INSTALL_LOCK_KEY_LENGTH,
   INSTALL_LOCK_PATH,
+  LockFindings,
   PUBLISHED_CARD_MANAGER_KEYS,
 } from '../src/utils/installLock';
 import { isTagLostError } from '../src/utils/keycardErrors';
@@ -40,6 +44,7 @@ const INS_EXTERNAL_AUTHENTICATE = 0x82;
 const INS_GET_DATA = 0xca;
 const INS_PUT_KEY = 0xd8;
 const INS_SET_STATUS = 0xf0;
+const INS_GET_STATUS = 0xf2;
 
 const OP_READY = 0x01;
 const INITIALIZED = 0x07;
@@ -52,6 +57,37 @@ const sw = (code: number) =>
 
 const desKeyset = (kvn: number) =>
   [1, 2, 3].flatMap(id => [0xc0, 0x04, id, kvn, 0x80, 0x10]);
+
+const tlv = (tag: number[], value: number[]) => [
+  ...tag,
+  value.length,
+  ...value,
+];
+const registryEntry = (
+  aid: number[],
+  lifeCycle: number,
+  privileges: number[],
+) =>
+  tlv(
+    [0xe3],
+    [
+      ...tlv([0x4f], aid),
+      ...tlv([0x9f, 0x70], [lifeCycle]),
+      ...tlv([0xc5], privileges),
+    ],
+  );
+
+/** The measured Developer card: its card manager's privileges and its four applets. */
+const CARD_MANAGER_PRIVILEGES = [0x9e, 0xfe, 0x80];
+const APPLICATIONS = [
+  ...fromHex(
+    'e3274f09a000000804000101019f700107c503000000c407a0000008040001cc08a000000151000000' +
+      'e3254f07d27600008501019f700107c503000000c407a0000008040001cc08a000000151000000' +
+      'e3274f09a000000804000103019f700107c503000000c407a0000008040001cc08a000000151000000' +
+      'e3274f09a000000804000104019f700107c503000000c407a0000008040001cc08a000000151000000',
+  ),
+];
+const DOMAIN_AID = [...fromHex('a0000001515350')];
 
 type FakeOptions = {
   kvn?: number;
@@ -75,7 +111,17 @@ class FakeCardManager {
   template?: number[];
   loseOnInitializeUpdate = false;
   loseOnGetData = false;
+  loseOnGetStatus = false;
   sessionOpen = false;
+  /** SET STATUS changes nothing, as on a card that will not leave its state. */
+  stuckLifeCycle = false;
+  cardManagerPrivileges = CARD_MANAGER_PRIVILEGES;
+  cardManagerEntry?: number[];
+  cardManagerPages?: number[][];
+  applications = APPLICATIONS;
+  applicationPages?: number[][];
+  refuseStatus: Record<number, number> = {};
+  private applicationPage = 0;
   readonly commands: APDUCommand[] = [];
   putKeys: { p1: number; newKvn: number; kcvs: string[] }[] = [];
 
@@ -124,6 +170,8 @@ class FakeCardManager {
         return this.putKey(cmd);
       case INS_SET_STATUS:
         return this.setStatus(cmd);
+      case INS_GET_STATUS:
+        return this.getStatus(cmd);
       default:
         return sw(0x6d00);
     }
@@ -159,6 +207,40 @@ class FakeCardManager {
       ...this.otherKeys,
     ];
     return ok([0xe0, entries.length, ...entries]);
+  }
+
+  private getStatus(cmd: APDUCommand): APDUResponse {
+    if (this.loseOnGetStatus) {
+      throw new Error('Tag was lost.');
+    }
+    if (!this.sessionOpen) {
+      return sw(0x6982);
+    }
+    if (this.refuseStatus[cmd.p1]) {
+      return sw(this.refuseStatus[cmd.p1]);
+    }
+    if (cmd.p1 === 0x80 && this.cardManagerPages) {
+      const [first, ...rest] = this.cardManagerPages;
+      return cmd.p2 === 0x03
+        ? ok(rest[0] ?? [])
+        : new APDUResponse(new Uint8Array([...first, 0x63, 0x10]));
+    }
+    if (cmd.p1 === 0x80) {
+      return ok(
+        this.cardManagerEntry ??
+          registryEntry(
+            [...CARD_MANAGER_AID],
+            this.lifeCycle,
+            this.cardManagerPrivileges,
+          ),
+      );
+    }
+    const pages = this.applicationPages ?? [this.applications];
+    this.applicationPage = cmd.p2 === 0x03 ? this.applicationPage + 1 : 0;
+    const page = pages[Math.min(this.applicationPage, pages.length - 1)];
+    return this.applicationPage < pages.length - 1
+      ? new APDUResponse(new Uint8Array([...page, 0x63, 0x10]))
+      : ok(page);
   }
 
   private initializeUpdate(hostChallenge: Uint8Array): APDUResponse {
@@ -219,7 +301,7 @@ class FakeCardManager {
     const next =
       (this.lifeCycle === OP_READY && cmd.p2 === INITIALIZED) ||
       (this.lifeCycle === INITIALIZED && cmd.p2 === SECURED);
-    if (cmd.p1 !== 0x80 || !next) {
+    if (cmd.p1 !== 0x80 || !next || this.stuckLifeCycle) {
       return sw(0x6985);
     }
     this.lifeCycle = cmd.p2;
@@ -456,11 +538,23 @@ describe('runInstallLock', () => {
   });
 });
 
-describe('the key list after a lock', () => {
-  const lock = (card: FakeCardManager) =>
-    runInstallLock(fakeKeycard(card).cmdSet, { action: 'lock' });
+const lock = (card: FakeCardManager) =>
+  runInstallLock(fakeKeycard(card).cmdSet, { action: 'lock' });
 
-  it('reads it in plain after selecting the card manager again', async () => {
+const unconfirmed = (findings: Partial<LockFindings>) => ({
+  outcome: 'unconfirmed',
+  cardManagerKey: 'lock',
+  findings: {
+    notSecured: null,
+    otherDomains: [],
+    otherKeyVersions: [],
+    unchecked: [],
+    ...findings,
+  },
+});
+
+describe('the checks after a lock', () => {
+  it('reads the state and the domains in the session, then the keys in plain after a new SELECT', async () => {
     const card = new FakeCardManager(DEV_KEY);
     await expect(lock(card)).resolves.toEqual({
       outcome: 'locked',
@@ -470,16 +564,306 @@ describe('the key list after a lock', () => {
       card.sent(INS_SET_STATUS).at(-1)!,
     );
     expect(
-      card.commands.slice(lastSetStatus + 1).map(cmd => [cmd.cla, cmd.ins]),
+      card.commands
+        .slice(lastSetStatus + 1)
+        .map(cmd => [cmd.cla, cmd.ins, cmd.p1, cmd.p2]),
     ).toEqual([
-      [0x00, INS_SELECT],
-      [0x80, INS_GET_DATA],
+      [0x84, INS_GET_STATUS, 0x80, 0x02],
+      [0x84, INS_GET_STATUS, 0x40, 0x02],
+      [0x00, INS_SELECT, 0x04, 0x00],
+      [0x80, INS_GET_DATA, 0x00, 0xe0],
     ]);
+    expect(toHex(card.sent(INS_GET_STATUS)[0].data.subarray(0, 2))).toBe(
+      '4f00',
+    );
     expect(card.sent(INS_GET_DATA)[0].serialize()).toEqual(
       fromHex('80ca00e000'),
     );
   });
 
+  it('sends GET STATUS as a case 4 command inside the session', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    await lock(card);
+    for (const cmd of card.sent(INS_GET_STATUS)) {
+      const bytes = cmd.serialize();
+      expect(toHex(bytes.subarray(0, 7))).toBe(
+        `84f2${cmd.p1.toString(16)}020a4f00`,
+      );
+      expect(bytes).toHaveLength(16);
+      expect(bytes[15]).toBe(0x00);
+    }
+  });
+
+  it('reports every finding at once', async () => {
+    const card = new FakeCardManager(DEV_KEY, {
+      lifeCycle: INITIALIZED,
+      otherKeys: desKeyset(0x02),
+    });
+    card.stuckLifeCycle = true;
+    card.applications = [
+      ...APPLICATIONS,
+      ...registryEntry(DOMAIN_AID, SECURED, [0x80, 0x10, 0x00]),
+    ];
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({
+        notSecured: 'INITIALIZED',
+        otherDomains: [
+          {
+            aid: 'A0000001515350',
+            securityDomain: true,
+            privileges: ['Global Delete'],
+          },
+        ],
+        otherKeyVersions: [0x02],
+      }),
+    );
+  });
+
+  it('sends no check on unlock', async () => {
+    const card = new FakeCardManager(LOCK_KEY);
+    const { cmdSet } = fakeKeycard(card);
+    await runInstallLock(cmdSet, { action: 'unlock', restore: 'gpDefault' });
+    expect(card.sent(INS_GET_STATUS)).toEqual([]);
+    expect(card.sent(INS_GET_DATA)).toEqual([]);
+  });
+});
+
+describe("the card manager's state after a lock", () => {
+  it.each([
+    ['OP_READY', OP_READY],
+    ['INITIALIZED', INITIALIZED],
+    ['CARD_LOCKED', 0x7f],
+    ['TERMINATED', 0xff],
+  ])('does not report a card left %s as locked', async (name, lifeCycle) => {
+    const card = new FakeCardManager(DEV_KEY, { lifeCycle });
+    card.stuckLifeCycle = true;
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ notSecured: name }),
+    );
+    expect(card.key).toEqual(LOCK_KEY);
+  });
+
+  it('leaves the state unchecked at a life cycle GlobalPlatform does not name', async () => {
+    const card = new FakeCardManager(DEV_KEY, { lifeCycle: 0x55 });
+    card.stuckLifeCycle = true;
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ unchecked: ['state'] }),
+    );
+  });
+
+  it.each<[string, (card: FakeCardManager) => void]>([
+    [
+      'is refused',
+      card => {
+        card.refuseStatus = { 0x80: 0x6a88 };
+      },
+    ],
+    [
+      'claims more data',
+      card => {
+        card.refuseStatus = { 0x80: 0x6310 };
+      },
+    ],
+    [
+      'answers for another AID',
+      card => {
+        card.cardManagerEntry = registryEntry(
+          DOMAIN_AID,
+          SECURED,
+          CARD_MANAGER_PRIVILEGES,
+        );
+      },
+    ],
+    [
+      'answers with two entries',
+      card => {
+        const entry = registryEntry(
+          [...CARD_MANAGER_AID],
+          SECURED,
+          CARD_MANAGER_PRIVILEGES,
+        );
+        card.cardManagerEntry = [...entry, ...entry];
+      },
+    ],
+  ])(
+    "leaves the state and the domains unchecked when the card manager's own query %s",
+    async (_, set) => {
+      const card = new FakeCardManager(DEV_KEY);
+      set(card);
+      await expect(lock(card)).resolves.toEqual(
+        unconfirmed({ unchecked: ['state', 'domains'] }),
+      );
+    },
+  );
+
+  it("never asks for a next occurrence of the card manager's own entry", async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    const entry = registryEntry(
+      [...CARD_MANAGER_AID],
+      SECURED,
+      CARD_MANAGER_PRIVILEGES,
+    );
+    card.cardManagerPages = [entry.slice(0, 10), entry.slice(10)];
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ unchecked: ['state', 'domains'] }),
+    );
+    expect(
+      card.sent(INS_GET_STATUS).filter(cmd => cmd.p1 === 0x80),
+    ).toHaveLength(1);
+  });
+
+  it('passes a card lost during GET STATUS through untouched', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    card.loseOnGetStatus = true;
+    const error = await lock(card).catch(e => e);
+    expect(isTagLostError(error)).toBe(true);
+  });
+});
+
+describe('the other security domains after a lock', () => {
+  it.each([
+    ['Authorized Management', [0x80, 0x40, 0x00], ['Authorized Management']],
+    ['Global Delete', [0x80, 0x10, 0x00], ['Global Delete']],
+    ['Delegated Management', [0xa0, 0x00, 0x00], ['Delegated Management']],
+    [
+      'Authorized Management and Global Delete',
+      [0x80, 0x50, 0x00],
+      ['Authorized Management', 'Global Delete'],
+    ],
+  ] as [string, number[], ManagementPrivilege[]][])(
+    'does not report a card as locked while another domain holds %s',
+    async (_, privileges, names) => {
+      const card = new FakeCardManager(DEV_KEY);
+      card.applications = [
+        ...APPLICATIONS,
+        ...registryEntry(DOMAIN_AID, SECURED, privileges),
+      ];
+      await expect(lock(card)).resolves.toEqual(
+        unconfirmed({
+          otherDomains: [
+            { aid: 'A0000001515350', securityDomain: true, privileges: names },
+          ],
+        }),
+      );
+    },
+  );
+
+  it('names an entry without the Security Domain bit an application', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    card.applications = [
+      ...APPLICATIONS,
+      ...registryEntry(DOMAIN_AID, 0x07, [0x00, 0x10, 0x00]),
+    ];
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({
+        otherDomains: [
+          {
+            aid: 'A0000001515350',
+            securityDomain: false,
+            privileges: ['Global Delete'],
+          },
+        ],
+      }),
+    );
+  });
+
+  it('passes over a domain that can only lock or terminate the card', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    card.applications = [
+      ...APPLICATIONS,
+      ...registryEntry(DOMAIN_AID, SECURED, [0x98, 0x0a, 0x00]),
+    ];
+    await expect(lock(card)).resolves.toMatchObject({ outcome: 'locked' });
+  });
+
+  it('passes over the card manager when the card lists it among its applications', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    card.applications = [
+      ...APPLICATIONS,
+      ...registryEntry([...CARD_MANAGER_AID], SECURED, CARD_MANAGER_PRIVILEGES),
+    ];
+    await expect(lock(card)).resolves.toMatchObject({ outcome: 'locked' });
+  });
+
+  it('reads a list the card splits over several answers', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    card.applicationPages = [APPLICATIONS.slice(0, 82), APPLICATIONS.slice(82)];
+    await expect(lock(card)).resolves.toMatchObject({ outcome: 'locked' });
+    expect(
+      card
+        .sent(INS_GET_STATUS)
+        .filter(cmd => cmd.p1 === 0x40)
+        .map(cmd => cmd.p2),
+    ).toEqual([0x02, 0x03]);
+  });
+
+  it('gives up on a card that keeps answering 6310', async () => {
+    const card = new FakeCardManager(DEV_KEY);
+    card.applicationPages = Array.from({ length: 20 }, () => APPLICATIONS);
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ unchecked: ['domains'] }),
+    );
+    expect(
+      card.sent(INS_GET_STATUS).filter(cmd => cmd.p1 === 0x40),
+    ).toHaveLength(16);
+  });
+
+  it.each<[string, (card: FakeCardManager) => void]>([
+    [
+      'the card manager lacks Global Registry',
+      card => {
+        card.cardManagerPrivileges = [0x9e, 0xfa, 0x80];
+      },
+    ],
+    [
+      'the list leaves out the Keycard applet',
+      card => {
+        card.applications = APPLICATIONS.slice(41);
+      },
+    ],
+    [
+      'an entry has a single privileges byte',
+      card => {
+        card.applications = [
+          ...APPLICATIONS,
+          ...registryEntry(DOMAIN_AID, SECURED, [0x80]),
+        ];
+      },
+    ],
+    [
+      'the card refuses the query',
+      card => {
+        card.refuseStatus = { 0x40: 0x6a88 };
+      },
+    ],
+    [
+      'an answer that claims more data is empty',
+      card => {
+        card.applicationPages = [[], APPLICATIONS];
+      },
+    ],
+    [
+      'an AID appears twice',
+      card => {
+        card.applications = [...APPLICATIONS, ...APPLICATIONS.slice(0, 41)];
+      },
+    ],
+    [
+      'the list does not parse',
+      card => {
+        card.applications = [0xe3, 0x05, 0x4f, 0x01];
+      },
+    ],
+  ])('leaves the domains unchecked when %s', async (_, set) => {
+    const card = new FakeCardManager(DEV_KEY);
+    set(card);
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ unchecked: ['domains'] }),
+    );
+  });
+});
+
+describe('the key list after a lock', () => {
   it.each([
     ['another keyset', [0x02], desKeyset(0x02)],
     [
@@ -497,11 +881,9 @@ describe('the key list after a lock', () => {
     'does not report a card as locked while it keeps %s',
     async (_, versions, otherKeys) => {
       const card = new FakeCardManager(DEV_KEY, { otherKeys });
-      await expect(lock(card)).resolves.toEqual({
-        outcome: 'otherKeysets',
-        cardManagerKey: 'lock',
-        otherKeyVersions: versions,
-      });
+      await expect(lock(card)).resolves.toEqual(
+        unconfirmed({ otherKeyVersions: versions }),
+      );
       expect(card.key).toEqual(LOCK_KEY);
       expect(card.lifeCycle).toBe(SECURED);
     },
@@ -509,10 +891,9 @@ describe('the key list after a lock', () => {
 
   it('reports a card already locked the same way', async () => {
     const card = new FakeCardManager(LOCK_KEY, { otherKeys: desKeyset(0x02) });
-    await expect(lock(card)).resolves.toMatchObject({
-      outcome: 'otherKeysets',
-      otherKeyVersions: [0x02],
-    });
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ otherKeyVersions: [0x02] }),
+    );
   });
 
   it('counts an initial keyset the card keeps beside version 1', async () => {
@@ -520,10 +901,9 @@ describe('the key list after a lock', () => {
       kvn: 0xff,
       keepsInitialKeyset: true,
     });
-    await expect(lock(card)).resolves.toMatchObject({
-      outcome: 'otherKeysets',
-      otherKeyVersions: [0xff],
-    });
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ otherKeyVersions: [0xff] }),
+    );
   });
 
   it('passes over a key version that holds only a public key', async () => {
@@ -543,10 +923,9 @@ describe('the key list after a lock', () => {
     ['refuses the second SELECT', { refuseSecondSelect: 0x6a82 }],
   ])('says the keys went unchecked when the card %s', async (_, fields) => {
     const card = Object.assign(new FakeCardManager(DEV_KEY), fields);
-    await expect(lock(card)).resolves.toEqual({
-      outcome: 'keysetsUnchecked',
-      cardManagerKey: 'lock',
-    });
+    await expect(lock(card)).resolves.toEqual(
+      unconfirmed({ unchecked: ['keys'] }),
+    );
     expect(card.key).toEqual(LOCK_KEY);
   });
 
@@ -555,13 +934,6 @@ describe('the key list after a lock', () => {
     card.loseOnGetData = true;
     const error = await lock(card).catch(e => e);
     expect(isTagLostError(error)).toBe(true);
-  });
-
-  it('is not read on unlock', async () => {
-    const card = new FakeCardManager(LOCK_KEY);
-    const { cmdSet } = fakeKeycard(card);
-    await runInstallLock(cmdSet, { action: 'unlock', restore: 'gpDefault' });
-    expect(card.sent(INS_GET_DATA)).toEqual([]);
   });
 });
 
@@ -585,6 +957,22 @@ describe('the operation hooks', () => {
 });
 
 describe('keycard-sdk contract', () => {
+  it('has the GET DATA and GET STATUS the lock sends', () => {
+    expect(typeof GlobalPlatformCommandset.prototype.getData).toBe('function');
+    expect(typeof GlobalPlatformCommandset.prototype.getStatus).toBe(
+      'function',
+    );
+    expect([
+      GlobalPlatformConstants.INS_GET_DATA,
+      GlobalPlatformConstants.GET_DATA_KEY_INFORMATION_TEMPLATE,
+      GlobalPlatformConstants.INS_GET_STATUS,
+      GlobalPlatformConstants.GET_STATUS_P1_ISD,
+      GlobalPlatformConstants.GET_STATUS_P1_APPLICATIONS,
+      GlobalPlatformConstants.GET_STATUS_P2_TLV,
+      GlobalPlatformConstants.GET_STATUS_P2_NEXT,
+    ]).toEqual([0xca, 0x00e0, 0xf2, 0x80, 0x40, 0x02, 0x01]);
+  });
+
   it('still throws the literal the hook looks for when no keyset matches', () => {
     const source = readFileSync(
       require.resolve('keycard-sdk/dist/global-platform-commandset.js'),

@@ -60,7 +60,7 @@
     "bitcoinjs-lib": "^6.1.10",
     "fast-text-encoding": "1.0.6",
     "fflate": "^0.8.3",
-    "keycard-sdk": "github:mmlado/keycard-sdk#53cbb0e4031dc69b9547161fb00e4f4adf6c15c8",
+    "keycard-sdk": "github:mmlado/keycard-sdk#8e99f5d00a04e7a9d929bcc93c701d97084b4c66",
     "node-libs-react-native": "^1.2.1",
     "react": "^19.2.0",
     "react-native": "^0.87.1",
