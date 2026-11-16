@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Button, Text } from 'react-native-paper';
 
 import theme from '@/theme';
 
@@ -9,12 +9,14 @@ import BottomActionArea from '@/components/BottomActionArea';
 import PrimaryButton from '@/components/PrimaryButton';
 
 import { bip85Format, bip85Path, type Bip85Format } from '@/utils/bip85';
+import { hasSeedQr } from '@/utils/seedQr';
 
 type Props = {
   format: Bip85Format;
   index: number;
   entropy: Uint8Array;
   onDone: () => void;
+  onShowSeedQr: (words: string[]) => void;
 };
 
 export const BIP85_RESULT_EXPLAINER =
@@ -24,7 +26,13 @@ export const BIP85_RESULT_EXPLAINER =
 export const BIP85_INVALID_KEY =
   'This index gives an invalid key. Use the next index.';
 
-export default function Bip85Review({ format, index, entropy, onDone }: Props) {
+export default function Bip85Review({
+  format,
+  index,
+  entropy,
+  onDone,
+  onShowSeedQr,
+}: Props) {
   const { title, layout, encode } = bip85Format(format);
   const [revealed, setRevealed] = useState(false);
   const secret = useMemo(() => encode(entropy), [encode, entropy]);
@@ -91,6 +99,11 @@ export default function Bip85Review({ format, index, entropy, onDone }: Props) {
       </ScrollView>
 
       <BottomActionArea style={styles.buttonArea}>
+        {revealed && hasSeedQr(words) && (
+          <Button mode="outlined" onPress={() => onShowSeedQr(words)}>
+            Show SeedQR
+          </Button>
+        )}
         <PrimaryButton
           testID="primary-button"
           label={revealed || secret === null ? 'Done' : 'Reveal'}
@@ -168,5 +181,6 @@ const styles = StyleSheet.create({
   buttonArea: {
     paddingHorizontal: 24,
     paddingTop: 16,
+    gap: 8,
   },
 });

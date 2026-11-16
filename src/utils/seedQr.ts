@@ -1,4 +1,8 @@
-import { entropyToMnemonic, validateMnemonic } from '@scure/bip39';
+import {
+  entropyToMnemonic,
+  mnemonicToEntropy,
+  validateMnemonic,
+} from '@scure/bip39';
 import { wordlist as englishWordlist } from '@scure/bip39/wordlists/english.js';
 
 export type SeedQrDecodeResult =
@@ -82,4 +86,50 @@ export function decodeCompactSeedQr(entropy: Uint8Array): SeedQrDecodeResult {
 
 export function isCompactSeedQrBytes(bytes: Uint8Array): boolean {
   return VALID_ENTROPY_LENGTHS.includes(bytes.length);
+}
+
+export type SeedQrFormat = 'standard' | 'compact';
+
+/** The phrase lengths the SeedQR specification defines. */
+const SEED_QR_WORD_COUNTS = [12, 24];
+
+export function hasSeedQr(words: string[]): boolean {
+  return SEED_QR_WORD_COUNTS.includes(words.length);
+}
+
+function seedQrPhrase(words: string[]): string {
+  const phrase = words.join(' ');
+  if (!hasSeedQr(words) || !validateMnemonic(phrase, englishWordlist)) {
+    throw new Error(`No SeedQR for this ${words.length}-word phrase`);
+  }
+  return phrase;
+}
+
+export function encodeStandardSeedQr(words: string[]): string {
+  seedQrPhrase(words);
+  return words
+    .map(word =>
+      String(englishWordlist.indexOf(word)).padStart(DIGITS_PER_INDEX, '0'),
+    )
+    .join('');
+}
+
+export function encodeCompactSeedQr(words: string[]): Uint8Array {
+  return mnemonicToEntropy(seedQrPhrase(words), englishWordlist);
+}
+
+/** L gives each code the size the specification lists. */
+export const SEED_QR_ERROR_CORRECTION = 'L';
+
+export type SeedQrSegment =
+  | { data: string; mode: 'numeric' }
+  | { data: Uint8Array; mode: 'byte' };
+
+export function seedQrSegments(
+  words: string[],
+  format: SeedQrFormat,
+): SeedQrSegment[] {
+  return format === 'standard'
+    ? [{ data: encodeStandardSeedQr(words), mode: 'numeric' }]
+    : [{ data: encodeCompactSeedQr(words), mode: 'byte' }];
 }

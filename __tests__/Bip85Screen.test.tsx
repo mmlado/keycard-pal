@@ -22,8 +22,16 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('react-native-paper', () => {
-  const { Text } = require('react-native');
-  return { MD3DarkTheme: { colors: {} }, Text };
+  const { Pressable, Text } = require('react-native');
+  return {
+    MD3DarkTheme: { colors: {} },
+    Text,
+    Button: ({ children, onPress }: any) => (
+      <Pressable onPress={onPress}>
+        <Text>{children}</Text>
+      </Pressable>
+    ),
+  };
 });
 
 jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
@@ -74,6 +82,8 @@ const ZERO_ENTROPY = new Uint8Array(16);
 const navigation = {
   addListener: jest.fn(() => jest.fn()),
   goBack: jest.fn(),
+  isFocused: jest.fn(() => true),
+  navigate: jest.fn(),
   reset: jest.fn(),
   setOptions: jest.fn(),
 } as any;
@@ -146,6 +156,8 @@ describe('Bip85Screen', () => {
     MockNFCBottomSheet.mockClear();
     navigation.addListener.mockClear();
     navigation.goBack.mockClear();
+    navigation.isFocused.mockReturnValue(true);
+    navigation.navigate.mockClear();
     navigation.reset.mockClear();
     navigation.setOptions.mockClear();
     mockGenerationsInUse = ['4.0'];
@@ -329,11 +341,40 @@ describe('Bip85Screen', () => {
       expect(mockReset).toHaveBeenCalledTimes(1);
     });
 
+    // Its Done resets the stack, which removes this screen too.
+    it('lets the SeedQR screen above leave through it', () => {
+      derive('words12', '0');
+      navigation.isFocused.mockReturnValue(false);
+      const preventDefault = jest.fn();
+      act(() => {
+        beforeRemove()({ preventDefault });
+      });
+      expect(preventDefault).not.toHaveBeenCalled();
+      expect(mockReset).not.toHaveBeenCalled();
+    });
+
     it('back on the form leaves', () => {
       renderScreen();
       const preventDefault = jest.fn();
       beforeRemove()({ preventDefault });
       expect(preventDefault).not.toHaveBeenCalled();
+      expect(mockReset).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('SeedQR', () => {
+    it('opens the QR result screen with the revealed words', async () => {
+      derive('words12', '0');
+      await act(async () => {
+        fireEvent.press(screen.getByText('Reveal'));
+      });
+      fireEvent.press(screen.getByText('Show SeedQR'));
+      expect(navigation.navigate).toHaveBeenCalledWith('QRResult', {
+        title: 'SeedQR',
+        description:
+          'The 12-word BIP39 phrase as a SeedQR. Anyone who scans it can use it.',
+        seedWords: Array(11).fill('abandon').concat('about'),
+      });
       expect(mockReset).not.toHaveBeenCalled();
     });
   });

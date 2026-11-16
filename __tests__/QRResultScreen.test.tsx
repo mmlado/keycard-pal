@@ -19,7 +19,17 @@ jest.mock('react-native-paper', () => {
   };
 });
 
-jest.mock('react-native-animated-ur-qr', () => () => null);
+const mockAnimatedURQRCode = jest.fn((_: object) => null);
+jest.mock(
+  'react-native-animated-ur-qr',
+  () => (props: object) => mockAnimatedURQRCode(props),
+);
+
+const mockSeedQrCode = jest.fn((_: object) => null);
+jest.mock(
+  '../src/components/SeedQrCode',
+  () => (props: object) => mockSeedQrCode(props),
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -104,6 +114,70 @@ describe('QRResultScreen', () => {
 
     fireEvent.press(screen.getByText('Done'));
 
+    expect(reset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [{ name: 'Dashboard' }],
+    });
+  });
+});
+
+describe('QRResultScreen with a phrase', () => {
+  const words = Array(11).fill('abandon').concat('about');
+
+  function renderPhrase(
+    navigation = { reset: jest.fn(), setOptions: jest.fn() },
+  ) {
+    return render(
+      <QRResultScreen
+        route={
+          {
+            params: {
+              title: 'SeedQR',
+              description: 'Anyone who scans it can use it.',
+              seedWords: words,
+            },
+            key: 'QRResult',
+            name: 'QRResult',
+          } as any
+        }
+        navigation={navigation as any}
+      />,
+    );
+  }
+
+  beforeEach(() => {
+    mockAnimatedURQRCode.mockClear();
+    mockSeedQrCode.mockClear();
+  });
+
+  it('draws the phrase as a SeedQR, not as a UR', () => {
+    renderPhrase();
+    expect(mockSeedQrCode).toHaveBeenCalledWith(
+      expect.objectContaining({ words }),
+    );
+    expect(mockAnimatedURQRCode).not.toHaveBeenCalled();
+  });
+
+  it('gives the SeedQR the size a UR code gets', () => {
+    renderPhrase();
+    const urSize = (mockSeedQrCode.mock.calls[0][0] as { size: number }).size;
+    renderScreen(SAMPLE_UR);
+    expect(mockAnimatedURQRCode).toHaveBeenCalledWith(
+      expect.objectContaining({ size: urSize }),
+    );
+  });
+
+  it('shows its title and description', () => {
+    const setOptions = jest.fn();
+    renderPhrase({ reset: jest.fn(), setOptions });
+    expect(setOptions).toHaveBeenCalledWith({ title: 'SeedQR' });
+    expect(screen.getByText('Anyone who scans it can use it.')).toBeTruthy();
+  });
+
+  it('"Done" resets navigation to Dashboard', () => {
+    const reset = jest.fn();
+    renderPhrase({ reset, setOptions: jest.fn() });
+    fireEvent.press(screen.getByText('Done'));
     expect(reset).toHaveBeenCalledWith({
       index: 0,
       routes: [{ name: 'Dashboard' }],

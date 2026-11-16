@@ -3,9 +3,11 @@ import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import AnimatedURQRCode from 'react-native-animated-ur-qr';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { QRResultScreenProps } from '../navigation/types';
-import theme from '../theme';
-import PrimaryButton from '../components/PrimaryButton';
+import type { QRResultScreenProps } from '@/navigation/types';
+import theme from '@/theme';
+
+import PrimaryButton from '@/components/PrimaryButton';
+import SeedQrCode from '@/components/SeedQrCode';
 
 const QR_PADDING = 24;
 
@@ -15,7 +17,7 @@ export default function QRResultScreen({
 }: QRResultScreenProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { urString, title, description } = route.params;
+  const { title, description } = route.params;
 
   useEffect(() => {
     navigation.setOptions({ title });
@@ -33,7 +35,11 @@ export default function QRResultScreen({
         <Text style={styles.description}>{description}</Text>
       ) : null}
       <View style={styles.qrArea}>
-        <AnimatedURQRCode urString={urString} size={qrSize} />
+        {'seedWords' in route.params ? (
+          <SeedQrCode words={route.params.seedWords} size={qrSize} />
+        ) : (
+          <AnimatedURQRCode urString={route.params.urString} size={qrSize} />
+        )}
       </View>
 
       <View style={styles.actions}>
