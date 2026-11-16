@@ -219,33 +219,29 @@ async function cardManagerEntry(
     : null;
 }
 
+/** Every managing entry the card lists, even when the list cannot be trusted to be whole. */
 async function otherManagingDomains(
   gp: GlobalPlatformCommandset,
   cardManager: RegistryEntry,
-): Promise<LockFindings['otherDomains'] | null> {
-  if (!listsEveryDomain(cardManager.privileges)) {
-    return null;
-  }
+): Promise<{ domains: LockFindings['otherDomains']; complete: boolean }> {
   const entries = await readRegistry(
     gp,
     GlobalPlatformConstants.GET_STATUS_P1_APPLICATIONS,
   );
-  // A list without the applet this tap used does not describe this card.
-  if (
-    !entries?.some(entry => sameAid(entry.aid, Identifiers.KEYCARD_INSTANCE_ID))
-  ) {
-    return null;
-  }
   const domains: LockFindings['otherDomains'] = [];
-  for (const entry of entries) {
+  // Without Global Registry, or without this tap's applet, the list may not be the whole card.
+  let complete =
+    entries !== null &&
+    listsEveryDomain(cardManager.privileges) &&
+    entries.some(entry => sameAid(entry.aid, Identifiers.KEYCARD_INSTANCE_ID));
+  for (const entry of entries ?? []) {
     if (sameAid(entry.aid, cardManager.aid)) {
       continue;
     }
     const privileges = managementPrivileges(entry.privileges);
     if (privileges === null) {
-      return null;
-    }
-    if (privileges.length > 0) {
+      complete = false;
+    } else if (privileges.length > 0) {
       domains.push({
         aid: toHex(entry.aid).toUpperCase(),
         securityDomain: isSecurityDomain(entry.privileges),
@@ -253,7 +249,7 @@ async function otherManagingDomains(
       });
     }
   }
-  return domains;
+  return { domains, complete };
 }
 
 /** GET STATUS needs the session, so it comes before the new SELECT of the key list. */
@@ -267,10 +263,10 @@ async function lockFindings(
   if (!state) {
     unchecked.push('state');
   }
-  const otherDomains = cardManager
+  const domainCheck = cardManager
     ? await otherManagingDomains(gp, cardManager)
     : null;
-  if (!otherDomains) {
+  if (!domainCheck?.complete) {
     unchecked.push('domains');
   }
   const otherKeyVersions = await otherKeysets(gp, lockKvn);
@@ -279,7 +275,7 @@ async function lockFindings(
   }
   return {
     notSecured: state && state !== 'SECURED' ? state : null,
-    otherDomains: otherDomains ?? [],
+    otherDomains: domainCheck?.domains ?? [],
     otherKeyVersions: otherKeyVersions ?? [],
     unchecked,
   };

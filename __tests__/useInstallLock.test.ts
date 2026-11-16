@@ -767,6 +767,47 @@ describe('the other security domains after a lock', () => {
     );
   });
 
+  it.each<[string, (card: FakeCardManager) => void]>([
+    [
+      'beside an entry whose privileges it cannot read',
+      card => {
+        card.applications = [
+          ...APPLICATIONS,
+          ...registryEntry(DOMAIN_AID, SECURED, [0x80, 0x40, 0x00]),
+          ...registryEntry([0xa0, 0, 0, 0, 0x99], SECURED, [0x80]),
+        ];
+      },
+    ],
+    [
+      'from a card manager without Global Registry',
+      card => {
+        card.cardManagerPrivileges = [0x9e, 0xfa, 0x80];
+        card.applications = [
+          ...APPLICATIONS,
+          ...registryEntry(DOMAIN_AID, SECURED, [0x80, 0x40, 0x00]),
+        ];
+      },
+    ],
+  ])(
+    'reports a managing domain listed %s, and the list as unchecked',
+    async (_, set) => {
+      const card = new FakeCardManager(DEV_KEY);
+      set(card);
+      await expect(lock(card)).resolves.toEqual(
+        unconfirmed({
+          otherDomains: [
+            {
+              aid: 'A0000001515350',
+              securityDomain: true,
+              privileges: ['Authorized Management'],
+            },
+          ],
+          unchecked: ['domains'],
+        }),
+      );
+    },
+  );
+
   it('passes over a domain that can only lock or terminate the card', async () => {
     const card = new FakeCardManager(DEV_KEY);
     card.applications = [
