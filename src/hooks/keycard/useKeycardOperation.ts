@@ -58,6 +58,8 @@ export interface ExecuteOptions {
   requiresMasterKey?: boolean;
   /** Refuse a card that already holds a key. Checked right after SELECT. */
   refusesMasterKey?: boolean;
+  /** Refuse a card whose key is in LEE mode. Checked right after SELECT. */
+  refusesLeeMode?: boolean;
   /**
    * The route this operation belongs to, when only some cards have it. Checked right after SELECT.
    */
@@ -107,6 +109,8 @@ export const PIN_BLOCKED_STATUS =
   "This Keycard's PIN is blocked. Unblock it with your PUK.";
 export const CARD_HAS_KEY_STATUS =
   'Card already has a key. Factory reset required.';
+export const LEE_MODE_STATUS =
+  "This Keycard's key cannot be rebuilt from a recovery phrase, so this is not available for it.";
 
 export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const [waitingForPin, setWaitingForPin] = useState(false);
@@ -143,6 +147,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
   const requiresPinRef = useRef(true);
   const requiresMasterKeyRef = useRef(true);
   const refusesMasterKeyRef = useRef(false);
+  const refusesLeeModeRef = useRef(false);
   const requiresRouteRef = useRef<GenerationBoundRoute | undefined>(undefined);
   const requiresCardKeyRef = useRef<string | undefined>(undefined);
   const operationRunningRef = useRef(false);
@@ -463,6 +468,9 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       if (refusesMasterKeyRef.current && appInfo.hasMasterKey()) {
         throw new Error(CARD_HAS_KEY_STATUS);
       }
+      if (refusesLeeModeRef.current && appInfo.isLEEMode()) {
+        throw new Error(LEE_MODE_STATUS);
+      }
 
       // A card with a certificate (ADR-0013): no pairing, no IDENTIFY CARD, and nothing but
       // SELECT outside the channel, so even the name waits for it.
@@ -553,6 +561,7 @@ export function useKeycardOperation<T>(): UseKeycardOperation<T> {
       requiresPinRef.current = options.requiresPin ?? true;
       requiresMasterKeyRef.current = options.requiresMasterKey ?? true;
       refusesMasterKeyRef.current = options.refusesMasterKey ?? false;
+      refusesLeeModeRef.current = options.refusesLeeMode ?? false;
       requiresRouteRef.current = options.requiresRoute;
       requiresCardKeyRef.current = options.requiresCardKey;
       retryOnTagLossRef.current = options.retryOnTagLoss ?? false;

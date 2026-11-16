@@ -23,11 +23,20 @@ jest.mock('../src/assets/icons', () => require('../__mocks__/iconsMock'));
 
 // These assertions describe the list layout's rows, so pin the preference.
 let mockGenerationsInUse: ('3.1' | '4.0')[] = ['3.1', '4.0'];
+let mockDeveloperCardOptions: 'unset' | 'shown' | 'hidden' = 'unset';
+let mockInstallLockSupported = true;
+
+jest.mock('../src/utils/installLockSupport', () => ({
+  get INSTALL_LOCK_SUPPORTED() {
+    return mockInstallLockSupported;
+  },
+}));
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
     preferences: mockTestPreferences({
       dashboardLayout: 'list',
+      developerCardOptions: mockDeveloperCardOptions,
       generationsInUse: mockGenerationsInUse,
     }),
     setPreference: jest.fn(),
@@ -45,7 +54,48 @@ describe('KeycardMenuScreen', () => {
   beforeEach(() => {
     navigation.navigate.mockClear();
     mockGenerationsInUse = ['3.1', '4.0'];
+    mockDeveloperCardOptions = 'unset';
+    mockInstallLockSupported = true;
     mockInsets.bottom = 0;
+  });
+
+  describe('Developer cards', () => {
+    it('is left out until the Settings switch is on', () => {
+      renderScreen();
+      expect(screen.queryByText('Developer cards')).toBeNull();
+    });
+
+    it('is left out when the user turned the switch off', () => {
+      mockDeveloperCardOptions = 'hidden';
+      renderScreen();
+      expect(screen.queryByText('Developer cards')).toBeNull();
+    });
+
+    it('is the last entry once the switch is on, and opens its menu', () => {
+      mockDeveloperCardOptions = 'shown';
+      renderScreen();
+      const labels = screen
+        .getAllByText(/./)
+        .map(node => node.props.children)
+        .filter(text => typeof text === 'string');
+      expect(labels[labels.length - 1]).toBe('Developer cards');
+      fireEvent.press(screen.getByText('Developer cards'));
+      expect(navigation.navigate).toHaveBeenCalledWith('DeveloperCardsMenu');
+    });
+
+    it('is left out when only 3.x cards are ticked', () => {
+      mockDeveloperCardOptions = 'shown';
+      mockGenerationsInUse = ['3.1'];
+      renderScreen();
+      expect(screen.queryByText('Developer cards')).toBeNull();
+    });
+
+    it('is left out where the install lock is not supported', () => {
+      mockDeveloperCardOptions = 'shown';
+      mockInstallLockSupported = false;
+      renderScreen();
+      expect(screen.queryByText('Developer cards')).toBeNull();
+    });
   });
 
   it('keeps the last entry above the bottom inset', () => {

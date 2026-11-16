@@ -8,7 +8,8 @@ import {
 export type GenerationBoundRoute =
   | 'PairingSlots'
   | 'ChangePairingSecret'
-  | 'Bip85';
+  | 'Bip85'
+  | 'InstallLock';
 
 /** The first and last generation that have a destination; at least one is set. */
 type GenerationSpan =
@@ -24,6 +25,7 @@ const ROUTE_GENERATIONS = {
   PairingSlots: { last: '3.1' },
   ChangePairingSecret: { last: '3.1' },
   Bip85: { first: '4.0' },
+  InstallLock: { first: '4.0' },
 } as const satisfies Record<GenerationBoundRoute, GenerationSpan>;
 
 /** No ticked generation has it: leave the menu entry out. An empty selection hides nothing. */
@@ -115,6 +117,15 @@ const NOT_ON_CARD: Record<GenerationBoundRoute, RouteAbsence> = {
     sheetError:
       'This Keycard cannot derive BIP85 secrets, so nothing was derived. Tap ' +
       'a newer Keycard.',
+  },
+  InstallLock: {
+    title: 'Install lock needs a newer Keycard',
+    detail: `This needs a Keycard with applet ${generationLabel(
+      ROUTE_GENERATIONS.InstallLock.first,
+    )}.`,
+    sheetError:
+      'This Keycard is too old for an install lock, so nothing was changed. ' +
+      'Tap a newer Keycard.',
   },
 };
 

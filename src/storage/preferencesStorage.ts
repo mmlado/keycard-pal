@@ -11,9 +11,13 @@ import {
 /** How the dashboard renders its destinations. */
 export type DashboardLayout = 'tiles' | 'list';
 
+/** 'unset' until the user moves the switch, so approving an unverified card may still turn it on. */
+export type DeveloperCardOptions = 'unset' | 'shown' | 'hidden';
+
 /** Every stored UI preference. Read once at startup by `PreferencesProvider` (ADR-0011). */
 export type Preferences = {
   dashboardLayout: DashboardLayout;
+  developerCardOptions: DeveloperCardOptions;
   /** The cards the user holds, all by default. Hides entries and taps; never refuses a card. */
   generationsInUse: Generation[];
   /** Generations whose dashboard reminder the user closed for good. */
@@ -26,6 +30,7 @@ export type Preferences = {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   dashboardLayout: 'tiles',
+  developerCardOptions: 'unset',
   generationsInUse: [...ALL_GENERATIONS],
   generationRemindersDismissed: [],
   pinPadScramble: false,
@@ -37,6 +42,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 /** Opt-in features end in `_enabled`, so unset reads as off (ADR-0003). Booleans are '1' / '0'. */
 const KEYS: Record<keyof Preferences, string> = {
   dashboardLayout: 'preference_dashboard_layout',
+  developerCardOptions: 'preference_developer_card_options',
   generationsInUse: 'preference_generations_in_use',
   generationRemindersDismissed: 'preference_generation_reminders_dismissed',
   pinPadScramble: 'preference_pinpad_scramble',
@@ -54,6 +60,9 @@ export async function loadPreferences(): Promise<Preferences> {
       // Anything but an explicit 'list' means tiles.
       dashboardLayout:
         stored[KEYS.dashboardLayout] === 'list' ? 'list' : 'tiles',
+      developerCardOptions: decodeDeveloperCardOptions(
+        stored[KEYS.developerCardOptions],
+      ),
       generationsInUse: parseGenerationsInUse(stored[KEYS.generationsInUse]),
       generationRemindersDismissed: parseGenerations(
         stored[KEYS.generationRemindersDismissed],
@@ -66,6 +75,12 @@ export async function loadPreferences(): Promise<Preferences> {
   } catch {
     return { ...DEFAULT_PREFERENCES };
   }
+}
+
+function decodeDeveloperCardOptions(
+  value: string | null | undefined,
+): DeveloperCardOptions {
+  return value === 'shown' || value === 'hidden' ? value : 'unset';
 }
 
 function encode(value: Preferences[keyof Preferences]): string {

@@ -31,6 +31,7 @@ jest.mock('../src/storage/preferencesStorage', () => ({
 
 const STORED: Preferences = {
   dashboardLayout: 'list',
+  developerCardOptions: 'unset',
   generationsInUse: ['3.1', '4.0'],
   generationRemindersDismissed: [],
   pinPadScramble: true,

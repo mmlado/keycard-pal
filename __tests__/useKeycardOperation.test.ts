@@ -9,6 +9,7 @@ import { loadPairing } from '../src/storage/pairingStorage';
 import {
   CARD_HAS_KEY_STATUS,
   DIFFERENT_CARD_STATUS,
+  LEE_MODE_STATUS,
   NOT_GENUINE_STATUS,
   PAIRING_PASSWORD_NEEDED_STATUS,
   PIN_BLOCKED_STATUS,
@@ -576,6 +577,40 @@ describe('useKeycardOperation', () => {
       expect(cmdSet.autoOpenSecureChannel).not.toHaveBeenCalled();
       expect(mockOp).not.toHaveBeenCalled();
     });
+
+    it.each([
+      [true, 'refuses'],
+      [false, 'runs on'],
+    ])(
+      'with refusesLeeMode, %s LEE mode: %s the card, before any pairing or PIN',
+      async (leeMode, verdict) => {
+        const cmdSet = {
+          ...makeMockCmdSet(),
+          applicationInfo: {
+            ...makeMockCmdSet().applicationInfo,
+            isLEEMode: () => leeMode,
+          },
+        };
+        mockCommandset.mockImplementation(() => cmdSet);
+
+        const mockOp = jest.fn().mockResolvedValue('ok');
+        const { result } = renderHook(() => useKeycardOperation<string>());
+        await act(async () => {
+          result.current.execute(mockOp, {
+            requiresPin: false,
+            refusesLeeMode: true,
+          });
+        });
+        await triggerCardConnect(result.current);
+        if (verdict === 'refuses') {
+          expect(result.current.status).toBe(LEE_MODE_STATUS);
+          expect(cmdSet.autoPair).not.toHaveBeenCalled();
+          expect(mockOp).not.toHaveBeenCalled();
+        } else {
+          expect(mockOp).toHaveBeenCalledTimes(1);
+        }
+      },
+    );
 
     it('runs on a card without a key when refusesMasterKey is set', async () => {
       mockCommandset.mockImplementation(() => ({

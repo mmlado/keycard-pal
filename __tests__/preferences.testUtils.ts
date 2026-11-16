@@ -7,6 +7,7 @@ import type { Preferences } from '../src/storage/preferencesStorage';
  */
 const DEFAULTS: Preferences = {
   dashboardLayout: 'tiles',
+  developerCardOptions: 'unset',
   generationsInUse: ['3.1', '4.0'],
   generationRemindersDismissed: [],
   pinPadScramble: false,
