@@ -7,6 +7,7 @@ import { Icons } from '@/assets/icons';
 import {
   KEYCARD_BUILD_GUIDE_LABEL,
   KEYCARD_BUILD_GUIDE_URL,
+  NOT_LOCKED_DETAIL,
   NOT_LOCKED_HEADING,
   UNLOCK_INSTALLS_INTRO,
   UNLOCK_INSTALLS_TITLE,
@@ -20,7 +21,10 @@ import theme from '@/theme';
 
 import PrimaryButton from '@/components/PrimaryButton';
 
-import { useUnlockInstalls } from '@/hooks/keycard/useInstallLock';
+import {
+  InstallLockResult,
+  useUnlockInstalls,
+} from '@/hooks/keycard/useInstallLock';
 import { useExternalLink } from '@/hooks/useExternalLink';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
 
@@ -37,7 +41,12 @@ export default function UnlockInstallsScreen({
   const insets = useSafeAreaInsets();
   const [restore, setRestore] = useState<PublishedCardManagerKey | null>(null);
   const keycard = useUnlockInstalls();
-  const { phase, result, start } = keycard;
+  const { phase, start } = keycard;
+  const result = keycard.result as InstallLockResult | null;
+  const notLockedKey =
+    result?.outcome === 'notLocked' && result.cardManagerKey !== 'lock'
+      ? result.cardManagerKey
+      : null;
   const { open, opensInBrowser } = useExternalLink({
     url: KEYCARD_BUILD_GUIDE_URL,
     title: KEYCARD_BUILD_GUIDE_LABEL,
@@ -66,6 +75,7 @@ export default function UnlockInstallsScreen({
                 <Pressable
                   key={key}
                   accessibilityRole="radio"
+                  accessibilityLabel={`${label}. ${detail}`}
                   accessibilityState={{ checked: selected }}
                   style={styles.choice}
                   onPress={() => setRestore(key)}
@@ -94,17 +104,28 @@ export default function UnlockInstallsScreen({
         <View style={styles.content}>
           <ScrollView contentContainerStyle={styles.body}>
             <Text style={styles.heading}>
-              {result === 'notLocked' ? NOT_LOCKED_HEADING : UNLOCKED_HEADING}
+              {notLockedKey ? NOT_LOCKED_HEADING : UNLOCKED_HEADING}
             </Text>
+            {notLockedKey && (
+              <Text style={styles.intro}>
+                {NOT_LOCKED_DETAIL[notLockedKey]}
+              </Text>
+            )}
             <Text style={styles.intro}>{UPDATE_STEPS_HEADING}</Text>
             {UPDATE_STEPS.map((step, index) => (
-              <View key={step} style={styles.point}>
+              <View
+                key={step}
+                accessible
+                accessibilityLabel={`${index + 1}. ${step}`}
+                style={styles.point}
+              >
                 <Text style={styles.number}>{`${index + 1}.`}</Text>
                 <Text style={styles.pointText}>{step}</Text>
               </View>
             ))}
             <Pressable
               accessibilityRole="link"
+              accessibilityLabel={KEYCARD_BUILD_GUIDE_LABEL}
               style={styles.link}
               onPress={open}
               testID="keycard-build-guide"

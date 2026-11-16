@@ -13,6 +13,7 @@ import {
   PUBLISHED_CARD_MANAGER_KEYS,
   PublishedCardManagerKey,
 } from '@/utils/installLock';
+import { isTagLostError } from '@/utils/keycardErrors';
 import { useKeycardOp } from './useKeycardOperation';
 
 export type InstallLockRequest =
@@ -25,21 +26,43 @@ export type InstallLockOutcome =
   | 'unlocked'
   | 'notLocked';
 
+/** 'lock' is the key derived from the card; the others are published. */
+export type CardManagerKey = 'lock' | PublishedCardManagerKey;
+
+export type InstallLockResult = {
+  outcome: InstallLockOutcome;
+  /** The key the card manager answers to once the tap is over. */
+  cardManagerKey: CardManagerKey;
+};
+
 export const NO_CHAIN_CODE_STATUS =
   "This Keycard's key cannot derive the lock key, so nothing was changed.";
 export const UNEXPECTED_LOCK_KEY_LENGTH =
   'The Keycard answered with the wrong length. Try again.';
 export const NO_MATCHING_KEY_STATUS =
-  "This PIN does not open this Keycard's applet installs, so nothing was " +
-  'changed. They may have been locked under another PIN or with another tool.';
+  "No key Keycard Pal knows opens this Keycard's card manager, so nothing " +
+  'was changed. It may be a retail Keycard, or locked under another ' +
+  'recovery phrase or PIN, or with another tool.';
 export const CARD_MANAGER_REFUSED_STATUS =
   "This Keycard's card manager refused the request, so nothing was changed.";
+export const CARD_MANAGER_BLOCKED_STATUS =
+  "This Keycard's card manager has blocked its key after too many failed " +
+  'attempts, so nothing was changed. Its applet installs can no longer be ' +
+  'changed.';
 
 /** keycard-sdk's literal for "no keyset matched the card cryptogram"; a test holds it to the SDK. */
 export const NO_MATCHING_KEYSET_MESSAGE = 'Error verifying card cryptogram';
 
+const INITIAL_KEY_VERSION = 0xff;
+
 function keyset(key: Uint8Array): SCP02Keys {
   return new SCP02Keys(key, key, key);
+}
+
+/** P1 and the new key version of a PUT KEY that replaces the keyset the card answered with. */
+function putKeyVersions(kvn: number): [number, number] {
+  // The initial keyset is replaced by adding version 1, as the SDK's own key upgrade does.
+  return kvn === INITIAL_KEY_VERSION ? [0, 1] : [kvn, kvn];
 }
 
 async function deriveLockKey(cmdSet: Commandset): Promise<Uint8Array> {
@@ -47,76 +70,113 @@ async function deriveLockKey(cmdSet: Commandset): Promise<Uint8Array> {
     INSTALL_LOCK_PATH,
     INSTALL_LOCK_KEY_LENGTH,
   );
-  if (response.sw === Constants.SW_CONDITIONS_OF_USE_NOT_SATISFIED) {
-    throw new Error(NO_CHAIN_CODE_STATUS);
+  try {
+    if (response.sw === Constants.SW_CONDITIONS_OF_USE_NOT_SATISFIED) {
+      throw new Error(NO_CHAIN_CODE_STATUS);
+    }
+    response.checkOK();
+    if (response.data.length !== INSTALL_LOCK_KEY_LENGTH) {
+      throw new Error(UNEXPECTED_LOCK_KEY_LENGTH);
+    }
+    return new Uint8Array(response.data);
+  } finally {
+    // The answer holds the key twice: its data is a copy of the raw buffer.
+    response.data.fill(0);
+    response.apdu.fill(0);
   }
-  response.checkOK();
-  if (response.data.length !== INSTALL_LOCK_KEY_LENGTH) {
-    throw new Error(UNEXPECTED_LOCK_KEY_LENGTH);
-  }
-  return response.data;
 }
 
-/** Opens the card manager's channel and tells whether it answered to the lock key or a published one. */
+/** A card's refusal in plain words; a lost card keeps its own error for the session to classify. */
+function cardManagerRefusal(e: unknown): unknown {
+  if (isTagLostError(e)) {
+    return e;
+  }
+  if (e instanceof Error && e.message.includes(NO_MATCHING_KEYSET_MESSAGE)) {
+    return new Error(NO_MATCHING_KEY_STATUS);
+  }
+  const sw = (e as { sw?: unknown } | null)?.sw;
+  if (sw === Constants.SW_AUTHENTICATION_METHOD_BLOCKED) {
+    return new Error(CARD_MANAGER_BLOCKED_STATUS);
+  }
+  if (typeof sw === 'number') {
+    return new Error(CARD_MANAGER_REFUSED_STATUS);
+  }
+  return e;
+}
+
+/** Opens the card manager's channel with whichever known key its cryptogram matched. */
 async function openCardManager(
   cmdSet: Commandset,
   lockKeys: SCP02Keys,
-): Promise<{ gp: GlobalPlatformCommandset; locked: boolean; kvn: number }> {
+): Promise<{
+  gp: GlobalPlatformCommandset;
+  cardManagerKey: CardManagerKey;
+  kvn: number;
+}> {
   const gp = new GlobalPlatformCommandset(cmdSet.apduChannel);
-  (await gp.select(CARD_MANAGER_AID)).checkOK();
-
   const challenge = CryptoUtils.getRandomBytes(8);
   let response;
   try {
+    (await gp.select(CARD_MANAGER_AID)).checkOK();
     // The development key is the commandset's own; the GlobalPlatform default is its fallback.
     response = await gp.initializeUpdate(challenge, [lockKeys]);
   } catch (e) {
-    if (e instanceof Error && e.message.includes(NO_MATCHING_KEYSET_MESSAGE)) {
-      throw new Error(NO_MATCHING_KEY_STATUS);
-    }
-    throw new Error(CARD_MANAGER_REFUSED_STATUS);
+    throw cardManagerRefusal(e);
   }
   (await gp.externalAuthenticate(challenge)).checkOK();
 
-  return {
-    gp,
-    locked: gp.scp02Session.staticKeys === lockKeys,
-    kvn: response.data[10],
-  };
+  const { staticKeys, fallbackKeys } = gp.scp02Session;
+  let cardManagerKey: CardManagerKey = 'keycardDevelopment';
+  if (staticKeys === lockKeys) {
+    cardManagerKey = 'lock';
+  } else if (fallbackKeys) {
+    cardManagerKey = 'gpDefault';
+  }
+  return { gp, cardManagerKey, kvn: response.data[10] };
 }
 
+/** Through INITIALIZED, since not every card takes OP_READY straight to SECURED. 6985: already past it. */
 async function secureCardManager(gp: GlobalPlatformCommandset): Promise<void> {
-  // 6985: already SECURED.
-  (
-    await gp.setStatus(
-      GlobalPlatformConstants.SET_STATUS_P1_ISD,
-      GlobalPlatformConstants.CARD_LIFE_CYCLE_SECURED,
-    )
-  ).checkSW([Constants.SW_OK, Constants.SW_CONDITIONS_OF_USE_NOT_SATISFIED]);
+  for (const state of [
+    GlobalPlatformConstants.CARD_LIFE_CYCLE_INITIALIZED,
+    GlobalPlatformConstants.CARD_LIFE_CYCLE_SECURED,
+  ]) {
+    (
+      await gp.setStatus(GlobalPlatformConstants.SET_STATUS_P1_ISD, state)
+    ).checkSW([Constants.SW_OK, Constants.SW_CONDITIONS_OF_USE_NOT_SATISFIED]);
+  }
 }
 
 export async function runInstallLock(
   cmdSet: Commandset,
   request: InstallLockRequest,
-): Promise<InstallLockOutcome> {
+): Promise<InstallLockResult> {
   const lockKey = await deriveLockKey(cmdSet);
   try {
-    const { gp, locked, kvn } = await openCardManager(cmdSet, keyset(lockKey));
+    const { gp, cardManagerKey, kvn } = await openCardManager(
+      cmdSet,
+      keyset(lockKey),
+    );
+    const [oldKvn, newKvn] = putKeyVersions(kvn);
 
     if (request.action === 'lock') {
+      const locked = cardManagerKey === 'lock';
       if (!locked) {
-        (await gp.putSCP02Keys(kvn, kvn, lockKey)).checkOK();
+        (await gp.putSCP02Keys(oldKvn, newKvn, lockKey)).checkOK();
       }
       await secureCardManager(gp);
-      return locked ? 'alreadyLocked' : 'locked';
+      return {
+        outcome: locked ? 'alreadyLocked' : 'locked',
+        cardManagerKey: 'lock',
+      };
     }
 
-    if (!locked) {
-      return 'notLocked';
+    if (cardManagerKey !== 'lock') {
+      return { outcome: 'notLocked', cardManagerKey };
     }
     const published = fromHex(PUBLISHED_CARD_MANAGER_KEYS[request.restore]);
-    (await gp.putSCP02Keys(kvn, kvn, published)).checkOK();
-    return 'unlocked';
+    (await gp.putSCP02Keys(oldKvn, newKvn, published)).checkOK();
+    return { outcome: 'unlocked', cardManagerKey: request.restore };
   } finally {
     lockKey.fill(0);
   }

@@ -119,13 +119,13 @@ const NOT_ON_CARD: Record<GenerationBoundRoute, RouteAbsence> = {
       'a newer Keycard.',
   },
   InstallLock: {
-    title: 'No install lock on this Keycard',
+    title: 'Install lock needs a newer Keycard',
     detail: `This needs a Keycard with applet ${generationLabel(
       ROUTE_GENERATIONS.InstallLock.first,
     )}.`,
     sheetError:
-      'This Keycard has no install lock, so nothing was changed. Tap a ' +
-      'newer Keycard.',
+      'This Keycard is too old for an install lock, so nothing was changed. ' +
+      'Tap a newer Keycard.',
   },
 };
 

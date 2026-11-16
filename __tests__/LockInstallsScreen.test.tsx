@@ -40,7 +40,11 @@ const navigation = {
 } as any;
 const route = { key: 'LockInstalls', name: 'LockInstalls' } as any;
 
-function renderScreen(phase = 'idle', result: string | null = null) {
+function renderScreen(
+  phase = 'idle',
+  outcome: 'locked' | 'alreadyLocked' | null = null,
+) {
+  const result = outcome && { outcome, cardManagerKey: 'lock' };
   mockUseLockInstalls.mockReturnValue({
     phase,
     status: '',
@@ -90,6 +94,13 @@ describe('LockInstallsScreen', () => {
   it('hides the explanation once the tap is under way', () => {
     renderScreen('nfc');
     expect(screen.queryByText(LOCK_INSTALLS_INTRO)).toBeNull();
+  });
+
+  it('reads each point as one line, without the bullet', () => {
+    renderScreen();
+    for (const point of LOCK_INSTALLS_POINTS) {
+      expect(screen.getByLabelText(point)).toBeTruthy();
+    }
   });
 
   it('leaves with the lock toast', () => {

@@ -51,10 +51,11 @@ describe('DeveloperCardsMenuScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith(target);
   });
 
-  it('marks both entries as starting a tap', () => {
+  // Each opens a screen first; the button there starts the tap and carries the mark.
+  it('marks neither entry as starting a tap', () => {
     renderScreen();
-    expect(screen.getByTestId('menu-nfc-indicator-0')).toBeTruthy();
-    expect(screen.getByTestId('menu-nfc-indicator-1')).toBeTruthy();
+    expect(screen.queryByTestId('menu-nfc-indicator-0')).toBeNull();
+    expect(screen.queryByTestId('menu-nfc-indicator-1')).toBeNull();
   });
 
   it('leaves both out when only 3.x cards are ticked', () => {

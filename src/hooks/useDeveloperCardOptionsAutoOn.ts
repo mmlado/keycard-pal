@@ -1,9 +1,12 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 import { usePreferences } from '@/hooks/usePreferences';
+
+import { loadApprovedCardKeys } from '@/storage/approvedCardsStorage';
 import {
   clearUnverifiedCardApproval,
   isUnverifiedCardApprovalPending,
+  noteUnverifiedCardApproved,
   subscribeUnverifiedCardApproval,
 } from '@/utils/unverifiedCardApproval';
 
@@ -15,6 +18,20 @@ export function useDeveloperCardOptionsAutoOn(): void {
     isUnverifiedCardApprovalPending,
   );
   const choice = preferences.developerCardOptions;
+
+  // An approval kept before this switch existed counts too.
+  useEffect(() => {
+    if (choice !== 'unset') {
+      return;
+    }
+    loadApprovedCardKeys()
+      .then(keys => {
+        if (keys.length > 0) {
+          noteUnverifiedCardApproved();
+        }
+      })
+      .catch(() => {});
+  }, [choice]);
 
   useEffect(() => {
     if (!pending) {

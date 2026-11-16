@@ -19,14 +19,12 @@ export default function DeveloperCardsMenuScreen({
     {
       label: LOCK_INSTALLS_TITLE,
       icon: Icons.lockInstalls,
-      requiresNfc: true,
       generationBoundRoute: 'InstallLock',
       onPress: () => navigation.navigate('LockInstalls'),
     },
     {
       label: UNLOCK_INSTALLS_TITLE,
       icon: Icons.unlockInstalls,
-      requiresNfc: true,
       generationBoundRoute: 'InstallLock',
       onPress: () => navigation.navigate('UnlockInstalls'),
     },

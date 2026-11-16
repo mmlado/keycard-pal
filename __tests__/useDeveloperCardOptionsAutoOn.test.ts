@@ -11,6 +11,11 @@ import { testPreferences as mockTestPreferences } from './preferences.testUtils'
 
 let mockChoice: DeveloperCardOptions = 'unset';
 const mockSetPreference = jest.fn();
+const mockLoadApprovedCardKeys = jest.fn();
+
+jest.mock('../src/storage/approvedCardsStorage', () => ({
+  loadApprovedCardKeys: () => mockLoadApprovedCardKeys(),
+}));
 
 jest.mock('../src/hooks/usePreferences', () => ({
   usePreferences: () => ({
@@ -22,8 +27,11 @@ jest.mock('../src/hooks/usePreferences', () => ({
 beforeEach(() => {
   mockChoice = 'unset';
   mockSetPreference.mockReset();
+  mockLoadApprovedCardKeys.mockReset().mockResolvedValue([]);
   clearUnverifiedCardApproval();
 });
+
+const flush = () => act(async () => {});
 
 describe('useDeveloperCardOptionsAutoOn', () => {
   it('does nothing without an approval', () => {
@@ -60,4 +68,41 @@ describe('useDeveloperCardOptionsAutoOn', () => {
       expect(isUnverifiedCardApprovalPending()).toBe(false);
     },
   );
+
+  describe('a card approved in an earlier run', () => {
+    it('shows the options at startup while the user has not chosen', async () => {
+      mockLoadApprovedCardKeys.mockResolvedValue(['02'.repeat(33)]);
+      renderHook(() => useDeveloperCardOptionsAutoOn());
+      await flush();
+      expect(mockSetPreference).toHaveBeenCalledWith(
+        'developerCardOptions',
+        'shown',
+      );
+    });
+
+    it('changes nothing when no card was ever approved', async () => {
+      renderHook(() => useDeveloperCardOptionsAutoOn());
+      await flush();
+      expect(mockSetPreference).not.toHaveBeenCalled();
+    });
+
+    it.each(['hidden', 'shown'] as const)(
+      'is not even read once the user chose %p',
+      async choice => {
+        mockChoice = choice;
+        mockLoadApprovedCardKeys.mockResolvedValue(['02'.repeat(33)]);
+        renderHook(() => useDeveloperCardOptionsAutoOn());
+        await flush();
+        expect(mockLoadApprovedCardKeys).not.toHaveBeenCalled();
+        expect(mockSetPreference).not.toHaveBeenCalled();
+      },
+    );
+
+    it('survives a store that cannot be read', async () => {
+      mockLoadApprovedCardKeys.mockRejectedValue(new Error('keystore'));
+      renderHook(() => useDeveloperCardOptionsAutoOn());
+      await flush();
+      expect(mockSetPreference).not.toHaveBeenCalled();
+    });
+  });
 });

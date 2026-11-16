@@ -1,4 +1,7 @@
-import { INSTALL_LOCK_PATH } from '@/utils/installLock';
+import {
+  INSTALL_LOCK_PATH,
+  PublishedCardManagerKey,
+} from '@/utils/installLock';
 
 export const LOCK_INSTALLS_TITLE = 'Lock applet installs';
 export const UNLOCK_INSTALLS_TITLE = 'Unlock applet installs';
@@ -30,6 +33,12 @@ export const UNLOCK_KEY_CHOICES = {
 
 export const UNLOCKED_HEADING = 'Applet installs unlocked';
 export const NOT_LOCKED_HEADING = 'Applet installs were not locked';
+
+export const NOT_LOCKED_DETAIL: Record<PublishedCardManagerKey, string> = {
+  gpDefault: 'Its card manager already uses the GlobalPlatform default key.',
+  keycardDevelopment:
+    'Its card manager already uses the Keycard development key.',
+};
 
 export const UPDATE_STEPS_HEADING = 'To update the Keycard applet:';
 

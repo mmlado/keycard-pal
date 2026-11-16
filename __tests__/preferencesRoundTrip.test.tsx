@@ -59,6 +59,12 @@ jest.mock('../src/utils/installLockSupport', () => ({
   INSTALL_LOCK_SUPPORTED: true,
 }));
 
+// Cards approved in an earlier run; none unless a test says so.
+let mockApprovedCardKeys: string[] = [];
+jest.mock('../src/storage/approvedCardsStorage', () => ({
+  loadApprovedCardKeys: () => Promise.resolve(mockApprovedCardKeys),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -139,6 +145,7 @@ async function flush() {
 beforeEach(async () => {
   await AsyncStorage.clear();
   clearUnverifiedCardApproval();
+  mockApprovedCardKeys = [];
 });
 
 /** The Settings switch with the app-level hook that turns it on after an approval. */
@@ -369,6 +376,13 @@ describe('developer card options', () => {
     first.unmount();
 
     await renderDeveloperCards();
+    expect(toggle().props.value).toBe(true);
+  });
+
+  it('a card approved before the switch existed turns them on at the next launch', async () => {
+    mockApprovedCardKeys = ['02'.repeat(33)];
+    await renderDeveloperCards();
+    await act(async () => {});
     expect(toggle().props.value).toBe(true);
   });
 

@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -14,7 +14,10 @@ import theme from '@/theme';
 
 import PrimaryButton from '@/components/PrimaryButton';
 
-import { useLockInstalls } from '@/hooks/keycard/useInstallLock';
+import {
+  InstallLockResult,
+  useLockInstalls,
+} from '@/hooks/keycard/useInstallLock';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
 
 export default function LockInstallsScreen({
@@ -30,7 +33,9 @@ export default function LockInstallsScreen({
     title: LOCK_INSTALLS_TITLE,
     done: {
       toast: result =>
-        result === 'alreadyLocked' ? ALREADY_LOCKED_TOAST : successMessage,
+        (result as InstallLockResult | null)?.outcome === 'alreadyLocked'
+          ? ALREADY_LOCKED_TOAST
+          : successMessage,
     },
     showOnDone: true,
   });
@@ -39,15 +44,20 @@ export default function LockInstallsScreen({
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
       {phase === 'idle' && (
         <View style={styles.content}>
-          <View style={styles.body}>
+          <ScrollView contentContainerStyle={styles.body}>
             <Text style={styles.intro}>{LOCK_INSTALLS_INTRO}</Text>
             {LOCK_INSTALLS_POINTS.map(point => (
-              <View key={point} style={styles.point}>
+              <View
+                key={point}
+                accessible
+                accessibilityLabel={point}
+                style={styles.point}
+              >
                 <Text style={styles.bullet}>{'•'}</Text>
                 <Text style={styles.pointText}>{point}</Text>
               </View>
             ))}
-          </View>
+          </ScrollView>
           <PrimaryButton
             label={LOCK_INSTALLS_TITLE}
             onPress={() => start({ action: 'lock' })}
@@ -71,9 +81,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 8,
+    gap: 16,
   },
   body: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     gap: 12,
   },

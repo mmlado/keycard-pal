@@ -44,10 +44,12 @@ import Slip39Screen from '../screens/keypair/Slip39Screen';
 
 // BIP85 screens
 import Bip85MenuScreen from '../screens/bip85/Bip85MenuScreen';
+import Bip85Screen from '../screens/bip85/Bip85Screen';
+
+// Developer cards screens
 import DeveloperCardsMenuScreen from '../screens/developerCards/DeveloperCardsMenuScreen';
 import LockInstallsScreen from '../screens/developerCards/LockInstallsScreen';
 import UnlockInstallsScreen from '../screens/developerCards/UnlockInstallsScreen';
-import Bip85Screen from '../screens/bip85/Bip85Screen';
 
 // Secrets screens
 import ChangeSecretScreen from '../screens/secrets/ChangeSecretScreen';
