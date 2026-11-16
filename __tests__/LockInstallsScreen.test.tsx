@@ -1,10 +1,16 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import {
   ALREADY_LOCKED_TOAST,
+  KEYSETS_UNCHECKED_DETAIL,
+  KEYSETS_UNCHECKED_HEADING,
   LOCK_INSTALLS_INTRO,
   LOCK_INSTALLS_POINTS,
+  OTHER_KEYSETS_HEADING,
+  otherKeysetsDetail,
+  otherKeysetsToast,
 } from '../src/constants/installLock';
 import LockInstallsScreen from '../src/screens/developerCards/LockInstallsScreen';
 import { INSTALL_LOCK_PATH } from '../src/utils/installLock';
@@ -40,11 +46,12 @@ const navigation = {
 } as any;
 const route = { key: 'LockInstalls', name: 'LockInstalls' } as any;
 
-function renderScreen(
-  phase = 'idle',
-  outcome: 'locked' | 'alreadyLocked' | null = null,
-) {
-  const result = outcome && { outcome, cardManagerKey: 'lock' };
+function renderScreen(phase = 'idle', outcome: string | null = null) {
+  const result = outcome && {
+    outcome,
+    cardManagerKey: 'lock',
+    ...(outcome === 'otherKeysets' && { otherKeyVersions: [0x02, 0x30] }),
+  };
   mockUseLockInstalls.mockReturnValue({
     phase,
     status: '',
@@ -111,5 +118,52 @@ describe('LockInstallsScreen', () => {
   it('says so when the card was already locked', () => {
     renderScreen('done', 'alreadyLocked');
     expect(toastOfLastReset()).toBe(ALREADY_LOCKED_TOAST);
+  });
+
+  it('shows the success mark for a lock the key list confirms', () => {
+    renderScreen('done', 'locked');
+    expect(jest.mocked(NFCBottomSheet).mock.lastCall?.[0].showOnDone).toBe(
+      true,
+    );
+  });
+
+  describe.each([
+    [
+      'otherKeysets',
+      OTHER_KEYSETS_HEADING,
+      otherKeysetsDetail([0x02, 0x30]),
+      otherKeysetsToast([0x02, 0x30]),
+    ],
+    [
+      'keysetsUnchecked',
+      KEYSETS_UNCHECKED_HEADING,
+      KEYSETS_UNCHECKED_DETAIL,
+      KEYSETS_UNCHECKED_HEADING,
+    ],
+  ])('a lock that ends as %s', (outcome, heading, detail, toast) => {
+    it('stays on what the key list says, with no success mark', () => {
+      renderScreen('done', outcome);
+      expect(navigation.reset).not.toHaveBeenCalled();
+      expect(screen.getByText(heading)).toBeTruthy();
+      expect(screen.getByText(detail)).toBeTruthy();
+      expect(jest.mocked(NFCBottomSheet).mock.lastCall?.[0].showOnDone).toBe(
+        false,
+      );
+    });
+
+    it('leaves on Done with its own toast', () => {
+      renderScreen('done', outcome);
+      fireEvent.press(screen.getByTestId('lock-done'));
+      expect(toastOfLastReset()).toBe(toast);
+    });
+  });
+
+  it('names every other keyset by its key version', () => {
+    expect(otherKeysetsDetail([0x02])).toContain(
+      'a keyset at key version 0x02',
+    );
+    expect(otherKeysetsToast([0x02, 0x30, 0xff])).toContain(
+      'keysets at key versions 0x02, 0x30 and 0xFF',
+    );
   });
 });

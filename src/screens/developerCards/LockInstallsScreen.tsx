@@ -5,9 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icons } from '@/assets/icons';
 import {
   ALREADY_LOCKED_TOAST,
+  KEYSETS_UNCHECKED_DETAIL,
+  KEYSETS_UNCHECKED_HEADING,
   LOCK_INSTALLS_INTRO,
   LOCK_INSTALLS_POINTS,
   LOCK_INSTALLS_TITLE,
+  OTHER_KEYSETS_HEADING,
+  otherKeysetsDetail,
+  otherKeysetsToast,
 } from '@/constants/installLock';
 import { LockInstallsScreenProps } from '@/navigation/types';
 import theme from '@/theme';
@@ -20,24 +25,57 @@ import {
 } from '@/hooks/keycard/useInstallLock';
 import { useKeycardScreen } from '@/hooks/useKeycardScreen';
 
+function unconfirmedLock(
+  result: InstallLockResult | null,
+): { heading: string; detail: string } | null {
+  switch (result?.outcome) {
+    case 'otherKeysets':
+      return {
+        heading: OTHER_KEYSETS_HEADING,
+        detail: otherKeysetsDetail(result.otherKeyVersions),
+      };
+    case 'keysetsUnchecked':
+      return {
+        heading: KEYSETS_UNCHECKED_HEADING,
+        detail: KEYSETS_UNCHECKED_DETAIL,
+      };
+    default:
+      return null;
+  }
+}
+
 export default function LockInstallsScreen({
   navigation,
 }: LockInstallsScreenProps) {
   const insets = useSafeAreaInsets();
   const keycard = useLockInstalls();
   const { phase, start, successMessage } = keycard;
+  const result = keycard.result as InstallLockResult | null;
+  const unconfirmed = phase === 'done' ? unconfirmedLock(result) : null;
 
-  const { sheet } = useKeycardScreen({
+  const { sheet, leave } = useKeycardScreen({
     keycard,
     navigation,
     title: LOCK_INSTALLS_TITLE,
     done: {
-      toast: result =>
-        (result as InstallLockResult | null)?.outcome === 'alreadyLocked'
-          ? ALREADY_LOCKED_TOAST
-          : successMessage,
+      toast: done => {
+        const lock = done as InstallLockResult | null;
+        switch (lock?.outcome) {
+          case 'alreadyLocked':
+            return ALREADY_LOCKED_TOAST;
+          case 'otherKeysets':
+            return otherKeysetsToast(lock.otherKeyVersions);
+          case 'keysetsUnchecked':
+            return KEYSETS_UNCHECKED_HEADING;
+          default:
+            return successMessage;
+        }
+      },
+      requireResult: true,
     },
-    showOnDone: true,
+    hold: unconfirmed !== null,
+    // The success mark would sit over a lock the card does not confirm.
+    showOnDone: unconfirmed === null,
   });
 
   return (
@@ -67,6 +105,18 @@ export default function LockInstallsScreen({
         </View>
       )}
 
+      {unconfirmed && (
+        <View style={styles.content}>
+          <ScrollView contentContainerStyle={styles.body}>
+            <Text accessibilityRole="header" style={styles.heading}>
+              {unconfirmed.heading}
+            </Text>
+            <Text style={styles.intro}>{unconfirmed.detail}</Text>
+          </ScrollView>
+          <PrimaryButton label="Done" onPress={leave} testID="lock-done" />
+        </View>
+      )}
+
       {sheet}
     </View>
   );
@@ -87,6 +137,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     gap: 12,
+  },
+  heading: {
+    color: theme.colors.onSurface,
+    fontSize: 20,
+    lineHeight: 28,
   },
   intro: {
     color: theme.colors.onSurface,
