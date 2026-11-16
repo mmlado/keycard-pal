@@ -4,16 +4,15 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
 import {
   ALREADY_LOCKED_TOAST,
-  KEYSETS_UNCHECKED_DETAIL,
-  KEYSETS_UNCHECKED_HEADING,
   LOCK_INSTALLS_INTRO,
   LOCK_INSTALLS_POINTS,
-  OTHER_KEYSETS_HEADING,
-  otherKeysetsDetail,
-  otherKeysetsToast,
+  LOCK_NOT_CONFIRMED_HEADING,
+  LOCK_NOT_FULLY_CHECKED_HEADING,
+  lockFindingLines,
+  lockFindingsHeading,
 } from '../src/constants/installLock';
 import LockInstallsScreen from '../src/screens/developerCards/LockInstallsScreen';
-import { INSTALL_LOCK_PATH } from '../src/utils/installLock';
+import { INSTALL_LOCK_PATH, LockFindings } from '../src/utils/installLock';
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
@@ -46,11 +45,36 @@ const navigation = {
 } as any;
 const route = { key: 'LockInstalls', name: 'LockInstalls' } as any;
 
-function renderScreen(phase = 'idle', outcome: string | null = null) {
+const findings = (found: Partial<LockFindings>): LockFindings => ({
+  notSecured: null,
+  otherDomains: [],
+  otherKeyVersions: [],
+  unchecked: [],
+  ...found,
+});
+
+const EVERY_FINDING = findings({
+  notSecured: 'INITIALIZED',
+  otherDomains: [
+    {
+      aid: 'A0000001515350',
+      securityDomain: true,
+      privileges: ['Authorized Management', 'Global Delete'],
+    },
+  ],
+  otherKeyVersions: [0x02, 0x30],
+  unchecked: ['keys'],
+});
+
+function renderScreen(
+  phase = 'idle',
+  outcome: string | null = null,
+  found?: LockFindings,
+) {
   const result = outcome && {
     outcome,
     cardManagerKey: 'lock',
-    ...(outcome === 'otherKeysets' && { otherKeyVersions: [0x02, 0x30] }),
+    ...(found && { findings: found }),
   };
   mockUseLockInstalls.mockReturnValue({
     phase,
@@ -128,42 +152,97 @@ describe('LockInstallsScreen', () => {
   });
 
   describe.each([
+    ['something it found', EVERY_FINDING, LOCK_NOT_CONFIRMED_HEADING],
     [
-      'otherKeysets',
-      OTHER_KEYSETS_HEADING,
-      otherKeysetsDetail([0x02, 0x30]),
-      otherKeysetsToast([0x02, 0x30]),
+      'only checks that failed',
+      findings({ unchecked: ['domains', 'keys'] }),
+      LOCK_NOT_FULLY_CHECKED_HEADING,
     ],
-    [
-      'keysetsUnchecked',
-      KEYSETS_UNCHECKED_HEADING,
-      KEYSETS_UNCHECKED_DETAIL,
-      KEYSETS_UNCHECKED_HEADING,
-    ],
-  ])('a lock that ends as %s', (outcome, heading, detail, toast) => {
-    it('stays on what the key list says, with no success mark', () => {
-      renderScreen('done', outcome);
+  ])('a lock with %s', (_, found, heading) => {
+    it('stays on every finding under its heading, with no success mark', () => {
+      renderScreen('done', 'unconfirmed', found);
       expect(navigation.reset).not.toHaveBeenCalled();
-      expect(screen.getByText(heading)).toBeTruthy();
-      expect(screen.getByText(detail)).toBeTruthy();
+      expect(screen.getByRole('header').props.children).toBe(heading);
+      for (const line of lockFindingLines(found)) {
+        expect(screen.getByLabelText(line)).toBeTruthy();
+      }
       expect(jest.mocked(NFCBottomSheet).mock.lastCall?.[0].showOnDone).toBe(
         false,
       );
     });
 
-    it('leaves on Done with its own toast', () => {
-      renderScreen('done', outcome);
+    it('leaves on Done with the heading as its toast', () => {
+      renderScreen('done', 'unconfirmed', found);
       fireEvent.press(screen.getByTestId('lock-done'));
-      expect(toastOfLastReset()).toBe(toast);
+      expect(toastOfLastReset()).toBe(heading);
     });
   });
 
-  it('names every other keyset by its key version', () => {
-    expect(otherKeysetsDetail([0x02])).toContain(
-      'a keyset at key version 0x02',
+  it.each<[string, Partial<LockFindings>]>([
+    ['a card left INITIALIZED', { notSecured: 'INITIALIZED' }],
+    [
+      'another domain',
+      {
+        otherDomains: [
+          {
+            aid: 'A0000001515350',
+            securityDomain: true,
+            privileges: ['Global Delete'],
+          },
+        ],
+      },
+    ],
+    ['another keyset', { otherKeyVersions: [0x02] }],
+    ['a state it could not check', { unchecked: ['state'] }],
+    [
+      'a finding beside a check that failed',
+      { notSecured: 'OP_READY', unchecked: ['keys'] },
+    ],
+  ])('does not call the card locked for %s alone', (_, found) => {
+    expect(lockFindingsHeading(findings(found))).toBe(
+      LOCK_NOT_CONFIRMED_HEADING,
     );
-    expect(otherKeysetsToast([0x02, 0x30, 0xff])).toContain(
-      'keysets at key versions 0x02, 0x30 and 0xFF',
-    );
+  });
+
+  it.each<[string, LockFindings['unchecked']]>([
+    ['the keys', ['keys']],
+    ['the domains', ['domains']],
+    ['both', ['domains', 'keys']],
+  ])(
+    'calls the card locked, not fully checked, when only %s went unchecked',
+    (_, unchecked) => {
+      expect(lockFindingsHeading(findings({ unchecked }))).toBe(
+        LOCK_NOT_FULLY_CHECKED_HEADING,
+      );
+    },
+  );
+
+  it('words each finding in GlobalPlatform terms', () => {
+    expect(lockFindingLines(EVERY_FINDING)).toEqual([
+      'The card manager is INITIALIZED, not SECURED.',
+      'Security domain A0000001515350 can still manage applets: Authorized Management, Global Delete.',
+      'The card manager also has keysets at key versions 0x02 and 0x30, which the lock did not replace.',
+      "The card manager's keys could not be checked.",
+    ]);
+    expect(
+      lockFindingLines(
+        findings({
+          otherDomains: [
+            {
+              aid: 'D2760000850101',
+              securityDomain: false,
+              privileges: ['Global Delete'],
+            },
+          ],
+          otherKeyVersions: [0x02],
+          unchecked: ['state', 'domains'],
+        }),
+      ),
+    ).toEqual([
+      'Application D2760000850101 can still manage applets: Global Delete.',
+      'The card manager also has a keyset at key version 0x02, which the lock did not replace.',
+      "The card manager's state could not be checked.",
+      'The security domains could not be checked.',
+    ]);
   });
 });

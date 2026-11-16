@@ -1,15 +1,27 @@
+/* eslint-disable no-bitwise */
 import { Commandset } from 'keycard-sdk/dist/commandset';
 import { Constants } from 'keycard-sdk/dist/constants';
 import { CryptoUtils } from 'keycard-sdk/dist/crypto-utils';
 import { GlobalPlatformCommandset } from 'keycard-sdk/dist/global-platform-commandset';
 import { GlobalPlatformConstants } from 'keycard-sdk/dist/global-platform-constants';
+import { Identifiers } from 'keycard-sdk/dist/identifiers';
 import { SCP02Keys } from 'keycard-sdk/dist/scp02-keys';
 
-import { fromHex } from '@/utils/hex';
+import {
+  RegistryEntry,
+  cardLifeCycleName,
+  isSecurityDomain,
+  listsEveryDomain,
+  managementPrivileges,
+  registryEntries,
+} from '@/utils/gpRegistry';
+import { fromHex, toHex } from '@/utils/hex';
 import {
   CARD_MANAGER_AID,
   INSTALL_LOCK_KEY_LENGTH,
   INSTALL_LOCK_PATH,
+  LockCheck,
+  LockFindings,
   PUBLISHED_CARD_MANAGER_KEYS,
   PublishedCardManagerKey,
 } from '@/utils/installLock';
@@ -26,19 +38,14 @@ export type CardManagerKey = 'lock' | PublishedCardManagerKey;
 
 export type InstallLockResult =
   | {
-      outcome:
-        | 'locked'
-        | 'alreadyLocked'
-        | 'keysetsUnchecked'
-        | 'unlocked'
-        | 'notLocked';
+      outcome: 'locked' | 'alreadyLocked' | 'unlocked' | 'notLocked';
       /** The key the card manager answers to once the tap is over. */
       cardManagerKey: CardManagerKey;
     }
   | {
-      outcome: 'otherKeysets';
+      outcome: 'unconfirmed';
       cardManagerKey: 'lock';
-      otherKeyVersions: number[];
+      findings: LockFindings;
     };
 
 export const NO_CHAIN_CODE_STATUS =
@@ -60,6 +67,8 @@ export const CARD_MANAGER_BLOCKED_STATUS =
 export const NO_MATCHING_KEYSET_MESSAGE = 'Error verifying card cryptogram';
 
 const INITIAL_KEY_VERSION = 0xff;
+const SW_MORE_DATA = 0x6310;
+const MAX_STATUS_ANSWERS = 16;
 
 function keyset(key: Uint8Array): SCP02Keys {
   return new SCP02Keys(key, key, key);
@@ -166,6 +175,118 @@ async function putKey(
   }
 }
 
+const sameAid = (a: Uint8Array, b: Uint8Array) => toHex(a) === toHex(b);
+
+/** Null unless the card answers the whole query; the loop is bounded against a card that never stops. */
+async function readRegistry(
+  gp: GlobalPlatformCommandset,
+  p1: number,
+): Promise<RegistryEntry[] | null> {
+  const data: number[] = [];
+  let p2 = GlobalPlatformConstants.GET_STATUS_P2_TLV;
+  for (let answer = 0; answer < MAX_STATUS_ANSWERS; answer++) {
+    const response = await gp.getStatus(p1, p2);
+    if (response.sw !== Constants.SW_OK && response.sw !== SW_MORE_DATA) {
+      return null;
+    }
+    data.push(...response.data);
+    if (response.sw === Constants.SW_OK) {
+      return registryEntries(new Uint8Array(data));
+    }
+    // The card manager's own entry has no next occurrence.
+    if (
+      p1 === GlobalPlatformConstants.GET_STATUS_P1_ISD ||
+      response.data.length === 0
+    ) {
+      return null;
+    }
+    p2 =
+      GlobalPlatformConstants.GET_STATUS_P2_TLV |
+      GlobalPlatformConstants.GET_STATUS_P2_NEXT;
+  }
+  return null;
+}
+
+async function cardManagerEntry(
+  gp: GlobalPlatformCommandset,
+): Promise<RegistryEntry | null> {
+  const entries = await readRegistry(
+    gp,
+    GlobalPlatformConstants.GET_STATUS_P1_ISD,
+  );
+  return entries?.length === 1 && sameAid(entries[0].aid, CARD_MANAGER_AID)
+    ? entries[0]
+    : null;
+}
+
+/** Every managing entry the card lists, even when the list cannot be trusted to be whole. */
+async function otherManagingDomains(
+  gp: GlobalPlatformCommandset,
+  cardManager: RegistryEntry,
+): Promise<{ domains: LockFindings['otherDomains']; complete: boolean }> {
+  const entries = await readRegistry(
+    gp,
+    GlobalPlatformConstants.GET_STATUS_P1_APPLICATIONS,
+  );
+  const domains: LockFindings['otherDomains'] = [];
+  // Without Global Registry, or without this tap's applet, the list may not be the whole card.
+  let complete =
+    entries !== null &&
+    listsEveryDomain(cardManager.privileges) &&
+    entries.some(entry => sameAid(entry.aid, Identifiers.KEYCARD_INSTANCE_ID));
+  for (const entry of entries ?? []) {
+    if (sameAid(entry.aid, cardManager.aid)) {
+      continue;
+    }
+    const privileges = managementPrivileges(entry.privileges);
+    if (privileges === null) {
+      complete = false;
+    } else if (privileges.length > 0) {
+      domains.push({
+        aid: toHex(entry.aid).toUpperCase(),
+        securityDomain: isSecurityDomain(entry.privileges),
+        privileges,
+      });
+    }
+  }
+  return { domains, complete };
+}
+
+/** GET STATUS needs the session, so it comes before the new SELECT of the key list. */
+async function lockFindings(
+  gp: GlobalPlatformCommandset,
+  lockKvn: number,
+): Promise<LockFindings> {
+  const unchecked: LockCheck[] = [];
+  const cardManager = await cardManagerEntry(gp);
+  const state = cardManager && cardLifeCycleName(cardManager.lifeCycle);
+  if (!state) {
+    unchecked.push('state');
+  }
+  const domainCheck = cardManager
+    ? await otherManagingDomains(gp, cardManager)
+    : null;
+  if (!domainCheck?.complete) {
+    unchecked.push('domains');
+  }
+  const otherKeyVersions = await otherKeysets(gp, lockKvn);
+  if (!otherKeyVersions) {
+    unchecked.push('keys');
+  }
+  return {
+    notSecured: state && state !== 'SECURED' ? state : null,
+    otherDomains: domainCheck?.domains ?? [],
+    otherKeyVersions: otherKeyVersions ?? [],
+    unchecked,
+  };
+}
+
+const confirmsLock = (findings: LockFindings) =>
+  findings.notSecured === null &&
+  findings.otherDomains.length === 0 &&
+  findings.otherKeyVersions.length === 0 &&
+  findings.unchecked.length === 0;
+
 async function otherKeysets(
   gp: GlobalPlatformCommandset,
   lockKvn: number,
@@ -205,16 +326,9 @@ export async function runInstallLock(
         await putKey(gp, putVersions, lockKey);
       }
       await secureCardManager(gp);
-      const others = await otherKeysets(gp, locked ? kvn : newKvn);
-      if (others === null) {
-        return { outcome: 'keysetsUnchecked', cardManagerKey: 'lock' };
-      }
-      if (others.length > 0) {
-        return {
-          outcome: 'otherKeysets',
-          cardManagerKey: 'lock',
-          otherKeyVersions: others,
-        };
+      const findings = await lockFindings(gp, locked ? kvn : newKvn);
+      if (!confirmsLock(findings)) {
+        return { outcome: 'unconfirmed', cardManagerKey: 'lock', findings };
       }
       return {
         outcome: locked ? 'alreadyLocked' : 'locked',

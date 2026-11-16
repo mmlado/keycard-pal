@@ -1,5 +1,7 @@
 import {
   INSTALL_LOCK_PATH,
+  LockCheck,
+  LockFindings,
   PublishedCardManagerKey,
 } from '@/utils/installLock';
 
@@ -17,7 +19,9 @@ export const LOCK_INSTALLS_POINTS = [
 
 export const ALREADY_LOCKED_TOAST = 'Applet installs were already locked';
 
-export const OTHER_KEYSETS_HEADING = 'Applet installs may not be locked';
+export const LOCK_NOT_CONFIRMED_HEADING = 'Applet installs may not be locked';
+export const LOCK_NOT_FULLY_CHECKED_HEADING =
+  'Applet installs locked, not fully checked';
 
 function keysetsAt(versions: number[]): string {
   const names = versions.map(
@@ -29,18 +33,40 @@ function keysetsAt(versions: number[]): string {
     : `keysets at key versions ${names.join(', ')} and ${last}`;
 }
 
-export function otherKeysetsDetail(versions: number[]): string {
-  const keysets = keysetsAt(versions);
-  return `The card manager also has ${keysets}, which the lock did not replace. Whoever holds those keys may still be able to replace or remove the Keycard applet.`;
+const UNCHECKED_LINES: Record<LockCheck, string> = {
+  state: "The card manager's state could not be checked.",
+  domains: 'The security domains could not be checked.',
+  keys: "The card manager's keys could not be checked.",
+};
+
+export function lockFindingLines(findings: LockFindings): string[] {
+  const lines: string[] = [];
+  if (findings.notSecured) {
+    lines.push(`The card manager is ${findings.notSecured}, not SECURED.`);
+  }
+  for (const { aid, securityDomain, privileges } of findings.otherDomains) {
+    const entry = securityDomain ? 'Security domain' : 'Application';
+    const names = privileges.join(', ');
+    lines.push(`${entry} ${aid} can still manage applets: ${names}.`);
+  }
+  if (findings.otherKeyVersions.length > 0) {
+    const keysets = keysetsAt(findings.otherKeyVersions);
+    lines.push(
+      `The card manager also has ${keysets}, which the lock did not replace.`,
+    );
+  }
+  return [...lines, ...findings.unchecked.map(check => UNCHECKED_LINES[check])];
 }
 
-export const otherKeysetsToast = (versions: number[]) =>
-  `Lock not confirmed: the card also has ${keysetsAt(versions)}`;
-
-export const KEYSETS_UNCHECKED_HEADING =
-  'Applet installs locked, keys not checked';
-export const KEYSETS_UNCHECKED_DETAIL =
-  "Keycard Pal couldn't read a key list from the card manager that shows the lock's key, so it couldn't check whether another keyset can still replace or remove the Keycard applet.";
+/** Only an unchecked state blocks the lock: SECURED is what makes it done. */
+export function lockFindingsHeading(findings: LockFindings): string {
+  const found =
+    findings.notSecured !== null ||
+    findings.otherDomains.length > 0 ||
+    findings.otherKeyVersions.length > 0 ||
+    findings.unchecked.includes('state');
+  return found ? LOCK_NOT_CONFIRMED_HEADING : LOCK_NOT_FULLY_CHECKED_HEADING;
+}
 
 export const UNLOCK_INSTALLS_INTRO =
   'Unlocking puts a published key back, so any tool can replace or remove the Keycard applet. Pick the key your install tool expects.';

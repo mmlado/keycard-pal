@@ -5,14 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icons } from '@/assets/icons';
 import {
   ALREADY_LOCKED_TOAST,
-  KEYSETS_UNCHECKED_DETAIL,
-  KEYSETS_UNCHECKED_HEADING,
   LOCK_INSTALLS_INTRO,
   LOCK_INSTALLS_POINTS,
   LOCK_INSTALLS_TITLE,
-  OTHER_KEYSETS_HEADING,
-  otherKeysetsDetail,
-  otherKeysetsToast,
+  lockFindingLines,
+  lockFindingsHeading,
 } from '@/constants/installLock';
 import { LockInstallsScreenProps } from '@/navigation/types';
 import theme from '@/theme';
@@ -27,21 +24,13 @@ import { useKeycardScreen } from '@/hooks/useKeycardScreen';
 
 function unconfirmedLock(
   result: InstallLockResult | null,
-): { heading: string; detail: string } | null {
-  switch (result?.outcome) {
-    case 'otherKeysets':
-      return {
-        heading: OTHER_KEYSETS_HEADING,
-        detail: otherKeysetsDetail(result.otherKeyVersions),
-      };
-    case 'keysetsUnchecked':
-      return {
-        heading: KEYSETS_UNCHECKED_HEADING,
-        detail: KEYSETS_UNCHECKED_DETAIL,
-      };
-    default:
-      return null;
-  }
+): { heading: string; lines: string[] } | null {
+  return result?.outcome === 'unconfirmed'
+    ? {
+        heading: lockFindingsHeading(result.findings),
+        lines: lockFindingLines(result.findings),
+      }
+    : null;
 }
 
 export default function LockInstallsScreen({
@@ -60,16 +49,10 @@ export default function LockInstallsScreen({
     done: {
       toast: done => {
         const lock = done as InstallLockResult | null;
-        switch (lock?.outcome) {
-          case 'alreadyLocked':
-            return ALREADY_LOCKED_TOAST;
-          case 'otherKeysets':
-            return otherKeysetsToast(lock.otherKeyVersions);
-          case 'keysetsUnchecked':
-            return KEYSETS_UNCHECKED_HEADING;
-          default:
-            return successMessage;
+        if (lock?.outcome === 'alreadyLocked') {
+          return ALREADY_LOCKED_TOAST;
         }
+        return unconfirmedLock(lock)?.heading ?? successMessage;
       },
       requireResult: true,
     },
@@ -111,7 +94,17 @@ export default function LockInstallsScreen({
             <Text accessibilityRole="header" style={styles.heading}>
               {unconfirmed.heading}
             </Text>
-            <Text style={styles.intro}>{unconfirmed.detail}</Text>
+            {unconfirmed.lines.map(line => (
+              <View
+                key={line}
+                accessible
+                accessibilityLabel={line}
+                style={styles.point}
+              >
+                <Text style={styles.bullet}>{'•'}</Text>
+                <Text style={styles.finding}>{line}</Text>
+              </View>
+            ))}
           </ScrollView>
           <PrimaryButton label="Done" onPress={leave} testID="lock-done" />
         </View>
@@ -162,5 +155,11 @@ const styles = StyleSheet.create({
     color: theme.colors.onSurfaceMuted,
     fontSize: 15,
     lineHeight: 22,
+  },
+  finding: {
+    flex: 1,
+    color: theme.colors.onSurface,
+    fontSize: 16,
+    lineHeight: 24,
   },
 });

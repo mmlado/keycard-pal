@@ -1,3 +1,5 @@
+import { readTlv } from './berTlv';
+
 const TEMPLATE_TAG = 0xe0;
 const KEY_TAG = 0xc0;
 const EXTENDED_KEY_TYPE = 0xff;
@@ -6,30 +8,6 @@ const EXTENDED_KEY_TYPE = 0xff;
 const PUBLIC_KEY_TYPES = new Set([
   0xa0, 0xa1, 0xb0, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xf0,
 ]);
-
-type Tlv = { tag: number; value: Uint8Array; end: number };
-
-function readTlv(data: Uint8Array, offset: number): Tlv | null {
-  let start = offset + 2;
-  if (start > data.length) {
-    return null;
-  }
-  const tag = data[offset];
-  let length = data[offset + 1];
-  if (length === 0x81 && start + 1 <= data.length) {
-    length = data[start];
-    start += 1;
-  } else if (length === 0x82 && start + 2 <= data.length) {
-    length = data[start] * 256 + data[start + 1];
-    start += 2;
-  } else if (length > 0x7f) {
-    return null;
-  }
-  const end = start + length;
-  return end > data.length
-    ? null
-    : { tag, value: data.subarray(start, end), end };
-}
 
 function shortFieldEnd(info: Uint8Array, at: number | null): number | null {
   if (at === null || at >= info.length || info[at] > 1) {
