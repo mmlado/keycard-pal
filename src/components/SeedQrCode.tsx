@@ -14,8 +14,10 @@ type Props = {
   size: number;
 };
 
-// As AnimatedURQRCode pads its code, so both QR results come out the same size.
-const PADDING = 12;
+// AnimatedURQRCode's padding, so the box is as large as a UR code's.
+const UR_PADDING = 12;
+// Four modules of the smallest SeedQR (21x21) a side, so every code has the quiet zone QR requires.
+const QUIET_ZONE = 4 / (21 + 4 * 2);
 
 const FORMATS: { value: SeedQrFormat; label: string }[] = [
   { value: 'standard', label: 'Standard' },
@@ -32,18 +34,20 @@ export default function SeedQrCode({ words, size }: Props) {
   );
 
   const label = FORMATS.find(f => f.value === format)!.label;
+  const box = size + UR_PADDING * 2;
+  const quiet = box * QUIET_ZONE;
 
   return (
-    <View style={[styles.container, { width: size + PADDING * 2 }]}>
+    <View style={[styles.container, { width: box }]}>
       <View
-        style={styles.qrWrapper}
+        style={[styles.qrWrapper, { padding: quiet }]}
         accessible
         accessibilityRole="image"
         accessibilityLabel={`${label} SeedQR`}
       >
         <QRCode
           value={value}
-          size={size}
+          size={box - quiet * 2}
           ecl={SEED_QR_ERROR_CORRECTION}
           color="#000000"
           backgroundColor="#ffffff"
@@ -64,7 +68,6 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   qrWrapper: {
-    padding: PADDING,
     backgroundColor: '#ffffff',
     borderRadius: 8,
   },

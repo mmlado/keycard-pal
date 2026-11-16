@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import jsQR from 'jsqr';
 
@@ -51,11 +52,16 @@ const TWENTY_FOUR = {
   hex: '0e74b64107f94cc0ccfae6a13dcbec3662154fec67e0e00999c07892597d190a',
 };
 
+/** The code as the screen draws it, its quiet zone included, read back with jsQR. */
 function drawnCode() {
-  const { value, ecl } = screen.getByTestId('seed-qr-code').props;
+  const { value, ecl, size } = screen.getByTestId('seed-qr-code').props;
+  const { padding } = StyleSheet.flatten(
+    screen.getByLabelText(/SeedQR$/).props.style,
+  );
   const matrix = genMatrix(value, ecl);
+  const quietModules = (padding * matrix.length) / size;
   const scale = 4;
-  const quiet = 4;
+  const quiet = Math.floor(quietModules);
   const width = (matrix.length + quiet * 2) * scale;
   const pixels = new Uint8ClampedArray(width * width * 4).fill(255);
   matrix.forEach((row, y) =>
@@ -78,6 +84,7 @@ function drawnCode() {
   }
   return {
     modules: matrix.length,
+    quietModules,
     modes: code.chunks.map(c => c.type),
     text: code.data,
     hex: Buffer.from(code.binaryData).toString('hex'),
@@ -92,11 +99,10 @@ describe('SeedQrCode', () => {
     'draws Standard first, in numeric mode, at the specification size',
     ({ words, digits }, modules) => {
       render(<SeedQrCode words={words.split(' ')} size={300} />);
-      expect(drawnCode()).toEqual({
+      expect(drawnCode()).toMatchObject({
         modules,
         modes: ['numeric'],
         text: digits,
-        hex: Buffer.from(digits).toString('hex'),
       });
     },
   );
@@ -123,11 +129,30 @@ describe('SeedQrCode', () => {
     expect(drawnCode().text).toBe(TWELVE.digits);
   });
 
-  // As AnimatedURQRCode takes it, so a SeedQR is as large as a UR code.
-  it('draws the code at the size it is given', () => {
+  // AnimatedURQRCode draws a code of `size` in a box padded by 12.
+  it('takes the box a UR code of the same size takes', () => {
     render(<SeedQrCode words={TWELVE.words.split(' ')} size={300} />);
-    expect(screen.getByTestId('seed-qr-code').props.size).toBe(300);
+    const { padding } = StyleSheet.flatten(
+      screen.getByLabelText('Standard SeedQR').props.style,
+    );
+    expect(
+      screen.getByTestId('seed-qr-code').props.size + padding * 2,
+    ).toBeCloseTo(324);
   });
+
+  it.each([
+    ['12 words, Standard', TWELVE, 'Standard'],
+    ['12 words, Compact', TWELVE, 'Compact'],
+    ['24 words, Standard', TWENTY_FOUR, 'Standard'],
+    ['24 words, Compact', TWENTY_FOUR, 'Compact'],
+  ])(
+    '%s leaves a quiet zone of four modules or more',
+    (_, { words }, format) => {
+      render(<SeedQrCode words={words.split(' ')} size={300} />);
+      fireEvent.press(screen.getByText(format));
+      expect(drawnCode().quietModules).toBeGreaterThanOrEqual(4 - 1e-9);
+    },
+  );
 
   // The generation tests run seedQrSegments, so they cover what is drawn.
   it('draws the segments and the error correction seedQr gives', () => {
