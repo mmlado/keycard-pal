@@ -455,6 +455,38 @@ describe('useInitCard', () => {
         expect(result.current.puk).toBe('');
       });
 
+      // The cancelled tap's GET CHALLENGE answers after the newer tap sent INIT.
+      it('keeps the PUK of a newer tap when a cancelled one draws late', async () => {
+        let answerCancelled: (resp: unknown) => void = () => {};
+        mockGetChallenge
+          .mockReturnValueOnce(new Promise(r => (answerCancelled = r)))
+          .mockResolvedValueOnce(
+            challenge([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 0, 0, 0, 0]),
+          );
+        const { result } = renderHook(() => useInitCard());
+        await act(async () => {
+          result.current.start('123456');
+        });
+        await act(async () => {
+          tapCard();
+        });
+        await act(async () => {
+          cancelSheet();
+        });
+        await act(async () => {
+          result.current.retry();
+        });
+        await tapAgain();
+        expect(result.current.phase).toBe('done');
+
+        await act(async () => {
+          answerCancelled(challenge(RANDOM_BYTES));
+        });
+        expect(result.current.puk).toBe('123456789012');
+        expect(mockInit).toHaveBeenCalledTimes(1);
+        expect(mockInit.mock.calls[0][1]).toBe('123456789012');
+      });
+
       // A retry reuses the drawn PUK, so it needs no channel of its own.
       it('draws once: a retry sends the same PUK and asks for no bytes', async () => {
         mockInit.mockRejectedValueOnce(new Error('Card refused'));

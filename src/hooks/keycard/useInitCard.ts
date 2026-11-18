@@ -37,6 +37,8 @@ export type UseInitCardOperation = Omit<
 export const UNVERIFIED_CARD_STATUS =
   'This Keycard could not be verified. Nothing was written to it.';
 
+const SUPERSEDED_STATUS = 'A newer tap took over this one.';
+
 export const CARD_RANDOM_FAILED =
   'Reading random bytes from the Keycard failed';
 
@@ -53,13 +55,22 @@ export function useInitCard(): UseInitCardOperation {
   // One per screen, so a retry sends the digits done will show.
   const [puk, setPuk] = useState('');
   const pukRef = useRef<string | null>(null);
-  const pukOnce = useCallback(async (draw: () => Promise<string>) => {
-    if (pukRef.current === null) {
-      pukRef.current = await draw();
-      setPuk(pukRef.current);
-    }
-    return pukRef.current;
-  }, []);
+  const runRef = useRef(0);
+  const pukOnce = useCallback(
+    async (run: number, draw: () => Promise<string>) => {
+      if (pukRef.current === null) {
+        const drawn = await draw();
+        // A cancelled tap's late draw must not replace the PUK a newer tap sends.
+        if (run !== runRef.current) {
+          throw new Error(SUPERSEDED_STATUS);
+        }
+        pukRef.current = drawn;
+        setPuk(drawn);
+      }
+      return pukRef.current;
+    },
+    [],
+  );
   // INIT is the tap's last command: a loss inside it leaves the card's state unknown (#430).
   const [initSent, setInitSent] = useState(false);
 
@@ -84,6 +95,7 @@ export function useInitCard(): UseInitCardOperation {
         card: SelectedCard,
         { pin, duressPin: chosenDuressPin }: InitInput,
       ) => {
+        const run = ++runRef.current;
         const appInfo = cmdSet.applicationInfo;
         if (appInfo?.initializedCard) {
           throw new Error(
@@ -101,7 +113,7 @@ export function useInitCard(): UseInitCardOperation {
           }
           setStatus('Initializing...');
           // GET CHALLENGE needs a channel; init() then opens a fresh one.
-          const cardPuk = await pukOnce(async () => {
+          const cardPuk = await pukOnce(run, async () => {
             await cmdSet.autoOpenSecureChannel();
             return drawPuk(length => cardRandomBytes(cmdSet, length));
           });
@@ -117,7 +129,9 @@ export function useInitCard(): UseInitCardOperation {
           }
         } else {
           // A 3.x card has no GET CHALLENGE.
-          const phonePuk = await pukOnce(() => drawPuk(platformRandomBytes));
+          const phonePuk = await pukOnce(run, () =>
+            drawPuk(platformRandomBytes),
+          );
           setInitSent(true);
           await cmdSet.init(pin, phonePuk, PAIRING_PASSWORD, duressPin);
           setInitSent(false);
