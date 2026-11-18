@@ -353,44 +353,6 @@ describe('decodeCalldata', () => {
     expect(result).not.toMatchObject({ highRisk: true });
   });
 
-  it('decodes Safe execTransaction as generic ABI args', () => {
-    const data = encodeFunctionData({
-      abi: parseAbi([
-        'function execTransaction(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,bytes signatures)',
-      ]),
-      functionName: 'execTransaction',
-      args: [
-        RECIPIENT,
-        1n,
-        '0xa9059cbb',
-        0,
-        100000n,
-        21000n,
-        0n,
-        '0x0000000000000000000000000000000000000000',
-        '0x0000000000000000000000000000000000000000',
-        '0x',
-      ],
-    });
-    const result = decodeCalldata(data);
-    expect(result).toMatchObject({
-      kind: 'contract-call',
-      selector: '0x6a761202',
-      functionName: 'execTransaction',
-      signature:
-        'execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)',
-    });
-    if (result?.kind === 'contract-call') {
-      expect(result.args).toEqual(
-        expect.arrayContaining([
-          { name: 'to', type: 'address', value: RECIPIENT },
-          { name: 'value', type: 'uint256', value: '1' },
-          { name: 'operation', type: 'uint8', value: '0' },
-        ]),
-      );
-    }
-  });
-
   it('formats array arguments in generic selector-map calls', () => {
     const data = encodeFunctionData({
       abi: parseAbi([
@@ -701,6 +663,27 @@ describe('decodeCalldata on a Safe MultiSend batch', () => {
     });
   });
 
+  it('splits the batch where subarray returns a plain Uint8Array, as on Hermes', () => {
+    const subarray = jest
+      .spyOn(Buffer.prototype, 'subarray')
+      .mockImplementation(function (this: Buffer, ...args: unknown[]) {
+        const [start, end] = args as [number?, number?];
+        return new Uint8Array(
+          this.buffer,
+          this.byteOffset,
+          this.length,
+        ).subarray(start, end) as Buffer;
+      });
+    try {
+      expect(decodeCalldata(multiSend(packed(0, USDC, 7n, TRANSFER)))).toEqual({
+        kind: 'multi-send',
+        calls: [{ operation: 'call', to: USDC, value: 7n, data: TRANSFER }],
+      });
+    } finally {
+      subarray.mockRestore();
+    }
+  });
+
   it('decodes an empty batch to no calls', () => {
     expect(decodeCalldata(multiSend(''))).toEqual({
       kind: 'multi-send',
@@ -737,6 +720,58 @@ describe('decodeCalldata on a Safe MultiSend batch', () => {
     expect(decodeCalldata(`0x8d80ff0a${'ff'.repeat(32)}`)).toEqual({
       kind: 'unknown-call',
       selector: '0x8d80ff0a',
+    });
+  });
+});
+
+describe('decodeCalldata on a Safe execTransaction', () => {
+  const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+  const RECIPIENT = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  const SIGNATURES = `0x${'11'.repeat(65)}` as const;
+  const exec = (operation: number) =>
+    encodeFunctionData({
+      abi: parseAbi([
+        'function execTransaction(address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, bytes signatures)',
+      ]),
+      args: [
+        USDC,
+        5n,
+        '0xdeadbeef',
+        operation,
+        1n,
+        2n,
+        3n,
+        ZERO,
+        RECIPIENT,
+        SIGNATURES,
+      ],
+    });
+
+  it('decodes the transaction a Safe executes', () => {
+    expect(decodeCalldata(exec(0))).toEqual({
+      kind: 'safe-exec-transaction',
+      to: USDC,
+      value: 5n,
+      data: '0xdeadbeef',
+      operation: 'call',
+      safeTxGas: 1n,
+      baseGas: 2n,
+      gasPrice: 3n,
+      gasToken: ZERO,
+      refundReceiver: RECIPIENT,
+      signatures: SIGNATURES,
+    });
+    expect(decodeCalldata(exec(1))).toMatchObject({
+      kind: 'safe-exec-transaction',
+      operation: 'delegatecall',
+    });
+  });
+
+  it('lists an operation other than call and delegate call as written', () => {
+    expect(decodeCalldata(exec(2))).toMatchObject({
+      kind: 'contract-call',
+      functionName: 'execTransaction',
     });
   });
 });

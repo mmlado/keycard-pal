@@ -1,9 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
+import { encodeFunctionData, encodePacked, parseAbi } from 'viem';
 
 import SpecialEip712Section from '../src/components/SignRequestDetail/eth/DataTabPanel/SpecialEip712Section';
 import { CUSTOM_TOKEN_CAPTION } from '../src/constants/customTokens';
 import { MISCASED_ADDRESS_WARNING } from '../src/constants/eip712';
+import {
+  DELEGATE_CALL_WARNING,
+  UNKNOWN_MULTI_SEND_WARNING,
+} from '../src/constants/safe';
 import type { Eip712SpecialReview } from '../src/utils/eip712';
 
 jest.mock('react-native-paper', () => {
@@ -32,16 +37,6 @@ jest.mock('../src/components/ens/AddressInfoRow.online', () => {
     <Text>{`${label}: ${value}`}</Text>
   );
 });
-
-jest.mock(
-  '../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection',
-  () => {
-    const { Text } = require('react-native');
-    return ({ chainId }: { chainId: number | undefined }) => (
-      <Text>{`DecodedCallSection chainId=${chainId}`}</Text>
-    );
-  },
-);
 
 const mockLookupToken = jest.fn((..._args: unknown[]): unknown => null);
 
@@ -73,6 +68,13 @@ const TOKEN = '0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
 const SAFE = '0xCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC';
 const GAS_TOKEN = '0xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD';
 const REFUND = '0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE';
+const AAVE_WETH_GATEWAY = '0xD01607c3C5eCABa394D8be377a08590149325722';
+const MULTI_SEND_1_4_1 = '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526';
+const AAVE_V2_POOL = '0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9';
+const TRANSFER = encodeFunctionData({
+  abi: parseAbi(['function transfer(address to, uint256 amount)']),
+  args: ['0xd8da6bf26964af9d7eed9e03e53415d37aa96045', 100n],
+});
 
 describe('SpecialEip712Section — permit', () => {
   const permit: Eip712SpecialReview = {
@@ -185,6 +187,8 @@ describe('SpecialEip712Section — safe-tx', () => {
     to: SPENDER,
     value: '0',
     operation: 'Call',
+    safeOperation: 'call' as const,
+    safeTxHash: true,
     safeTxGas: '0',
     baseGas: '0',
     gasPrice: '0',
@@ -208,48 +212,141 @@ describe('SpecialEip712Section — safe-tx', () => {
     expect(screen.getByText(`Safe: ${SAFE}`)).toBeTruthy();
   });
 
-  it('renders DecodedCallSection with fallbackChainId when decodedCall is present', () => {
+  it('describes the call through the clear-signing registry, with its value', () => {
     const special: Eip712SpecialReview = {
       ...base,
-      decodedCall: {
-        kind: 'erc20-transfer',
-        to: SPENDER,
-        amount: 100n,
-      },
+      to: AAVE_WETH_GATEWAY,
+      value: '500000000000000000',
+      data: encodeFunctionData({
+        abi: parseAbi([
+          'function depositETH(address lendingPool, address onBehalfOf, uint16 referralCode)',
+        ]),
+        args: [AAVE_V2_POOL, SPENDER.toLowerCase() as `0x${string}`, 0],
+      }),
     };
     render(<SpecialEip712Section special={special} fallbackChainId={1} />);
-    expect(screen.getByText('DecodedCallSection chainId=1')).toBeTruthy();
+    expect(screen.getByText('Supply')).toBeTruthy();
+    // formatTokenAmount is mocked above to print the raw amount.
+    expect(
+      screen.getByText('Amount to supply: 500000000000000000 ETH'),
+    ).toBeTruthy();
   });
 
-  it('shows raw data when no decodedCall', () => {
+  it('gives a delegate call, or an operation Safe does not name, no value', () => {
+    const deposit = {
+      ...base,
+      to: AAVE_WETH_GATEWAY,
+      value: '500000000000000000',
+      data: encodeFunctionData({
+        abi: parseAbi([
+          'function depositETH(address lendingPool, address onBehalfOf, uint16 referralCode)',
+        ]),
+        args: [AAVE_V2_POOL, SPENDER.toLowerCase() as `0x${string}`, 0],
+      }),
+    };
+    for (const safeOperation of ['delegatecall', undefined] as const) {
+      const { unmount } = render(
+        <SpecialEip712Section
+          special={{ ...deposit, safeOperation }}
+          fallbackChainId={1}
+        />,
+      );
+      expect(screen.getByText('Supply')).toBeTruthy();
+      expect(
+        screen.queryByText('Amount to supply: 500000000000000000 ETH'),
+      ).toBeNull();
+      unmount();
+    }
+  });
+
+  it('describes the MultiSend batch it calls, not the Safe', () => {
+    const transactions = encodePacked(
+      ['uint8', 'address', 'uint256', 'uint256', 'bytes'],
+      [0, '0xd8da6bf26964af9d7eed9e03e53415d37aa96045', 1n, 0n, '0x'],
+    );
+    render(
+      <SpecialEip712Section
+        special={{
+          ...base,
+          safeAddress: SAFE,
+          to: MULTI_SEND_1_4_1,
+          operation: 'Delegate call',
+          safeOperation: 'delegatecall',
+          data: encodeFunctionData({
+            abi: parseAbi(['function multiSend(bytes transactions)']),
+            args: [transactions],
+          }),
+        }}
+        fallbackChainId={1}
+      />,
+    );
+    expect(screen.getByText('Safe MultiSend')).toBeTruthy();
+    expect(screen.getByText('Call 1 of 1')).toBeTruthy();
+    expect(screen.queryByText(UNKNOWN_MULTI_SEND_WARNING)).toBeNull();
+    expect(screen.queryByText(DELEGATE_CALL_WARNING)).toBeNull();
+  });
+
+  it("decodes a call no entry describes as the app's own section", () => {
+    render(
+      <SpecialEip712Section
+        special={{ ...base, data: TRANSFER }}
+        fallbackChainId={1}
+      />,
+    );
+    expect(screen.getByText('ERC-20 Transfer')).toBeTruthy();
+    expect(screen.getByText('Amount (raw units): 100')).toBeTruthy();
+  });
+
+  it('shows the data as written when nothing decodes it, without naming the callee again', () => {
     const special: Eip712SpecialReview = {
       ...base,
       data: '0xdeadbeef',
     };
     render(<SpecialEip712Section special={special} fallbackChainId={1} />);
     expect(screen.getByText('Data: 0xdeadbeef')).toBeTruthy();
+    expect(screen.queryByText(/^Contract: /)).toBeNull();
+  });
+
+  it('warns on a delegate call, to a known MultiSend too when it shows no batch', () => {
+    const delegate: Eip712SpecialReview = {
+      ...base,
+      operation: 'Delegate call',
+      safeOperation: 'delegatecall',
+    };
+    for (const special of [
+      delegate,
+      { ...delegate, to: MULTI_SEND_1_4_1 },
+      { ...delegate, to: MULTI_SEND_1_4_1, data: '0xdeadbeef' },
+    ]) {
+      const { unmount } = render(
+        <SpecialEip712Section special={special} fallbackChainId={1} />,
+      );
+      expect(screen.getByText(DELEGATE_CALL_WARNING)).toBeTruthy();
+      unmount();
+    }
   });
 
   it('uses special.chainId when fallbackChainId is undefined', () => {
     const special: Eip712SpecialReview = {
       ...base,
       chainId: 137,
-      decodedCall: { kind: 'erc20-transfer', to: SPENDER, amount: 100n },
+      data: TRANSFER,
     };
     render(
       <SpecialEip712Section special={special} fallbackChainId={undefined} />,
     );
-    expect(screen.getByText('DecodedCallSection chainId=137')).toBeTruthy();
+    expect(mockLookupToken).toHaveBeenCalledWith(137, SPENDER);
   });
 
   it('prefers special.chainId over fallbackChainId when both present', () => {
     const special: Eip712SpecialReview = {
       ...base,
       chainId: 137,
-      decodedCall: { kind: 'erc20-transfer', to: SPENDER, amount: 100n },
+      data: TRANSFER,
     };
     render(<SpecialEip712Section special={special} fallbackChainId={1} />);
-    expect(screen.getByText('DecodedCallSection chainId=137')).toBeTruthy();
+    expect(mockLookupToken).toHaveBeenCalledWith(137, SPENDER);
+    expect(mockLookupToken).not.toHaveBeenCalledWith(1, SPENDER);
   });
 });
 
@@ -290,6 +387,8 @@ describe('SpecialEip712Section: mis-cased addresses', () => {
           to: SPENDER,
           value: '0',
           operation: 'Call',
+          safeOperation: 'call',
+          safeTxHash: true,
           safeTxGas: '0',
           baseGas: '0',
           gasPrice: '0',

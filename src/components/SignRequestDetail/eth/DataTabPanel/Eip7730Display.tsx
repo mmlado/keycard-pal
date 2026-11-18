@@ -57,10 +57,18 @@ function Caption({ text }: { text: string }) {
   );
 }
 
-function InnerCall({ request }: { request: CallRequest }) {
+function InnerCall({
+  request,
+  calleeShown,
+}: {
+  request: CallRequest;
+  calleeShown?: boolean;
+}) {
   const { description } = useCallDescription(request);
   if (!description) return null;
-  return <DisplayNodes nodes={displayInnerCall(request, description)} />;
+  return (
+    <DisplayNodes nodes={displayInnerCall(request, description, calleeShown)} />
+  );
 }
 
 function Node({ node }: { node: DisplayNode }) {
@@ -87,7 +95,9 @@ function Node({ node }: { node: DisplayNode }) {
         </View>
       );
     case 'call':
-      return <InnerCall request={node.request} />;
+      return (
+        <InnerCall request={node.request} calleeShown={node.calleeShown} />
+      );
     case 'token':
       return (
         <>

@@ -3,10 +3,29 @@ import React from 'react';
 
 import { DELEGATE_CALL_WARNING } from '../src/constants/safe';
 
-import DecodedCallSection from '../src/components/SignRequestDetail/eth/DataTabPanel/DecodedCallSection';
+import { DisplayNodes } from '../src/components/SignRequestDetail/eth/DataTabPanel/Eip7730Display';
 
+import { displayDecodedCall } from '../src/utils/decodedCallDisplay';
 import { checksumEthAddress } from '../src/utils/ethereumAddress';
 import type { DecodedCall } from '../src/utils/txParser';
+
+function DecodedCallSection({
+  call,
+  tokenContract,
+  chainId,
+  depth,
+}: {
+  call: DecodedCall;
+  tokenContract?: string;
+  chainId?: number;
+  depth?: number;
+}) {
+  return (
+    <DisplayNodes
+      nodes={displayDecodedCall(call, tokenContract, chainId, depth)}
+    />
+  );
+}
 
 jest.mock('react-native-paper', () => {
   const { Text, View } = require('react-native');

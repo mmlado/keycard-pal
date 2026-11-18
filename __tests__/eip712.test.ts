@@ -303,11 +303,9 @@ describe('parseEip712Summary', () => {
       chainId: 1,
       to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
       operation: 'Call',
+      safeOperation: 'call',
       nonce: '12',
-      decodedCall: {
-        kind: 'erc20-transfer',
-        amount: 1000000n,
-      },
+      data: '0xa9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604500000000000000000000000000000000000000000000000000000000000f4240',
     });
   });
 
@@ -421,6 +419,7 @@ describe('parseEip712Summary', () => {
       kind: 'safe-tx',
       to: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
       operation: 'Delegate call',
+      safeOperation: 'delegatecall',
       value: '0',
       data: '0x1234',
       gasToken: 'native',
@@ -429,16 +428,11 @@ describe('parseEip712Summary', () => {
     });
   });
 
-  it('decodes a SafeTx that delegate calls a MultiSend batch', () => {
-    const transfer =
-      'a9059cbb000000000000000000000000d8da6bf26964af9d7eed9e03e53415d37aa9604500000000000000000000000000000000000000000000000000000000000f4240';
-    const transactions =
-      '00' +
-      'a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48' +
-      '0'.repeat(64) +
-      (transfer.length / 2).toString(16).padStart(64, '0') +
-      transfer;
-    const payload = {
+  describe('reads a SafeTx as its signature does', () => {
+    const safeTx = (
+      message: Record<string, unknown>,
+      chainId: unknown = 1,
+    ) => ({
       types: {
         EIP712Domain: [
           { name: 'chainId', type: 'uint256' },
@@ -446,40 +440,111 @@ describe('parseEip712Summary', () => {
         ],
         SafeTx: [
           { name: 'to', type: 'address' },
+          { name: 'value', type: 'uint256' },
           { name: 'data', type: 'bytes' },
           { name: 'operation', type: 'uint8' },
         ],
       },
       primaryType: 'SafeTx',
       domain: {
-        chainId: 1,
+        chainId,
         verifyingContract: '0x3333333333333333333333333333333333333333',
       },
       message: {
-        to: '0x38869bf66a61cf6bdb996a6ae40d5853fd43b526',
-        data:
-          '0x8d80ff0a' +
-          '20'.padStart(64, '0') +
-          (transactions.length / 2).toString(16).padStart(64, '0') +
-          transactions.padEnd(Math.ceil(transactions.length / 64) * 64, '0'),
-        operation: 1,
+        to: '0xdac17f958d2ee523a2206206994597c13d831ec7',
+        value: 0,
+        data: '0x',
+        operation: 0,
+        ...message,
       },
-    };
+    });
+    const special = (payload: unknown) =>
+      parseEip712Summary(typedDataHex(payload))?.special;
 
-    expect(parseEip712Summary(typedDataHex(payload))?.special).toMatchObject({
-      kind: 'safe-tx',
-      operation: 'Delegate call',
-      decodedCall: {
-        kind: 'multi-send',
-        calls: [
-          {
-            operation: 'call',
-            to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-            value: 0n,
-            data: `0x${transfer}`,
-          },
-        ],
+    it.each([1, '1', '0x01', '01', ' 1', true])(
+      'reads operation %p as a delegate call',
+      operation => {
+        expect(special(safeTx({ operation }))).toMatchObject({
+          operation: 'Delegate call',
+          safeOperation: 'delegatecall',
+        });
       },
+    );
+
+    it.each([0, '0x0', ''])('reads operation %p as a call', operation => {
+      expect(special(safeTx({ operation }))).toMatchObject({
+        operation: 'Call',
+        safeOperation: 'call',
+      });
+    });
+
+    it('names no operation Safe does not have', () => {
+      expect(special(safeTx({ operation: 2 }))).toMatchObject({
+        operation: '2',
+        safeOperation: undefined,
+      });
+    });
+
+    it('reads a hex value and a chain as viem signs them', () => {
+      expect(special(safeTx({ value: '0x10' }, '0x89'))).toMatchObject({
+        value: '16',
+        chainId: 137,
+      });
+      expect(special(safeTx({}, ' 137'))).toMatchObject({ chainId: 137 });
+    });
+
+    it('reads no number from an operation declared as another type', () => {
+      const typed = safeTx({ operation: ' 1' });
+      typed.types.SafeTx[3] = { name: 'operation', type: 'string' };
+      expect(special(typed)).toMatchObject({
+        operation: ' 1',
+        safeOperation: undefined,
+      });
+    });
+
+    it("names its digest the safeTxHash only under Safe's own types", () => {
+      const full = (domain: Record<string, unknown>) => ({
+        types: {
+          SafeTx: [
+            ['to', 'address'],
+            ['value', 'uint256'],
+            ['data', 'bytes'],
+            ['operation', 'uint8'],
+            ['safeTxGas', 'uint256'],
+            ['baseGas', 'uint256'],
+            ['gasPrice', 'uint256'],
+            ['gasToken', 'address'],
+            ['refundReceiver', 'address'],
+            ['nonce', 'uint256'],
+          ].map(([name, type]) => ({ name, type })),
+        },
+        primaryType: 'SafeTx',
+        domain,
+        message: {
+          to: '0xdac17f958d2ee523a2206206994597c13d831ec7',
+          value: 0,
+          data: '0x',
+          operation: 0,
+          safeTxGas: 0,
+          baseGas: 0,
+          gasPrice: 0,
+          gasToken: '0x0000000000000000000000000000000000000000',
+          refundReceiver: '0x0000000000000000000000000000000000000000',
+          nonce: 0,
+        },
+      });
+      const SAFE = '0x3333333333333333333333333333333333333333';
+      expect(
+        special(full({ chainId: 1, verifyingContract: SAFE })),
+      ).toMatchObject({ safeTxHash: true });
+      // Before 1.3.0 Safe's domain held only the contract.
+      expect(special(full({ verifyingContract: SAFE }))).toMatchObject({
+        safeTxHash: true,
+      });
+      expect(
+        special(full({ name: 'Safe', chainId: 1, verifyingContract: SAFE })),
+      ).toMatchObject({ safeTxHash: false });
+      expect(special(safeTx({}))).toMatchObject({ safeTxHash: false });
     });
   });
 
