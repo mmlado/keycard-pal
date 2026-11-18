@@ -5,10 +5,14 @@ import { MISCASED_ADDRESS_WARNING } from '@/constants/eip712';
 import AddressInfoRow from '@/components/ens/AddressInfoRow.online';
 import InfoRow from '@/components/InfoRow';
 
+import { delegateCallWarnings } from '@/utils/decodedCallDisplay';
 import { type Eip712SpecialReview } from '@/utils/eip712';
 
-import DecodedCallSection from '../DecodedCallSection';
+import { DisplayNodes } from '../Eip7730Display';
 import { SectionHeader, WarningRow } from '../shared';
+
+// The call a Safe makes sits one level below the message.
+const SAFE_TX_CALL_DEPTH = 1;
 
 export default function SafeTxReviewSection({
   special,
@@ -39,6 +43,10 @@ export default function SafeTxReviewSection({
       </View>
       <View style={styles.row}>
         <InfoRow label="Operation" value={special.operation} />
+        {special.safeOperation === 'delegatecall' &&
+          delegateCallWarnings(special.to, SAFE_TX_CALL_DEPTH).map(warning => (
+            <WarningRow key={warning} text={warning} />
+          ))}
       </View>
       <View style={styles.row}>
         <InfoRow label="Nonce" value={special.nonce} />
@@ -61,19 +69,25 @@ export default function SafeTxReviewSection({
           <WarningRow text={MISCASED_ADDRESS_WARNING} />
         )}
       </View>
-      {special.decodedCall ? (
-        <DecodedCallSection
-          call={special.decodedCall}
-          tokenContract={special.to}
-          chainId={chainId}
-          depth={1}
+      {special.data && (
+        <DisplayNodes
+          nodes={[
+            {
+              kind: 'call',
+              calleeShown: true,
+              request: {
+                chainId,
+                contract: special.to,
+                data: special.data,
+                // A delegate call carries no value.
+                ...(special.safeOperation === 'call' && {
+                  value: special.value,
+                }),
+                depth: SAFE_TX_CALL_DEPTH,
+              },
+            },
+          ]}
         />
-      ) : (
-        special.data && (
-          <View style={styles.row}>
-            <InfoRow label="Data" value={special.data} />
-          </View>
-        )
       )}
     </>
   );

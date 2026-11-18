@@ -6,7 +6,7 @@ import {
 
 import { checksumEthAddress } from './ethereumAddress';
 import { ensureHexPrefix } from './hex';
-import { decodeCalldata, type DecodedCall } from './txParser';
+import type { SafeOperation } from './txParser';
 
 type JsonValue =
   | string
@@ -64,8 +64,9 @@ export type Eip712SpecialReview =
       to: string;
       value: string;
       data?: string;
-      decodedCall?: DecodedCall;
       operation: string;
+      /** Undefined for an operation Safe does not name. */
+      safeOperation: SafeOperation | undefined;
       safeTxGas: string;
       baseGas: string;
       gasPrice: string;
@@ -186,6 +187,15 @@ function toDisplayValue(value: unknown): string | undefined {
   return undefined;
 }
 
+// viem hashes a uint through BigInt, so "0x01", " 1" and true sign as 1.
+function signedUint(value: unknown): bigint | undefined {
+  try {
+    return BigInt(value as string);
+  } catch {
+    return undefined;
+  }
+}
+
 function toChainId(value: unknown): number | undefined {
   const chainId = toBigIntValue(value);
   if (chainId === undefined) return undefined;
@@ -264,21 +274,26 @@ function parseSafeTx({
   const to = toAddress(message.to);
   const data = toHexBytes(message.data);
   if (!to) return null;
+  const operation = signedUint(message.operation);
 
   return {
     kind: 'safe-tx',
     safeAddress: toAddress(domain.verifyingContract),
-    chainId: toChainId(domain.chainId),
+    chainId: eip712DomainChainId(domain),
     to,
-    value: toDisplayValue(message.value) ?? '0',
+    value:
+      signedUint(message.value)?.toString() ??
+      toDisplayValue(message.value) ??
+      '0',
     data,
-    decodedCall: data ? decodeCalldata(data) ?? undefined : undefined,
     operation:
-      toDisplayValue(message.operation) === '0'
+      operation === 0n
         ? 'Call'
-        : toDisplayValue(message.operation) === '1'
+        : operation === 1n
         ? 'Delegate call'
         : toDisplayValue(message.operation) ?? 'Unknown',
+    safeOperation:
+      operation === 0n ? 'call' : operation === 1n ? 'delegatecall' : undefined,
     safeTxGas: toDisplayValue(message.safeTxGas) ?? '0',
     baseGas: toDisplayValue(message.baseGas) ?? '0',
     gasPrice: toDisplayValue(message.gasPrice) ?? '0',

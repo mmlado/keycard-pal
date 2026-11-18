@@ -67,10 +67,25 @@ export type DecodedCall =
       calls: MultiSendCall[];
       malformed?: { error: string; rawInput: string };
     }
+  | {
+      kind: 'safe-exec-transaction';
+      to: string;
+      value: bigint;
+      data: string;
+      operation: SafeOperation;
+      safeTxGas: bigint;
+      baseGas: bigint;
+      gasPrice: bigint;
+      gasToken: string;
+      refundReceiver: string;
+      signatures: string;
+    }
   | { kind: 'unknown-call'; selector: string };
 
+export type SafeOperation = 'call' | 'delegatecall';
+
 export type MultiSendCall = {
-  operation: 'call' | 'delegatecall';
+  operation: SafeOperation;
   to: string;
   value: bigint;
   data: string;
@@ -79,6 +94,8 @@ export type MultiSendCall = {
 const selectors = (selectorsData as SelectorsData).selectors;
 
 const MULTI_SEND_SELECTOR = '0x8d80ff0a';
+const SAFE_EXEC_TRANSACTION =
+  'execTransaction(address,uint256,bytes,uint8,uint256,uint256,uint256,address,address,bytes)';
 const MULTI_SEND_HEADER = 1 + 20 + 32 + 32;
 
 const UNIVERSAL_ROUTER_COMMAND_MASK = 0x1f;
@@ -255,8 +272,10 @@ function decodeUniversalRouterExecute(
 // The contract checks none of this framing and reads past the end of a short batch.
 function decodeMultiSend(transactions: string): DecodedCall {
   const bytes = Buffer.from(transactions.slice(2), 'hex');
-  const word = (at: number) =>
-    BigInt(`0x${bytes.subarray(at, at + 32).toString('hex')}`);
+  // Not subarray: on Hermes it returns a plain Uint8Array, whose toString ignores 'hex'.
+  const hex = (from: number, to: number) =>
+    `0x${bytes.toString('hex', from, to)}`;
+  const word = (at: number) => BigInt(hex(at, at + 32));
   const malformed = (error: string): DecodedCall => ({
     kind: 'multi-send',
     calls: [],
@@ -280,11 +299,9 @@ function decodeMultiSend(transactions: string): DecodedCall {
     const end = start + Number(dataLength);
     calls.push({
       operation: operation === 0 ? 'call' : 'delegatecall',
-      to: checksumEthAddress(
-        `0x${bytes.subarray(i + 1, i + 21).toString('hex')}`,
-      ),
+      to: checksumEthAddress(hex(i + 1, i + 21)),
       value: word(i + 21),
-      data: `0x${bytes.subarray(start, end).toString('hex')}`,
+      data: hex(start, end),
     });
     i = end;
   }
@@ -297,6 +314,24 @@ function toSpecializedDecodedCall(
 ): DecodedCall | null {
   if (entry.signature === 'execute(bytes,bytes[],uint256)') {
     return decodeUniversalRouterExecute(decodedArgs);
+  }
+  if (entry.signature === SAFE_EXEC_TRANSACTION) {
+    const operation = decodedArgs[3] as number;
+    // Any other operation is listed as written.
+    if (operation > 1) return null;
+    return {
+      kind: 'safe-exec-transaction',
+      to: decodedArgs[0] as string,
+      value: decodedArgs[1] as bigint,
+      data: decodedArgs[2] as string,
+      operation: operation === 0 ? 'call' : 'delegatecall',
+      safeTxGas: decodedArgs[4] as bigint,
+      baseGas: decodedArgs[5] as bigint,
+      gasPrice: decodedArgs[6] as bigint,
+      gasToken: decodedArgs[7] as string,
+      refundReceiver: decodedArgs[8] as string,
+      signatures: decodedArgs[9] as string,
+    };
   }
   if (entry.signature === 'transfer(address,uint256)') {
     return {

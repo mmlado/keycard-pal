@@ -10,12 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Settings lists the bundled tokens by chain, filtered by symbol or address
 - About opens the Welcome slides again under How it works
-- The review decodes a Safe MultiSend batch call by call, with a warning on each delegate call and on a contract that is not a known MultiSend
+- The review decodes a Safe MultiSend batch call by call, with a warning on each delegate call to anything but a known MultiSend and on a contract that is not a known MultiSend
+- The review shows a Safe execTransaction as a Safe transaction: its target, operation, value and refund fields, and the call the Safe makes decoded
 - Settings can show developer card options, which lock and unlock applet installs on a Developer card with a key the card derives (Android, applet 4.0)
 - A 12- or 24-word BIP85 phrase can be shown as a Standard or Compact SeedQR
 
 ### Changed
 
+- The review of a SafeTx typed-data request describes the call it makes through the clear-signing registry like any inner call, warns on a delegate call to anything but a known MultiSend, and its Digests tab names the digest the safeTxHash
 - The F-Droid repository at fdroid.keycardpal.com serves the ABI split APKs only and archives older releases up to 800 MiB
 - Updated bitcoinjs-lib to 6.1.10, flagged by Dependabot
 - The Welcome screen is a set of swipeable slides: its introduction, then setting up the Keycard, connecting a wallet and signing

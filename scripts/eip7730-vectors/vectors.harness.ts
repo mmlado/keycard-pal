@@ -115,7 +115,10 @@ function walk(nodes: DisplayNode[], shown: Shown): void {
         const description = describeCall(node.request);
         if (description instanceof Promise)
           throw new Error('unexpected promise');
-        walk(displayInnerCall(node.request, description), shown);
+        walk(
+          displayInnerCall(node.request, description, node.calleeShown),
+          shown,
+        );
         break;
       }
     }

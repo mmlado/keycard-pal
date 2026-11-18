@@ -47,6 +47,7 @@ import type {
   Eip7730Field,
 } from '../src/utils/eip7730/zip';
 import { checksumEthAddress } from '../src/utils/ethereumAddress';
+import { decodeCalldata } from '../src/utils/txParser';
 
 const USDC = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
 const WETH = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
@@ -109,7 +110,11 @@ function outline(nodes: DisplayNode[], indent = ''): string[] {
         ];
       case 'call':
         return outline(
-          displayInnerCall(node.request, now(describeCall(node.request))),
+          displayInnerCall(
+            node.request,
+            now(describeCall(node.request)),
+            node.calleeShown,
+          ),
           indent,
         );
       case 'token':
@@ -1388,6 +1393,145 @@ describe('a Safe MultiSend batch', () => {
     expect(
       lines.filter(line => line.endsWith('Contract call: 0x8d80ff0a')),
     ).toHaveLength(1);
+  });
+
+  it('warns on no delegate call into a known MultiSend whose batch it decodes', () => {
+    const lines = review(
+      MULTI_SEND_1_4_1,
+      batch([[1, MULTI_SEND_1_4_1, 0n, batch([[0, RECIPIENT, 1n, '0x']])]]),
+    );
+    expect(lines).toContain('  Operation: Delegate call');
+    expect(lines.filter(line => line.includes(DELEGATE_CALL_WARNING))).toEqual(
+      [],
+    );
+    expect(lines).toContain('  # Safe MultiSend');
+  });
+
+  it('warns on the delegate call into a MultiSend whose batch is past the depth limit', () => {
+    let data = batch([[1, SOME_CONTRACT, 0n, '0xdeadbeef']]);
+    for (let i = 0; i < 4; i++) {
+      data = batch([[1, MULTI_SEND_1_4_1, 0n, data]]);
+    }
+    const lines = review(MULTI_SEND_1_4_1, data);
+    const warned = lines.findIndex(line =>
+      line.includes(DELEGATE_CALL_WARNING),
+    );
+    expect(
+      lines.filter(line => line.includes(DELEGATE_CALL_WARNING)),
+    ).toHaveLength(1);
+    expect(
+      lines
+        .slice(warned)
+        .some(line => line.endsWith('Contract call: 0x8d80ff0a')),
+    ).toBe(true);
+  });
+});
+
+describe('a Safe execTransaction', () => {
+  const SAFE = checksumEthAddress('0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe');
+  const MULTI_SEND_1_4_1 = '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526';
+  const exec = (to: string, value: bigint, data: string, operation: number) =>
+    encode(
+      'execTransaction(address to, uint256 value, bytes data, uint8 operation, uint256 safeTxGas, uint256 baseGas, uint256 gasPrice, address gasToken, address refundReceiver, bytes signatures)',
+      [
+        to,
+        value,
+        data,
+        operation,
+        0n,
+        0n,
+        0n,
+        ZERO,
+        ZERO,
+        `0x${'11'.repeat(65)}`,
+      ],
+    );
+  const review = (data: string) => {
+    const place = { chainId: 1, contract: SAFE, depth: 0 };
+    return outline(
+      displayCallSection(now(describeCall({ ...place, data })), place),
+    );
+  };
+
+  it('names the operation, describes the call the Safe makes, then the refund fields', () => {
+    const data = exec(
+      UNKNOWN,
+      0n,
+      encode('transfer(address to, uint256 amount)', [RECIPIENT, 7n]),
+      0,
+    );
+    expect(review(data)).toEqual([
+      '# Safe Transaction',
+      `To: ${UNKNOWN}`,
+      'Operation: Call',
+      'Value: 0',
+      '-',
+      '  # ERC-20 Transfer',
+      `  Token contract: ${UNKNOWN}`,
+      `  Recipient: ${RECIPIENT}`,
+      '  Amount (raw units): 7',
+      'Safe tx gas: 0',
+      'Base gas: 0',
+      'Gas price: 0',
+      `Gas token: ${ZERO}`,
+      `Refund receiver: ${ZERO}`,
+      'Signatures: 65 bytes',
+    ]);
+  });
+
+  it('warns on a delegate call, except to a known MultiSend', () => {
+    expect(
+      review(exec(SOME_CONTRACT, 0n, '0xdeadbeef', 1)).slice(0, 7),
+    ).toEqual([
+      '# Safe Transaction',
+      `To: ${SOME_CONTRACT}`,
+      'Operation: Delegate call',
+      `  ! ${DELEGATE_CALL_WARNING}`,
+      '-',
+      '  Contract call: 0xdeadbeef',
+      '  Data: 0xdeadbeef',
+    ]);
+    const batch = review(
+      exec(
+        MULTI_SEND_1_4_1,
+        0n,
+        encode('multiSend(bytes transactions)', ['0x']),
+        1,
+      ),
+    );
+    expect(batch.slice(0, 7)).toEqual([
+      '# Safe Transaction',
+      `To: ${MULTI_SEND_1_4_1}`,
+      'Operation: Delegate call',
+      '-',
+      '  # Safe MultiSend',
+      '  Calls: None',
+      'Safe tx gas: 0',
+    ]);
+  });
+
+  it('hands the inner call a value only for a call, and never a sender', () => {
+    const requestOf = (operation: number) => {
+      const call = decodeCalldata(exec(RECIPIENT, 5n, '0x', operation));
+      const nodes = displayDecodedCall(call!, SAFE, 1);
+      const inner = nodes
+        .flatMap(node => (node.kind === 'item' ? node.nodes : [node]))
+        .find(node => node.kind === 'call');
+      return inner?.kind === 'call' ? inner.request : undefined;
+    };
+    expect(requestOf(0)).toEqual({
+      chainId: 1,
+      contract: RECIPIENT,
+      data: '0x',
+      value: '5',
+      depth: 1,
+    });
+    expect(requestOf(1)).toEqual({
+      chainId: 1,
+      contract: RECIPIENT,
+      data: '0x',
+      depth: 1,
+    });
   });
 });
 

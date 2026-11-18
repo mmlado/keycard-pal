@@ -63,7 +63,8 @@ export type DisplayNode =
   // Rows that read as one entry, such as a Universal Router command and its arguments.
   | { kind: 'group'; rows: DisplayRow[] }
   // Its entry may wait for a saved slice, so the review describes it on its own.
-  | { kind: 'call'; request: CallRequest }
+  // `calleeShown`: a row above already names the contract it calls.
+  | { kind: 'call'; request: CallRequest; calleeShown?: boolean }
   | {
       kind: 'token';
       token: TokenMetadata;
@@ -434,12 +435,13 @@ export function displayCallSection(
 export function displayInnerCall(
   request: CallRequest,
   description: CallDescription,
+  calleeShown = false,
 ): DisplayNode[] {
   const nodes: DisplayNode[] = [];
   if (description.rejected) {
     nodes.push({ kind: 'warning', text: DESCRIPTOR_CHECK_FAILED_WARNING });
   }
-  if (description.contractRow === 'contract') {
+  if (description.contractRow === 'contract' && !calleeShown) {
     nodes.push(
       addressRow(
         'Contract',

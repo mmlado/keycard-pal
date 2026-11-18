@@ -119,6 +119,32 @@ describe('Eip712JsonPanel', () => {
     expect(screen.getByTestId('digest-explainer')).toBeTruthy();
   });
 
+  it('names the digest of a SafeTx its safeTxHash', () => {
+    const payload = classifyEthPayload(request.signData, request.dataType);
+    if (payload.kind !== 'eip712-json') throw new Error(payload.kind);
+    const special = {
+      kind: 'safe-tx' as const,
+      to: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+      value: '0',
+      operation: 'Call',
+      safeOperation: 'call' as const,
+      safeTxGas: '0',
+      baseGas: '0',
+      gasPrice: '0',
+      gasToken: '0x0000000000000000000000000000000000000000',
+      refundReceiver: '0x0000000000000000000000000000000000000000',
+      nonce: '0',
+      miscased: [],
+    };
+    render(
+      <Panel request={request} eip712={{ ...eip712, special }} chainId={1} />,
+    );
+    fireEvent.press(screen.getByText('Digests'));
+    expect(
+      screen.getByText(`EIP-712 Digest (safeTxHash): ${payload.digest}`),
+    ).toBeTruthy();
+  });
+
   it('switches to Raw tab and shows raw JSON', () => {
     render(<Panel request={request} eip712={eip712} chainId={1} />);
     fireEvent.press(screen.getByText('Raw'));

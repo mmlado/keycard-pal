@@ -137,7 +137,14 @@ export default function Eip712JsonPanel({
         )}
         {tab === 'digests' && eip712Digest && (
           <>
-            <DigestRow label="EIP-712 Digest" value={eip712Digest} />
+            <DigestRow
+              label={
+                specialEip712?.kind === 'safe-tx'
+                  ? 'EIP-712 Digest (safeTxHash)'
+                  : 'EIP-712 Digest'
+              }
+              value={eip712Digest}
+            />
             <DigestExplainer text={EIP712_DIGEST_EXPLAINER} />
           </>
         )}

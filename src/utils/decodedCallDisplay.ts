@@ -6,6 +6,7 @@ import {
   ZERO_ADDRESS_CALL_WARNING,
 } from '@/constants/safe';
 
+import { MAX_CALL_DEPTH } from '@/utils/callDescription';
 import { getNativeCurrencySymbol } from '@/utils/chainMetadata';
 import { customTokenRemarks } from '@/utils/customTokenChecks';
 import type {
@@ -24,6 +25,7 @@ import {
   type DecodedCall,
   type DecodedCallArg,
   type MultiSendCall,
+  type SafeOperation,
 } from '@/utils/txParser';
 
 const UINT256_MAX = 2n ** 256n - 1n;
@@ -78,6 +80,38 @@ export function tokenContractRows(
   ];
 }
 
+// Every Safe batch delegate calls MultiSend, and its calls carry their own warnings,
+// but only while the batch is still decoded.
+export function delegateCallWarnings(
+  target: string | undefined,
+  depth: number,
+): string[] {
+  return target &&
+    SAFE_MULTI_SEND_VERSIONS.has(target.toLowerCase()) &&
+    depth <= MAX_CALL_DEPTH
+    ? []
+    : [DELEGATE_CALL_WARNING];
+}
+
+function operationRow(
+  operation: SafeOperation,
+  target: string,
+  depth: number,
+): DisplayRow {
+  return operation === 'call'
+    ? textRow('Operation', 'Call')
+    : {
+        ...textRow('Operation', 'Delegate call'),
+        warnings: delegateCallWarnings(target, depth),
+      };
+}
+
+const nativeValue = (wei: bigint, chainId: number | undefined) =>
+  weiToNative(
+    wei,
+    chainId === undefined ? 'ETH' : getNativeCurrencySymbol(chainId),
+  );
+
 function multiSendItem(
   sub: MultiSendCall,
   index: number,
@@ -86,22 +120,15 @@ function multiSendItem(
   zeroIsSafe: boolean,
 ): DisplayNode {
   const isCall = sub.operation === 'call';
-  const symbol =
-    place.chainId === undefined
-      ? 'ETH'
-      : getNativeCurrencySymbol(place.chainId);
   return {
     kind: 'item',
     title: `Call ${index + 1} of ${count}`,
     nodes: [
-      isCall
-        ? textRow('Operation', 'Call')
-        : {
-            ...textRow('Operation', 'Delegate call'),
-            warnings: [DELEGATE_CALL_WARNING],
-          },
+      operationRow(sub.operation, sub.to, place.depth + 1),
       // A delegate call carries no value.
-      ...(isCall ? [textRow('Value', weiToNative(sub.value, symbol))] : []),
+      ...(isCall
+        ? [textRow('Value', nativeValue(sub.value, place.chainId))]
+        : []),
       ...(zeroIsSafe && /^0x0{40}$/.test(sub.to)
         ? [{ kind: 'warning' as const, text: ZERO_ADDRESS_CALL_WARNING }]
         : []),
@@ -117,6 +144,45 @@ function multiSendItem(
       },
     ],
   };
+}
+
+function displaySafeExecTransaction(
+  call: Extract<DecodedCall, { kind: 'safe-exec-transaction' }>,
+  place: CallPlace,
+): DisplayNode[] {
+  const isCall = call.operation === 'call';
+  return [
+    { kind: 'section', title: 'Safe Transaction' },
+    addressRow('To', call.to),
+    operationRow(call.operation, call.to, place.depth + 1),
+    ...(isCall
+      ? [textRow('Value', nativeValue(call.value, place.chainId))]
+      : []),
+    // A block keeps the inner call's own section apart from the rows below.
+    {
+      kind: 'item',
+      nodes: [
+        {
+          kind: 'call',
+          calleeShown: true,
+          request: {
+            chainId: place.chainId,
+            contract: call.to,
+            data: call.data,
+            // A delegate call carries no value.
+            ...(isCall && { value: call.value.toString() }),
+            depth: place.depth + 1,
+          },
+        },
+      ],
+    },
+    textRow('Safe tx gas', call.safeTxGas.toString()),
+    textRow('Base gas', call.baseGas.toString()),
+    textRow('Gas price', call.gasPrice.toString()),
+    addressRow('Gas token', call.gasToken),
+    addressRow('Refund receiver', call.refundReceiver),
+    textRow('Signatures', `${(call.signatures.length - 2) / 2} bytes`),
+  ];
 }
 
 function displayMultiSend(
@@ -240,6 +306,12 @@ export function displayDecodedCall(
       ];
     case 'multi-send':
       return displayMultiSend(call, {
+        chainId,
+        contract: tokenContract,
+        depth,
+      });
+    case 'safe-exec-transaction':
+      return displaySafeExecTransaction(call, {
         chainId,
         contract: tokenContract,
         depth,
