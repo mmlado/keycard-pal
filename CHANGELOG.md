@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - The NFC sheet no longer shows a check mark as it closes over a screen that shows its own result, such as a recovery phrase that does not match the Keycard (Android)
+- A generated PUK has every digit equally likely; on applet 4.0 its random bytes come from the card
 
 ## [1.17.0] - 2026-11-10
 

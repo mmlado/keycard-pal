@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { PAIRING_PASSWORD } from '../src/constants/keycard';
 
 import {
+  CARD_RANDOM_FAILED,
   UNVERIFIED_CARD_STATUS,
   useInitCard,
 } from '../src/hooks/keycard/useInitCard';
@@ -33,11 +34,23 @@ jest.mock(
 
 const mockInit = jest.fn();
 const mockSelect = jest.fn();
+const mockAutoOpenSecureChannel = jest.fn();
+const mockGetChallenge = jest.fn();
 const mockCmdSet = {
   select: mockSelect,
   applicationInfo: { initializedCard: false } as unknown,
   init: mockInit,
+  autoOpenSecureChannel: mockAutoOpenSecureChannel,
+  getChallenge: mockGetChallenge,
 };
+
+function challenge(bytes: number[]) {
+  return { sw: 0x9000, data: new Uint8Array(bytes), checkOK: jest.fn() };
+}
+
+// 255 is skipped; the rest map to 349176082390.
+const RANDOM_BYTES = [255, 13, 24, 39, 41, 57, 66, 70, 88, 92, 103, 119, 120];
+const RANDOM_PUK = '349176082390';
 
 const mockLoadApprovedCardKeys = jest.fn();
 const mockApproveCardKey = jest.fn();
@@ -60,6 +73,12 @@ describe('useInitCard', () => {
     mockInit.mockResolvedValue({ sw: 0x9000, checkOK: jest.fn() });
     mockSelect.mockClear();
     mockInit.mockClear();
+    mockAutoOpenSecureChannel.mockReset().mockResolvedValue(undefined);
+    mockGetChallenge
+      .mockReset()
+      .mockImplementation(async (length: number) =>
+        challenge([...RANDOM_BYTES, ...Array(length).fill(0)].slice(0, length)),
+      );
     mockLoadApprovedCardKeys.mockReset().mockResolvedValue([]);
     mockApproveCardKey.mockReset().mockResolvedValue(undefined);
     mockCmdSet.applicationInfo = { initializedCard: false };
@@ -73,17 +92,10 @@ describe('useInitCard', () => {
       expect(result.current.result).toBeNull();
     });
 
-    // One PUK per screen: sent on every tap, shown once one succeeds.
-    it('holds a 12-digit PUK from the start', () => {
+    // The card that is set up decides where the digits come from.
+    it('holds no PUK before a tap', () => {
       const { result } = renderHook(() => useInitCard());
-      expect(result.current.puk).toMatch(/^\d{12}$/);
-    });
-
-    it('keeps the same PUK across renders', () => {
-      const { result, rerender } = renderHook(() => useInitCard());
-      const puk = result.current.puk;
-      rerender(undefined);
-      expect(result.current.puk).toBe(puk);
+      expect(result.current.puk).toBe('');
     });
   });
 
@@ -278,11 +290,34 @@ describe('useInitCard', () => {
       expect(result.current.phase).toBe('done');
     });
 
+    it('draws the PUK from the phone, not the card', async () => {
+      const getRandomValues = jest
+        .spyOn(crypto, 'getRandomValues')
+        .mockImplementation(array => {
+          (array as Uint8Array).set(
+            RANDOM_BYTES.slice(0, (array as Uint8Array).length),
+          );
+          return array;
+        });
+      const { result } = renderHook(() => useInitCard());
+      await act(async () => {
+        result.current.start('123456');
+      });
+      await act(async () => {
+        await tapCard();
+      });
+
+      expect(result.current.puk).toBe(RANDOM_PUK);
+      expect(getRandomValues).toHaveBeenCalled();
+      expect(mockGetChallenge).not.toHaveBeenCalled();
+      expect(mockAutoOpenSecureChannel).not.toHaveBeenCalled();
+      getRandomValues.mockRestore();
+    });
+
     // The digits already on paper are the digits the card gets.
     it('sends the same PUK on a tap after a failed one', async () => {
-      mockSelect.mockResolvedValueOnce({ sw: 0x6a82 });
+      mockInit.mockRejectedValueOnce(new Error('Card refused'));
       const { result } = renderHook(() => useInitCard());
-      const puk = result.current.puk;
       await act(async () => {
         result.current.start('123456');
       });
@@ -290,6 +325,8 @@ describe('useInitCard', () => {
         await tapCard();
       });
       expect(result.current.phase).toBe('error');
+      const puk = result.current.puk;
+      expect(puk).toMatch(/^\d{12}$/);
 
       await act(async () => {
         result.current.retry();
@@ -300,6 +337,7 @@ describe('useInitCard', () => {
       expect(result.current.phase).toBe('done');
       expect(result.current.puk).toBe(puk);
       expect(mockInit.mock.calls[0][1]).toBe(puk);
+      expect(mockInit.mock.calls[1][1]).toBe(puk);
     });
 
     it('passes duress pin when provided', async () => {
@@ -375,6 +413,64 @@ describe('useInitCard', () => {
         expect(mockInit.mock.calls[0][1]).toBe(result.current.puk);
       });
 
+      it('draws the PUK from the card', async () => {
+        const { result } = await startAndTap();
+        expect(mockGetChallenge).toHaveBeenCalledTimes(1);
+        expect(result.current.puk).toBe(RANDOM_PUK);
+        expect(mockInit.mock.calls[0][1]).toBe(RANDOM_PUK);
+      });
+
+      // GET CHALLENGE needs the channel, and INIT comes last.
+      it('opens the channel before asking for the bytes', async () => {
+        await startAndTap();
+        const [open] = mockAutoOpenSecureChannel.mock.invocationCallOrder;
+        const [draw] = mockGetChallenge.mock.invocationCallOrder;
+        const [init] = mockInit.mock.invocationCallOrder;
+        expect(open).toBeLessThan(draw);
+        expect(draw).toBeLessThan(init);
+      });
+
+      it('asks the card again when one answer has too few usable bytes', async () => {
+        mockGetChallenge
+          .mockResolvedValueOnce(challenge([1, 2, 3, ...Array(13).fill(250)]))
+          .mockResolvedValueOnce(challenge([4, 5, 6, 7, 8, 9, 10, 11, 12]));
+        const { result } = await startAndTap();
+        expect(mockGetChallenge).toHaveBeenCalledTimes(2);
+        expect(result.current.puk).toBe('123456789012');
+      });
+
+      it('sends no INIT when the card refuses GET CHALLENGE', async () => {
+        mockGetChallenge.mockResolvedValue({
+          sw: 0x6d00,
+          data: new Uint8Array(0),
+          checkOK: () => {
+            throw new Error(CARD_RANDOM_FAILED);
+          },
+        });
+        const { result } = await startAndTap();
+        expect(mockInit).not.toHaveBeenCalled();
+        expect(result.current.phase).toBe('error');
+        expect(result.current.status).toBe(CARD_RANDOM_FAILED);
+        expect(result.current.initSent).toBe(false);
+        expect(result.current.puk).toBe('');
+      });
+
+      // A retry reuses the drawn PUK, so it needs no channel of its own.
+      it('draws once: a retry sends the same PUK and asks for no bytes', async () => {
+        mockInit.mockRejectedValueOnce(new Error('Card refused'));
+        const { result } = await startAndTap();
+        expect(result.current.phase).toBe('error');
+
+        await act(async () => {
+          result.current.retry();
+        });
+        await tapAgain();
+        expect(result.current.phase).toBe('done');
+        expect(mockGetChallenge).toHaveBeenCalledTimes(1);
+        expect(mockAutoOpenSecureChannel).toHaveBeenCalledTimes(1);
+        expect(mockInit.mock.calls[1][1]).toBe(RANDOM_PUK);
+      });
+
       it('passes the duress PIN when one was chosen', async () => {
         await startAndTap('654321');
         expect(mockInit.mock.calls[0][2]).toBeUndefined();
@@ -435,6 +531,8 @@ describe('useInitCard', () => {
         const { result } = await startAndTap();
         expect(result.current.phase).toBe('genuine_warning');
         expect(mockInit).not.toHaveBeenCalled();
+        expect(mockAutoOpenSecureChannel).not.toHaveBeenCalled();
+        expect(mockGetChallenge).not.toHaveBeenCalled();
       });
 
       // A tap that returned would close Apple's sheet with "Card initialized".
