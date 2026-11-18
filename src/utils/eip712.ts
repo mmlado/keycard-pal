@@ -67,6 +67,8 @@ export type Eip712SpecialReview =
       operation: string;
       /** Undefined for an operation Safe does not name. */
       safeOperation: SafeOperation | undefined;
+      /** The types and domain are Safe's, so the digest is its safeTxHash. */
+      safeTxHash: boolean;
       safeTxGas: string;
       baseGas: string;
       gasPrice: string;
@@ -265,24 +267,50 @@ function parsePermitSingle({
   };
 }
 
-function parseSafeTx({
-  primaryType,
-  domain,
-  message,
-}: Eip712RawTypedData): Eip712SpecialReview | null {
+// Safe's own types: with any other, the digest is not a hash Safe computes.
+const SAFE_TX_TYPE =
+  'SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)';
+const SAFE_DOMAIN_TYPES = [
+  'EIP712Domain(address verifyingContract)',
+  // Safe 1.3.0 added the chain.
+  'EIP712Domain(uint256 chainId,address verifyingContract)',
+];
+
+const isUint = (type: string | null | undefined) =>
+  type != null && /^uint\d*$/.test(type);
+
+// Any other declared type is hashed as something other than a number.
+function signedUintField(
+  typed: Eip712RawTypedData,
+  name: string,
+): bigint | undefined {
+  return isUint(eip712FieldType(typed.types, typed.primaryType, name))
+    ? signedUint(typed.message[name])
+    : undefined;
+}
+
+function parseSafeTx(typed: Eip712RawTypedData): Eip712SpecialReview | null {
+  const { primaryType, domain, message } = typed;
   if (primaryType !== 'SafeTx') return null;
   const to = toAddress(message.to);
   const data = toHexBytes(message.data);
   if (!to) return null;
-  const operation = signedUint(message.operation);
+  const operation = signedUintField(typed, 'operation');
+  const domainMembers = domainMembersOf(typed);
+  const chainMember = domainMembers.find(m => m.name === 'chainId');
+  const domainType = `EIP712Domain(${domainMembers
+    .map(m => `${m.type} ${m.name}`)
+    .join(',')})`;
 
   return {
     kind: 'safe-tx',
     safeAddress: toAddress(domain.verifyingContract),
-    chainId: eip712DomainChainId(domain),
+    chainId: isUint(chainMember?.type)
+      ? toChainId(signedUint(domain.chainId))
+      : undefined,
     to,
     value:
-      signedUint(message.value)?.toString() ??
+      signedUintField(typed, 'value')?.toString() ??
       toDisplayValue(message.value) ??
       '0',
     data,
@@ -294,6 +322,9 @@ function parseSafeTx({
         : toDisplayValue(message.operation) ?? 'Unknown',
     safeOperation:
       operation === 0n ? 'call' : operation === 1n ? 'delegatecall' : undefined,
+    safeTxHash:
+      encodeEip712Type('SafeTx', typed.types) === SAFE_TX_TYPE &&
+      SAFE_DOMAIN_TYPES.includes(domainType),
     safeTxGas: toDisplayValue(message.safeTxGas) ?? '0',
     baseGas: toDisplayValue(message.baseGas) ?? '0',
     gasPrice: toDisplayValue(message.gasPrice) ?? '0',

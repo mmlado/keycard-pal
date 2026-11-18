@@ -188,6 +188,7 @@ describe('SpecialEip712Section — safe-tx', () => {
     value: '0',
     operation: 'Call',
     safeOperation: 'call' as const,
+    safeTxHash: true,
     safeTxGas: '0',
     baseGas: '0',
     gasPrice: '0',
@@ -306,27 +307,23 @@ describe('SpecialEip712Section — safe-tx', () => {
     expect(screen.queryByText(/^Contract: /)).toBeNull();
   });
 
-  it('warns on a delegate call, but not on one to a known MultiSend', () => {
+  it('warns on a delegate call, to a known MultiSend too when it shows no batch', () => {
     const delegate: Eip712SpecialReview = {
       ...base,
       operation: 'Delegate call',
       safeOperation: 'delegatecall',
     };
-    const { unmount } = render(
-      <SpecialEip712Section special={delegate} fallbackChainId={1} />,
-    );
-    expect(screen.getByText(DELEGATE_CALL_WARNING)).toBeTruthy();
-    unmount();
-    render(
-      <SpecialEip712Section
-        special={{
-          ...delegate,
-          to: '0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526',
-        }}
-        fallbackChainId={1}
-      />,
-    );
-    expect(screen.queryByText(DELEGATE_CALL_WARNING)).toBeNull();
+    for (const special of [
+      delegate,
+      { ...delegate, to: MULTI_SEND_1_4_1 },
+      { ...delegate, to: MULTI_SEND_1_4_1, data: '0xdeadbeef' },
+    ]) {
+      const { unmount } = render(
+        <SpecialEip712Section special={special} fallbackChainId={1} />,
+      );
+      expect(screen.getByText(DELEGATE_CALL_WARNING)).toBeTruthy();
+      unmount();
+    }
   });
 
   it('uses special.chainId when fallbackChainId is undefined', () => {
@@ -391,6 +388,7 @@ describe('SpecialEip712Section: mis-cased addresses', () => {
           value: '0',
           operation: 'Call',
           safeOperation: 'call',
+          safeTxHash: true,
           safeTxGas: '0',
           baseGas: '0',
           gasPrice: '0',

@@ -1407,6 +1407,15 @@ describe('a Safe MultiSend batch', () => {
     expect(lines).toContain('  # Safe MultiSend');
   });
 
+  it('warns on a delegate call into a known MultiSend that carries no batch it decodes', () => {
+    const intoMultiSend = (data: string) =>
+      review(MULTI_SEND_1_4_1, batch([[1, MULTI_SEND_1_4_1, 0n, data]]));
+    const malformed = encode('multiSend(bytes transactions)', ['0x00']);
+    for (const data of ['0xdeadbeef', malformed]) {
+      expect(intoMultiSend(data)).toContain(`    ! ${DELEGATE_CALL_WARNING}`);
+    }
+  });
+
   it('warns on the delegate call into a MultiSend whose batch is past the depth limit', () => {
     let data = batch([[1, SOME_CONTRACT, 0n, '0xdeadbeef']]);
     for (let i = 0; i < 4; i++) {

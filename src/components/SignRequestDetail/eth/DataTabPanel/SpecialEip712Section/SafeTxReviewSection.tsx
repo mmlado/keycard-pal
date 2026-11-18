@@ -44,9 +44,11 @@ export default function SafeTxReviewSection({
       <View style={styles.row}>
         <InfoRow label="Operation" value={special.operation} />
         {special.safeOperation === 'delegatecall' &&
-          delegateCallWarnings(special.to, SAFE_TX_CALL_DEPTH).map(warning => (
-            <WarningRow key={warning} text={warning} />
-          ))}
+          delegateCallWarnings(
+            special.to,
+            SAFE_TX_CALL_DEPTH,
+            special.data,
+          ).map(warning => <WarningRow key={warning} text={warning} />)}
       </View>
       <View style={styles.row}>
         <InfoRow label="Nonce" value={special.nonce} />

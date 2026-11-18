@@ -139,7 +139,7 @@ export default function Eip712JsonPanel({
           <>
             <DigestRow
               label={
-                specialEip712?.kind === 'safe-tx'
+                specialEip712?.kind === 'safe-tx' && specialEip712.safeTxHash
                   ? 'EIP-712 Digest (safeTxHash)'
                   : 'EIP-712 Digest'
               }

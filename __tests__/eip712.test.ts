@@ -485,11 +485,66 @@ describe('parseEip712Summary', () => {
       });
     });
 
-    it('reads a hex value and a hex chain', () => {
+    it('reads a hex value and a chain as viem signs them', () => {
       expect(special(safeTx({ value: '0x10' }, '0x89'))).toMatchObject({
         value: '16',
         chainId: 137,
       });
+      expect(special(safeTx({}, ' 137'))).toMatchObject({ chainId: 137 });
+    });
+
+    it('reads no number from an operation declared as another type', () => {
+      const typed = safeTx({ operation: ' 1' });
+      typed.types.SafeTx[3] = { name: 'operation', type: 'string' };
+      expect(special(typed)).toMatchObject({
+        operation: ' 1',
+        safeOperation: undefined,
+      });
+    });
+
+    it("names its digest the safeTxHash only under Safe's own types", () => {
+      const full = (domain: Record<string, unknown>) => ({
+        types: {
+          SafeTx: [
+            ['to', 'address'],
+            ['value', 'uint256'],
+            ['data', 'bytes'],
+            ['operation', 'uint8'],
+            ['safeTxGas', 'uint256'],
+            ['baseGas', 'uint256'],
+            ['gasPrice', 'uint256'],
+            ['gasToken', 'address'],
+            ['refundReceiver', 'address'],
+            ['nonce', 'uint256'],
+          ].map(([name, type]) => ({ name, type })),
+        },
+        primaryType: 'SafeTx',
+        domain,
+        message: {
+          to: '0xdac17f958d2ee523a2206206994597c13d831ec7',
+          value: 0,
+          data: '0x',
+          operation: 0,
+          safeTxGas: 0,
+          baseGas: 0,
+          gasPrice: 0,
+          gasToken: '0x0000000000000000000000000000000000000000',
+          refundReceiver: '0x0000000000000000000000000000000000000000',
+          nonce: 0,
+        },
+      });
+      const SAFE = '0x3333333333333333333333333333333333333333';
+      expect(
+        special(full({ chainId: 1, verifyingContract: SAFE })),
+      ).toMatchObject({ safeTxHash: true });
+      // Before 1.3.0 Safe's domain held only the contract.
+      expect(special(full({ verifyingContract: SAFE }))).toMatchObject({
+        safeTxHash: true,
+      });
+      expect(
+        special(full({ name: 'Safe', chainId: 1, verifyingContract: SAFE })),
+      ).toMatchObject({ safeTxHash: false });
+      expect(special(safeTx({}))).toMatchObject({ safeTxHash: false });
     });
   });
 

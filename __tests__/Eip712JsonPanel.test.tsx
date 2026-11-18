@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
+import { encodeAbiParameters, keccak256, parseAbiParameters } from 'viem';
 
 import Eip712JsonPanel from '../src/components/SignRequestDetail/eth/DataTabPanel/Eip712JsonPanel';
 import { UNCOVERED_VALUES_WARNING } from '../src/constants/eip712';
-import type { Eip712Summary } from '../src/utils/eip712';
+import { parseEip712Summary, type Eip712Summary } from '../src/utils/eip712';
 import { classifyEthPayload } from '../src/utils/ethPayload';
 import type { EthSignRequest } from '../src/types';
 
@@ -119,30 +120,103 @@ describe('Eip712JsonPanel', () => {
     expect(screen.getByTestId('digest-explainer')).toBeTruthy();
   });
 
-  it('names the digest of a SafeTx its safeTxHash', () => {
-    const payload = classifyEthPayload(request.signData, request.dataType);
-    if (payload.kind !== 'eip712-json') throw new Error(payload.kind);
-    const special = {
-      kind: 'safe-tx' as const,
-      to: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+  describe('a SafeTx', () => {
+    const SAFE = '0x5afe5afe5afe5afe5afe5afe5afe5afe5afe5afe' as const;
+    const ZERO = '0x0000000000000000000000000000000000000000' as const;
+    const message = {
+      to: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const,
       value: '0',
-      operation: 'Call',
-      safeOperation: 'call' as const,
+      data: '0xdeadbeef' as const,
+      operation: 1,
       safeTxGas: '0',
       baseGas: '0',
       gasPrice: '0',
-      gasToken: '0x0000000000000000000000000000000000000000',
-      refundReceiver: '0x0000000000000000000000000000000000000000',
-      nonce: '0',
-      miscased: [],
+      gasToken: ZERO,
+      refundReceiver: ZERO,
+      nonce: '42',
     };
-    render(
-      <Panel request={request} eip712={{ ...eip712, special }} chainId={1} />,
-    );
-    fireEvent.press(screen.getByText('Digests'));
-    expect(
-      screen.getByText(`EIP-712 Digest (safeTxHash): ${payload.digest}`),
-    ).toBeTruthy();
+    const SAFE_TX = [
+      ['to', 'address'],
+      ['value', 'uint256'],
+      ['data', 'bytes'],
+      ['operation', 'uint8'],
+      ['safeTxGas', 'uint256'],
+      ['baseGas', 'uint256'],
+      ['gasPrice', 'uint256'],
+      ['gasToken', 'address'],
+      ['refundReceiver', 'address'],
+      ['nonce', 'uint256'],
+    ].map(([name, type]) => ({ name, type }));
+    const typed = (safeTx = SAFE_TX) => ({
+      types: {
+        EIP712Domain: [
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' },
+        ],
+        SafeTx: safeTx,
+      },
+      primaryType: 'SafeTx',
+      domain: { chainId: 1, verifyingContract: SAFE },
+      message,
+    });
+    // Safe 1.4.1's getTransactionHash, with the constants from Safe.sol.
+    const safeTxHash = () => {
+      const domainSeparator = keccak256(
+        encodeAbiParameters(parseAbiParameters('bytes32, uint256, address'), [
+          '0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218',
+          1n,
+          SAFE,
+        ]),
+      );
+      const structHash = keccak256(
+        encodeAbiParameters(
+          parseAbiParameters(
+            'bytes32, address, uint256, bytes32, uint8, uint256, uint256, uint256, address, address, uint256',
+          ),
+          [
+            '0xbb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8',
+            message.to,
+            0n,
+            keccak256(message.data),
+            1,
+            0n,
+            0n,
+            0n,
+            ZERO,
+            ZERO,
+            42n,
+          ],
+        ),
+      );
+      return keccak256(
+        `0x1901${domainSeparator.slice(2)}${structHash.slice(2)}`,
+      );
+    };
+    const show = (data: object) => {
+      const signData = Buffer.from(JSON.stringify(data), 'utf8').toString(
+        'hex',
+      );
+      render(
+        <Panel
+          request={{ ...request, signData }}
+          eip712={parseEip712Summary(signData)!}
+          chainId={1}
+        />,
+      );
+      fireEvent.press(screen.getByText('Digests'));
+    };
+
+    it("names its digest the safeTxHash, Safe's own hash of it", () => {
+      show(typed());
+      expect(
+        screen.getByText(`EIP-712 Digest (safeTxHash): ${safeTxHash()}`),
+      ).toBeTruthy();
+    });
+
+    it('names no safeTxHash for types Safe does not hash', () => {
+      show(typed(SAFE_TX.filter(member => member.name !== 'nonce')));
+      expect(screen.getByText(/^EIP-712 Digest: 0x/)).toBeTruthy();
+    });
   });
 
   it('switches to Raw tab and shows raw JSON', () => {

@@ -21,6 +21,7 @@ import {
   type TokenMetadata,
 } from '@/utils/tokenMetadata';
 import {
+  decodeCalldata,
   weiToNative,
   type DecodedCall,
   type DecodedCallArg,
@@ -81,14 +82,18 @@ export function tokenContractRows(
 }
 
 // Every Safe batch delegate calls MultiSend, and its calls carry their own warnings,
-// but only while the batch is still decoded.
+// but only where the review shows the decoded batch.
 export function delegateCallWarnings(
   target: string | undefined,
   depth: number,
+  data: string | undefined,
 ): string[] {
+  const batch =
+    data !== undefined && depth <= MAX_CALL_DEPTH ? decodeCalldata(data) : null;
   return target &&
     SAFE_MULTI_SEND_VERSIONS.has(target.toLowerCase()) &&
-    depth <= MAX_CALL_DEPTH
+    batch?.kind === 'multi-send' &&
+    !batch.malformed
     ? []
     : [DELEGATE_CALL_WARNING];
 }
@@ -97,12 +102,13 @@ function operationRow(
   operation: SafeOperation,
   target: string,
   depth: number,
+  data: string,
 ): DisplayRow {
   return operation === 'call'
     ? textRow('Operation', 'Call')
     : {
         ...textRow('Operation', 'Delegate call'),
-        warnings: delegateCallWarnings(target, depth),
+        warnings: delegateCallWarnings(target, depth, data),
       };
 }
 
@@ -124,7 +130,7 @@ function multiSendItem(
     kind: 'item',
     title: `Call ${index + 1} of ${count}`,
     nodes: [
-      operationRow(sub.operation, sub.to, place.depth + 1),
+      operationRow(sub.operation, sub.to, place.depth + 1, sub.data),
       // A delegate call carries no value.
       ...(isCall
         ? [textRow('Value', nativeValue(sub.value, place.chainId))]
@@ -154,7 +160,7 @@ function displaySafeExecTransaction(
   return [
     { kind: 'section', title: 'Safe Transaction' },
     addressRow('To', call.to),
-    operationRow(call.operation, call.to, place.depth + 1),
+    operationRow(call.operation, call.to, place.depth + 1, call.data),
     ...(isCall
       ? [textRow('Value', nativeValue(call.value, place.chainId))]
       : []),
