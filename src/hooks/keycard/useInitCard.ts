@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 import { Commandset } from 'keycard-sdk/dist/commandset';
 
-import { PAIRING_PASSWORD, PUK_LENGTH } from '@/constants/keycard';
+import { PAIRING_PASSWORD } from '@/constants/keycard';
 
 import { secureChannelVersion } from '@/utils/cardGeneration';
 import { getCardKey } from '@/utils/cardIdentity';
+import { drawPuk, platformRandomBytes } from '@/utils/puk';
 import { useCertificateApprovals } from './useCertificateApprovals';
 import type { KeycardPhase } from './useKeycardOperation';
 import {
@@ -23,7 +24,7 @@ export type UseInitCardOperation = Omit<
   'start' | 'phase'
 > & {
   phase: KeycardPhase;
-  /** The PUK the card is set up with, shown once the tap has succeeded. */
+  /** The PUK the card is set up with; empty until a tap has drawn it. */
   puk: string;
   /** INIT went out and the card has not answered: it may hold the PUK. Survives cancel and retry. */
   initSent: boolean;
@@ -36,17 +37,40 @@ export type UseInitCardOperation = Omit<
 export const UNVERIFIED_CARD_STATUS =
   'This Keycard could not be verified. Nothing was written to it.';
 
-function generatePUK(): string {
-  const bytes = new Uint8Array(PUK_LENGTH);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map(b => b % 10)
-    .join('');
+const SUPERSEDED_STATUS = 'A newer tap took over this one.';
+
+export const CARD_RANDOM_FAILED =
+  'Reading random bytes from the Keycard failed';
+
+async function cardRandomBytes(
+  cmdSet: Commandset,
+  length: number,
+): Promise<Uint8Array> {
+  const resp = await cmdSet.getChallenge(length);
+  resp.checkOK(CARD_RANDOM_FAILED);
+  return resp.data;
 }
 
 export function useInitCard(): UseInitCardOperation {
   // One per screen, so a retry sends the digits done will show.
-  const [puk] = useState(generatePUK);
+  const [puk, setPuk] = useState('');
+  const pukRef = useRef<string | null>(null);
+  const runRef = useRef(0);
+  const pukOnce = useCallback(
+    async (run: number, draw: () => Promise<string>) => {
+      if (pukRef.current === null) {
+        const drawn = await draw();
+        // A cancelled tap's late draw must not replace the PUK a newer tap sends.
+        if (run !== runRef.current) {
+          throw new Error(SUPERSEDED_STATUS);
+        }
+        pukRef.current = drawn;
+        setPuk(drawn);
+      }
+      return pukRef.current;
+    },
+    [],
+  );
   // INIT is the tap's last command: a loss inside it leaves the card's state unknown (#430).
   const [initSent, setInitSent] = useState(false);
 
@@ -71,6 +95,7 @@ export function useInitCard(): UseInitCardOperation {
         card: SelectedCard,
         { pin, duressPin: chosenDuressPin }: InitInput,
       ) => {
+        const run = ++runRef.current;
         const appInfo = cmdSet.applicationInfo;
         if (appInfo?.initializedCard) {
           throw new Error(
@@ -86,10 +111,15 @@ export function useInitCard(): UseInitCardOperation {
             setShowGenuineWarning(true);
             throw new Error(UNVERIFIED_CARD_STATUS);
           }
-          // No pairing on 4.0; the SDK opens the channel in init() (ADR-0008).
           setStatus('Initializing...');
+          // GET CHALLENGE needs a channel; init() then opens a fresh one.
+          const cardPuk = await pukOnce(run, async () => {
+            await cmdSet.autoOpenSecureChannel();
+            return drawPuk(length => cardRandomBytes(cmdSet, length));
+          });
           setInitSent(true);
-          const resp = await cmdSet.init(pin, puk, undefined, duressPin);
+          // No pairing on 4.0.
+          const resp = await cmdSet.init(pin, cardPuk, undefined, duressPin);
           // An answer, refusal included, ends the unknown window.
           setInitSent(false);
           resp.checkOK('Initializing the Keycard failed');
@@ -98,12 +128,16 @@ export function useInitCard(): UseInitCardOperation {
             handshakeSucceeded(cardKey);
           }
         } else {
+          // A 3.x card has no GET CHALLENGE.
+          const phonePuk = await pukOnce(run, () =>
+            drawPuk(platformRandomBytes),
+          );
           setInitSent(true);
-          await cmdSet.init(pin, puk, PAIRING_PASSWORD, duressPin);
+          await cmdSet.init(pin, phonePuk, PAIRING_PASSWORD, duressPin);
           setInitSent(false);
         }
       },
-      [handshakeSucceeded, puk],
+      [handshakeSucceeded, pukOnce],
     ),
     { successMessage: 'Card initialized', whitelistedCardKeys },
   );
