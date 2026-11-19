@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -166,6 +167,8 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
 
   const prepareAndStart = useCallback(
     (sharesToRecover: string[]) => {
+      // The preparing view unmounts the focused field, and Android keeps the keyboard of a field that is gone.
+      Keyboard.dismiss();
       setIsPreparingSlip39(true);
       setTimeout(() => {
         try {

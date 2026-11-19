@@ -1,5 +1,5 @@
 import React, { act } from 'react';
-import { TextInput } from 'react-native';
+import { Keyboard, TextInput } from 'react-native';
 import {
   fireEvent,
   render,
@@ -538,6 +538,28 @@ describe('Slip39Screen', () => {
     });
     await flushTimers();
   }
+
+  // Android keeps the keyboard of a field that unmounts while focused.
+  it.each([
+    ['verify', 'Verify'],
+    ['import', 'Import to Keycard'],
+  ] as const)(
+    '%s closes the keyboard before the preparing view takes the fields away',
+    async (mode, button) => {
+      const fieldsAtDismiss: number[] = [];
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {
+        fieldsAtDismiss.push(getTextInputs().length);
+      });
+      try {
+        renderScreen(mode);
+        await enterBothShares(button);
+        expect(fieldsAtDismiss.length).toBeGreaterThan(0);
+        expect(fieldsAtDismiss[0]).toBeGreaterThan(0);
+      } finally {
+        dismiss.mockRestore();
+      }
+    },
+  );
 
   it('verifies with the fingerprint and zeroes the secret and the key pair', async () => {
     renderScreen('verify');
