@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A generated PUK has every digit equally likely; on applet 4.0 its random bytes come from the card
 - QR codes keep a white margin of four modules or more in dark mode on phones that recolor the app, such as MIUI
 - The NFC sheet says "Tap your Keycard" once while it waits for a card, not twice (Android)
+- A QR result fits the screen when it is wider than tall, such as a phone turned sideways, instead of running under Done
 - After SLIP39 Import or Verify the keyboard closes before the PIN pad appears, instead of covering its bottom rows (Android)
 - `npm run smoke` fails only on a crash in the app's own process, not on other apps' errors in the device log, and reports a refused install with adb's message
 - Generating SLIP39 shares counts down the review time on the first share, which stayed at 30 seconds and blocked the backup
