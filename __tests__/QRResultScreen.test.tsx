@@ -121,6 +121,50 @@ describe('QRResultScreen', () => {
   });
 });
 
+function layOut(width: number, height: number) {
+  fireEvent(screen.getByTestId('qr-area'), 'layout', {
+    nativeEvent: { layout: { x: 0, y: 0, width, height } },
+  });
+}
+
+const lastProps = (mock: jest.Mock) =>
+  mock.mock.calls[mock.mock.calls.length - 1][0] as {
+    size: number;
+    maxHeight?: number;
+  };
+
+describe('QRResultScreen code size', () => {
+  beforeEach(() => mockAnimatedURQRCode.mockClear());
+
+  // The box is the size plus 12 a side, inside 24 a side and 16 above and below.
+  it('takes its size from the width in an area taller than wide', () => {
+    renderScreen(SAMPLE_UR);
+    layOut(400, 900);
+    expect(lastProps(mockAnimatedURQRCode).size).toBe(400 - 48 - 24);
+  });
+
+  it('takes its size from the height in an area wider than tall', () => {
+    renderScreen(SAMPLE_UR);
+    layOut(900, 400);
+    expect(lastProps(mockAnimatedURQRCode).size).toBe(400 - 32 - 24);
+  });
+
+  it('follows the area when it turns', () => {
+    renderScreen(SAMPLE_UR);
+    layOut(400, 900);
+    layOut(900, 400);
+    expect(lastProps(mockAnimatedURQRCode).size).toBe(344);
+    layOut(400, 900);
+    expect(lastProps(mockAnimatedURQRCode).size).toBe(328);
+  });
+
+  it('never asks for a negative size', () => {
+    renderScreen(SAMPLE_UR);
+    layOut(900, 40);
+    expect(lastProps(mockAnimatedURQRCode).size).toBe(0);
+  });
+});
+
 describe('QRResultScreen with a phrase', () => {
   const words = Array(11).fill('abandon').concat('about');
 
@@ -165,6 +209,15 @@ describe('QRResultScreen with a phrase', () => {
     expect(mockAnimatedURQRCode).toHaveBeenCalledWith(
       expect.objectContaining({ size: urSize }),
     );
+  });
+
+  it('hands the SeedQR the height it must fit, switch included', () => {
+    renderPhrase();
+    layOut(900, 400);
+    expect(lastProps(mockSeedQrCode)).toMatchObject({
+      size: 400 - 32 - 24,
+      maxHeight: 400 - 32,
+    });
   });
 
   it('shows its title and description', () => {
