@@ -6,37 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-19
+
 ### Added
 
-- Settings lists the bundled tokens by chain, filtered by symbol or address
-- About opens the Welcome slides again under How it works
-- The review decodes a Safe MultiSend batch call by call, with a warning on each delegate call, except into a known MultiSend whose batch it shows, and on a contract that is not a known MultiSend
-- The review shows a Safe execTransaction as a Safe transaction: its target, operation, value and refund fields, and the call the Safe makes decoded
-- Settings can show developer card options, which lock and unlock applet installs on a Developer card with a key the card derives (Android, applet 4.0)
-- A 12- or 24-word BIP85 phrase can be shown as a Standard or Compact SeedQR
+- The review decodes Safe MultiSend batches and execTransaction calls, warning on delegate calls except into a known MultiSend
+- A 12- or 24-word BIP85 phrase can be shown as a SeedQR
+- Developer card options in Settings lock and unlock applet installs on a Developer card (Android, applet 4.0)
+- Settings lists the bundled tokens, filtered by chain, symbol or address
 
 ### Changed
 
-- The review of a SafeTx typed-data request describes the call it makes through the clear-signing registry like any inner call, warns on a delegate call, except into a known MultiSend whose batch it shows, and its Digests tab names the digest the safeTxHash when the types and domain are Safe's
-- The F-Droid repository at fdroid.keycardpal.com serves the ABI split APKs only and archives older releases up to 800 MiB
-- Updated bitcoinjs-lib to 6.1.10 and fast-xml-parser to 5.12.0, flagged by Dependabot
-- The Welcome screen is a set of swipeable slides: its introduction, then setting up the Keycard, connecting a wallet and signing
+- The SafeTx review decodes its call the same way and names its digest the safeTxHash
+- The Welcome screen is a set of swipeable slides, which About opens again under How it works
+- The bundled clear-signing registry adds Safe 1.5.0 on more chains, Chainlink's LINK token and staking pool, and stake.link's LINK migration
+- fdroid.keycardpal.com serves only the ABI split APKs and archives older releases
+- Updated bitcoinjs-lib and fast-xml-parser, flagged by Dependabot
 
 ### Removed
 
-- The Solana tokens from the bundled token list, and their logos from the offline APK
+- The Solana tokens and their logos from the bundled token list
 
 ### Fixed
 
-- The NFC sheet no longer shows a check mark as it closes over a screen that shows its own result, such as a recovery phrase that does not match the Keycard (Android)
-- A generated PUK has every digit equally likely; on applet 4.0 its random bytes come from the card
-- QR codes keep a white margin of four modules or more in dark mode on phones that recolor the app, such as MIUI
-- The NFC sheet says "Tap your Keycard" once while it waits for a card, not twice (Android)
-- A QR result fits the screen when it is wider than tall, such as a phone turned sideways, instead of running under Done
-- After SLIP39 Import or Verify the keyboard closes before the PIN pad appears, instead of covering its bottom rows (Android)
-- `npm run smoke` fails only on a crash in the app's own process, not on other apps' errors in the device log, and reports a refused install with adb's message
-- Generating SLIP39 shares counts down the review time on the first share, which stayed at 30 seconds and blocked the backup
-- The Bitcoin PSBT review takes its network from every input, not the first, and refuses a PSBT whose inputs name different networks; coin type 1 reads Bitcoin Testnet or Signet
+- The NFC sheet says "Tap your Keycard" once, and shows no check mark over a screen with its own result (Android)
+- QR codes keep their light margin in dark mode on MIUI and fit a screen wider than tall
+- A generated PUK has every digit equally likely, from the card's random bytes on applet 4.0
+- The first generated SLIP39 share counts down its review time, and on Android the keyboard closes before the PIN pad after SLIP39 Import or Verify
+- The PSBT review takes its network from every input and refuses inputs that name different networks
 
 ## [1.17.0] - 2026-11-10
 
@@ -580,7 +577,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.17.0...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.18.0...HEAD
+[1.18.0]: https://github.com/mmlado/keycard-pal/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/mmlado/keycard-pal/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/mmlado/keycard-pal/compare/v1.15.1...v1.16.0
 [1.15.1]: https://github.com/mmlado/keycard-pal/compare/v1.15.0...v1.15.1
