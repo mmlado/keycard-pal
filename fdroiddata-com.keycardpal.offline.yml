@@ -25,9 +25,9 @@ RepoType: git
 Repo: https://github.com/mmlado/keycard-pal
 
 Builds:
-  - versionName: 1.17.0
-    versionCode: 117001
-    commit: v1.17.0
+  - versionName: 1.18.0
+    versionCode: 118001
+    commit: v1.18.0
     subdir: android/app
     sudo:
       - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
@@ -65,9 +65,9 @@ Builds:
     gradleprops:
       - reactNativeArchitectures=armeabi-v7a
 
-  - versionName: 1.17.0
-    versionCode: 117002
-    commit: v1.17.0
+  - versionName: 1.18.0
+    versionCode: 118002
+    commit: v1.18.0
     subdir: android/app
     sudo:
       - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
@@ -112,5 +112,5 @@ UpdateCheckMode: Tags
 VercodeOperation:
   - '%c + 1'
   - '%c + 2'
-CurrentVersion: 1.17.0
-CurrentVersionCode: 117002
+CurrentVersion: 1.18.0
+CurrentVersionCode: 118002

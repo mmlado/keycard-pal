@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-19
+
 ### Added
 
 - Settings lists the bundled tokens by chain, filtered by symbol or address
@@ -580,7 +582,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Signing transaction with Keycard
 - Scan back result QR code into the compatible Ethereum wallet
 
-[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.17.0...HEAD
+[Unreleased]: https://github.com/mmlado/keycard-pal/compare/v1.18.0...HEAD
+[1.18.0]: https://github.com/mmlado/keycard-pal/compare/v1.17.0...v1.18.0
 [1.17.0]: https://github.com/mmlado/keycard-pal/compare/v1.16.0...v1.17.0
 [1.16.0]: https://github.com/mmlado/keycard-pal/compare/v1.15.1...v1.16.0
 [1.15.1]: https://github.com/mmlado/keycard-pal/compare/v1.15.0...v1.15.1
