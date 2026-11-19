@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import SeedQrCode from '../src/components/SeedQrCode';
@@ -94,6 +95,46 @@ describe('SeedQrCode', () => {
   it('takes the box a UR code of the same size takes', () => {
     render(<SeedQrCode words={TWELVE.words.split(' ')} size={300} />);
     expect(screen.getByTestId('seed-qr-code').props.size).toBe(324);
+  });
+
+  it('shrinks the box to leave room for the gap and the switch', () => {
+    render(
+      <SeedQrCode words={TWELVE.words.split(' ')} size={300} maxHeight={300} />,
+    );
+    const box = () => screen.getByTestId('seed-qr-code').props.size;
+    expect(box()).toBe(300 - 24);
+    fireEvent(screen.getByTestId('seed-qr-switch'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 276, height: 48 } },
+    });
+    expect(box()).toBe(300 - 24 - 48);
+  });
+
+  it('keeps the UR box when the height leaves room for it', () => {
+    render(
+      <SeedQrCode words={TWELVE.words.split(' ')} size={300} maxHeight={900} />,
+    );
+    fireEvent(screen.getByTestId('seed-qr-switch'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 324, height: 48 } },
+    });
+    expect(screen.getByTestId('seed-qr-code').props.size).toBe(324);
+  });
+
+  it('keeps the switch wide enough for its labels when the box is small', () => {
+    render(
+      <SeedQrCode words={TWELVE.words.split(' ')} size={300} maxHeight={200} />,
+    );
+    const container = StyleSheet.flatten(
+      screen.getByTestId('seed-qr').props.style,
+    );
+    expect(screen.getByTestId('seed-qr-code').props.size).toBeLessThan(240);
+    expect(container.width).toBe(240);
+  });
+
+  it('still draws a readable code at the smaller box', () => {
+    render(
+      <SeedQrCode words={TWELVE.words.split(' ')} size={300} maxHeight={200} />,
+    );
+    expect(drawnCode().text).toBe(TWELVE.digits);
   });
 
   it.each([

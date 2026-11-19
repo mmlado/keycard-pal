@@ -1,5 +1,11 @@
-import React, { useCallback, useEffect } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  type LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import AnimatedURQRCode from 'react-native-animated-ur-qr';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,20 +16,37 @@ import PrimaryButton from '@/components/PrimaryButton';
 import SeedQrCode from '@/components/SeedQrCode';
 
 const QR_PADDING = 24;
+const QR_MARGIN_VERTICAL = 16;
+// AnimatedURQRCode's box is its size plus this on each side.
+const UR_BOX_MARGIN = 12;
 
 export default function QRResultScreen({
   route,
   navigation,
 }: QRResultScreenProps) {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const windowSize = useWindowDimensions();
+  // Known only after layout; the window stands in until then.
+  const [area, setArea] = useState<{ width: number; height: number } | null>(
+    null,
+  );
+  const handleAreaLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setArea({ width, height });
+  }, []);
   const { title, description } = route.params;
 
   useEffect(() => {
     navigation.setOptions({ title });
   }, [navigation, title]);
 
-  const qrSize = width - QR_PADDING * 2 - 12 * 2;
+  const areaWidth = (area ?? windowSize).width - QR_PADDING * 2;
+  // The area does not scroll, so the code must fit its height as well.
+  const areaHeight = (area ?? windowSize).height - QR_MARGIN_VERTICAL * 2;
+  const qrSize = Math.max(
+    0,
+    Math.min(areaWidth, areaHeight) - UR_BOX_MARGIN * 2,
+  );
 
   const handleDone = useCallback(() => {
     navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] });
@@ -34,9 +57,13 @@ export default function QRResultScreen({
       {description ? (
         <Text style={styles.description}>{description}</Text>
       ) : null}
-      <View style={styles.qrArea}>
+      <View style={styles.qrArea} onLayout={handleAreaLayout} testID="qr-area">
         {'seedWords' in route.params ? (
-          <SeedQrCode words={route.params.seedWords} size={qrSize} />
+          <SeedQrCode
+            words={route.params.seedWords}
+            size={qrSize}
+            maxHeight={areaHeight}
+          />
         ) : (
           <AnimatedURQRCode urString={route.params.urString} size={qrSize} />
         )}
