@@ -627,7 +627,7 @@ describe('NFCBottomSheet — iOS error overlay', () => {
   });
 
   it('does not show iOS error overlay when phase is nfc', () => {
-    renderSheet(makeNfc('nfc', { status: 'Tap your Keycard' }));
+    renderSheet(makeNfc('nfc', { status: '' }));
     expect(screen.queryByText('Something went wrong')).toBeNull();
   });
 

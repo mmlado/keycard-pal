@@ -107,7 +107,7 @@ describe('useNFCSession', () => {
         result.current.startNFC();
       });
       expect(result.current.phase).toBe('nfc');
-      expect(result.current.status).toBe('Tap your Keycard');
+      expect(result.current.status).toBe('');
       expect(mockStartNFC).toHaveBeenCalledWith('Tap your Keycard');
     });
 
@@ -223,7 +223,7 @@ describe('useNFCSession', () => {
 
         expect(result.current.openNFCSettings).toBeUndefined();
         expect(result.current.phase).toBe('nfc');
-        expect(result.current.status).toBe('Tap your Keycard');
+        expect(result.current.status).toBe('');
         // doStartNFC only fires after re-enable (not during the initial disabled check)
         expect(mockStartNFC).toHaveBeenCalledTimes(1);
       } finally {
