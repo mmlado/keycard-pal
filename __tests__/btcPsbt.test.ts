@@ -477,6 +477,123 @@ describe('inspectBtcPsbt', () => {
 });
 
 // ---------------------------------------------------------------------------
+// inspectBtcPsbt – network
+// ---------------------------------------------------------------------------
+
+type InputPath = { fingerprint: Buffer; path: string };
+
+const cardPath = (path: string): InputPath => ({
+  fingerprint: CARD_FINGERPRINT,
+  path,
+});
+const otherPath = (path: string): InputPath => ({
+  fingerprint: OTHER_FINGERPRINT,
+  path,
+});
+
+// One input per entry with those derivation entries; null leaves the input with none.
+function psbtWithInputPaths(inputs: Array<InputPath[] | null>): string {
+  const { Psbt, payments, networks } = require('bitcoinjs-lib');
+  const { output } = payments.p2wpkh({
+    pubkey: CARD_PUBKEY,
+    network: networks.bitcoin,
+  });
+  const psbt = new Psbt({ network: networks.bitcoin });
+
+  inputs.forEach((paths, index) => {
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xb0 + index),
+      index: 0,
+      ...(paths
+        ? {
+            bip32Derivation: paths.map(({ fingerprint, path }) => ({
+              masterFingerprint: fingerprint,
+              path,
+              pubkey:
+                fingerprint === CARD_FINGERPRINT ? CARD_PUBKEY : OTHER_PUBKEY,
+            })),
+          }
+        : {}),
+    });
+  });
+  psbt.addOutput({ script: output!, value: 10_000 });
+
+  return psbt.toBuffer().toString('hex');
+}
+
+describe('inspectBtcPsbt network', () => {
+  it('refuses inputs on different coin types, naming both', () => {
+    const hex = psbtWithInputPaths([
+      [cardPath("m/84'/0'/0'/0/0")],
+      [cardPath("m/84'/1'/0'/0/1")],
+    ]);
+    expect(() => inspectBtcPsbt(hex)).toThrow(BtcPsbtRefusedError);
+    expect(() => inspectBtcPsbt(hex)).toThrow(
+      'Input 1 is on Bitcoin (coin type 0) and input 2 on testnet or signet ' +
+        '(coin type 1).',
+    );
+  });
+
+  it("refuses a first input of another wallet's on another coin type than the card's", () => {
+    const hex = psbtWithInputPaths([
+      [otherPath("m/84'/1'/0'/0/0")],
+      [cardPath("m/84'/0'/0'/0/0")],
+    ]);
+    expect(() => inspectBtcPsbt(hex)).toThrow(
+      'Input 1 is on testnet or signet (coin type 1) and input 2 on Bitcoin ' +
+        '(coin type 0).',
+    );
+  });
+
+  it('refuses one input whose derivation entries name two coin types', () => {
+    const hex = psbtWithInputPaths([
+      [cardPath("m/48'/0'/0'/2'/0/0"), otherPath("m/48'/1'/0'/2'/0/0")],
+    ]);
+    expect(() => inspectBtcPsbt(hex)).toThrow(
+      'Input 1 names both Bitcoin (coin type 0) and testnet or signet ' +
+        '(coin type 1).',
+    );
+  });
+
+  it('refuses the same PSBT when signing', () => {
+    const hex = psbtWithInputPaths([
+      [otherPath("m/84'/1'/0'/0/0")],
+      [cardPath("m/84'/0'/0'/0/0")],
+    ]);
+    expect(() => new BtcSigningSession(hex)).toThrow(BtcPsbtRefusedError);
+  });
+
+  it("names the network all inputs agree on when the first is another wallet's", () => {
+    const hex = psbtWithInputPaths([
+      [otherPath("m/84'/0'/0'/0/7")],
+      [cardPath("m/84'/0'/0'/0/0")],
+    ]);
+    expect(inspectBtcPsbt(hex).network).toBe('mainnet');
+  });
+
+  it('takes the network and the addresses from a later input when the first names none', () => {
+    const summary = inspectBtcPsbt(
+      psbtWithInputPaths([null, [cardPath("m/84'/1'/0'/0/0")]]),
+    );
+    expect(summary.network).toBe('testnet');
+    expect(summary.outputs[0].address.startsWith('tb1')).toBe(true);
+  });
+
+  it('passes over a path that names no coin type', () => {
+    const hex = psbtWithInputPaths([
+      [otherPath("m/45'/0/0/0")],
+      [cardPath("m/84'/0'/0'/0/0")],
+    ]);
+    expect(inspectBtcPsbt(hex).network).toBe('mainnet');
+  });
+
+  it('calls a coin type other than 0 and 1 unknown', () => {
+    const hex = psbtWithInputPaths([[cardPath("m/84'/2'/0'/0/0")]]);
+    expect(inspectBtcPsbt(hex).network).toBe('unknown');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // inspectBtcPsbt – fee
 // ---------------------------------------------------------------------------
 
