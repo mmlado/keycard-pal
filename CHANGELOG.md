@@ -32,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A generated PUK has every digit equally likely; on applet 4.0 its random bytes come from the card
 - QR codes keep a white margin of four modules or more in dark mode on phones that recolor the app, such as MIUI
 - `npm run smoke` fails only on a crash in the app's own process, not on other apps' errors in the device log, and reports a refused install with adb's message
+- Generating SLIP39 shares counts down the review time on the first share, which stayed at 30 seconds and blocked the backup
 - The Bitcoin PSBT review takes its network from every input, not the first, and refuses a PSBT whose inputs name different networks; coin type 1 reads Bitcoin Testnet or Signet
 
 ## [1.17.0] - 2026-11-10
