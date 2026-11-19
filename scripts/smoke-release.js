@@ -13,6 +13,8 @@ const { execSync, execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+const { appCrash, appPids, installFailure } = require('./lib/smoke-log');
+
 const ROOT = path.resolve(__dirname, '..');
 const flavor = (process.argv[2] || 'full').toLowerCase();
 
@@ -133,7 +135,13 @@ try {
   // Not installed — fine.
 }
 
-adb(['install', '-r', path.join(outDir, apk)], { stdio: 'ignore' });
+try {
+  adb(['install', '-r', path.join(outDir, apk)], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+} catch (error) {
+  fail(`Installing ${apk} failed.`, installFailure(error));
+}
 adb(['logcat', '-c']);
 adb([
   'shell',
@@ -153,10 +161,7 @@ execSync(`sleep ${SETTLE_MS / 1000}`);
 // Verdict
 // ---------------------------------------------------------------------------
 
-const log = adb(['logcat', '-d']);
-const crashes = log
-  .split('\n')
-  .filter(l => /FATAL EXCEPTION|UnsatisfiedLinkError|ClassNotFoundException|NoSuchMethodError/.test(l));
+const log = adb(['logcat', '-d', '-v', 'threadtime']);
 
 let pid = '';
 try {
@@ -165,11 +170,13 @@ try {
   // pidof exits non-zero when the process is gone.
 }
 
-if (crashes.length) {
-  // Include the frames after the first crash line: with R8 the class names are
-  // mangled, and those frames are what identify the stripped symbol.
-  const start = log.split('\n').findIndex(l => crashes[0] === l);
-  const trace = log.split('\n').slice(start, start + 25).join('\n');
+// MIUI's own apps log the same errors on install, and a crashed app is gone from pidof.
+const pids = appPids(log, applicationId);
+pid.split(/\s+/).filter(Boolean).forEach(p => pids.add(p));
+
+// The trace runs on past the crash line: with R8 the frames are what name the stripped symbol.
+const trace = appCrash(log, pids);
+if (trace) {
   fail(`${applicationId} crashed on launch.`, trace);
 }
 
