@@ -35,6 +35,12 @@ describe('appPids', () => {
     expect([...appPids(log, 'com.keycardpal.standalone')]).toEqual(['15762']);
   });
 
+  it("counts a secondary process of the app as the app's", () => {
+    const log =
+      '11-19 07:52:28.100  1568  1738 I ActivityManager: Start proc 14300:com.keycardpal:remote/u0a256 for service {com.keycardpal/x.Y} caller=com.keycardpal';
+    expect([...appPids(log, 'com.keycardpal')]).toEqual(['14300']);
+  });
+
   it('reads the offline application id', () => {
     const log = join(
       START(200, 'com.keycardpal'),

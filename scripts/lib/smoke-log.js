@@ -3,17 +3,16 @@
 const CRASH =
   /FATAL EXCEPTION|UnsatisfiedLinkError|ClassNotFoundException|NoSuchMethodError/;
 const THREADTIME_PID = /^\d\d-\d\d \d\d:\d\d:\d\d\.\d+\s+(\d+)\s+\d+\s/;
+// The process name ends at `/` (the uid) or `:` (a secondary process of the same app).
+const START_PROC = /Start proc (\d+):([^/:\s]+)/;
 const TRACE_LINES = 25;
 
 /** Every pid the app ran under, from ActivityManager's `Start proc <pid>:<applicationId>` lines. */
 function appPids(log, applicationId) {
-  const id = applicationId.replace(/\./g, '\\.');
-  // The lookahead keeps com.keycardpal from matching com.keycardpal.offline.
-  const start = new RegExp(`Start proc (\\d+):${id}(?=[/:\\s])`);
   const pids = new Set();
   for (const line of log.split('\n')) {
-    const match = line.match(start);
-    if (match) {
+    const match = line.match(START_PROC);
+    if (match && match[2] === applicationId) {
       pids.add(match[1]);
     }
   }
