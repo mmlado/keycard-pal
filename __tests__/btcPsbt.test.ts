@@ -555,6 +555,48 @@ describe('inspectBtcPsbt network', () => {
     );
   });
 
+  it('names any other coin type by its number', () => {
+    const hex = psbtWithInputPaths([
+      [cardPath("m/84'/0'/0'/0/0")],
+      [cardPath("m/84'/2'/0'/0/1")],
+    ]);
+    expect(() => inspectBtcPsbt(hex)).toThrow(
+      'Input 1 is on Bitcoin (coin type 0) and input 2 on coin type 2.',
+    );
+  });
+
+  it("reads a Taproot input's derivation paths too", () => {
+    const { Psbt, networks } = require('bitcoinjs-lib');
+    const psbt = new Psbt({ network: networks.bitcoin });
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xd0),
+      index: 0,
+      tapBip32Derivation: [
+        {
+          masterFingerprint: OTHER_FINGERPRINT,
+          path: "m/86'/1'/0'/0/0",
+          pubkey: Buffer.alloc(32, 0x04),
+          leafHashes: [],
+        },
+      ],
+    });
+    psbt.addInput({
+      hash: Buffer.alloc(32, 0xd1),
+      index: 0,
+      bip32Derivation: [
+        {
+          masterFingerprint: CARD_FINGERPRINT,
+          path: "m/84'/0'/0'/0/0",
+          pubkey: CARD_PUBKEY,
+        },
+      ],
+    });
+    expect(() => inspectBtcPsbt(psbt.toBuffer().toString('hex'))).toThrow(
+      'Input 1 is on testnet or signet (coin type 1) and input 2 on Bitcoin ' +
+        '(coin type 0).',
+    );
+  });
+
   it('refuses the same PSBT when signing', () => {
     const hex = psbtWithInputPaths([
       [otherPath("m/84'/1'/0'/0/0")],
