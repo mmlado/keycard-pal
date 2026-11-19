@@ -138,24 +138,58 @@ function assertSighashTypesAreSignable(psbt: Psbt): void {
   }
 }
 
-function inferNetworkFromPath(path: string | undefined): NetworkName {
-  if (!path) {
-    return 'unknown';
-  }
-
+function coinTypeOf(path: string): number | null {
   const match = path.match(/^m\/\d+'\/(\d+)'/);
-  if (!match) {
-    return 'unknown';
+  return match ? Number(match[1]) : null;
+}
+
+function describeCoinType(coinType: number): string {
+  if (coinType === 0) {
+    return 'Bitcoin (coin type 0)';
+  }
+  if (coinType === 1) {
+    return 'testnet or signet (coin type 1)';
+  }
+  return `coin type ${coinType}`;
+}
+
+// Every input, not input 0: the card signs each at its own path, and input 0 may be another wallet's.
+function inferNetwork(psbt: Psbt): NetworkName {
+  let first: { input: number; coinType: number } | null = null;
+  for (const [index, input] of psbt.data.inputs.entries()) {
+    const derivations = [
+      ...(input.bip32Derivation ?? []),
+      ...(input.tapBip32Derivation ?? []),
+    ];
+    for (const { path } of derivations) {
+      const coinType = coinTypeOf(path);
+      if (coinType === null) {
+        continue;
+      }
+      if (!first) {
+        first = { input: index, coinType };
+      } else if (coinType !== first.coinType) {
+        const was = describeCoinType(first.coinType);
+        const is = describeCoinType(coinType);
+        const conflict =
+          index === first.input
+            ? `Input ${index + 1} names both ${was} and ${is}.`
+            : `Input ${first.input + 1} is on ${was} and input ${
+                index + 1
+              } on ${is}.`;
+        throw new BtcPsbtRefusedError(
+          `${conflict} One review cannot name the network of both.`,
+        );
+      }
+    }
   }
 
-  if (match[1] === '0') {
+  if (first?.coinType === 0) {
     return 'mainnet';
   }
-
-  if (match[1] === '1') {
+  if (first?.coinType === 1) {
     return 'testnet';
   }
-
   return 'unknown';
 }
 
@@ -177,18 +211,6 @@ function decodeAddress(script: Buffer, network: NetworkName): string {
   }
 
   return script.toString('hex');
-}
-
-function extractInputPath(
-  input: Psbt['data']['inputs'][number],
-): string | undefined {
-  return input.bip32Derivation?.[0]?.path;
-}
-
-function inferNetwork(psbt: Psbt): NetworkName {
-  return inferNetworkFromPath(
-    psbt.data.inputs[0] ? extractInputPath(psbt.data.inputs[0]) : undefined,
-  );
 }
 
 function getInputUtxo(
