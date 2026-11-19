@@ -352,6 +352,33 @@ describe('NFCSheet', () => {
       expect(screen.getAllByText('Tap your Keycard')).toHaveLength(1);
     });
 
+    // A second tap, after a wrong PIN or a Try again, keeps the card's name in the title.
+    it('asks for the tap under the card name while waiting', () => {
+      render(
+        <NFCSheet
+          variant="scanning"
+          status=""
+          cardName="Alice"
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('Alice')).toBeTruthy();
+      expect(screen.getAllByText('Tap your Keycard')).toHaveLength(1);
+    });
+
+    it('shows the progress, not the prompt, under the card name once connected', () => {
+      render(
+        <NFCSheet
+          variant="connected"
+          status="Selecting applet..."
+          cardName="Alice"
+          onCancel={onCancel}
+        />,
+      );
+      expect(screen.getByText('Selecting applet...')).toBeTruthy();
+      expect(screen.queryByText('Tap your Keycard')).toBeNull();
+    });
+
     it('shows "Tap your Keycard" when cardName is undefined', () => {
       render(<NFCSheet variant="scanning" status="test" onCancel={onCancel} />);
       expect(screen.getByText('Tap your Keycard')).toBeTruthy();

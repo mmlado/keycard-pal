@@ -69,6 +69,8 @@ function PulseRing({ delay, size }: { delay: number; size: number }) {
   );
 }
 
+const TAP_PROMPT = 'Tap your Keycard';
+
 export default function NFCSheet({
   variant,
   status,
@@ -80,6 +82,7 @@ export default function NFCSheet({
   onUnblockPin,
   onBuyKeycard,
 }: Props) {
+  const named = cardName !== undefined && cardName !== null;
   const showBuyKeycard =
     onBuyKeycard !== undefined &&
     (variant === 'scanning' || variant === 'error');
@@ -106,12 +109,12 @@ export default function NFCSheet({
       </View>
 
       <Text variant="titleLarge" style={styles.title}>
-        {cardName === undefined || cardName === null
-          ? 'Tap your Keycard'
-          : displayKeycardName(cardName, cardFingerprint)}
+        {named ? displayKeycardName(cardName, cardFingerprint) : TAP_PROMPT}
       </Text>
       <Text variant="bodyMedium" style={styles.status}>
-        {status}
+        {status ||
+          // A second tap keeps the card's name in the title, so the prompt moves down here.
+          (named && variant === 'scanning' ? TAP_PROMPT : '')}
       </Text>
 
       {variant === 'error' && !openNFCSettings && onUnblockPin && (
