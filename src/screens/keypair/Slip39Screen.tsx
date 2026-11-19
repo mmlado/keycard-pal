@@ -75,18 +75,11 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
   const [backupStep, setBackupStep] = useState<'display' | 'confirm'>(
     'display',
   );
-  const shareTimer = useSeedReviewTimer();
-
-  useEffect(() => {
-    if (
-      mode === 'generate' &&
-      backupStep === 'display' &&
-      currentGeneratedShare !== null
-    ) {
-      shareTimer.start();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generatedShareIndex, backupStep]);
+  const {
+    timeLeft: shareTimeLeft,
+    done: shareReviewed,
+    start: startShareTimer,
+  } = useSeedReviewTimer();
 
   const operationShares = mode === 'generate' ? generatedShares : shares;
   const parsedShareCount = parseCount(shareCount);
@@ -143,6 +136,18 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
     () => currentGeneratedShare?.split(' ') ?? [],
     [currentGeneratedShare],
   );
+
+  // Keyed on the share, not its index: the first share arrives at index 0, where the index already was.
+  useEffect(() => {
+    if (
+      mode === 'generate' &&
+      backupStep === 'display' &&
+      currentGeneratedShare !== null
+    ) {
+      startShareTimer();
+    }
+  }, [mode, backupStep, currentGeneratedShare, startShareTimer]);
+
   const currentGeneratedWordHalf =
     currentGeneratedWords.length > 0 ? currentGeneratedWords.length / 2 : 0;
 
@@ -541,14 +546,14 @@ export default function Slip39Screen({ navigation, route }: Slip39ScreenProps) {
           currentGeneratedShare ? (
           <PrimaryButton
             label={
-              !shareTimer.done
-                ? `Review this share (${shareTimer.timeLeft}s)`
+              !shareReviewed
+                ? `Review this share (${shareTimeLeft}s)`
                 : generatedShareIndex + 1 === generatedShares.length
                 ? 'I saved the last share'
                 : 'I saved this share'
             }
             onPress={handleGeneratedShareSaved}
-            disabled={!shareTimer.done}
+            disabled={!shareReviewed}
           />
         ) : mode !== 'generate' && !importComplete && !isPreparingSlip39 ? (
           <PrimaryButton

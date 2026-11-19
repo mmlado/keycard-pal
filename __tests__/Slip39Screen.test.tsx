@@ -8,6 +8,7 @@ import {
 } from '@testing-library/react-native';
 
 import NFCBottomSheet from '../src/components/NFCBottomSheet';
+import { SEED_REVIEW_SECONDS } from '../src/constants/backup';
 import Slip39Screen from '../src/screens/keypair/Slip39Screen';
 import { pubKeyFingerprint } from '../src/utils/cryptoAccount';
 
@@ -41,9 +42,17 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 
-jest.mock('../src/hooks/useSeedReviewTimer', () => ({
-  useSeedReviewTimer: () => ({ timeLeft: 0, done: true, start: jest.fn() }),
-}));
+// Most tests skip the review wait; the timer's own test turns the real hook on.
+let mockRealReviewTimer = false;
+jest.mock('../src/hooks/useSeedReviewTimer', () => {
+  const real = jest.requireActual('../src/hooks/useSeedReviewTimer');
+  return {
+    useSeedReviewTimer: () =>
+      mockRealReviewTimer
+        ? real.useSeedReviewTimer()
+        : { timeLeft: 0, done: true, start: () => {} },
+  };
+});
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -189,6 +198,7 @@ describe('Slip39Screen', () => {
   afterEach(() => {
     (Math.random as jest.Mock).mockRestore();
     jest.useRealTimers();
+    mockRealReviewTimer = false;
   });
 
   it('keeps the share button clear of the keyboard in the bottom action area', () => {
@@ -375,6 +385,41 @@ describe('Slip39Screen', () => {
     await flushTimers();
     expect(mockStartLoad).toHaveBeenCalledTimes(1);
     expect(mockResetGenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts down the review time on the first share and again on the next', async () => {
+    mockRealReviewTimer = true;
+    renderScreen('generate', 'idle', null, 'done', new Uint8Array([1, 2, 3]));
+    await flushTimers();
+    expect(screen.getByText('1/2')).toBeTruthy();
+
+    const review = async (last: string) => {
+      expect(
+        screen.getByText(`Review this share (${SEED_REVIEW_SECONDS}s)`),
+      ).toBeTruthy();
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(
+        screen.getByText(`Review this share (${SEED_REVIEW_SECONDS - 1}s)`),
+      ).toBeTruthy();
+      await act(async () => {
+        jest.advanceTimersByTime((SEED_REVIEW_SECONDS - 1) * 1000);
+      });
+      expect(screen.getByText(last)).toBeTruthy();
+    };
+
+    await review('I saved this share');
+    await act(async () => {
+      fireEvent.press(screen.getByText('I saved this share'));
+    });
+    for (const word of ['academic', 'graduate', 'academic', 'acid', 'best']) {
+      await act(async () => {
+        fireEvent.press(screen.getByText(word));
+      });
+    }
+    expect(screen.getByText('2/2')).toBeTruthy();
+    await review('I saved the last share');
   });
 
   it('shows error when adding share with invalid word', async () => {
