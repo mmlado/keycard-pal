@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - The review of a SafeTx typed-data request describes the call it makes through the clear-signing registry like any inner call, warns on a delegate call, except into a known MultiSend whose batch it shows, and its Digests tab names the digest the safeTxHash when the types and domain are Safe's
 - The F-Droid repository at fdroid.keycardpal.com serves the ABI split APKs only and archives older releases up to 800 MiB
-- Updated bitcoinjs-lib to 6.1.10, flagged by Dependabot
+- Updated bitcoinjs-lib to 6.1.10 and fast-xml-parser to 5.12.0, flagged by Dependabot
 - The Welcome screen is a set of swipeable slides: its introduction, then setting up the Keycard, connecting a wallet and signing
 
 ### Removed
