@@ -1,10 +1,9 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import jsQR from 'jsqr';
 
 import SeedQrCode from '../src/components/SeedQrCode';
 import { SEED_QR_ERROR_CORRECTION, seedQrSegments } from '../src/utils/seedQr';
+import { decodeDrawnCode } from './qrImage.testUtils';
 
 jest.mock('react-native-qrcode-svg', () => 'QRCode');
 
@@ -33,10 +32,6 @@ jest.mock('react-native-paper', () => {
   };
 });
 
-// The library's own step from props to modules, so the test reads what the screen draws.
-const genMatrix: (value: unknown, ecl: string) => number[][] =
-  jest.requireActual('react-native-qrcode-svg/src/genMatrix').default;
-
 // Published SeedQR vectors 4 (12 words) and 1 (24 words).
 const TWELVE = {
   words:
@@ -54,41 +49,7 @@ const TWENTY_FOUR = {
 
 /** The code as the screen draws it, its quiet zone included, read back with jsQR. */
 function drawnCode() {
-  const { value, ecl, size } = screen.getByTestId('seed-qr-code').props;
-  const { padding } = StyleSheet.flatten(
-    screen.getByLabelText(/SeedQR$/).props.style,
-  );
-  const matrix = genMatrix(value, ecl);
-  const quietModules = (padding * matrix.length) / size;
-  const scale = 4;
-  const quiet = Math.floor(quietModules);
-  const width = (matrix.length + quiet * 2) * scale;
-  const pixels = new Uint8ClampedArray(width * width * 4).fill(255);
-  matrix.forEach((row, y) =>
-    row.forEach((dark, x) => {
-      if (!dark) {
-        return;
-      }
-      for (let dy = 0; dy < scale; dy++) {
-        for (let dx = 0; dx < scale; dx++) {
-          const pixel =
-            ((y + quiet) * scale + dy) * width + (x + quiet) * scale + dx;
-          pixels.fill(0, pixel * 4, pixel * 4 + 3);
-        }
-      }
-    }),
-  );
-  const code = jsQR(pixels, width, width);
-  if (!code) {
-    throw new Error('the drawn code does not decode');
-  }
-  return {
-    modules: matrix.length,
-    quietModules,
-    modes: code.chunks.map(c => c.type),
-    text: code.data,
-    hex: Buffer.from(code.binaryData).toString('hex'),
-  };
+  return decodeDrawnCode(screen.getByTestId('seed-qr-code').props);
 }
 
 describe('SeedQrCode', () => {
@@ -129,15 +90,10 @@ describe('SeedQrCode', () => {
     expect(drawnCode().text).toBe(TWELVE.digits);
   });
 
-  // AnimatedURQRCode draws a code of `size` in a box padded by 12.
+  // AnimatedURQRCode is `size` plus a margin of 12 a side.
   it('takes the box a UR code of the same size takes', () => {
     render(<SeedQrCode words={TWELVE.words.split(' ')} size={300} />);
-    const { padding } = StyleSheet.flatten(
-      screen.getByLabelText('Standard SeedQR').props.style,
-    );
-    expect(
-      screen.getByTestId('seed-qr-code').props.size + padding * 2,
-    ).toBeCloseTo(324);
+    expect(screen.getByTestId('seed-qr-code').props.size).toBe(324);
   });
 
   it.each([

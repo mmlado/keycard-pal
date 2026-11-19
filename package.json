@@ -64,7 +64,7 @@
     "node-libs-react-native": "^1.2.1",
     "react": "^19.2.0",
     "react-native": "^0.87.1",
-    "react-native-animated-ur-qr": "^0.1.5",
+    "react-native-animated-ur-qr": "^0.1.6",
     "react-native-encrypted-storage": "^4.0.3",
     "react-native-fs": "^2.20.0",
     "react-native-get-random-values": "^2.0.0",

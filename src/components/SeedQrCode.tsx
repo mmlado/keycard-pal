@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons } from 'react-native-paper';
-import QRCode from 'react-native-qrcode-svg';
+
+import QrCodeImage from '@/components/QrCodeImage';
 
 import {
   SEED_QR_ERROR_CORRECTION,
@@ -14,10 +15,8 @@ type Props = {
   size: number;
 };
 
-// AnimatedURQRCode's padding, so the box is as large as a UR code's.
-const UR_PADDING = 12;
-// Four modules of the smallest SeedQR (21x21) a side, so every code has the quiet zone QR requires.
-const QUIET_ZONE = 4 / (21 + 4 * 2);
+// AnimatedURQRCode's margin, so the box is as large as a UR code's.
+const UR_MARGIN = 12;
 
 const FORMATS: { value: SeedQrFormat; label: string }[] = [
   { value: 'standard', label: 'Standard' },
@@ -34,26 +33,19 @@ export default function SeedQrCode({ words, size }: Props) {
   );
 
   const label = FORMATS.find(f => f.value === format)!.label;
-  const box = size + UR_PADDING * 2;
-  const quiet = box * QUIET_ZONE;
+  const box = size + UR_MARGIN * 2;
 
   return (
     <View style={[styles.container, { width: box }]}>
-      <View
-        style={[styles.qrWrapper, { padding: quiet }]}
+      <QrCodeImage
+        value={value}
+        size={box}
+        ecl={SEED_QR_ERROR_CORRECTION}
+        testID="seed-qr-code"
         accessible
         accessibilityRole="image"
         accessibilityLabel={`${label} SeedQR`}
-      >
-        <QRCode
-          value={value}
-          size={box - quiet * 2}
-          ecl={SEED_QR_ERROR_CORRECTION}
-          color="#000000"
-          backgroundColor="#ffffff"
-          testID="seed-qr-code"
-        />
-      </View>
+      />
       <SegmentedButtons
         value={format}
         onValueChange={v => setFormat(v as SeedQrFormat)}
@@ -66,9 +58,5 @@ export default function SeedQrCode({ words, size }: Props) {
 const styles = StyleSheet.create({
   container: {
     gap: 24,
-  },
-  qrWrapper: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
   },
 });

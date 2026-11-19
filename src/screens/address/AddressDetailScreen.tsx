@@ -1,15 +1,15 @@
 import { useCallback, useLayoutEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
-import QRCode from 'react-native-qrcode-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { AddressDetailScreenProps } from '../../navigation/types';
-import theme from '../../theme';
+import type { AddressDetailScreenProps } from '@/navigation/types';
+import theme from '@/theme';
 
-import { Icons } from '../../assets/icons';
-import EnsAddressLabel from '../../components/ens/EnsAddressLabel.online';
-import PrimaryButton from '../../components/PrimaryButton';
+import { Icons } from '@/assets/icons';
+import EnsAddressLabel from '@/components/ens/EnsAddressLabel.online';
+import PrimaryButton from '@/components/PrimaryButton';
+import QrCodeImage from '@/components/QrCodeImage';
 
 export default function AddressDetailScreen({
   route,
@@ -29,14 +29,7 @@ export default function AddressDetailScreen({
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
       <View style={styles.qrContainer}>
-        <View style={styles.qrWrapper}>
-          <QRCode
-            value={address}
-            size={280}
-            color="#000000"
-            backgroundColor="#ffffff"
-          />
-        </View>
+        <QrCodeImage value={address} size={312} />
         <EnsAddressLabel address={address} />
         {derivationPath ? (
           <Text style={styles.path}>{derivationPath}</Text>
@@ -64,11 +57,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 24,
-  },
-  qrWrapper: {
-    padding: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
   },
   path: {
     color: theme.colors.onSurfaceVariant,
