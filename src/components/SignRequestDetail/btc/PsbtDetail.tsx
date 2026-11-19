@@ -65,7 +65,7 @@ export default function PsbtDetail({ summary }: { summary: BtcPsbtSummary }) {
             summary.network === 'mainnet'
               ? 'Bitcoin Mainnet'
               : summary.network === 'testnet'
-              ? 'Bitcoin Testnet'
+              ? 'Bitcoin Testnet or Signet'
               : 'Unknown'
           }
         />
