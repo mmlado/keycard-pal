@@ -68,12 +68,12 @@ describe('useFactoryReset', () => {
       expect(mockStartNFC).toHaveBeenCalledWith('Tap your Keycard');
     });
 
-    it('sets status to "Tap your Keycard"', async () => {
+    it('leaves the status empty while waiting, under the sheet title', async () => {
       const { result } = renderHook(() => useFactoryReset());
       await act(async () => {
         result.current.start();
       });
-      expect(result.current.status).toBe('Tap your Keycard');
+      expect(result.current.status).toBe('');
     });
   });
 

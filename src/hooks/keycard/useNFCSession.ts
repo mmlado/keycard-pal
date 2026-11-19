@@ -403,7 +403,7 @@ export default function useNFCSession(
           if (handler) {
             handler();
           } else {
-            setStatus('Tap your Keycard');
+            setStatus('');
             setPhase('nfc');
             doStartNFC();
           }
@@ -425,8 +425,8 @@ export default function useNFCSession(
     clearIosRestartTimer();
     setCardPresence('waiting');
 
-    // Open the sheet at once; an NFC-off error lands inside it.
-    setStatus('Tap your Keycard');
+    // Open the sheet at once; an NFC-off error lands inside it. Its title already says to tap the card.
+    setStatus('');
     setPhase('nfc');
 
     RNKeycard.Core.isNFCEnabled()
