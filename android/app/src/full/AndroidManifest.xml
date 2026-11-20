@@ -1,3 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- netinfo's ACCESS_WIFI_STATE would otherwise imply a required Wi-Fi feature. -->
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
 </manifest>
