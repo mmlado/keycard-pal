@@ -17,6 +17,7 @@ class MainApplication : Application(), ReactApplication {
                     addAll(onlineNativePackages())
                     add(BuildConfigPackage())
                     add(CameraPackage())
+                    add(ScanDisplayPackage())
                 },
         )
     }

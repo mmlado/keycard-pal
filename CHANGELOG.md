@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - A clear-signing descriptor can take a value from one of its maps, such as Aave V4's token for a reserve
+- A signature or key QR code is shown at full brightness with the screen kept on
+- A QR code of several parts shows a tip to hold both devices steady
 
 ### Changed
 
