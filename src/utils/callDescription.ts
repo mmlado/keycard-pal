@@ -72,13 +72,14 @@ function matchEntry(
     chainId: request.chainId,
   };
   const resolvePath = buildArgsPathResolver(args, container);
+  const resolveEach = buildArgsEachResolver(args, container);
   // Decoded calldata already reads in the canonical key form.
-  const resolved = withMapValues(format, resolvePath);
+  const resolved = withMapValues(format, resolveEach);
   if (!resolved) return { descriptor: null, rejected: true };
   const descriptor = {
     format: resolved,
     resolvePath,
-    resolveEach: buildArgsEachResolver(args, container),
+    resolveEach,
     // Calldata holds an address as 20 bytes, with no case to get wrong.
     miscasedAt: () => false,
   };

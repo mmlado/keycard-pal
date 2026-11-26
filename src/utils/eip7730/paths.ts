@@ -13,7 +13,7 @@ import {
 import { checksumEthAddress } from '@/utils/ethereumAddress';
 import { isWholeBytes } from '@/utils/hex';
 
-import type { MapKeyAt } from './maps';
+import type { MapKeysAt } from './maps';
 
 export type Eip7730Container = {
   from?: string;
@@ -306,7 +306,7 @@ export function buildEip712Resolvers(
   resolvePath: (path: string) => string | null;
   resolveEach: (path: string) => string[];
   miscasedAt: (path: string) => boolean;
-  mapKeyAt: MapKeyAt;
+  mapKeysAt: MapKeysAt;
 } {
   const typeAt = (path: string) =>
     path.startsWith('@.')
@@ -329,9 +329,11 @@ export function buildEip712Resolvers(
       resolveEip712FieldValues(path, typed.message, container).some(
         isMiscasedAddress,
       ),
-    mapKeyAt: path => {
-      const value = resolveEip712FieldValue(path, typed.message, container);
-      return value === null ? null : mapKey(typeAt(path), value);
+    mapKeysAt: path => {
+      const type = typeAt(path);
+      return resolveEip712FieldValues(path, typed.message, container).map(
+        value => mapKey(type, value),
+      );
     },
   };
 }

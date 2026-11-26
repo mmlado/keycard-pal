@@ -54,13 +54,13 @@ export function describeMessage(
     format: Eip7730DisplayFormat | null,
   ): MessageDescription => {
     if (!format) return none;
-    const { mapKeyAt, ...resolvers } = buildEip712Resolvers(typed, {
+    const { mapKeysAt, ...resolvers } = buildEip712Resolvers(typed, {
       from,
       to: verifyingContract,
       value: '0',
       chainId,
     });
-    const resolved = withMapValues(format, mapKeyAt);
+    const resolved = withMapValues(format, mapKeysAt);
     if (!resolved) return { ...none, rejected: true };
     const descriptor = { format: resolved, ...resolvers };
     return fitsRequest(resolved, descriptor)

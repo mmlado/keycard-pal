@@ -267,8 +267,8 @@ describe('building an index from untrusted descriptors', () => {
     const [format] = buildIndexFromDescriptors([descriptor]).formats;
     expect(({} as Record<string, unknown>).upper).toBeUndefined();
     expect(format.metadata?.maps).toEqual({ m: {} });
-    expect(withMapValues(format, () => '1')).toBeNull();
-    expect(withMapValues(format, () => '__proto__')).toBeNull();
+    expect(withMapValues(format, () => ['1'])).toBeNull();
+    expect(withMapValues(format, () => ['__proto__'])).toBeNull();
   });
 
   it('shows an intent given as labels and values on one line', () => {

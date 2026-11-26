@@ -2,7 +2,10 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 import { withMapValues } from '../src/utils/eip7730/maps';
-import { buildEip712Resolvers } from '../src/utils/eip7730/paths';
+import {
+  buildArgsEachResolver,
+  buildEip712Resolvers,
+} from '../src/utils/eip7730/paths';
 import {
   buildIndexFromDescriptors,
   type Eip7730DisplayFormat,
@@ -144,8 +147,11 @@ describe('withMapValues', () => {
       maps: { reserve: { '7': USDC, [USDC.toLowerCase()]: 'by address' } },
     },
   });
-  const keys: Record<string, string> = { reserveId: '7', asset: USDC };
-  const keyAt = (path: string) => keys[path] ?? null;
+  const keys: Record<string, (string | null)[]> = {
+    reserveId: ['7'],
+    asset: [USDC],
+  };
+  const keysAt = (path: string) => keys[path] ?? [];
 
   it('replaces each reference with its value and keeps the other params', () => {
     const plain: Eip7730Field = { path: 'to', label: 'To', format: 'raw' };
@@ -154,7 +160,7 @@ describe('withMapValues', () => {
         plain,
         field({ map: 'reserve', keyPath: 'reserveId' }, { threshold: '10' }),
       ),
-      keyAt,
+      keysAt,
     );
     expect(resolved?.fields[0]).toBe(plain);
     expect(resolved?.fields[1].params).toEqual({
@@ -166,43 +172,63 @@ describe('withMapValues', () => {
   it('matches a key without regard to case', () => {
     const resolved = withMapValues(
       format(field({ map: 'reserve', keyPath: 'asset' })),
-      keyAt,
+      keysAt,
     );
     expect(resolved?.fields[0].params?.token).toBe('by address');
   });
 
   it('answers the same format when nothing refers to a map', () => {
     const plain = format(field(USDC));
-    expect(withMapValues(plain, keyAt)).toBe(plain);
+    expect(withMapValues(plain, keysAt)).toBe(plain);
   });
 
   it.each([
-    ['no key matches', { map: 'reserve', keyPath: 'other' }, { other: '8' }],
+    ['no key matches', { map: 'reserve', keyPath: 'other' }, { other: ['8'] }],
     ['the key cannot be read', { map: 'reserve', keyPath: 'missing' }, {}],
+    [
+      'the value has no key form',
+      { map: 'reserve', keyPath: 'flag' },
+      { flag: [null] },
+    ],
     ['the map does not exist', { map: 'nothing', keyPath: 'reserveId' }, {}],
     ['the reference named no map', { map: '', keyPath: 'reserveId' }, {}],
     [
-      'the key is read from an array',
+      'the key path gives a key per element',
       { map: 'reserve', keyPath: 'ids.[]' },
-      { 'ids.[]': '7' },
+      { 'ids.[]': ['7', '7'] },
     ],
-    ['the key path is empty', { map: 'reserve', keyPath: '' }, { '': '7' }],
+    ['the key path is empty', { map: 'reserve', keyPath: '' }, { '': ['7'] }],
   ])('answers null when %s', (_case, ref, extra) => {
     const at = (path: string) =>
-      (extra as Record<string, string>)[path] ?? keyAt(path);
+      (extra as Record<string, (string | null)[]>)[path] ?? keysAt(path);
     expect(withMapValues(format(field(USDC), field(ref)), at)).toBeNull();
+  });
+
+  it('reads a key from a slice of bytes, and none from an array of several', () => {
+    const each = buildArgsEachResolver({ payload: '0x123456', ids: [7n, 8n] });
+    const sliced = (keyPath: string) =>
+      withMapValues(
+        {
+          ...format(field({ map: 'reserve', keyPath })),
+          metadata: { maps: { reserve: { '0x1234': USDC, '7': WETH } } },
+        },
+        each,
+      )?.fields[0].params?.token;
+    expect(sliced('payload.[0:2]')).toBe(USDC);
+    expect(sliced('ids.[0:1]')).toBe(WETH);
+    expect(sliced('ids.[]')).toBeUndefined();
   });
 
   it('reads only a map of its own', () => {
     expect(
       withMapValues(
         format(field({ map: 'toString', keyPath: 'reserveId' })),
-        keyAt,
+        keysAt,
       ),
     ).toBeNull();
     expect(
       withMapValues(format(field({ map: 'reserve', keyPath: 'proto' })), path =>
-        path === 'proto' ? 'constructor' : null,
+        path === 'proto' ? ['constructor'] : [],
       ),
     ).toBeNull();
   });
@@ -221,6 +247,8 @@ describe('EIP-712 map keys', () => {
           { name: 'flag', type: 'bool' },
           { name: 'asset', type: 'address' },
           { name: 'label', type: 'string' },
+          { name: 'ids', type: 'uint256[]' },
+          { name: 'payload', type: 'bytes' },
         ],
       },
       primaryType: 'Order',
@@ -233,24 +261,28 @@ describe('EIP-712 map keys', () => {
         flag: 'yes',
         asset: USDC.toLowerCase(),
         label: 'Main',
+        ids: ['0x07', 8],
+        payload: '0x123456',
       },
     },
     { chainId: 10, to: USDC },
   );
 
   it.each([
-    ['reserveId', '7'],
-    ['hexId', '7'],
-    ['negative', '-3'],
-    ['blank', null],
-    ['enabled', 'true'],
-    ['flag', null],
-    ['asset', USDC.toLowerCase()],
-    ['label', 'Main'],
-    ['@.chainId', '10'],
-    ['@.to', USDC],
-    ['missing', null],
+    ['reserveId', ['7']],
+    ['hexId', ['7']],
+    ['negative', ['-3']],
+    ['blank', [null]],
+    ['enabled', ['true']],
+    ['flag', [null]],
+    ['asset', [USDC.toLowerCase()]],
+    ['label', ['Main']],
+    ['ids.[]', ['7', '8']],
+    ['payload.[0:2]', ['0x1234']],
+    ['@.chainId', ['10']],
+    ['@.to', [USDC]],
+    ['missing', []],
   ])('reads %s as %p', (path, key) => {
-    expect(resolvers.mapKeyAt(path)).toBe(key);
+    expect(resolvers.mapKeysAt(path)).toEqual(key);
   });
 });
