@@ -17,6 +17,7 @@
 		911E2EBCBBDAF829F8F3F76E /* CameraViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 43D18B5B2CBEAB5651E0309E /* CameraViewManager.m */; };
 		99D8BF80EADAD18B333197A2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		AA11BB22CC33DD44AA11BB22 /* BuildConfigModule.m in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD4400112233 /* BuildConfigModule.m */; };
+		AA11BB22CC33DD55AA11BB22 /* ScanDisplayModule.m in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD5500112233 /* ScanDisplayModule.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,7 +35,9 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = KeycardPal/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = KeycardPal/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		AA11BB22CC33DD4400112233 /* BuildConfigModule.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = BuildConfigModule.m; path = KeycardPal/BuildConfigModule.m; sourceTree = "<group>"; };
+		AA11BB22CC33DD5500112233 /* ScanDisplayModule.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = ScanDisplayModule.m; path = KeycardPal/ScanDisplayModule.m; sourceTree = "<group>"; };
 		AA11BB22CC33DD4400AABBCC /* BuildConfigModule.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = BuildConfigModule.h; path = KeycardPal/BuildConfigModule.h; sourceTree = "<group>"; };
+		AA11BB22CC33DD5500AABBCC /* ScanDisplayModule.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = ScanDisplayModule.h; path = KeycardPal/ScanDisplayModule.h; sourceTree = "<group>"; };
 		E6D2A27E40DB81D631A6EF6E /* CameraView.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; name = CameraView.h; path = KeycardPal/CameraView.h; sourceTree = "<group>"; };
 		E79372919EB24B959343D071 /* Inter_18pt-Medium.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "Inter_18pt-Medium.ttf"; path = "../src/assets/fonts/Inter/static/Inter_18pt-Medium.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -65,7 +68,9 @@
 				57CA86AF77A0EDD777EB2F36 /* CameraView.m */,
 				43D18B5B2CBEAB5651E0309E /* CameraViewManager.m */,
 				AA11BB22CC33DD4400AABBCC /* BuildConfigModule.h */,
+				AA11BB22CC33DD5500AABBCC /* ScanDisplayModule.h */,
 				AA11BB22CC33DD4400112233 /* BuildConfigModule.m */,
+				AA11BB22CC33DD5500112233 /* ScanDisplayModule.m */,
 			);
 			name = KeycardPal;
 			sourceTree = "<group>";
@@ -281,6 +286,7 @@
 				8358A8EFDD3FDCD172AD2848 /* CameraView.m in Sources */,
 				911E2EBCBBDAF829F8F3F76E /* CameraViewManager.m in Sources */,
 				AA11BB22CC33DD44AA11BB22 /* BuildConfigModule.m in Sources */,
+				AA11BB22CC33DD55AA11BB22 /* ScanDisplayModule.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

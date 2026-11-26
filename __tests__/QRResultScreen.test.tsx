@@ -1,7 +1,10 @@
 import React from 'react';
+import { UR, UREncoder } from '@ngraveio/bc-ur';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import { MULTI_PART_TIP } from '../src/constants/qrResult';
 import QRResultScreen from '../src/screens/QRResultScreen';
+import { UR_FRAGMENT_CAPACITY } from '../src/utils/urParts';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -24,6 +27,11 @@ jest.mock(
   'react-native-animated-ur-qr',
   () => (props: object) => mockAnimatedURQRCode(props),
 );
+
+const mockUseScanDisplay = jest.fn();
+jest.mock('../src/hooks/useScanDisplay', () => ({
+  useScanDisplay: (_: object, enabled: boolean) => mockUseScanDisplay(enabled),
+}));
 
 const mockSeedQrCode = jest.fn((_: object) => null);
 jest.mock(
@@ -117,6 +125,53 @@ describe('QRResultScreen', () => {
     expect(reset).toHaveBeenCalledWith({
       index: 0,
       routes: [{ name: 'Dashboard' }],
+    });
+  });
+});
+
+describe('QRResultScreen scanning aids', () => {
+  const longUr = UREncoder.encodeSinglePart(
+    new UR(Buffer.alloc(500, 1), 'bytes'),
+  );
+
+  it('raises the display while shown', () => {
+    mockUseScanDisplay.mockClear();
+    renderScreen(SAMPLE_UR);
+    expect(mockUseScanDisplay).toHaveBeenLastCalledWith(true);
+  });
+
+  it('shows the tip for a code of several parts', () => {
+    renderScreen(longUr);
+    expect(screen.getByText(MULTI_PART_TIP)).toBeTruthy();
+  });
+
+  it('shows no tip for a code of one part', () => {
+    renderScreen(SAMPLE_UR);
+    expect(screen.queryByText(MULTI_PART_TIP)).toBeNull();
+  });
+
+  it('shows no tip for a SeedQR and leaves the display alone', () => {
+    render(
+      <QRResultScreen
+        route={
+          {
+            params: { seedWords: Array(12).fill('abandon'), title: 'SeedQR' },
+            key: 'QRResult',
+            name: 'QRResult',
+          } as any
+        }
+        navigation={{ reset: jest.fn(), setOptions: jest.fn() } as any}
+      />,
+    );
+    expect(mockUseScanDisplay).toHaveBeenLastCalledWith(false);
+    expect(screen.queryByText(MULTI_PART_TIP)).toBeNull();
+  });
+
+  it('splits the code at the capacity the tip is decided by', () => {
+    mockAnimatedURQRCode.mockClear();
+    renderScreen(longUr);
+    expect(mockAnimatedURQRCode.mock.calls[0][0]).toMatchObject({
+      capacity: UR_FRAGMENT_CAPACITY,
     });
   });
 });
