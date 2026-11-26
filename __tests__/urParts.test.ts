@@ -14,6 +14,14 @@ describe('isMultiPartUr', () => {
     expect(isMultiPartUr(urOf(UR_FRAGMENT_CAPACITY * 2))).toBe(true);
   });
 
+  it('is false for one part of a longer UR', () => {
+    const part = new UREncoder(
+      new UR(Buffer.alloc(UR_FRAGMENT_CAPACITY * 2, 1), 'bytes'),
+      UR_FRAGMENT_CAPACITY,
+    ).nextPart();
+    expect(isMultiPartUr(part)).toBe(false);
+  });
+
   it('is false for text that is not a UR', () => {
     expect(isMultiPartUr('not a ur')).toBe(false);
   });

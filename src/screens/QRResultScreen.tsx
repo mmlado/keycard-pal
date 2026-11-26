@@ -74,13 +74,14 @@ export default function QRResultScreen({
       <View style={styles.qrArea} onLayout={handleAreaLayout} testID="qr-area">
         {seedWords !== null ? (
           <SeedQrCode words={seedWords} size={qrSize} maxHeight={areaHeight} />
-        ) : (
+        ) : null}
+        {urString !== null ? (
           <AnimatedURQRCode
-            urString={urString ?? ''}
+            urString={urString}
             size={qrSize}
             capacity={UR_FRAGMENT_CAPACITY}
           />
-        )}
+        ) : null}
       </View>
       {multiPart ? <Text style={styles.tip}>{MULTI_PART_TIP}</Text> : null}
 
