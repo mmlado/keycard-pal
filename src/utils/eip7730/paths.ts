@@ -13,6 +13,8 @@ import {
 import { checksumEthAddress } from '@/utils/ethereumAddress';
 import { isWholeBytes } from '@/utils/hex';
 
+import type { MapKeysAt } from './maps';
+
 export type Eip7730Container = {
   from?: string;
   to?: string;
@@ -284,6 +286,18 @@ export function buildArgsPathResolver(
   };
 }
 
+const INTEGER_RE = /^(-?\d+|0x[0-9a-f]+)$/i;
+
+// EIP-712 JSON may write an integer in hex or as a string; its map key is decimal.
+function mapKey(type: string | null, value: string): string | null {
+  if (type && /^u?int\d*$/.test(type)) {
+    return INTEGER_RE.test(value) ? BigInt(value).toString() : null;
+  }
+  if (type === 'bool')
+    return value === 'true' || value === 'false' ? value : null;
+  return value;
+}
+
 /** EIP-712 resolvers that write an `address` field in ERC-55, as the spec's raw format asks. */
 export function buildEip712Resolvers(
   typed: Pick<Eip712RawTypedData, 'types' | 'primaryType' | 'message'>,
@@ -292,10 +306,13 @@ export function buildEip712Resolvers(
   resolvePath: (path: string) => string | null;
   resolveEach: (path: string) => string[];
   miscasedAt: (path: string) => boolean;
+  mapKeysAt: MapKeysAt;
 } {
-  const isAddress = (path: string) =>
-    !path.startsWith('@.') &&
-    eip712FieldType(typed.types, typed.primaryType, path) === 'address';
+  const typeAt = (path: string) =>
+    path.startsWith('@.')
+      ? null
+      : eip712FieldType(typed.types, typed.primaryType, path);
+  const isAddress = (path: string) => typeAt(path) === 'address';
   const write = (path: string, value: string) =>
     isAddress(path) ? checksumEthAddress(value) : value;
   return {
@@ -312,5 +329,11 @@ export function buildEip712Resolvers(
       resolveEip712FieldValues(path, typed.message, container).some(
         isMiscasedAddress,
       ),
+    mapKeysAt: path => {
+      const type = typeAt(path);
+      return resolveEip712FieldValues(path, typed.message, container).map(
+        value => mapKey(type, value),
+      );
+    },
   };
 }

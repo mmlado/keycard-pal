@@ -1,4 +1,5 @@
 import { lookupCalldata } from '@/utils/eip7730/lookup';
+import { withMapValues } from '@/utils/eip7730/maps';
 import {
   buildArgsEachResolver,
   buildArgsPathResolver,
@@ -70,14 +71,19 @@ function matchEntry(
     value: request.value,
     chainId: request.chainId,
   };
+  const resolvePath = buildArgsPathResolver(args, container);
+  const resolveEach = buildArgsEachResolver(args, container);
+  // Decoded calldata already reads in the canonical key form.
+  const resolved = withMapValues(format, resolveEach);
+  if (!resolved) return { descriptor: null, rejected: true };
   const descriptor = {
-    format,
-    resolvePath: buildArgsPathResolver(args, container),
-    resolveEach: buildArgsEachResolver(args, container),
+    format: resolved,
+    resolvePath,
+    resolveEach,
     // Calldata holds an address as 20 bytes, with no case to get wrong.
     miscasedAt: () => false,
   };
-  return fitsRequest(format, descriptor)
+  return fitsRequest(resolved, descriptor)
     ? { descriptor, rejected: false }
     : { descriptor: null, rejected: true };
 }

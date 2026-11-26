@@ -304,6 +304,40 @@ describe('describeMessage', () => {
     expect(kept.descriptor).not.toBeNull();
   });
 
+  it('takes a param from a map by the message value, and rejects the entry when the map has no key for it', () => {
+    const typed = transferWithAuthorization();
+    const format = now(describeMessage(typed, SIGNER)).descriptor!.format;
+    // validAfter is written as a hex string here; its key is the decimal form.
+    const byValidAfter = (keys: Record<string, string>) => ({
+      ...format,
+      fields: format.fields.map(field =>
+        field.path === 'value'
+          ? {
+              ...field,
+              params: { token: { map: 'tokens', keyPath: 'validAfter' } },
+            }
+          : field,
+      ),
+      metadata: { ...format.metadata, maps: { tokens: keys } },
+    });
+    const hexTyped = transferWithAuthorization({}, { validAfter: '0x10' });
+
+    mockLookupEip712.mockReturnValueOnce(byValidAfter({ 16: USDC }));
+    const kept = now(describeMessage(hexTyped, SIGNER));
+    const amount = kept.descriptor!.format.fields.find(f => f.path === 'value');
+    expect(amount?.params?.token).toBe(USDC);
+    const display = displayMessage(kept.descriptor!, kept);
+    expect(rowValue(display.nodes, 'Amount')).toBe('1.5 USDC');
+
+    mockLookupEip712.mockReturnValueOnce(byValidAfter({ '0x10': USDC }));
+    expect(now(describeMessage(hexTyped, SIGNER))).toEqual({
+      descriptor: null,
+      rejected: true,
+      chainId: 1,
+      verifyingContract: USDC,
+    });
+  });
+
   it('marks a declared address the request wrote with a wrong checksum', () => {
     const description = now(
       describeMessage(

@@ -53,6 +53,10 @@ export type Eip7730Field = {
   group?: Eip7730Group;
 };
 
+export type Eip7730MapRef = { map: string; keyPath: string };
+
+export type Eip7730MapValue = string | number | boolean;
+
 export type Eip7730TokenMetadata = {
   decimals?: number;
   ticker?: string;
@@ -69,6 +73,7 @@ export type Eip7730DisplayFormat = {
   domain?: Record<string, string>;
   metadata?: {
     enums?: Record<string, Record<string, string>>;
+    maps?: Record<string, Record<string, Eip7730MapValue>>;
     tokens?: Record<string, Eip7730TokenMetadata>;
     owner?: string;
   };
@@ -97,7 +102,7 @@ export type Eip7730IndexSlice = Pick<
   'formats' | 'contracts' | 'eip712'
 >;
 
-export const EIP7730_INDEX_VERSION = 10;
+export const EIP7730_INDEX_VERSION = 11;
 
 const SCHEMA_MAJOR = 2;
 const SELECTOR_RE = /^0x[0-9a-f]{8}$/i;
@@ -109,6 +114,7 @@ const MAX_JSON_BYTES = 64 * 1024 * 1024;
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const CONSTANT_REF = '$.metadata.constants.';
 const DEFINITION_REF = '$.display.definitions.';
+const MAP_REF = '$.metadata.maps.';
 
 type Json = Record<string, unknown>;
 type JsonFiles = Map<string, unknown>;
@@ -136,7 +142,7 @@ function isSafeKey(key: string): boolean {
   return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
 }
 
-function own(object: Json, key: string): unknown {
+export function own<T>(object: Record<string, T>, key: string): T | undefined {
   return Object.prototype.hasOwnProperty.call(object, key)
     ? object[key]
     : undefined;
@@ -162,11 +168,35 @@ function substituteConstant(value: unknown, constants: Json): unknown {
   return constant === undefined ? value : constant;
 }
 
-function withConstants(params: unknown, constants: Json): Json | undefined {
+export function isMapRef(value: unknown): value is Eip7730MapRef {
+  return (
+    isPlainObject(value) &&
+    typeof value.map === 'string' &&
+    typeof value.keyPath === 'string'
+  );
+}
+
+// The spec has no other object param, so a malformed one rejects the entry instead of passing as a constant.
+function parseMapRef(raw: Json): Eip7730MapRef {
+  const map = own(raw, 'map');
+  const keyPath = own(raw, 'keyPath');
+  return {
+    map:
+      typeof map === 'string' && map.startsWith(MAP_REF)
+        ? map.slice(MAP_REF.length)
+        : '',
+    keyPath: typeof keyPath === 'string' ? keyPath : '',
+  };
+}
+
+function extractParams(params: unknown, constants: Json): Json | undefined {
   if (!isPlainObject(params)) return undefined;
   const out: Json = {};
   for (const [key, value] of Object.entries(params)) {
-    if (isSafeKey(key)) out[key] = substituteConstant(value, constants);
+    if (!isSafeKey(key)) continue;
+    out[key] = isPlainObject(value)
+      ? parseMapRef(value)
+      : substituteConstant(value, constants);
   }
   return out;
 }
@@ -263,6 +293,8 @@ function withGroupPaths(
       key,
       key.endsWith('Path') && typeof value === 'string'
         ? joinFieldPath(prefix, value)
+        : isMapRef(value) && value.keyPath
+        ? { ...value, keyPath: joinFieldPath(prefix, value.keyPath) }
         : value,
     ]),
   );
@@ -306,7 +338,7 @@ function expandFields(
       typeof field.format === 'string' ? field.format : 'raw'
     ) as Eip7730FieldFormat;
     const params = withGroupPaths(
-      withConstants(field.params, sources.constants),
+      extractParams(field.params, sources.constants),
       prefix,
     );
     const value = substituteConstant(field.value, sources.constants);
@@ -395,6 +427,32 @@ function validInterpolation(
   });
 }
 
+// Keys match without regard to case, so two that differ only by case leave the map with no single answer.
+function parseMapValues(raw: Json): Record<string, Eip7730MapValue> | null {
+  const out: Record<string, Eip7730MapValue> = {};
+  const seen = new Set<string>();
+  for (const [rawKey, value] of Object.entries(raw)) {
+    const key = rawKey.toLowerCase();
+    if (seen.has(key)) return null;
+    seen.add(key);
+    if (isSafeKey(key) && isScalar(value)) out[key] = value;
+  }
+  return out;
+}
+
+function extractMaps(
+  raw: unknown,
+): Record<string, Record<string, Eip7730MapValue>> | undefined {
+  if (!isPlainObject(raw)) return undefined;
+  const maps: Record<string, Record<string, Eip7730MapValue>> = {};
+  for (const [name, map] of Object.entries(raw)) {
+    const values = isPlainObject(map) ? own(map, 'values') : undefined;
+    const parsed = isPlainObject(values) ? parseMapValues(values) : null;
+    if (parsed && isSafeKey(name)) maps[name] = parsed;
+  }
+  return Object.keys(maps).length > 0 ? maps : undefined;
+}
+
 function extractMetadata(
   rawMeta: unknown,
 ): Eip7730DisplayFormat['metadata'] | undefined {
@@ -412,6 +470,8 @@ function extractMetadata(
     }
     if (Object.keys(enums).length > 0) result.enums = enums;
   }
+  const maps = extractMaps(rawMeta.maps);
+  if (maps) result.maps = maps;
   if (isPlainObject(rawMeta.token)) {
     const t = rawMeta.token;
     const decimals = isDecimals(t.decimals) ? t.decimals : undefined;
