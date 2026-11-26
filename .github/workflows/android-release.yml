@@ -220,7 +220,7 @@ jobs:
           # Draft: uploaded and visible in the Console, never rolled out by CI.
           status: draft
           # 'beta' is Play's name for open testing.
-          track: ${{ vars.PLAY_TRACK || 'beta' }}
+          tracks: ${{ vars.PLAY_TRACK || 'beta' }}
           whatsNewDirectory: play/whatsnew
 
   fdroid:
