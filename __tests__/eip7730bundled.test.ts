@@ -29,9 +29,10 @@ import {
   resolveEip712FieldValue,
 } from '../src/utils/eip7730/paths';
 import { shownFields } from '../src/utils/eip7730/visibility';
-import type {
-  Eip7730DisplayFormat,
-  Eip7730Index,
+import {
+  isMapRef,
+  type Eip7730DisplayFormat,
+  type Eip7730Index,
 } from '../src/utils/eip7730/zip';
 import { checksumEthAddress } from '../src/utils/ethereumAddress';
 import { classifyEthPayload } from '../src/utils/ethPayload';
@@ -51,6 +52,7 @@ const lookupEip712 = (...args: Parameters<typeof lookup.lookupEip712>) =>
 const USDT = '0xdac17f958d2ee523a2206206994597c13d831ec7';
 const USDC = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
 const AAVE_V2_POOL = '0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9';
+const AAVE_V4_SPOKE = '0x94e7a5dcbe816e498b89ab752661904e2f56c485';
 const ONEINCH_V5 = '0x1111111254eeb25477b68fb85ed929f73a960582';
 const RECIPIENT = '0xd3cda913deb6f4967b2ef3aa68f5a843da74c4ef';
 const AMOUNT = 1_500_000n;
@@ -141,6 +143,36 @@ describe('bundled EIP-7730 descriptors', () => {
     expect(out.intent).toBe('Borrow');
     expect(out['Amount to borrow']).toBe('1.5 USDT');
     expect(out['Interest Rate mode']).toBe('variable');
+  });
+
+  describe('Aave V4 takes the token from its reserve map', () => {
+    const supply = (reserveId: bigint) =>
+      encodeFunctionData({
+        abi: [
+          parseAbiItem(
+            'function supply(uint256 reserveId,uint256 amount,address onBehalfOf)',
+          ) as AbiFunction,
+        ],
+        args: [reserveId, 750_728_116n, RECIPIENT],
+      });
+
+    it('shows the amount in the mapped token', () => {
+      const out = renderCalldata(AAVE_V4_SPOKE, supply(7n));
+      expect(out['Amount to supply']).toBe('750.728116 USDC');
+    });
+
+    it('does not use the entry for a reserve the map does not name', () => {
+      const described = describeCall({
+        chainId: 1,
+        contract: AAVE_V4_SPOKE,
+        data: supply(99n),
+        depth: 0,
+      });
+      if (described instanceof Promise)
+        throw new Error('bundled lookup returned a promise');
+      expect(described).toMatchObject({ descriptor: null, rejected: true });
+      expect(described.view).not.toBe('descriptor');
+    });
   });
 
   it('Kiln vault: formats come through two includes, with constants and a fixed value', () => {
@@ -441,6 +473,16 @@ describe('every bundled calldata descriptor', () => {
         );
         paths += 1;
         for (const [key, value] of Object.entries(field.params ?? {})) {
+          if (isMapRef(value)) {
+            expect(format.metadata?.maps?.[value.map]).toBeDefined();
+            expect([
+              format.signature,
+              value.keyPath,
+              resolve(value.keyPath),
+            ]).not.toEqual([format.signature, value.keyPath, null]);
+            paths += 1;
+            continue;
+          }
           if (!key.endsWith('Path') || typeof value !== 'string') continue;
           if (value.startsWith('$.')) continue;
           expect([format.signature, key, resolve(value)]).not.toEqual([

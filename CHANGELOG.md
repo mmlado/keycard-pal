@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- A clear-signing descriptor can take a value from one of its maps, such as Aave V4's token for a reserve
+
+### Changed
+
+- The bundled clear-signing registry adds Aave V4, Circle CCTP V2 on more chains, Uniswap Permit2 approvals, WETH on Base and Optimism, USDT OFT transfers, and Arbitrum, Polygon, Railgun, Blur and Pendle contracts
+
 ### Fixed
 
 - Android devices without host card emulation, and without Wi-Fi for the full flavor, can install the app

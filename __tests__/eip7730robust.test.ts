@@ -10,6 +10,7 @@ import {
   formatEip7730Field,
   interpolateIntent,
 } from '../src/utils/eip7730/format';
+import { withMapValues } from '../src/utils/eip7730/maps';
 import {
   buildArgsPathResolver,
   decodeArgsBySignature,
@@ -244,6 +245,30 @@ describe('building an index from untrusted descriptors', () => {
     } finally {
       delete (Object.prototype as Record<string, unknown>)['1'];
     }
+  });
+
+  it('never lets a map name or key reach Object.prototype, and resolves nothing through one', () => {
+    const descriptor = JSON.parse(`{
+      "context": { "contract": {
+        "deployments": [{ "chainId": 1, "address": "${ADDRESS}" }]
+      } },
+      "metadata": { "maps": {
+        "__proto__": { "values": { "1": "proto" } },
+        "m": { "values": { "__PROTO__": "upper", "constructor": "ctor", "1": { "__proto__": "x" } } },
+        "broken": { "values": [1, 2] },
+        "noValues": "text"
+      } },
+      "display": { "formats": { "transfer(address to,uint256 amount)": {
+        "intent": "Send",
+        "fields": [{ "path": "amount", "label": "Amount", "format": "tokenAmount",
+          "params": { "token": { "map": "$.metadata.maps.__proto__", "keyPath": "amount" } } }]
+      } } }
+    }`);
+    const [format] = buildIndexFromDescriptors([descriptor]).formats;
+    expect(({} as Record<string, unknown>).upper).toBeUndefined();
+    expect(format.metadata?.maps).toEqual({ m: {} });
+    expect(withMapValues(format, () => '1')).toBeNull();
+    expect(withMapValues(format, () => '__proto__')).toBeNull();
   });
 
   it('shows an intent given as labels and values on one line', () => {

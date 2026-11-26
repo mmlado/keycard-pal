@@ -6,6 +6,7 @@ import {
   type Eip712RawTypedData,
 } from '@/utils/eip712';
 import { lookupEip712 } from '@/utils/eip7730/lookup';
+import { withMapValues } from '@/utils/eip7730/maps';
 import { buildEip712Resolvers } from '@/utils/eip7730/paths';
 import { fitsRequest } from '@/utils/eip7730/visibility';
 import type { Eip7730DisplayFormat } from '@/utils/eip7730/zip';
@@ -53,16 +54,16 @@ export function describeMessage(
     format: Eip7730DisplayFormat | null,
   ): MessageDescription => {
     if (!format) return none;
-    const descriptor = {
-      format,
-      ...buildEip712Resolvers(typed, {
-        from,
-        to: verifyingContract,
-        value: '0',
-        chainId,
-      }),
-    };
-    return fitsRequest(format, descriptor)
+    const { mapKeyAt, ...resolvers } = buildEip712Resolvers(typed, {
+      from,
+      to: verifyingContract,
+      value: '0',
+      chainId,
+    });
+    const resolved = withMapValues(format, mapKeyAt);
+    if (!resolved) return { ...none, rejected: true };
+    const descriptor = { format: resolved, ...resolvers };
+    return fitsRequest(resolved, descriptor)
       ? { ...none, descriptor }
       : { ...none, rejected: true };
   };
